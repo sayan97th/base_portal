@@ -4,7 +4,7 @@ module.exports = {
       name: "base-portal",
       script: "node_modules/.bin/next",
       args: "start",
-      cwd: "/home/kevin-manjaro/Downloads/base_portal",
+      cwd: "/var/www/html/base_portal",
       instances: 1,
       exec_mode: "fork",
       env: {
