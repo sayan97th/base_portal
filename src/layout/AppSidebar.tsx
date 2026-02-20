@@ -45,7 +45,7 @@ const sidebarSections: SidebarSection[] = [
   {
     title: "OFF PAGE PRODUCTS",
     items: [
-      { name: "Link Building", icon: <PlugInIcon />, path: "#" },
+      { name: "Link Building", icon: <PlugInIcon />, path: "/link-building" },
       { name: "Premium Mentions", icon: <ShootingStarIcon />, path: "#" },
       { name: "PR Campaigns", icon: <PaperPlaneIcon />, path: "#" },
     ],
