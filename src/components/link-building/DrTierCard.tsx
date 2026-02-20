@@ -7,6 +7,8 @@ interface DrTierCardProps {
   onQuantityChange: (quantity: number) => void;
 }
 
+const quantity_options = Array.from({ length: 20 }, (_, i) => i + 1);
+
 const DrTierCard: React.FC<DrTierCardProps> = ({
   tier,
   quantity,
@@ -14,7 +16,7 @@ const DrTierCard: React.FC<DrTierCardProps> = ({
 }) => {
   const is_selected = quantity > 0;
 
-  const handleSelect = () => {
+  const handleToggle = () => {
     if (is_selected) {
       onQuantityChange(0);
     } else {
@@ -22,36 +24,48 @@ const DrTierCard: React.FC<DrTierCardProps> = ({
     }
   };
 
-  const handleIncrement = (e: React.MouseEvent) => {
+  const handleQuantitySelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
     e.stopPropagation();
-    onQuantityChange(quantity + 1);
-  };
-
-  const handleDecrement = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (quantity > 1) {
-      onQuantityChange(quantity - 1);
-    } else {
-      onQuantityChange(0);
-    }
+    onQuantityChange(Number(e.target.value));
   };
 
   return (
     <div
-      onClick={handleSelect}
+      onClick={handleToggle}
       className={`relative cursor-pointer rounded-2xl border bg-white p-5 transition-all dark:bg-white/[0.03] ${
         is_selected
           ? "border-coral-500 ring-2 ring-coral-500/20 dark:border-coral-500"
           : "border-gray-200 hover:border-gray-300 dark:border-gray-800 dark:hover:border-gray-700"
       }`}
     >
+      {/* Checkmark */}
+      {is_selected && (
+        <div className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full bg-coral-500 text-white">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 14 14"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M11.6666 3.5L5.24992 9.91667L2.33325 7"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </div>
+      )}
+
       {/* Header */}
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3">
         <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
           {tier.dr_label}
         </h3>
         {tier.is_most_popular && (
-          <span className="rounded-full bg-coral-500 px-2.5 py-0.5 text-xs font-medium text-white">
+          <span className="mt-1 inline-block text-sm font-semibold text-gray-800 dark:text-white/90">
             Most Popular
           </span>
         )}
@@ -63,51 +77,45 @@ const DrTierCard: React.FC<DrTierCardProps> = ({
           <span className="mt-0.5 text-gray-400">•</span>
           Monthly Organic Traffic: {tier.traffic_range}
         </li>
-        {shared_features.map((feature) => (
+        {shared_features.slice(0, 1).map((feature) => (
           <li key={feature} className="flex items-start gap-2">
             <span className="mt-0.5 text-gray-400">•</span>
-            {feature === "Original Content"
-              ? feature
-              : feature}
-            {feature === "Original Content" && (
-              <></>
-            )}
+            {feature}
           </li>
         ))}
         <li className="flex items-start gap-2">
           <span className="mt-0.5 text-gray-400">•</span>
           Content Word Count: {tier.word_count.toLocaleString()}
         </li>
+        {shared_features.slice(1).map((feature) => (
+          <li key={feature} className="flex items-start gap-2">
+            <span className="mt-0.5 text-gray-400">•</span>
+            {feature}
+          </li>
+        ))}
       </ul>
+
+      {/* Quantity Dropdown */}
+      {is_selected && (
+        <div className="mb-3" onClick={(e) => e.stopPropagation()}>
+          <select
+            value={quantity}
+            onChange={handleQuantitySelect}
+            className="h-9 rounded-lg border border-gray-300 bg-white px-3 py-1 text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+          >
+            {quantity_options.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Price */}
       <p className="text-lg font-semibold text-gray-800 dark:text-white/90">
         ${tier.price_per_link.toFixed(2)}
       </p>
-
-      {/* Quantity Stepper */}
-      {is_selected && (
-        <div
-          className="mt-4 flex items-center justify-center gap-3"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            onClick={handleDecrement}
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-300 text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800"
-          >
-            −
-          </button>
-          <span className="w-8 text-center text-sm font-medium text-gray-800 dark:text-white/90">
-            {quantity}
-          </span>
-          <button
-            onClick={handleIncrement}
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-300 text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800"
-          >
-            +
-          </button>
-        </div>
-      )}
     </div>
   );
 };

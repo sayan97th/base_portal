@@ -6,17 +6,47 @@ import LinkBuildingEmailField from "./LinkBuildingEmailField";
 import LinkBuildingOrderTitle from "./LinkBuildingOrderTitle";
 import DrTierGrid from "./DrTierGrid";
 import OrderSummary from "./OrderSummary";
+import CheckoutStep, {
+  BillingAddress,
+  PaymentInfo,
+} from "./CheckoutStep";
 import { dr_tiers } from "./drTierData";
 
+type Step = "selection" | "checkout";
+
 const LinkBuildingPage: React.FC = () => {
+  const [current_step, setCurrentStep] = useState<Step>("selection");
   const [selected_quantities, setSelectedQuantities] = useState<
     Record<string, number>
   >({});
   const [order_title, setOrderTitle] = useState("");
   const [coupon_code, setCouponCode] = useState("");
 
+  const [billing_address, setBillingAddress] = useState<BillingAddress>({
+    address: "",
+    city: "",
+    country: "United States",
+    state: "Alabama",
+    postal_code: "",
+    company: "",
+  });
+
+  const [payment_info, setPaymentInfo] = useState<PaymentInfo>({
+    card_number: "",
+    name_on_card: "",
+  });
+
   // Placeholder email — replace with actual user data when auth is integrated
   const user_email = "user@example.com";
+
+  const selected_items = useMemo(() => {
+    return dr_tiers
+      .filter((tier) => (selected_quantities[tier.id] || 0) > 0)
+      .map((tier) => ({
+        tier,
+        quantity: selected_quantities[tier.id],
+      }));
+  }, [selected_quantities]);
 
   const total = useMemo(() => {
     const total_links = Object.values(selected_quantities).reduce(
@@ -44,12 +74,39 @@ const LinkBuildingPage: React.FC = () => {
     });
   };
 
+  const handleBillingChange = (
+    field: keyof BillingAddress,
+    value: string
+  ) => {
+    setBillingAddress((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handlePaymentChange = (
+    field: keyof PaymentInfo,
+    value: string
+  ) => {
+    setPaymentInfo((prev) => ({ ...prev, [field]: value }));
+  };
+
   const handleNext = () => {
-    // TODO: Navigate to the next step or submit the order
-    console.log("Order:", {
+    if (selected_items.length === 0) return;
+    setCurrentStep("checkout");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handlePrevious = () => {
+    setCurrentStep("selection");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleComplete = () => {
+    // TODO: Submit order to API
+    console.log("Order completed:", {
       selected_quantities,
       order_title,
       coupon_code,
+      billing_address,
+      payment_info,
       total,
     });
   };
@@ -59,29 +116,46 @@ const LinkBuildingPage: React.FC = () => {
       <div className="grid grid-cols-12 gap-6">
         {/* Main Content */}
         <div className="col-span-12 space-y-6 lg:col-span-8">
-          <LinkBuildingHeader />
-          <LinkBuildingEmailField email={user_email} />
-          <LinkBuildingOrderTitle
-            value={order_title}
-            onChange={setOrderTitle}
-          />
-          <DrTierGrid
-            selected_quantities={selected_quantities}
-            onQuantityChange={handleQuantityChange}
-          />
+          {current_step === "selection" && (
+            <>
+              <LinkBuildingHeader />
+              <LinkBuildingEmailField email={user_email} />
+              <LinkBuildingOrderTitle
+                value={order_title}
+                onChange={setOrderTitle}
+              />
+              <DrTierGrid
+                selected_quantities={selected_quantities}
+                onQuantityChange={handleQuantityChange}
+              />
 
-          {/* Next Button */}
-          <button
-            onClick={handleNext}
-            className="w-full rounded-lg bg-coral-500 px-6 py-3.5 text-sm font-medium text-white shadow-theme-xs transition-colors hover:bg-coral-600 disabled:bg-coral-300 disabled:cursor-not-allowed"
-          >
-            Next
-          </button>
+              {/* Next Button */}
+              <button
+                onClick={handleNext}
+                disabled={selected_items.length === 0}
+                className="w-full rounded-lg bg-coral-500 px-6 py-3.5 text-sm font-medium text-white shadow-theme-xs transition-colors hover:bg-coral-600 disabled:cursor-not-allowed disabled:bg-coral-300"
+              >
+                Next
+              </button>
+            </>
+          )}
+
+          {current_step === "checkout" && (
+            <CheckoutStep
+              billing_address={billing_address}
+              payment_info={payment_info}
+              onBillingChange={handleBillingChange}
+              onPaymentChange={handlePaymentChange}
+              onPrevious={handlePrevious}
+              onComplete={handleComplete}
+            />
+          )}
         </div>
 
         {/* Sidebar */}
         <div className="col-span-12 lg:col-span-4">
           <OrderSummary
+            selected_items={selected_items}
             total={total}
             coupon_code={coupon_code}
             onCouponChange={setCouponCode}

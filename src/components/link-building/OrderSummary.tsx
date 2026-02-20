@@ -1,6 +1,13 @@
 import React from "react";
+import { DrTier } from "./drTierData";
+
+interface SelectedItem {
+  tier: DrTier;
+  quantity: number;
+}
 
 interface OrderSummaryProps {
+  selected_items: SelectedItem[];
   total: number;
   coupon_code: string;
   onCouponChange: (code: string) => void;
@@ -11,6 +18,7 @@ const formatPrice = (amount: number): string => {
 };
 
 const OrderSummary: React.FC<OrderSummaryProps> = ({
+  selected_items,
   total,
   coupon_code,
   onCouponChange,
@@ -21,8 +29,29 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
         Summary
       </h2>
 
+      {/* Selected Items Breakdown */}
+      {selected_items.length > 0 && (
+        <div className="mb-5 space-y-4">
+          {selected_items.map((item) => (
+            <div key={item.tier.id} className="flex items-start justify-between">
+              <div>
+                <p className="text-sm font-semibold text-gray-800 dark:text-white/90">
+                  {item.tier.dr_label}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Qty {item.quantity}
+                </p>
+              </div>
+              <p className="text-sm font-medium text-gray-800 dark:text-white/90">
+                {formatPrice(item.tier.price_per_link * item.quantity)}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Coupon Input */}
-      <div className="mb-6">
+      <div className="mb-5">
         <input
           type="text"
           value={coupon_code}
@@ -35,7 +64,7 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
       {/* Total */}
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Total</p>
+          <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">Total</p>
           <p className="text-xs text-gray-400 dark:text-gray-500">USD</p>
         </div>
         <p className="text-2xl font-bold text-gray-800 dark:text-white/90">
