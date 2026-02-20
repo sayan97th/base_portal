@@ -33,6 +33,9 @@ const LinkBuildingPage: React.FC = () => {
 
   const [payment_info, setPaymentInfo] = useState<PaymentInfo>({
     card_number: "",
+    expiry_month: "",
+    expiry_year: "",
+    cvc: "",
     name_on_card: "",
   });
 
