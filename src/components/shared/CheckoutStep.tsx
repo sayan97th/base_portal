@@ -65,13 +65,11 @@ const select_class =
 
 const label_class = "mt-1.5 text-xs text-gray-500 dark:text-gray-400";
 
-// Formats card number as "1234 5678 9012 3456"
 function formatCardNumber(raw: string): string {
   const digits = raw.replace(/\D/g, "").slice(0, 16);
   return digits.replace(/(\d{4})(?=\d)/g, "$1 ");
 }
 
-// Validates card number using Luhn algorithm
 function validateCardNumber(value: string): boolean {
   const digits = value.replace(/\D/g, "");
   if (digits.length < 13 || digits.length > 16) return false;

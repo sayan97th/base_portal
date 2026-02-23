@@ -1,13 +1,14 @@
 import React from "react";
-import { DrTier } from "./drTierData";
 
-interface SelectedItem {
-  tier: DrTier;
+export interface SummaryItem {
+  id: string;
+  label: string;
   quantity: number;
+  unit_price: number;
 }
 
 interface OrderSummaryProps {
-  selected_items: SelectedItem[];
+  selected_items: SummaryItem[];
   total: number;
   coupon_code: string;
   onCouponChange: (code: string) => void;
@@ -33,17 +34,17 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
       {selected_items.length > 0 && (
         <div className="mb-5 space-y-4">
           {selected_items.map((item) => (
-            <div key={item.tier.id} className="flex items-start justify-between">
+            <div key={item.id} className="flex items-start justify-between">
               <div>
                 <p className="text-sm font-semibold text-gray-800 dark:text-white/90">
-                  {item.tier.dr_label}
+                  {item.label}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   Qty {item.quantity}
                 </p>
               </div>
               <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                {formatPrice(item.tier.price_per_link * item.quantity)}
+                {formatPrice(item.unit_price * item.quantity)}
               </p>
             </div>
           ))}

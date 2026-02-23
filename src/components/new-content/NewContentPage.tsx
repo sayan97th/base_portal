@@ -1,25 +1,23 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import LinkBuildingHeader from "./LinkBuildingHeader";
+import NewContentHeader from "./NewContentHeader";
 import EmailField from "@/components/shared/EmailField";
-import LinkBuildingOrderTitle from "./LinkBuildingOrderTitle";
-import DrTierGrid from "./DrTierGrid";
+import ArticleGrid from "./ArticleGrid";
 import OrderSummary, { SummaryItem } from "@/components/shared/OrderSummary";
 import CheckoutStep, {
   BillingAddress,
   PaymentInfo,
 } from "@/components/shared/CheckoutStep";
-import { dr_tiers } from "./drTierData";
+import { article_tiers } from "./newContentData";
 
 type Step = "selection" | "checkout";
 
-const LinkBuildingPage: React.FC = () => {
+const NewContentPage: React.FC = () => {
   const [current_step, setCurrentStep] = useState<Step>("selection");
   const [selected_quantities, setSelectedQuantities] = useState<
     Record<string, number>
   >({});
-  const [order_title, setOrderTitle] = useState("");
   const [coupon_code, setCouponCode] = useState("");
 
   const [billing_address, setBillingAddress] = useState<BillingAddress>({
@@ -40,30 +38,23 @@ const LinkBuildingPage: React.FC = () => {
   });
 
   // Placeholder email — replace with actual user data when auth is integrated
-  const user_email = "user@example.com";
+  const user_email = "marketing@basesearchmarketing.com";
 
   const selected_items: SummaryItem[] = useMemo(() => {
-    return dr_tiers
+    return article_tiers
       .filter((tier) => (selected_quantities[tier.id] || 0) > 0)
       .map((tier) => ({
         id: tier.id,
-        label: tier.dr_label,
+        label: tier.label,
         quantity: selected_quantities[tier.id],
-        unit_price: tier.price_per_link,
+        unit_price: tier.price,
       }));
   }, [selected_quantities]);
 
   const total = useMemo(() => {
-    const total_links = Object.values(selected_quantities).reduce(
-      (sum, qty) => sum + qty,
-      0
-    );
-    const is_bulk_discount = total_links >= 10;
-    const discount_multiplier = is_bulk_discount ? 0.9 : 1;
-
-    return dr_tiers.reduce((sum, tier) => {
+    return article_tiers.reduce((sum, tier) => {
       const qty = selected_quantities[tier.id] || 0;
-      return sum + qty * tier.price_per_link * discount_multiplier;
+      return sum + qty * tier.price;
     }, 0);
   }, [selected_quantities]);
 
@@ -108,7 +99,6 @@ const LinkBuildingPage: React.FC = () => {
     // TODO: Submit order to API
     console.log("Order completed:", {
       selected_quantities,
-      order_title,
       coupon_code,
       billing_address,
       payment_info,
@@ -123,13 +113,9 @@ const LinkBuildingPage: React.FC = () => {
         <div className="col-span-12 space-y-6 lg:col-span-8">
           {current_step === "selection" && (
             <>
-              <LinkBuildingHeader />
+              <NewContentHeader />
               <EmailField email={user_email} />
-              <LinkBuildingOrderTitle
-                value={order_title}
-                onChange={setOrderTitle}
-              />
-              <DrTierGrid
+              <ArticleGrid
                 selected_quantities={selected_quantities}
                 onQuantityChange={handleQuantityChange}
               />
@@ -171,4 +157,4 @@ const LinkBuildingPage: React.FC = () => {
   );
 };
 
-export default LinkBuildingPage;
+export default NewContentPage;

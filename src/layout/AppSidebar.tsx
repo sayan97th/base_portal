@@ -53,7 +53,7 @@ const sidebarSections: SidebarSection[] = [
   {
     title: "ON PAGE PRODUCTS",
     items: [
-      { name: "New Content", icon: <FileIcon />, path: "#" },
+      { name: "New Content", icon: <FileIcon />, path: "/new-content" },
       { name: "Content Refresh", icon: <CopyIcon />, path: "#" },
       { name: "SME Content", icon: <PencilIcon />, path: "#" },
     ],

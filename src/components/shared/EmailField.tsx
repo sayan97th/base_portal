@@ -3,13 +3,11 @@ import Link from "next/link";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
 
-interface LinkBuildingEmailFieldProps {
+interface EmailFieldProps {
   email: string;
 }
 
-const LinkBuildingEmailField: React.FC<LinkBuildingEmailFieldProps> = ({
-  email,
-}) => {
+const EmailField: React.FC<EmailFieldProps> = ({ email }) => {
   return (
     <div>
       <Label>Email</Label>
@@ -28,4 +26,4 @@ const LinkBuildingEmailField: React.FC<LinkBuildingEmailFieldProps> = ({
   );
 };
 
-export default LinkBuildingEmailField;
+export default EmailField;
