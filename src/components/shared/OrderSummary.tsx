@@ -41,7 +41,6 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
   total,
   on_coupon_applied,
 }) => {
-  const [is_coupon_open, setIsCouponOpen] = useState(false);
   const [coupon_input, setCouponInput] = useState("");
   const [applied_coupon, setAppliedCoupon] = useState<CouponData | null>(null);
   const [coupon_error, setCouponError] = useState("");
@@ -178,115 +177,82 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
       <div className="mb-5">
         {!applied_coupon ? (
           <>
-            {/* Toggle Link */}
-            <button
-              type="button"
-              onClick={() => setIsCouponOpen((prev) => !prev)}
-              className="mb-3 flex items-center gap-1.5 text-sm font-medium text-brand-500 transition-colors hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 16 16"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className={`transition-transform duration-200 ${is_coupon_open ? "rotate-90" : ""}`}
-              >
-                <path
-                  d="M6 4L10 8L6 12"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              Have a coupon?
-            </button>
-
-            {/* Collapsible Input */}
+            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Coupon Code
+            </label>
             <div
-              className={`grid transition-all duration-300 ease-in-out ${
-                is_coupon_open
-                  ? "grid-rows-[1fr] opacity-100"
-                  : "grid-rows-[0fr] opacity-0"
-              }`}
+              className={`flex gap-2 ${shake_error ? "animate-[shake_0.4s_ease-in-out]" : ""}`}
             >
-              <div className="overflow-hidden">
-                <div
-                  className={`flex gap-2 ${shake_error ? "animate-[shake_0.4s_ease-in-out]" : ""}`}
-                >
-                  <div className="relative flex-1">
-                    <input
-                      type="text"
-                      value={coupon_input}
-                      onChange={handleInputChange}
-                      onKeyDown={handleKeyDown}
-                      placeholder="Enter code"
-                      maxLength={MAX_COUPON_LENGTH}
-                      disabled={is_validating}
-                      className={`h-11 w-full rounded-lg border bg-transparent px-4 py-2.5 text-sm uppercase tracking-wider text-gray-800 shadow-theme-xs placeholder:normal-case placeholder:tracking-normal placeholder:text-gray-400 focus:outline-hidden focus:ring-3 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 ${
-                        coupon_error
-                          ? "border-red-400 focus:border-red-400 focus:ring-red-500/10 dark:border-red-500"
-                          : "border-gray-300 focus:border-brand-300 focus:ring-brand-500/10 dark:border-gray-700 dark:focus:border-brand-800"
-                      }`}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={applyCoupon}
-                    disabled={is_validating || !coupon_input.trim()}
-                    className="h-11 shrink-0 rounded-lg bg-brand-500 px-5 text-sm font-medium text-white shadow-theme-xs transition-all hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {is_validating ? (
-                      <svg
-                        className="h-4 w-4 animate-spin"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                      >
-                        <circle
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="3"
-                          className="opacity-25"
-                        />
-                        <path
-                          d="M4 12a8 8 0 018-8"
-                          stroke="currentColor"
-                          strokeWidth="3"
-                          strokeLinecap="round"
-                          className="opacity-75"
-                        />
-                      </svg>
-                    ) : (
-                      "Apply"
-                    )}
-                  </button>
-                </div>
-
-                {/* Error Message */}
-                {coupon_error && (
-                  <p className="mt-2 flex items-center gap-1 text-xs font-medium text-red-500 dark:text-red-400">
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 14 14"
-                      fill="none"
-                    >
-                      <path
-                        d="M7 4.5V7.5M7 9.5H7.005M13 7C13 10.3137 10.3137 13 7 13C3.68629 13 1 10.3137 1 7C1 3.68629 3.68629 1 7 1C10.3137 1 13 3.68629 13 7Z"
-                        stroke="currentColor"
-                        strokeWidth="1.2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                    {coupon_error}
-                  </p>
-                )}
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={coupon_input}
+                  onChange={handleInputChange}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Enter code"
+                  maxLength={MAX_COUPON_LENGTH}
+                  disabled={is_validating}
+                  className={`h-11 w-full rounded-lg border bg-transparent px-4 py-2.5 text-sm uppercase tracking-wider text-gray-800 shadow-theme-xs placeholder:normal-case placeholder:tracking-normal placeholder:text-gray-400 focus:outline-hidden focus:ring-3 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 ${
+                    coupon_error
+                      ? "border-red-400 focus:border-red-400 focus:ring-red-500/10 dark:border-red-500"
+                      : "border-gray-300 focus:border-brand-300 focus:ring-brand-500/10 dark:border-gray-700 dark:focus:border-brand-800"
+                  }`}
+                />
               </div>
+              <button
+                type="button"
+                onClick={applyCoupon}
+                disabled={is_validating || !coupon_input.trim()}
+                className="h-11 shrink-0 rounded-lg bg-brand-500 px-5 text-sm font-medium text-white shadow-theme-xs transition-all hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {is_validating ? (
+                  <svg
+                    className="h-4 w-4 animate-spin"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <circle
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      className="opacity-25"
+                    />
+                    <path
+                      d="M4 12a8 8 0 018-8"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      className="opacity-75"
+                    />
+                  </svg>
+                ) : (
+                  "Apply"
+                )}
+              </button>
             </div>
+
+            {/* Error Message */}
+            {coupon_error && (
+              <p className="mt-2 flex items-center gap-1 text-xs font-medium text-red-500 dark:text-red-400">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 14 14"
+                  fill="none"
+                >
+                  <path
+                    d="M7 4.5V7.5M7 9.5H7.005M13 7C13 10.3137 10.3137 13 7 13C3.68629 13 1 10.3137 1 7C1 3.68629 3.68629 1 7 1C10.3137 1 13 3.68629 13 7Z"
+                    stroke="currentColor"
+                    strokeWidth="1.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                {coupon_error}
+              </p>
+            )}
           </>
         ) : (
           /* Applied Coupon Badge */
