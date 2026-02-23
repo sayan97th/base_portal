@@ -99,7 +99,7 @@ const sidebar_sections: SidebarSection[] = [
     items: [
       { name: "Profile", icon: <UserCircleIcon />, path: "/profile" },
       { name: "Team", icon: <GroupIcon />, path: "#" },
-      { name: "Invoices", icon: <DollarLineIcon />, path: "#" },
+      { name: "Invoices", icon: <DollarLineIcon />, path: "/invoices" },
     ],
   },
 ];
@@ -191,8 +191,8 @@ const AppSidebar: React.FC = () => {
                             <button
                               onClick={() => toggleSubmenu(item.name)}
                               className={`relative flex items-center w-full gap-3 px-3 py-2 font-medium rounded-lg text-theme-sm transition-colors ${isSubActive(item.sub_items!)
-                                  ? "bg-brand-50 text-brand-500 dark:bg-brand-500/[0.12] dark:text-brand-400"
-                                  : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/5"
+                                ? "bg-brand-50 text-brand-500 dark:bg-brand-500/[0.12] dark:text-brand-400"
+                                : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/5"
                                 } ${!isExpanded && !isHovered
                                   ? "lg:justify-center"
                                   : "lg:justify-start"
@@ -226,8 +226,8 @@ const AppSidebar: React.FC = () => {
                                     <Link
                                       href={sub_item.path}
                                       className={`block px-3 py-1.5 text-theme-sm rounded-lg transition-colors ${isActive(sub_item.path)
-                                          ? "text-brand-500 font-medium dark:text-brand-400"
-                                          : "text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-white/5"
+                                        ? "text-brand-500 font-medium dark:text-brand-400"
+                                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-white/5"
                                         }`}
                                     >
                                       {sub_item.name}
@@ -241,10 +241,10 @@ const AppSidebar: React.FC = () => {
                           <Link
                             href={item.path}
                             className={`relative flex items-center w-full gap-3 px-3 py-2 font-medium rounded-lg text-theme-sm transition-colors ${item.highlight && isActive(item.path)
-                                ? "bg-coral-500 text-white"
-                                : isActive(item.path)
-                                  ? "bg-brand-50 text-brand-500 dark:bg-brand-500/[0.12] dark:text-brand-400"
-                                  : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/5"
+                              ? "bg-coral-500 text-white"
+                              : isActive(item.path)
+                                ? "bg-brand-50 text-brand-500 dark:bg-brand-500/[0.12] dark:text-brand-400"
+                                : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/5"
                               } ${!isExpanded && !isHovered
                                 ? "lg:justify-center"
                                 : "lg:justify-start"
