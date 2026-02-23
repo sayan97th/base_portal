@@ -18,8 +18,6 @@ const ContentBriefsPage: React.FC = () => {
   const [selected_quantities, setSelectedQuantities] = useState<
     Record<string, number>
   >({});
-  const [coupon_code, setCouponCode] = useState("");
-
   const [billing_address, setBillingAddress] = useState<BillingAddress>({
     address: "",
     city: "",
@@ -99,7 +97,6 @@ const ContentBriefsPage: React.FC = () => {
     // TODO: Submit order to API
     console.log("Order completed:", {
       selected_quantities,
-      coupon_code,
       billing_address,
       payment_info,
       total,
@@ -148,8 +145,6 @@ const ContentBriefsPage: React.FC = () => {
           <OrderSummary
             selected_items={selected_items}
             total={total}
-            coupon_code={coupon_code}
-            onCouponChange={setCouponCode}
           />
         </div>
       </div>

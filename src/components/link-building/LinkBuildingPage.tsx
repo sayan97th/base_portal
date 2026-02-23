@@ -20,8 +20,6 @@ const LinkBuildingPage: React.FC = () => {
     Record<string, number>
   >({});
   const [order_title, setOrderTitle] = useState("");
-  const [coupon_code, setCouponCode] = useState("");
-
   const [billing_address, setBillingAddress] = useState<BillingAddress>({
     address: "",
     city: "",
@@ -109,7 +107,6 @@ const LinkBuildingPage: React.FC = () => {
     console.log("Order completed:", {
       selected_quantities,
       order_title,
-      coupon_code,
       billing_address,
       payment_info,
       total,
@@ -162,8 +159,6 @@ const LinkBuildingPage: React.FC = () => {
           <OrderSummary
             selected_items={selected_items}
             total={total}
-            coupon_code={coupon_code}
-            onCouponChange={setCouponCode}
           />
         </div>
       </div>
