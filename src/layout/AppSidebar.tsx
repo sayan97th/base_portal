@@ -20,6 +20,7 @@ import {
   GroupIcon,
   DollarLineIcon,
   CreditCardIcon,
+  ChatIcon,
   ChevronDownIcon,
 } from "../icons/index";
 import SidebarWidget from "./SidebarWidget";
@@ -102,6 +103,7 @@ const sidebar_sections: SidebarSection[] = [
       { name: "Team", icon: <GroupIcon />, path: "/team" },
       { name: "Billing", icon: <CreditCardIcon />, path: "/billing" },
       { name: "Invoices", icon: <DollarLineIcon />, path: "/invoices" },
+      { name: "Support", icon: <ChatIcon />, path: "/support" },
     ],
   },
 ];
