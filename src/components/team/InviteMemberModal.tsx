@@ -103,11 +103,10 @@ const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
                   key={value}
                   type="button"
                   onClick={() => togglePermission(value)}
-                  className={`inline-flex items-center rounded-full px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer ${
-                    is_selected
-                      ? "bg-brand-500 text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                  }`}
+                  className={`inline-flex items-center rounded-full px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer ${is_selected
+                    ? "bg-brand-500 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                    }`}
                 >
                   {label}
                 </button>
