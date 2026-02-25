@@ -98,7 +98,7 @@ const sidebar_sections: SidebarSection[] = [
     title: "ACCOUNT",
     items: [
       { name: "Profile", icon: <UserCircleIcon />, path: "/profile" },
-      { name: "Team", icon: <GroupIcon />, path: "#" },
+      { name: "Team", icon: <GroupIcon />, path: "/team" },
       { name: "Invoices", icon: <DollarLineIcon />, path: "/invoices" },
     ],
   },
