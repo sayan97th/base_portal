@@ -23,6 +23,7 @@ import {
   ChatIcon,
   ChevronDownIcon,
   CalenderIcon,
+  TaskIcon,
 } from "../icons/index";
 import SidebarWidget from "./SidebarWidget";
 
