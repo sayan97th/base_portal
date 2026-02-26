@@ -11,6 +11,7 @@ import {
   TableCell,
 } from "../ui/table";
 import { getInvoiceDetail } from "./invoiceData";
+import { generateInvoicePdf } from "./generateInvoicePdf";
 
 interface InvoiceDetailPageProps {
   invoice_id: string;
@@ -99,7 +100,10 @@ const InvoiceDetailPage: React.FC<InvoiceDetailPageProps> = ({
             {status_label}
           </Badge>
         </div>
-        <button className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-theme-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
+        <button
+          onClick={() => generateInvoicePdf(invoice)}
+          className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-theme-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+        >
           Download
         </button>
       </div>
