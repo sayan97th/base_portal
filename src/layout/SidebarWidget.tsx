@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 
 export default function SidebarWidget() {
   return (
@@ -28,12 +29,12 @@ export default function SidebarWidget() {
       <p className="mb-4 text-gray-500 text-theme-sm dark:text-gray-400">
         Let&apos;s talk
       </p>
-      <a
-        href="#"
+      <Link
+        href="/schedule-a-call"
         className="flex items-center justify-center p-3 font-medium text-white rounded-lg bg-coral-500 text-theme-sm hover:bg-coral-600 uppercase tracking-wide"
       >
         Schedule a Call
-      </a>
+      </Link>
     </div>
   );
 }
