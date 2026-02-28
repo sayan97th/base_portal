@@ -169,7 +169,7 @@ export default function BillingAddressSection({
         </div>
 
         {/* Country / State / Postal Code */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+        <div className={`grid grid-cols-1 gap-5 ${country === "US" ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
           <div>
             <Select
               options={country_options}
@@ -181,17 +181,19 @@ export default function BillingAddressSection({
               Country
             </p>
           </div>
-          <div>
-            <Select
-              options={us_state_options}
-              defaultValue={state_province}
-              onChange={(value) => onFieldChange("state_province", value)}
-              placeholder="Select state"
-            />
-            <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-              State / Province / Region
-            </p>
-          </div>
+          {country === "US" && (
+            <div>
+              <Select
+                options={us_state_options}
+                defaultValue={state_province}
+                onChange={(value) => onFieldChange("state_province", value)}
+                placeholder="Select state"
+              />
+              <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                State
+              </p>
+            </div>
+          )}
           <div>
             <Input
               id="postal_code"
