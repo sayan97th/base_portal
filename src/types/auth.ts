@@ -69,6 +69,30 @@ export interface RegisterData {
   invitation_token?: string;
 }
 
+export interface ProfileData {
+  first_name: string;
+  last_name: string;
+  business_email: string;
+  phone: string | null;
+  timezone: string;
+  interested_in: string;
+  notification_channel: string;
+  team_order_updates: boolean;
+  push_notifications_enabled: boolean;
+  address: string;
+  city: string;
+  country: string;
+  state_province: string;
+  postal_code: string;
+  company: string;
+  tax_id: string;
+}
+
+export interface UpdateProfileResponse {
+  user: User;
+  message: string;
+}
+
 export interface ApiError {
   message: string;
   errors?: Record<string, string[]>;
