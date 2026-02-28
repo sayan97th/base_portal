@@ -10,7 +10,7 @@ interface SelectProps {
   placeholder?: string;
   onChange: (value: string) => void;
   className?: string;
-  defaultValue?: string;
+  defaultValue?: string | null;
 }
 
 const Select: React.FC<SelectProps> = ({
@@ -18,10 +18,13 @@ const Select: React.FC<SelectProps> = ({
   placeholder = "Select an option",
   onChange,
   className = "",
-  defaultValue = "",
+  defaultValue,
 }) => {
+  // Coerce null/undefined to empty string to prevent React warning
+  const safe_default = defaultValue ?? "";
+
   // Manage the selected value
-  const [selectedValue, setSelectedValue] = useState<string>(defaultValue);
+  const [selectedValue, setSelectedValue] = useState<string>(safe_default);
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;

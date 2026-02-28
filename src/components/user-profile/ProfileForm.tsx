@@ -40,7 +40,13 @@ export default function ProfileForm() {
     const loadProfile = async () => {
       try {
         const data = await profileService.fetchUserProfile();
-        setFormData(data);
+        const sanitized_data: ProfileData = { ...default_form_data };
+        for (const key of Object.keys(default_form_data) as Array<keyof ProfileData>) {
+          if (data[key] !== null && data[key] !== undefined) {
+            (sanitized_data as Record<string, unknown>)[key] = data[key];
+          }
+        }
+        setFormData(sanitized_data);
       } catch {
         setErrorMessage("Failed to load profile data.");
       } finally {
