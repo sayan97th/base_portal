@@ -111,6 +111,49 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   return response.json();
 }
 
+async function requestFormData<T>(endpoint: string, form_data: FormData, method: string = "POST"): Promise<T> {
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+  };
+
+  const token = getToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const config: RequestInit = {
+    method,
+    headers,
+    body: form_data,
+  };
+
+  let response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+
+  if (response.status === 401 && token) {
+    const new_token = await tryRefreshToken();
+    if (new_token) {
+      headers["Authorization"] = `Bearer ${new_token}`;
+      config.headers = headers;
+      response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+    } else {
+      removeToken();
+      if (typeof window !== "undefined") {
+        window.location.href = "/signin";
+      }
+      throw new Error("Session expired");
+    }
+  }
+
+  if (!response.ok) {
+    const error_data = await response.json().catch(() => ({
+      message: "An unexpected error occurred",
+    }));
+    throw error_data;
+  }
+
+  return response.json();
+}
+
 export const apiClient = {
   get: <T>(endpoint: string, options?: RequestOptions) =>
     request<T>(endpoint, { ...options, method: "GET" }),
@@ -123,6 +166,9 @@ export const apiClient = {
 
   delete: <T>(endpoint: string, options?: RequestOptions) =>
     request<T>(endpoint, { ...options, method: "DELETE" }),
+
+  postFormData: <T>(endpoint: string, form_data: FormData) =>
+    requestFormData<T>(endpoint, form_data, "POST"),
 };
 
 export { setToken, removeToken, getToken };

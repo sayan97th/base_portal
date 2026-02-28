@@ -29,8 +29,9 @@ const default_form_data: ProfileData = {
 };
 
 export default function ProfileForm() {
-  const { refreshUser } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [form_data, setFormData] = useState<ProfileData>(default_form_data);
+  const [profile_photo_url, setProfilePhotoUrl] = useState<string | null>(null);
   const [is_loading, setIsLoading] = useState(true);
   const [is_saving, setIsSaving] = useState(false);
   const [error_message, setErrorMessage] = useState<string | null>(null);
@@ -47,6 +48,7 @@ export default function ProfileForm() {
           }
         }
         setFormData(sanitized_data);
+        setProfilePhotoUrl(user?.profile_photo_url ?? null);
       } catch {
         setErrorMessage("Failed to load profile data.");
       } finally {
@@ -70,6 +72,18 @@ export default function ProfileForm() {
 
   const handlePushNotificationsChange = (checked: boolean) => {
     setFormData((prev) => ({ ...prev, push_notifications_enabled: checked }));
+  };
+
+  const handlePhotoUpload = async (file: File) => {
+    const response = await profileService.uploadProfilePhoto(file);
+    setProfilePhotoUrl(response.user.profile_photo_url);
+    await refreshUser();
+  };
+
+  const handlePhotoDelete = async () => {
+    const response = await profileService.deleteProfilePhoto();
+    setProfilePhotoUrl(response.user.profile_photo_url);
+    await refreshUser();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -116,7 +130,10 @@ export default function ProfileForm() {
           password=""
           first_name={form_data.first_name}
           last_name={form_data.last_name}
+          profile_photo_url={profile_photo_url}
           onFieldChange={handleFieldChange}
+          onPhotoUpload={handlePhotoUpload}
+          onPhotoDelete={handlePhotoDelete}
         />
 
         <hr className="border-gray-200 dark:border-gray-800" />

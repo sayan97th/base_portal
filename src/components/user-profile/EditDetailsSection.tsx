@@ -10,19 +10,31 @@ interface EditDetailsSectionProps {
   password: string;
   first_name: string;
   last_name: string;
+  profile_photo_url: string | null;
   onFieldChange: (field: string, value: string) => void;
+  onPhotoUpload: (file: File) => Promise<void>;
+  onPhotoDelete: () => Promise<void>;
 }
+
+const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 
 export default function EditDetailsSection({
   business_email,
   password,
   first_name,
   last_name,
+  profile_photo_url,
   onFieldChange,
+  onPhotoUpload,
+  onPhotoDelete,
 }: EditDetailsSectionProps) {
   const [is_password_visible, setIsPasswordVisible] = useState(false);
   const [avatar_preview, setAvatarPreview] = useState<string | null>(null);
   const [is_dragging, setIsDragging] = useState(false);
+  const [is_uploading, setIsUploading] = useState(false);
+  const [is_deleting, setIsDeleting] = useState(false);
+  const [upload_error, setUploadError] = useState<string | null>(null);
   const file_input_ref = useRef<HTMLInputElement>(null);
 
   const full_name = `${first_name} ${last_name}`.trim();
@@ -34,15 +46,44 @@ export default function EditDetailsSection({
       .toUpperCase()
       .slice(0, 2) || "U";
 
+  const displayed_photo = avatar_preview || profile_photo_url;
+
   const togglePasswordVisibility = () => {
     setIsPasswordVisible(!is_password_visible);
   };
 
-  const handleFileSelect = (file: File) => {
-    if (!file.type.startsWith("image/")) return;
+  const validateFile = (file: File): string | null => {
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      return "Invalid file type. Please upload a PNG, JPG, GIF or WebP image.";
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      return "File size exceeds 2MB. Please choose a smaller image.";
+    }
+    return null;
+  };
+
+  const handleFileSelect = async (file: File) => {
+    const validation_error = validateFile(file);
+    if (validation_error) {
+      setUploadError(validation_error);
+      return;
+    }
+
+    setUploadError(null);
+
     const reader = new FileReader();
     reader.onload = (e) => setAvatarPreview(e.target?.result as string);
     reader.readAsDataURL(file);
+
+    setIsUploading(true);
+    try {
+      await onPhotoUpload(file);
+    } catch {
+      setUploadError("Failed to upload photo. Please try again.");
+      setAvatarPreview(null);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -67,9 +108,18 @@ export default function EditDetailsSection({
     if (file) handleFileSelect(file);
   };
 
-  const handleDeletePhoto = () => {
-    setAvatarPreview(null);
-    if (file_input_ref.current) file_input_ref.current.value = "";
+  const handleDeletePhoto = async () => {
+    setUploadError(null);
+    setIsDeleting(true);
+    try {
+      await onPhotoDelete();
+      setAvatarPreview(null);
+      if (file_input_ref.current) file_input_ref.current.value = "";
+    } catch {
+      setUploadError("Failed to remove photo. Please try again.");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -161,31 +211,45 @@ export default function EditDetailsSection({
             onChange={handleInputChange}
             className="hidden"
             id="avatar_upload"
+            disabled={is_uploading}
           />
 
-          {avatar_preview ? (
-            /* ── Preview state ── */
+          {upload_error && (
+            <div className="mb-3 rounded-lg border border-error-300 bg-error-50 px-4 py-2 text-xs text-error-600 dark:border-error-500/40 dark:bg-error-500/10 dark:text-error-400">
+              {upload_error}
+            </div>
+          )}
+
+          {displayed_photo ? (
+            /* -- Preview state -- */
             <div className="flex items-center gap-5 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50">
               <div className="relative shrink-0 group">
                 <div className="h-[72px] w-[72px] overflow-hidden rounded-full ring-2 ring-white shadow-theme-sm dark:ring-gray-700">
-                  <Image
-                    src={avatar_preview}
-                    alt="Profile photo"
-                    width={72}
-                    height={72}
-                    className="h-full w-full object-cover"
-                  />
+                  {is_uploading ? (
+                    <div className="flex h-full w-full items-center justify-center bg-gray-100 dark:bg-gray-700">
+                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-200 border-t-brand-500" />
+                    </div>
+                  ) : (
+                    <Image
+                      src={displayed_photo}
+                      alt="Profile photo"
+                      width={72}
+                      height={72}
+                      className="h-full w-full object-cover"
+                    />
+                  )}
                 </div>
-                {/* Hover overlay on the avatar */}
-                <div
-                  className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity group-hover:opacity-100 cursor-pointer"
-                  onClick={() => file_input_ref.current?.click()}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                  </svg>
-                </div>
+                {!is_uploading && (
+                  <div
+                    className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity group-hover:opacity-100 cursor-pointer"
+                    onClick={() => file_input_ref.current?.click()}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                  </div>
+                )}
               </div>
 
               <div className="flex-1 min-w-0">
@@ -193,7 +257,7 @@ export default function EditDetailsSection({
                   {full_name || "Your photo"}
                 </p>
                 <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
-                  Hover the image to change it
+                  {is_uploading ? "Uploading..." : "Hover the image to change it"}
                 </p>
               </div>
 
@@ -201,7 +265,8 @@ export default function EditDetailsSection({
                 <button
                   type="button"
                   onClick={() => file_input_ref.current?.click()}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 shadow-theme-xs transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                  disabled={is_uploading || is_deleting}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 shadow-theme-xs transition-colors hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -213,18 +278,23 @@ export default function EditDetailsSection({
                 <button
                   type="button"
                   onClick={handleDeletePhoto}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-error-300 bg-white px-3 py-2 text-xs font-medium text-error-600 shadow-theme-xs transition-colors hover:bg-error-50 dark:border-error-500/40 dark:bg-gray-800 dark:text-error-400 dark:hover:bg-error-500/10"
+                  disabled={is_uploading || is_deleting}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-error-300 bg-white px-3 py-2 text-xs font-medium text-error-600 shadow-theme-xs transition-colors hover:bg-error-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-error-500/40 dark:bg-gray-800 dark:text-error-400 dark:hover:bg-error-500/10"
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="3 6 5 6 21 6" />
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                  </svg>
-                  Remove
+                  {is_deleting ? (
+                    <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-error-200 border-t-error-500" />
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    </svg>
+                  )}
+                  {is_deleting ? "Removing..." : "Remove"}
                 </button>
               </div>
             </div>
           ) : (
-            /* ── Empty / drop zone state ── */
+            /* -- Empty / drop zone state -- */
             <label
               htmlFor="avatar_upload"
               onDragOver={handleDragOver}
