@@ -88,6 +88,11 @@ export interface ProfileData {
   tax_id: string;
 }
 
+export interface ProfileResponse extends ProfileData {
+  profile_photo_path: string | null;
+  profile_photo_url: string | null;
+}
+
 export interface UpdateProfileResponse {
   user: User;
   message: string;

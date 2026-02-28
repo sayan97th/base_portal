@@ -1,5 +1,4 @@
 "use client";
-import Image from "next/image";
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
@@ -8,6 +7,7 @@ import { DropdownItem } from "../ui/dropdown/DropdownItem";
 
 export default function UserDropdown() {
   const [isOpen, setIsOpen] = useState(false);
+  const [has_image_error, setHasImageError] = useState(false);
   const { user, logout } = useAuth();
   const router = useRouter();
 
@@ -47,13 +47,12 @@ export default function UserDropdown() {
         className="flex items-center text-gray-700 dark:text-gray-400 dropdown-toggle"
       >
         <span className="mr-3 overflow-hidden rounded-full h-11 w-11 shrink-0">
-          {profile_photo ? (
-            <Image
-              width={44}
-              height={44}
+          {profile_photo && !has_image_error ? (
+            <img
               src={profile_photo}
               alt={full_name}
               className="h-full w-full object-cover"
+              onError={() => setHasImageError(true)}
             />
           ) : (
             <span className="flex h-full w-full items-center justify-center bg-brand-500 text-sm font-semibold text-white">
@@ -92,13 +91,12 @@ export default function UserDropdown() {
       >
         <div className="flex items-center gap-3 pb-3 border-b border-gray-200 dark:border-gray-800">
           <span className="shrink-0 overflow-hidden rounded-full h-10 w-10">
-            {profile_photo ? (
-              <Image
-                width={40}
-                height={40}
+            {profile_photo && !has_image_error ? (
+              <img
                 src={profile_photo}
                 alt={full_name}
                 className="h-full w-full object-cover"
+                onError={() => setHasImageError(true)}
               />
             ) : (
               <span className="flex h-full w-full items-center justify-center bg-brand-500 text-sm font-semibold text-white">

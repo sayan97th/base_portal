@@ -1,6 +1,5 @@
 "use client";
 import React, { useState, useRef } from "react";
-import Image from "next/image";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
@@ -19,6 +18,16 @@ interface EditDetailsSectionProps {
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 
+function isValidUrl(url: string | null | undefined): url is string {
+  if (!url || typeof url !== "string" || url.trim() === "") return false;
+  try {
+    new URL(url);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export default function EditDetailsSection({
   business_email,
   password,
@@ -35,6 +44,7 @@ export default function EditDetailsSection({
   const [is_uploading, setIsUploading] = useState(false);
   const [is_deleting, setIsDeleting] = useState(false);
   const [upload_error, setUploadError] = useState<string | null>(null);
+  const [has_image_error, setHasImageError] = useState(false);
   const file_input_ref = useRef<HTMLInputElement>(null);
 
   const full_name = `${first_name} ${last_name}`.trim();
@@ -46,7 +56,8 @@ export default function EditDetailsSection({
       .toUpperCase()
       .slice(0, 2) || "U";
 
-  const displayed_photo = avatar_preview || profile_photo_url;
+  const validated_photo_url = isValidUrl(profile_photo_url) ? profile_photo_url : null;
+  const displayed_photo = avatar_preview || (has_image_error ? null : validated_photo_url);
 
   const togglePasswordVisibility = () => {
     setIsPasswordVisible(!is_password_visible);
@@ -70,6 +81,7 @@ export default function EditDetailsSection({
     }
 
     setUploadError(null);
+    setHasImageError(false);
 
     const reader = new FileReader();
     reader.onload = (e) => setAvatarPreview(e.target?.result as string);
@@ -230,12 +242,11 @@ export default function EditDetailsSection({
                       <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-200 border-t-brand-500" />
                     </div>
                   ) : (
-                    <Image
+                    <img
                       src={displayed_photo}
                       alt="Profile photo"
-                      width={72}
-                      height={72}
                       className="h-full w-full object-cover"
+                      onError={() => setHasImageError(true)}
                     />
                   )}
                 </div>

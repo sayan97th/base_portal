@@ -48,7 +48,7 @@ export default function ProfileForm() {
           }
         }
         setFormData(sanitized_data);
-        setProfilePhotoUrl(user?.profile_photo_url ?? null);
+        setProfilePhotoUrl(data.profile_photo_url ?? null);
       } catch {
         setErrorMessage("Failed to load profile data.");
       } finally {

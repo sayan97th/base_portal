@@ -1,9 +1,9 @@
 import { apiClient } from "@/lib/api-client";
-import type { ProfileData, UpdateProfileResponse } from "@/types/auth";
+import type { ProfileData, ProfileResponse, UpdateProfileResponse } from "@/types/auth";
 
 export const profileService = {
-  async fetchUserProfile(): Promise<ProfileData> {
-    return apiClient.get<ProfileData>("/api/profile");
+  async fetchUserProfile(): Promise<ProfileResponse> {
+    return apiClient.get<ProfileResponse>("/api/profile");
   },
 
   async updateUserProfile(data: ProfileData): Promise<UpdateProfileResponse> {
