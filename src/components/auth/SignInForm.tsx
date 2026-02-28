@@ -5,11 +5,43 @@ import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
 import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "@/icons";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import React, { useState } from "react";
+import { useAuth } from "@/context/AuthContext";
+import type { ApiError } from "@/types/auth";
 
 export default function SignInForm() {
+  const router = useRouter();
+  const { login } = useAuth();
+
   const [showPassword, setShowPassword] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setFieldErrors({});
+    setIsSubmitting(true);
+
+    try {
+      await login({ email, password });
+      router.push("/");
+    } catch (err: unknown) {
+      const apiError = err as ApiError;
+      if (apiError.errors) {
+        setFieldErrors(apiError.errors);
+      }
+      setError(apiError.message || "An error occurred during sign in.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="flex flex-col flex-1 lg:w-1/2 w-full">
       <div className="w-full max-w-md sm:pt-10 mx-auto mb-5">
@@ -84,13 +116,27 @@ export default function SignInForm() {
                 </span>
               </div>
             </div>
-            <form>
+
+            {error && (
+              <div className="mb-4 rounded-lg bg-error-50 p-3 text-sm text-error-600 dark:bg-error-500/10 dark:text-error-400">
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit}>
               <div className="space-y-6">
                 <div>
                   <Label>
                     Email <span className="text-error-500">*</span>{" "}
                   </Label>
-                  <Input placeholder="info@gmail.com" type="email" />
+                  <Input
+                    placeholder="info@gmail.com"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    error={!!fieldErrors.email}
+                    hint={fieldErrors.email?.[0]}
+                  />
                 </div>
                 <div>
                   <Label>
@@ -100,6 +146,10 @@ export default function SignInForm() {
                     <Input
                       type={showPassword ? "text" : "password"}
                       placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      error={!!fieldErrors.password}
+                      hint={fieldErrors.password?.[0]}
                     />
                     <span
                       onClick={() => setShowPassword(!showPassword)}
@@ -128,8 +178,12 @@ export default function SignInForm() {
                   </Link>
                 </div>
                 <div>
-                  <Button className="w-full" size="sm">
-                    Sign in
+                  <Button
+                    className="w-full"
+                    size="sm"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? "Signing in..." : "Sign in"}
                   </Button>
                 </div>
               </div>
