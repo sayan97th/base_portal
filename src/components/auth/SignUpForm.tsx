@@ -4,13 +4,15 @@ import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "@/icons";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import React, { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { getValidRedirectUrl } from "@/utils/redirect";
 import type { ApiError } from "@/types/auth";
 
 export default function SignUpForm() {
   const router = useRouter();
+  const search_params = useSearchParams();
   const { register } = useAuth();
 
   const [showPassword, setShowPassword] = useState(false);
@@ -44,7 +46,8 @@ export default function SignUpForm() {
         password,
         password_confirmation: passwordConfirmation,
       });
-      router.push("/");
+      const redirect_url = getValidRedirectUrl(search_params.get("callbackUrl"));
+      router.push(redirect_url);
     } catch (err: unknown) {
       const apiError = err as ApiError;
       if (apiError.errors) {
