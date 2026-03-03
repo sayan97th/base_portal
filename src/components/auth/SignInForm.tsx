@@ -5,14 +5,13 @@ import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
 import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "@/icons";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import React, { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { getValidRedirectUrl } from "@/utils/redirect";
 import type { ApiError } from "@/types/auth";
 
 export default function SignInForm() {
-  const router = useRouter();
   const search_params = useSearchParams();
   const { login } = useAuth();
 
@@ -33,7 +32,7 @@ export default function SignInForm() {
     try {
       await login({ email, password });
       const redirect_url = getValidRedirectUrl(search_params.get("callbackUrl"));
-      router.push(redirect_url);
+      window.location.href = redirect_url;
     } catch (err: unknown) {
       const apiError = err as ApiError;
       if (apiError.errors) {
