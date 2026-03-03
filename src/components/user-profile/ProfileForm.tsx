@@ -44,7 +44,7 @@ export default function ProfileForm() {
         const sanitized_data: ProfileData = { ...default_form_data };
         for (const key of Object.keys(default_form_data) as Array<keyof ProfileData>) {
           if (data[key] !== null && data[key] !== undefined) {
-            (sanitized_data as Record<string, unknown>)[key] = data[key];
+            (sanitized_data as unknown as Record<string, unknown>)[key] = data[key];
           }
         }
         setFormData(sanitized_data);
