@@ -1,38 +1,30 @@
 import React from "react";
-import Link from "next/link";
+
+const feature_list = [
+  "In-house, original written content",
+  "650-700 guest blog word count",
+  "Indexed regularly",
+  "Do-follow links",
+  "30-day turnaround time",
+];
 
 const LinkBuildingHeader: React.FC = () => {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-      <h1 className="mb-4 text-xl font-semibold text-gray-800 dark:text-white/90">
-        Link Building
-      </h1>
-      <ul className="mb-5 list-disc space-y-1.5 pl-5 text-sm text-gray-600 dark:text-gray-400">
-        <li>
-          We handle the writing, outreach, and placement of your links
-        </li>
-        <li>
-          For best/natural results, mix up DR range placements
-        </li>
-        <li>
-          For <strong className="font-semibold text-gray-800 dark:text-white/90">bulk pricing</strong> select 10 or more total links for an automatic 10% discount
-        </li>
-        <li>
-          <strong className="font-semibold text-gray-800 dark:text-white/90">
-            Please insert your keyword(s) and landing page(s) in the intake form after completing the purchase.
-          </strong>
-        </li>
+    <div>
+      <h2 className="mb-3 text-lg font-semibold text-gray-800 dark:text-white/90">
+        Guest Post Backlinks
+      </h2>
+      <ul className="space-y-1.5">
+        {feature_list.map((feature) => (
+          <li
+            key={feature}
+            className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400"
+          >
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-gray-400 dark:bg-gray-500" />
+            {feature}
+          </li>
+        ))}
       </ul>
-      <p className="text-sm text-gray-600 dark:text-gray-400">
-        Have any additional questions before ordering?{" "}
-        <Link
-          href="/support"
-          className="font-medium text-brand-500 underline hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
-        >
-          Send us a message here
-        </Link>
-        .
-      </p>
     </div>
   );
 };

@@ -2,24 +2,36 @@
 
 import React, { useState, useMemo } from "react";
 import LinkBuildingHeader from "./LinkBuildingHeader";
-import EmailField from "@/components/shared/EmailField";
-import LinkBuildingOrderTitle from "./LinkBuildingOrderTitle";
 import DrTierGrid from "./DrTierGrid";
-import OrderSummary, { SummaryItem } from "@/components/shared/OrderSummary";
+import LinkBuildingOrderSummary, {
+  OrderSummaryItem,
+} from "./LinkBuildingOrderSummary";
+import KeywordEntryStep, {
+  KeywordData,
+  KeywordRow,
+} from "./KeywordEntryStep";
 import CheckoutStep, {
   BillingAddress,
   PaymentInfo,
 } from "@/components/shared/CheckoutStep";
 import { dr_tiers } from "./drTierData";
 
-type Step = "selection" | "checkout";
+type Step = "selection" | "keywords" | "checkout";
+
+const empty_keyword_row = (): KeywordRow => ({
+  keyword: "",
+  landing_page: "",
+  exact_match: false,
+});
 
 const LinkBuildingPage: React.FC = () => {
   const [current_step, setCurrentStep] = useState<Step>("selection");
   const [selected_quantities, setSelectedQuantities] = useState<
     Record<string, number>
   >({});
+  const [keyword_data, setKeywordData] = useState<KeywordData>({});
   const [order_title, setOrderTitle] = useState("");
+  const [order_notes, setOrderNotes] = useState("");
   const [billing_address, setBillingAddress] = useState<BillingAddress>({
     address: "",
     city: "",
@@ -28,7 +40,6 @@ const LinkBuildingPage: React.FC = () => {
     postal_code: "",
     company: "",
   });
-
   const [payment_info, setPaymentInfo] = useState<PaymentInfo>({
     card_number: "",
     expiry_month: "",
@@ -37,12 +48,34 @@ const LinkBuildingPage: React.FC = () => {
     name_on_card: "",
   });
 
-  // Placeholder email — replace with actual user data when auth is integrated
-  const user_email = "user@example.com";
+  // Derive keyword rows from selected_quantities, filling gaps with empty rows
+  // while preserving any data already entered by the user.
+  const computed_keyword_rows = useMemo<KeywordData>(() => {
+    const result: KeywordData = {};
 
-  const selected_items: SummaryItem[] = useMemo(() => {
+    dr_tiers.forEach((tier) => {
+      const qty = selected_quantities[tier.id] ?? 0;
+      if (qty === 0) return;
+
+      const stored = keyword_data[tier.id] ?? [];
+      if (stored.length === qty) {
+        result[tier.id] = stored;
+      } else if (stored.length < qty) {
+        result[tier.id] = [
+          ...stored,
+          ...Array.from({ length: qty - stored.length }, empty_keyword_row),
+        ];
+      } else {
+        result[tier.id] = stored.slice(0, qty);
+      }
+    });
+
+    return result;
+  }, [selected_quantities, keyword_data]);
+
+  const selected_items: OrderSummaryItem[] = useMemo(() => {
     return dr_tiers
-      .filter((tier) => (selected_quantities[tier.id] || 0) > 0)
+      .filter((tier) => (selected_quantities[tier.id] ?? 0) > 0)
       .map((tier) => ({
         id: tier.id,
         label: tier.dr_label,
@@ -52,16 +85,9 @@ const LinkBuildingPage: React.FC = () => {
   }, [selected_quantities]);
 
   const total = useMemo(() => {
-    const total_links = Object.values(selected_quantities).reduce(
-      (sum, qty) => sum + qty,
-      0
-    );
-    const is_bulk_discount = total_links >= 10;
-    const discount_multiplier = is_bulk_discount ? 0.9 : 1;
-
     return dr_tiers.reduce((sum, tier) => {
-      const qty = selected_quantities[tier.id] || 0;
-      return sum + qty * tier.price_per_link * discount_multiplier;
+      const qty = selected_quantities[tier.id] ?? 0;
+      return sum + qty * tier.price_per_link;
     }, 0);
   }, [selected_quantities]);
 
@@ -77,36 +103,56 @@ const LinkBuildingPage: React.FC = () => {
     });
   };
 
-  const handleBillingChange = (
-    field: keyof BillingAddress,
-    value: string
+  const handleKeywordChange = (
+    tier_id: string,
+    row_index: number,
+    field: keyof KeywordRow,
+    value: string | boolean
   ) => {
+    // Use computed_keyword_rows as the base so every row always has all fields
+    // defined (avoids controlled→uncontrolled input warnings).
+    const base_rows = (computed_keyword_rows[tier_id] ?? []).map((r) => ({
+      ...r,
+    }));
+    if (base_rows[row_index]) {
+      base_rows[row_index] = { ...base_rows[row_index], [field]: value };
+    }
+    setKeywordData((prev) => ({ ...prev, [tier_id]: base_rows }));
+  };
+
+  const handleBillingChange = (field: keyof BillingAddress, value: string) => {
     setBillingAddress((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handlePaymentChange = (
-    field: keyof PaymentInfo,
-    value: string
-  ) => {
+  const handlePaymentChange = (field: keyof PaymentInfo, value: string) => {
     setPaymentInfo((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleNext = () => {
+  const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
+
+  const handleContinue = () => {
     if (selected_items.length === 0) return;
+    setCurrentStep("keywords");
+    scrollToTop();
+  };
+
+  const handleReview = () => {
     setCurrentStep("checkout");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    scrollToTop();
   };
 
   const handlePrevious = () => {
-    setCurrentStep("selection");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setCurrentStep(current_step === "checkout" ? "keywords" : "selection");
+    scrollToTop();
   };
 
   const handleComplete = () => {
-    // TODO: Submit order to API
-    console.log("Order completed:", {
+    // TODO: submit order to API
+    console.log("Order submitted:", {
       selected_quantities,
+      keyword_data,
       order_title,
+      order_notes,
       billing_address,
       payment_info,
       total,
@@ -116,29 +162,41 @@ const LinkBuildingPage: React.FC = () => {
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
       <div className="grid grid-cols-12 gap-6">
-        {/* Main Content */}
+        {/* Main content */}
         <div className="col-span-12 space-y-6 lg:col-span-8">
           {current_step === "selection" && (
             <>
               <LinkBuildingHeader />
-              <EmailField email={user_email} />
-              <LinkBuildingOrderTitle
-                value={order_title}
-                onChange={setOrderTitle}
-              />
               <DrTierGrid
                 selected_quantities={selected_quantities}
                 onQuantityChange={handleQuantityChange}
               />
+            </>
+          )}
 
-              {/* Next Button */}
-              <button
-                onClick={handleNext}
-                disabled={selected_items.length === 0}
-                className="w-full rounded-lg bg-coral-500 px-6 py-3.5 text-sm font-medium text-white shadow-theme-xs transition-colors hover:bg-coral-600 disabled:cursor-not-allowed disabled:bg-coral-300"
-              >
-                Next
-              </button>
+          {current_step === "keywords" && (
+            <>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handlePrevious}
+                  className="text-sm font-medium text-brand-500 transition-colors hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
+                >
+                  &laquo; Back
+                </button>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Enter your target keywords and landing pages for each
+                  placement.
+                </p>
+              </div>
+              <KeywordEntryStep
+                selected_items={selected_items}
+                keyword_data={computed_keyword_rows}
+                order_title={order_title}
+                order_notes={order_notes}
+                onKeywordChange={handleKeywordChange}
+                onOrderTitleChange={setOrderTitle}
+                onOrderNotesChange={setOrderNotes}
+              />
             </>
           )}
 
@@ -155,12 +213,34 @@ const LinkBuildingPage: React.FC = () => {
         </div>
 
         {/* Sidebar */}
-        <div className="col-span-12 lg:col-span-4">
-          <OrderSummary
-            selected_items={selected_items}
-            total={total}
-          />
-        </div>
+        {current_step !== "checkout" && (
+          <div className="col-span-12 lg:col-span-4">
+            <LinkBuildingOrderSummary
+              selected_items={selected_items}
+              total={total}
+              action_label={
+                current_step === "selection" ? "Continue" : "Review"
+              }
+              onAction={
+                current_step === "selection" ? handleContinue : handleReview
+              }
+              is_action_disabled={selected_items.length === 0}
+              onQuantityChange={handleQuantityChange}
+            />
+          </div>
+        )}
+
+        {current_step === "checkout" && (
+          <div className="col-span-12 lg:col-span-4">
+            <LinkBuildingOrderSummary
+              selected_items={selected_items}
+              total={total}
+              action_label="Review"
+              onAction={() => {}}
+              is_action_disabled
+            />
+          </div>
+        )}
       </div>
     </div>
   );
