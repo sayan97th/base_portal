@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import LinkBuildingHeader from "./LinkBuildingHeader";
 import DrTierGrid from "./DrTierGrid";
 import LinkBuildingOrderSummary, {
@@ -14,7 +15,9 @@ import CheckoutStep, {
   BillingAddress,
   PaymentInfo,
 } from "@/components/shared/CheckoutStep";
-import { dr_tiers } from "./drTierData";
+import { dr_tiers as fallback_dr_tiers } from "./drTierData";
+import { linkBuildingService } from "@/services/link-building.service";
+import type { DrTier } from "@/types/link-building";
 
 type Step = "selection" | "keywords" | "checkout";
 
@@ -25,6 +28,17 @@ const empty_keyword_row = (): KeywordRow => ({
 });
 
 const LinkBuildingPage: React.FC = () => {
+  const router = useRouter();
+
+  // DR Tiers state
+  const [dr_tiers, setDrTiers] = useState<DrTier[]>(fallback_dr_tiers);
+  const [dr_tiers_loading, setDrTiersLoading] = useState(true);
+  const [dr_tiers_error, setDrTiersError] = useState<string | null>(null);
+
+  // Order submission state
+  const [is_submitting, setIsSubmitting] = useState(false);
+  const [submit_error, setSubmitError] = useState<string | null>(null);
+
   const [current_step, setCurrentStep] = useState<Step>("selection");
   const [selected_quantities, setSelectedQuantities] = useState<
     Record<string, number>
@@ -47,6 +61,23 @@ const LinkBuildingPage: React.FC = () => {
     cvc: "",
     name_on_card: "",
   });
+
+  const loadDrTiers = useCallback(async () => {
+    setDrTiersLoading(true);
+    setDrTiersError(null);
+    try {
+      const tiers = await linkBuildingService.fetchDrTiers();
+      setDrTiers(tiers.filter((t) => t.is_active));
+    } catch {
+      setDrTiersError("Failed to load DR tiers. Showing default catalog.");
+    } finally {
+      setDrTiersLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDrTiers();
+  }, [loadDrTiers]);
 
   // Derive keyword rows from selected_quantities, filling gaps with empty rows
   // while preserving any data already entered by the user.
@@ -71,7 +102,7 @@ const LinkBuildingPage: React.FC = () => {
     });
 
     return result;
-  }, [selected_quantities, keyword_data]);
+  }, [selected_quantities, keyword_data, dr_tiers]);
 
   const selected_items: OrderSummaryItem[] = useMemo(() => {
     return dr_tiers
@@ -82,14 +113,14 @@ const LinkBuildingPage: React.FC = () => {
         quantity: selected_quantities[tier.id],
         unit_price: tier.price_per_link,
       }));
-  }, [selected_quantities]);
+  }, [selected_quantities, dr_tiers]);
 
   const total = useMemo(() => {
     return dr_tiers.reduce((sum, tier) => {
       const qty = selected_quantities[tier.id] ?? 0;
       return sum + qty * tier.price_per_link;
     }, 0);
-  }, [selected_quantities]);
+  }, [selected_quantities, dr_tiers]);
 
   const handleQuantityChange = (tier_id: string, quantity: number) => {
     setSelectedQuantities((prev) => {
@@ -146,17 +177,60 @@ const LinkBuildingPage: React.FC = () => {
     scrollToTop();
   };
 
-  const handleComplete = () => {
-    // TODO: submit order to API
-    console.log("Order submitted:", {
-      selected_quantities,
-      keyword_data,
-      order_title,
-      order_notes,
-      billing_address,
-      payment_info,
-      total,
-    });
+  const handleComplete = async () => {
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      // TODO: Replace with actual Stripe.js tokenization before production.
+      // payment_method_id should be obtained via stripe.createPaymentMethod()
+      // using the card element — never send raw card data to your backend.
+      const payment_method_id = "pm_placeholder";
+
+      const items = dr_tiers
+        .filter((tier) => (selected_quantities[tier.id] ?? 0) > 0)
+        .map((tier) => {
+          const qty = selected_quantities[tier.id];
+          const rows = computed_keyword_rows[tier.id] ?? [];
+          return {
+            dr_tier_id: tier.id,
+            quantity: qty,
+            unit_price: tier.price_per_link,
+            placements: Array.from({ length: qty }, (_, row_index) => ({
+              row_index,
+              keyword: rows[row_index]?.keyword || null,
+              landing_page: rows[row_index]?.landing_page || null,
+              exact_match: rows[row_index]?.exact_match ?? false,
+            })),
+          };
+        });
+
+      const result = await linkBuildingService.createLinkBuildingOrder({
+        order_title: order_title || null,
+        order_notes: order_notes || null,
+        total_amount: total,
+        items,
+        billing: {
+          company: billing_address.company || null,
+          address: billing_address.address,
+          city: billing_address.city,
+          state: billing_address.state,
+          country: billing_address.country,
+          postal_code: billing_address.postal_code,
+        },
+        payment: { payment_method_id },
+      });
+
+      router.push(`/link-building/orders/${result.order_id}`);
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message: string }).message)
+          : "Something went wrong. Please try again.";
+      setSubmitError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -167,10 +241,27 @@ const LinkBuildingPage: React.FC = () => {
           {current_step === "selection" && (
             <>
               <LinkBuildingHeader />
-              <DrTierGrid
-                selected_quantities={selected_quantities}
-                onQuantityChange={handleQuantityChange}
-              />
+              {dr_tiers_error && (
+                <p className="text-sm text-amber-600 dark:text-amber-400">
+                  {dr_tiers_error}
+                </p>
+              )}
+              {dr_tiers_loading ? (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-36 animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-800"
+                    />
+                  ))}
+                </div>
+              ) : (
+                <DrTierGrid
+                  dr_tiers={dr_tiers}
+                  selected_quantities={selected_quantities}
+                  onQuantityChange={handleQuantityChange}
+                />
+              )}
             </>
           )}
 
@@ -208,6 +299,8 @@ const LinkBuildingPage: React.FC = () => {
               onPaymentChange={handlePaymentChange}
               onPrevious={handlePrevious}
               onComplete={handleComplete}
+              is_loading={is_submitting}
+              error_message={submit_error}
             />
           )}
         </div>

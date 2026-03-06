@@ -27,6 +27,8 @@ interface CheckoutStepProps {
   onPaymentChange: (field: keyof PaymentInfo, value: string) => void;
   onPrevious: () => void;
   onComplete: () => void;
+  is_loading?: boolean;
+  error_message?: string | null;
 }
 
 interface CardErrors {
@@ -115,6 +117,8 @@ const CheckoutStep: React.FC<CheckoutStepProps> = ({
   onPaymentChange,
   onPrevious,
   onComplete,
+  is_loading = false,
+  error_message,
 }) => {
   const [card_errors, setCardErrors] = useState<CardErrors>({});
 
@@ -406,12 +410,18 @@ const CheckoutStep: React.FC<CheckoutStepProps> = ({
         </div>
       </div>
 
+      {/* Submit Error */}
+      {error_message && (
+        <p className="text-sm text-error-500">{error_message}</p>
+      )}
+
       {/* Complete Purchase Button */}
       <button
         onClick={handleComplete}
+        disabled={is_loading}
         className="w-full rounded-lg bg-coral-500 px-6 py-3.5 text-sm font-medium text-white shadow-theme-xs transition-colors hover:bg-coral-600 disabled:cursor-not-allowed disabled:bg-coral-300"
       >
-        Complete Purchase
+        {is_loading ? "Processing..." : "Complete Purchase"}
       </button>
     </div>
   );

@@ -1,11 +1,5 @@
-export interface DrTier {
-  id: string;
-  dr_label: string;
-  traffic_range: string;
-  word_count: number;
-  price_per_link: number;
-  is_most_popular: boolean;
-}
+export type { DrTier } from "@/types/link-building";
+import type { DrTier } from "@/types/link-building";
 
 export const dr_tiers: DrTier[] = [
   {
@@ -15,6 +9,7 @@ export const dr_tiers: DrTier[] = [
     word_count: 650,
     price_per_link: 260,
     is_most_popular: false,
+    is_active: true,
   },
   {
     id: "dr_40",
@@ -23,6 +18,7 @@ export const dr_tiers: DrTier[] = [
     word_count: 700,
     price_per_link: 315,
     is_most_popular: true,
+    is_active: true,
   },
   {
     id: "dr_50",
@@ -31,6 +27,7 @@ export const dr_tiers: DrTier[] = [
     word_count: 700,
     price_per_link: 400,
     is_most_popular: false,
+    is_active: true,
   },
   {
     id: "dr_60",
@@ -39,6 +36,7 @@ export const dr_tiers: DrTier[] = [
     word_count: 700,
     price_per_link: 475,
     is_most_popular: false,
+    is_active: true,
   },
   {
     id: "dr_70",
@@ -47,6 +45,7 @@ export const dr_tiers: DrTier[] = [
     word_count: 700,
     price_per_link: 630,
     is_most_popular: false,
+    is_active: true,
   },
 ];
 

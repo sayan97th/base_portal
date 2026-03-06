@@ -1,13 +1,15 @@
 import React from "react";
-import { dr_tiers } from "./drTierData";
+import type { DrTier } from "@/types/link-building";
 import DrTierCard from "./DrTierCard";
 
 interface DrTierGridProps {
+  dr_tiers: DrTier[];
   selected_quantities: Record<string, number>;
   onQuantityChange: (tier_id: string, quantity: number) => void;
 }
 
 const DrTierGrid: React.FC<DrTierGridProps> = ({
+  dr_tiers,
   selected_quantities,
   onQuantityChange,
 }) => {

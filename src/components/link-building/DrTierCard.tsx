@@ -1,5 +1,5 @@
 import React from "react";
-import { DrTier } from "./drTierData";
+import type { DrTier } from "@/types/link-building";
 
 interface DrTierCardProps {
   tier: DrTier;
