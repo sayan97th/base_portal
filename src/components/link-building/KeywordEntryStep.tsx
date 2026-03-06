@@ -49,8 +49,8 @@ const KeywordEntryStep: React.FC<KeywordEntryStepProps> = ({
             className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3"
           >
             {/* Tier header */}
-            <div className="bg-teal-50 px-5 py-3 dark:bg-teal-900/20">
-              <h3 className="text-sm font-semibold text-teal-700 dark:text-teal-300">
+            <div className="border-b border-gray-200  px-5 py-3 dark:border-gray-600 dark:bg-gray-700">
+              <h3 className="text-sm font-semibold ">
                 {item.label}
               </h3>
             </div>
@@ -64,17 +64,17 @@ const KeywordEntryStep: React.FC<KeywordEntryStepProps> = ({
                 <col className="w-28" />
               </colgroup>
               <thead>
-                <tr className="border-b border-gray-100 dark:border-gray-800">
-                  <th className="py-2 pl-5 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/60">
+                  <th className="py-2 pl-5 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     #
                   </th>
-                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     Keyword / Key Phrase
                   </th>
-                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     Landing Page
                   </th>
-                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                  <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     Exact Match
                   </th>
                 </tr>
@@ -83,16 +83,13 @@ const KeywordEntryStep: React.FC<KeywordEntryStepProps> = ({
                 {rows.map((row, idx) => (
                   <tr
                     key={idx}
-                    className={
-                      idx % 2 === 1
-                        ? "bg-gray-50/50 dark:bg-white/[0.01]"
-                        : ""
-                    }
+                    className={`border-b border-gray-100 last:border-0 dark:border-gray-800 ${idx % 2 === 1 ? "bg-gray-50/70 dark:bg-white/2" : ""
+                      }`}
                   >
                     <td className="py-1 pl-5 text-sm text-gray-400 dark:text-gray-500">
                       {idx + 1}.
                     </td>
-                    <td className="border-l border-gray-100 px-1 py-1 dark:border-gray-800">
+                    <td className="border-l border-gray-200 px-1 py-1 dark:border-gray-700">
                       <input
                         type="text"
                         value={row.keyword}
@@ -108,7 +105,7 @@ const KeywordEntryStep: React.FC<KeywordEntryStepProps> = ({
                         className={input_class}
                       />
                     </td>
-                    <td className="border-l border-gray-100 px-1 py-1 dark:border-gray-800">
+                    <td className="border-l border-gray-200 px-1 py-1 dark:border-gray-700">
                       <input
                         type="text"
                         value={row.landing_page}
@@ -124,7 +121,7 @@ const KeywordEntryStep: React.FC<KeywordEntryStepProps> = ({
                         className={input_class}
                       />
                     </td>
-                    <td className="border-l border-gray-100 px-3 py-1 dark:border-gray-800">
+                    <td className="border-l border-gray-200 px-3 py-1 dark:border-gray-700">
                       <input
                         type="checkbox"
                         checked={row.exact_match}
