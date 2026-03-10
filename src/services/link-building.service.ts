@@ -29,7 +29,14 @@ export const linkBuildingService = {
     return response.data;
   },
 
-  async fetchLinkBuildingOrders(): Promise<LinkBuildingOrderSummary[]> {
+  async fetchAllOrders(): Promise<LinkBuildingOrderSummary[]> {
+    const response = await apiClient.get<OrdersListResponse>(
+      "/api/link-building/orders"
+    );
+    return response.data;
+  },
+
+  async fetchMyOrders(): Promise<LinkBuildingOrderSummary[]> {
     const response = await apiClient.get<OrdersListResponse>(
       "/api/link-building/orders"
     );
