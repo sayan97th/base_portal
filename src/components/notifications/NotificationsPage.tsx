@@ -1,77 +1,36 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import NotificationItem from "./NotificationItem";
-import { notificationsService } from "@/services/notifications.service";
-import type { Notification } from "@/services/notifications.service";
+import { useNotifications } from "@/context/NotificationsContext";
 
 const ITEMS_PER_PAGE = 7;
 
 const NotificationsPage: React.FC = () => {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [is_loading, setIsLoading] = useState(true);
   const [current_page, setCurrentPage] = useState(1);
 
-  useEffect(() => {
-    setIsLoading(true);
-    notificationsService
-      .getNotifications()
-      .then(setNotifications)
-      .finally(() => setIsLoading(false));
-  }, []);
+  const {
+    notifications,
+    is_loading,
+    unread_count,
+    markAsRead,
+    markAllAsRead,
+    archiveNotification,
+    snoozeNotification,
+  } = useNotifications();
 
   const visible_notifications = useMemo(
     () => notifications.filter((n) => !n.is_archived),
     [notifications]
   );
 
-  const unread_count = visible_notifications.filter((n) => !n.is_read).length;
   const total_pages = Math.ceil(visible_notifications.length / ITEMS_PER_PAGE);
 
   const paginated_notifications = useMemo(() => {
     const start_index = (current_page - 1) * ITEMS_PER_PAGE;
-    return visible_notifications.slice(
-      start_index,
-      start_index + ITEMS_PER_PAGE
-    );
+    return visible_notifications.slice(start_index, start_index + ITEMS_PER_PAGE);
   }, [visible_notifications, current_page]);
-
-  async function handleMarkAllAsRead() {
-    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-    await notificationsService.markAllAsRead().catch(() => {
-      notificationsService.getNotifications().then(setNotifications);
-    });
-  }
-
-  async function handleMarkAsRead(id: number) {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
-    );
-    await notificationsService.markAsRead(id).catch(() => {
-      notificationsService.getNotifications().then(setNotifications);
-    });
-  }
-
-  async function handleArchive(id: number) {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, is_archived: true } : n))
-    );
-    await notificationsService.archiveNotification(id).catch(() => {
-      notificationsService.getNotifications().then(setNotifications);
-    });
-  }
-
-  async function handleSnooze(id: number) {
-    setNotifications((prev) =>
-      prev.map((n) =>
-        n.id === id ? { ...n, is_snoozed: true, is_read: true } : n
-      )
-    );
-    await notificationsService.snoozeNotification(id).catch(() => {
-      notificationsService.getNotifications().then(setNotifications);
-    });
-  }
 
   function goToPreviousPage() {
     setCurrentPage((prev) => Math.max(prev - 1, 1));
@@ -106,7 +65,7 @@ const NotificationsPage: React.FC = () => {
 
         {unread_count > 0 && (
           <button
-            onClick={handleMarkAllAsRead}
+            onClick={markAllAsRead}
             className="text-sm font-medium text-brand-500 transition-colors hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
           >
             Mark all as read
@@ -122,9 +81,9 @@ const NotificationsPage: React.FC = () => {
               <NotificationItem
                 key={notification.id}
                 notification={notification}
-                onMarkAsRead={handleMarkAsRead}
-                onArchive={handleArchive}
-                onSnooze={handleSnooze}
+                onMarkAsRead={markAsRead}
+                onArchive={archiveNotification}
+                onSnooze={snoozeNotification}
               />
             ))}
           </div>
@@ -159,11 +118,7 @@ const NotificationsPage: React.FC = () => {
                 className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700"
                 aria-label="Previous page"
               >
-                <svg
-                  className="h-4 w-4"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
+                <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                   <path
                     fillRule="evenodd"
                     d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
@@ -177,11 +132,7 @@ const NotificationsPage: React.FC = () => {
                 className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700"
                 aria-label="Next page"
               >
-                <svg
-                  className="h-4 w-4"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
+                <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                   <path
                     fillRule="evenodd"
                     d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
@@ -197,11 +148,7 @@ const NotificationsPage: React.FC = () => {
               className="flex items-center gap-1.5 text-sm font-medium text-brand-500 transition-colors hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
             >
               Show all
-              <svg
-                className="h-4 w-4"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
+              <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                 <path
                   fillRule="evenodd"
                   d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"

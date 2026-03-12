@@ -18,7 +18,7 @@ import CheckoutStep, {
 } from "@/components/shared/CheckoutStep";
 import { dr_tiers as fallback_dr_tiers } from "./drTierData";
 import { linkBuildingService } from "@/services/link-building.service";
-import { notificationsService } from "@/services/notifications.service";
+import { useNotifications } from "@/context/NotificationsContext";
 import { useBillingAddress } from "@/hooks/useBillingAddress";
 import type { DrTier } from "@/types/link-building";
 
@@ -32,6 +32,7 @@ const empty_keyword_row = (): KeywordRow => ({
 
 const LinkBuildingPage: React.FC = () => {
   const router = useRouter();
+  const { addNotification } = useNotifications();
 
   // DR Tiers state
   const [dr_tiers, setDrTiers] = useState<DrTier[]>(fallback_dr_tiers);
@@ -248,7 +249,7 @@ const LinkBuildingPage: React.FC = () => {
         maximumFractionDigits: 2,
       });
 
-      await notificationsService.createNotification({
+      await addNotification({
         type: "order",
         message: "Your link building order has been placed successfully.",
         preview_text: `Order #${result.order_id} · ${total_links} link${total_links !== 1 ? "s" : ""} · $${formatted_amount}`,

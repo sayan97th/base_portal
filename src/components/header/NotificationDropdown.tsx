@@ -3,28 +3,26 @@
 import Link from "next/link";
 import React, { useState, useRef, useEffect } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
-import { notificationsService } from "@/services/notifications.service";
-import type { Notification } from "@/services/notifications.service";
+import { useNotifications } from "@/context/NotificationsContext";
 
 const DROPDOWN_ITEMS_LIMIT = 5;
 
 export default function NotificationDropdown() {
   const [is_open, setIsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [active_menu_id, setActiveMenuId] = useState<number | null>(null);
   const menu_ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    notificationsService.getNotifications().then(setNotifications);
-  }, []);
+  const {
+    notifications,
+    unread_count,
+    markAsRead,
+    snoozeNotification,
+    archiveNotification,
+  } = useNotifications();
 
   const visible_notifications = notifications
     .filter((n) => !n.is_archived)
     .slice(0, DROPDOWN_ITEMS_LIMIT);
-
-  const unread_count = notifications.filter(
-    (n) => !n.is_read && !n.is_archived
-  ).length;
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -57,37 +55,20 @@ export default function NotificationDropdown() {
 
   async function handleMarkAsRead(id: number, e: React.MouseEvent) {
     e.stopPropagation();
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
-    );
     setActiveMenuId(null);
-    await notificationsService.markAsRead(id).catch(() => {
-      notificationsService.getNotifications().then(setNotifications);
-    });
+    await markAsRead(id);
   }
 
   async function handleSnooze(id: number, e: React.MouseEvent) {
     e.stopPropagation();
-    setNotifications((prev) =>
-      prev.map((n) =>
-        n.id === id ? { ...n, is_snoozed: true, is_read: true } : n
-      )
-    );
     setActiveMenuId(null);
-    await notificationsService.snoozeNotification(id).catch(() => {
-      notificationsService.getNotifications().then(setNotifications);
-    });
+    await snoozeNotification(id);
   }
 
   async function handleArchive(id: number, e: React.MouseEvent) {
     e.stopPropagation();
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, is_archived: true } : n))
-    );
     setActiveMenuId(null);
-    await notificationsService.archiveNotification(id).catch(() => {
-      notificationsService.getNotifications().then(setNotifications);
-    });
+    await archiveNotification(id);
   }
 
   return (
