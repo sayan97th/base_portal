@@ -9,12 +9,15 @@ interface InvoiceDetailResponse {
   data: InvoiceDetail;
 }
 
-interface CreateInvoicePayload {
+export interface CreateInvoicePayload {
   order_id: string;
+  payment_method?: "Account Balance" | "Credit Card";
+  currency_type?: "usd" | "credits";
+  credit_amount?: number;
 }
 
 interface CreateInvoiceResponse {
-  data: { unique_id: string };
+  data: InvoiceDetail;
 }
 
 export const invoicesService = {
@@ -30,7 +33,7 @@ export const invoicesService = {
     return response.data;
   },
 
-  async createInvoice(payload: CreateInvoicePayload): Promise<{ unique_id: string }> {
+  async createInvoice(payload: CreateInvoicePayload): Promise<InvoiceDetail> {
     const response = await apiClient.post<CreateInvoiceResponse>(
       "/api/invoices",
       payload

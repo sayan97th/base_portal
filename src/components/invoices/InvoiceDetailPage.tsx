@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Badge from "../ui/badge/Badge";
 import {
@@ -10,44 +10,91 @@ import {
   TableRow,
   TableCell,
 } from "../ui/table";
-import { getInvoiceDetail } from "./invoiceData";
+import { invoicesService } from "@/services/invoices.service";
 import { generateInvoicePdf } from "./generateInvoicePdf";
+import type { InvoiceDetail } from "./invoiceData";
 
 interface InvoiceDetailPageProps {
   invoice_id: string;
 }
 
-const InvoiceDetailPage: React.FC<InvoiceDetailPageProps> = ({
-  invoice_id,
-}) => {
-  const invoice = getInvoiceDetail(invoice_id);
+const BackLink: React.FC = () => (
+  <Link
+    href="/invoices"
+    className="inline-flex items-center gap-1.5 text-theme-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+  >
+    <svg
+      className="h-4 w-4"
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      stroke="currentColor"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M15.75 19.5L8.25 12l7.5-7.5"
+      />
+    </svg>
+    Back to Invoices
+  </Link>
+);
 
-  if (!invoice) {
+const InvoiceDetailPage: React.FC<InvoiceDetailPageProps> = ({ invoice_id }) => {
+  const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadInvoice = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await invoicesService.getInvoiceDetail(invoice_id);
+        setInvoice(data);
+      } catch (err: unknown) {
+        const api_error = err as { message?: string };
+        if (api_error?.message === "Invoice not found.") {
+          setError("not_found");
+        } else {
+          setError("Failed to load invoice. Please try again.");
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadInvoice();
+  }, [invoice_id]);
+
+  if (loading) {
     return (
       <div className="space-y-6">
-        <Link
-          href="/invoices"
-          className="inline-flex items-center gap-1.5 text-theme-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-        >
-          <svg
-            className="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={2}
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15.75 19.5L8.25 12l7.5-7.5"
-            />
-          </svg>
-          Back to Invoices
-        </Link>
-        <div className="rounded-xl border border-gray-200 bg-white p-10 text-center dark:border-gray-800 dark:bg-white/[0.03]">
-          <p className="text-gray-500 dark:text-gray-400">
-            Invoice not found.
-          </p>
+        <BackLink />
+        <div className="flex items-center justify-center py-16">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-brand-500" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error === "not_found" || !invoice) {
+    return (
+      <div className="space-y-6">
+        <BackLink />
+        <div className="rounded-xl border border-gray-200 bg-white p-10 text-center dark:border-gray-800 dark:bg-white/3">
+          <p className="text-gray-500 dark:text-gray-400">Invoice not found.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <BackLink />
+        <div className="rounded-xl border border-gray-200 bg-white p-10 text-center dark:border-gray-800 dark:bg-white/3">
+          <p className="text-error-500">{error}</p>
         </div>
       </div>
     );
@@ -58,26 +105,7 @@ const InvoiceDetailPage: React.FC<InvoiceDetailPageProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Back Link */}
-      <Link
-        href="/invoices"
-        className="inline-flex items-center gap-1.5 text-theme-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-      >
-        <svg
-          className="h-4 w-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={2}
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M15.75 19.5L8.25 12l7.5-7.5"
-          />
-        </svg>
-        Back to Invoices
-      </Link>
+      <BackLink />
 
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -109,7 +137,7 @@ const InvoiceDetailPage: React.FC<InvoiceDetailPageProps> = ({
       </div>
 
       {/* Invoice Card */}
-      <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03] sm:p-8">
+      <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/3 sm:p-8">
         {/* Company Header */}
         <div className="flex flex-col justify-between gap-6 sm:flex-row">
           {/* Logo + Company */}
@@ -162,14 +190,30 @@ const InvoiceDetailPage: React.FC<InvoiceDetailPageProps> = ({
             <h3 className="mb-2 text-theme-sm font-semibold text-gray-900 dark:text-white">
               Invoiced to
             </h3>
-            <div className="space-y-0.5 text-theme-sm text-gray-600 dark:text-gray-400">
-              <p>{invoice.billed_to.company_name}</p>
-              <p>{invoice.billed_to.company_description}</p>
-              <p>{invoice.billed_to.address_line_1}</p>
-              <p>{invoice.billed_to.address_line_2}</p>
-              <p>{invoice.billed_to.state}</p>
-              <p>{invoice.billed_to.country}</p>
-            </div>
+            {invoice.billed_to ? (
+              <div className="space-y-0.5 text-theme-sm text-gray-600 dark:text-gray-400">
+                {invoice.billed_to.company_name && (
+                  <p>{invoice.billed_to.company_name}</p>
+                )}
+                {invoice.billed_to.company_description && (
+                  <p>{invoice.billed_to.company_description}</p>
+                )}
+                {invoice.billed_to.address_line_1 && (
+                  <p>{invoice.billed_to.address_line_1}</p>
+                )}
+                {invoice.billed_to.address_line_2 && (
+                  <p>{invoice.billed_to.address_line_2}</p>
+                )}
+                {invoice.billed_to.state && <p>{invoice.billed_to.state}</p>}
+                {invoice.billed_to.country && (
+                  <p>{invoice.billed_to.country}</p>
+                )}
+              </div>
+            ) : (
+              <p className="text-theme-sm text-gray-400 dark:text-gray-500">
+                No billing information available.
+              </p>
+            )}
           </div>
 
           {/* Invoice Meta */}
@@ -179,7 +223,7 @@ const InvoiceDetailPage: React.FC<InvoiceDetailPageProps> = ({
                 { label: "Invoice number", value: invoice.invoice_number },
                 { label: "Unique ID", value: invoice.unique_id },
                 { label: "Date issued", value: invoice.date_issued },
-                { label: "Date paid", value: invoice.date_paid },
+                { label: "Date paid", value: invoice.date_paid ?? "—" },
                 { label: "Payment method", value: invoice.payment_method },
               ].map((field) => (
                 <div

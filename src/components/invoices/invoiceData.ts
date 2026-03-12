@@ -7,26 +7,28 @@ export interface InvoiceLineItem {
   item_total: string;
 }
 
+export interface InvoiceBilledTo {
+  company_name: string | null;
+  company_description: string | null;
+  address_line_1: string | null;
+  address_line_2: string | null;
+  state: string | null;
+  country: string | null;
+}
+
 export interface InvoiceDetail {
   invoice_number: string;
   unique_id: string;
   date_issued: string;
-  date_paid: string;
+  date_paid: string | null;
+  date_due: string;
   payment_method: string;
   status: InvoiceStatus;
-  total: string;
-  date_due: string;
-  billed_to: {
-    company_name: string;
-    company_description: string;
-    address_line_1: string;
-    address_line_2: string;
-    state: string;
-    country: string;
-  };
-  line_items: InvoiceLineItem[];
   subtotal: string;
+  total: string;
   credit: string;
+  billed_to: InvoiceBilledTo | null;
+  line_items: InvoiceLineItem[];
 }
 
 export interface InvoiceSummary {

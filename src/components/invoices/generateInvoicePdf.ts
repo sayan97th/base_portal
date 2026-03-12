@@ -96,14 +96,17 @@ function drawBilledToSection(
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...COLORS.secondary);
 
-  const billed_lines = [
-    invoice.billed_to.company_name,
-    invoice.billed_to.company_description,
-    invoice.billed_to.address_line_1,
-    invoice.billed_to.address_line_2,
-    invoice.billed_to.state,
-    invoice.billed_to.country,
-  ];
+  const billed_to = invoice.billed_to;
+  const billed_lines = billed_to
+    ? [
+        billed_to.company_name,
+        billed_to.company_description,
+        billed_to.address_line_1,
+        billed_to.address_line_2,
+        billed_to.state,
+        billed_to.country,
+      ].filter((line): line is string => !!line)
+    : [];
 
   billed_lines.forEach((line) => {
     doc.text(line, PAGE_MARGIN, y_position);
@@ -125,7 +128,7 @@ function drawInvoiceMetadata(
     { label: "Invoice number", value: invoice.invoice_number },
     { label: "Unique ID", value: invoice.unique_id },
     { label: "Date issued", value: invoice.date_issued },
-    { label: "Date paid", value: invoice.date_paid },
+    { label: "Date paid", value: invoice.date_paid ?? "—" },
     { label: "Payment method", value: invoice.payment_method },
   ];
 
