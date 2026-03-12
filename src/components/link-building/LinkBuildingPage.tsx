@@ -18,6 +18,7 @@ import CheckoutStep, {
 } from "@/components/shared/CheckoutStep";
 import { dr_tiers as fallback_dr_tiers } from "./drTierData";
 import { linkBuildingService } from "@/services/link-building.service";
+import { notificationsService } from "@/services/notifications.service";
 import { useBillingAddress } from "@/hooks/useBillingAddress";
 import type { DrTier } from "@/types/link-building";
 
@@ -239,6 +240,19 @@ const LinkBuildingPage: React.FC = () => {
           postal_code: billing_address.postal_code,
         },
         payment: { payment_method_id },
+      });
+
+      const total_links = items.reduce((sum, item) => sum + item.quantity, 0);
+      const formatted_amount = total.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+
+      await notificationsService.createNotification({
+        type: "order",
+        message: "Your link building order has been placed successfully.",
+        preview_text: `Order #${result.order_id} · ${total_links} link${total_links !== 1 ? "s" : ""} · $${formatted_amount}`,
+        link: `/link-building/orders/${result.order_id}`,
       });
 
       router.push(`/link-building/orders/${result.order_id}`);

@@ -1,6 +1,6 @@
 import { apiClient } from "@/lib/api-client";
 
-export type NotificationType = "payment" | "post" | "system";
+export type NotificationType = "payment" | "post" | "system" | "order";
 
 export interface Notification {
   id: number;
@@ -63,6 +63,17 @@ interface ArchiveResponse {
   };
 }
 
+export interface CreateNotificationPayload {
+  type: NotificationType;
+  message: string;
+  preview_text?: string | null;
+  link?: string | null;
+}
+
+interface CreateNotificationResponse {
+  data: Notification;
+}
+
 export const notificationsService = {
   async getNotifications(filters?: NotificationFilters): Promise<Notification[]> {
     const params = new URLSearchParams();
@@ -111,6 +122,14 @@ export const notificationsService = {
   async archiveNotification(id: number): Promise<{ id: number; is_archived: boolean }> {
     const response = await apiClient.patch<ArchiveResponse>(
       `/api/notifications/${id}/archive`
+    );
+    return response.data;
+  },
+
+  async createNotification(payload: CreateNotificationPayload): Promise<Notification> {
+    const response = await apiClient.post<CreateNotificationResponse>(
+      "/api/notifications",
+      payload
     );
     return response.data;
   },
