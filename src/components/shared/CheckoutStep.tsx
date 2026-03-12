@@ -29,6 +29,10 @@ interface CheckoutStepProps {
   onComplete: () => void;
   is_loading?: boolean;
   error_message?: string | null;
+  /** Saved billing address from the user's profile, if available. */
+  saved_billing_address?: BillingAddress | null;
+  /** Called when the user clicks "Use saved address". */
+  onApplySavedAddress?: () => void;
 }
 
 interface CardErrors {
@@ -119,6 +123,8 @@ const CheckoutStep: React.FC<CheckoutStepProps> = ({
   onComplete,
   is_loading = false,
   error_message,
+  saved_billing_address,
+  onApplySavedAddress,
 }) => {
   const [card_errors, setCardErrors] = useState<CardErrors>({});
 
@@ -199,6 +205,58 @@ const CheckoutStep: React.FC<CheckoutStepProps> = ({
         <h2 className="mb-4 text-base font-semibold text-gray-800 dark:text-white/90">
           Billing address
         </h2>
+
+        {/* Saved address banner — shown only when a profile address exists */}
+        {saved_billing_address && (
+          <div className="mb-4 flex items-start justify-between gap-4 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 dark:border-brand-800 dark:bg-brand-900/20">
+            <div className="flex items-start gap-3">
+              <svg
+                className="mt-0.5 h-4 w-4 shrink-0 text-brand-500 dark:text-brand-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.8}
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z"
+                />
+              </svg>
+              <div>
+                <p className="text-sm font-medium text-brand-700 dark:text-brand-300">
+                  Saved billing address found
+                </p>
+                <p className="mt-0.5 text-xs text-brand-600 dark:text-brand-400">
+                  {[
+                    saved_billing_address.address,
+                    saved_billing_address.city,
+                    saved_billing_address.state,
+                    saved_billing_address.postal_code,
+                    saved_billing_address.country,
+                  ]
+                    .filter(Boolean)
+                    .join(", ")}
+                </p>
+              </div>
+            </div>
+            {onApplySavedAddress && (
+              <button
+                type="button"
+                onClick={onApplySavedAddress}
+                className="shrink-0 rounded-lg border border-brand-300 bg-white px-3 py-1.5 text-xs font-medium text-brand-700 shadow-theme-xs transition-colors hover:bg-brand-50 dark:border-brand-700 dark:bg-transparent dark:text-brand-300 dark:hover:bg-brand-900/30"
+              >
+                Use saved address
+              </button>
+            )}
+          </div>
+        )}
+
         <div className="space-y-4">
           {/* Address + City */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

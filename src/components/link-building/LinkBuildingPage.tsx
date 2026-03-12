@@ -18,6 +18,7 @@ import CheckoutStep, {
 } from "@/components/shared/CheckoutStep";
 import { dr_tiers as fallback_dr_tiers } from "./drTierData";
 import { linkBuildingService } from "@/services/link-building.service";
+import { useBillingAddress } from "@/hooks/useBillingAddress";
 import type { DrTier } from "@/types/link-building";
 
 type Step = "selection" | "keywords" | "checkout";
@@ -62,6 +63,8 @@ const LinkBuildingPage: React.FC = () => {
     cvc: "",
     name_on_card: "",
   });
+
+  const { saved_billing_address, has_saved_address } = useBillingAddress();
 
   const loadDrTiers = useCallback(async () => {
     setDrTiersLoading(true);
@@ -168,7 +171,23 @@ const LinkBuildingPage: React.FC = () => {
     scrollToTop();
   };
 
+  const handleApplySavedAddress = useCallback(() => {
+    if (saved_billing_address) {
+      setBillingAddress(saved_billing_address);
+    }
+  }, [saved_billing_address]);
+
   const handleReview = () => {
+    // Auto-populate billing address from profile when the user has no data entered yet
+    if (has_saved_address && saved_billing_address) {
+      const is_billing_empty =
+        !billing_address.address &&
+        !billing_address.city &&
+        !billing_address.postal_code;
+      if (is_billing_empty) {
+        setBillingAddress(saved_billing_address);
+      }
+    }
     setCurrentStep("checkout");
     scrollToTop();
   };
@@ -327,6 +346,8 @@ const LinkBuildingPage: React.FC = () => {
               onComplete={handleComplete}
               is_loading={is_submitting}
               error_message={submit_error}
+              saved_billing_address={saved_billing_address}
+              onApplySavedAddress={handleApplySavedAddress}
             />
           )}
         </div>
