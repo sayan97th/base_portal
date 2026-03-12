@@ -211,11 +211,11 @@ const OrderItemCard: React.FC<OrderItemCardProps> = ({ item, index }) => {
                   </TableRow>
                 </TableHeader>
                 <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {item.placements
+                  {[...item.placements]
                     .sort((a, b) => a.row_index - b.row_index)
                     .map((placement) => (
                       <TableRow
-                        key={placement.id}
+                        key={placement.id ?? placement.row_index}
                         className="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]"
                       >
                         <TableCell className="px-4 py-3 text-center text-xs text-gray-400 dark:text-gray-500">
