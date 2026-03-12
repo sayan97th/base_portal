@@ -5,9 +5,9 @@ import type { Notification } from "./notificationData";
 
 interface NotificationItemProps {
   notification: Notification;
-  onMarkAsRead: (id: string) => void;
-  onArchive: (id: string) => void;
-  onSnooze: (id: string) => void;
+  onMarkAsRead: (id: number) => void;
+  onArchive: (id: number) => void;
+  onSnooze: (id: number) => void;
 }
 
 const NotificationItem: React.FC<NotificationItemProps> = ({

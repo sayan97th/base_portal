@@ -1,17 +1,25 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import NotificationItem from "./NotificationItem";
-import { notification_list } from "./notificationData";
-import type { Notification } from "./notificationData";
+import { notificationsService } from "@/services/notifications.service";
+import type { Notification } from "@/services/notifications.service";
 
 const ITEMS_PER_PAGE = 7;
 
 const NotificationsPage: React.FC = () => {
-  const [notifications, setNotifications] =
-    useState<Notification[]>(notification_list);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [is_loading, setIsLoading] = useState(true);
   const [current_page, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setIsLoading(true);
+    notificationsService
+      .getNotifications()
+      .then(setNotifications)
+      .finally(() => setIsLoading(false));
+  }, []);
 
   const visible_notifications = useMemo(
     () => notifications.filter((n) => !n.is_archived),
@@ -29,30 +37,40 @@ const NotificationsPage: React.FC = () => {
     );
   }, [visible_notifications, current_page]);
 
-  function handleMarkAllAsRead() {
-    setNotifications((prev) =>
-      prev.map((n) => ({ ...n, is_read: true }))
-    );
+  async function handleMarkAllAsRead() {
+    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    await notificationsService.markAllAsRead().catch(() => {
+      notificationsService.getNotifications().then(setNotifications);
+    });
   }
 
-  function handleMarkAsRead(id: string) {
+  async function handleMarkAsRead(id: number) {
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
     );
+    await notificationsService.markAsRead(id).catch(() => {
+      notificationsService.getNotifications().then(setNotifications);
+    });
   }
 
-  function handleArchive(id: string) {
+  async function handleArchive(id: number) {
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, is_archived: true } : n))
     );
+    await notificationsService.archiveNotification(id).catch(() => {
+      notificationsService.getNotifications().then(setNotifications);
+    });
   }
 
-  function handleSnooze(id: string) {
+  async function handleSnooze(id: number) {
     setNotifications((prev) =>
       prev.map((n) =>
         n.id === id ? { ...n, is_snoozed: true, is_read: true } : n
       )
     );
+    await notificationsService.snoozeNotification(id).catch(() => {
+      notificationsService.getNotifications().then(setNotifications);
+    });
   }
 
   function goToPreviousPage() {
@@ -61,6 +79,14 @@ const NotificationsPage: React.FC = () => {
 
   function goToNextPage() {
     setCurrentPage((prev) => Math.min(prev + 1, total_pages));
+  }
+
+  if (is_loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+      </div>
+    );
   }
 
   return (
@@ -89,7 +115,7 @@ const NotificationsPage: React.FC = () => {
       </div>
 
       {/* Notification List */}
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
         {paginated_notifications.length > 0 ? (
           <div className="divide-y divide-gray-100 dark:divide-gray-800">
             {paginated_notifications.map((notification) => (

@@ -3,18 +3,20 @@
 import Link from "next/link";
 import React, { useState, useRef, useEffect } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
-import { notification_list } from "../notifications/notificationData";
-import type { Notification } from "../notifications/notificationData";
+import { notificationsService } from "@/services/notifications.service";
+import type { Notification } from "@/services/notifications.service";
 
 const DROPDOWN_ITEMS_LIMIT = 5;
 
 export default function NotificationDropdown() {
   const [is_open, setIsOpen] = useState(false);
-  const [notifying, setNotifying] = useState(true);
-  const [notifications, setNotifications] =
-    useState<Notification[]>(notification_list);
-  const [active_menu_id, setActiveMenuId] = useState<string | null>(null);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [active_menu_id, setActiveMenuId] = useState<number | null>(null);
   const menu_ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    notificationsService.getNotifications().then(setNotifications);
+  }, []);
 
   const visible_notifications = notifications
     .filter((n) => !n.is_archived)
@@ -48,25 +50,23 @@ export default function NotificationDropdown() {
     setActiveMenuId(null);
   }
 
-  function handleClick() {
-    toggleDropdown();
-    setNotifying(false);
-  }
-
-  function handleToggleMenu(id: string, e: React.MouseEvent) {
+  function handleToggleMenu(id: number, e: React.MouseEvent) {
     e.stopPropagation();
     setActiveMenuId((prev) => (prev === id ? null : id));
   }
 
-  function handleMarkAsRead(id: string, e: React.MouseEvent) {
+  async function handleMarkAsRead(id: number, e: React.MouseEvent) {
     e.stopPropagation();
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
     );
     setActiveMenuId(null);
+    await notificationsService.markAsRead(id).catch(() => {
+      notificationsService.getNotifications().then(setNotifications);
+    });
   }
 
-  function handleSnooze(id: string, e: React.MouseEvent) {
+  async function handleSnooze(id: number, e: React.MouseEvent) {
     e.stopPropagation();
     setNotifications((prev) =>
       prev.map((n) =>
@@ -74,25 +74,31 @@ export default function NotificationDropdown() {
       )
     );
     setActiveMenuId(null);
+    await notificationsService.snoozeNotification(id).catch(() => {
+      notificationsService.getNotifications().then(setNotifications);
+    });
   }
 
-  function handleArchive(id: string, e: React.MouseEvent) {
+  async function handleArchive(id: number, e: React.MouseEvent) {
     e.stopPropagation();
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, is_archived: true } : n))
     );
     setActiveMenuId(null);
+    await notificationsService.archiveNotification(id).catch(() => {
+      notificationsService.getNotifications().then(setNotifications);
+    });
   }
 
   return (
     <div className="relative">
       <button
         className="relative dropdown-toggle flex items-center justify-center text-gray-500 transition-colors bg-white border border-gray-200 rounded-full hover:text-gray-700 h-11 w-11 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
-        onClick={handleClick}
+        onClick={toggleDropdown}
       >
         <span
           className={`absolute right-0 top-0.5 z-10 h-2 w-2 rounded-full bg-orange-400 ${
-            !notifying ? "hidden" : "flex"
+            unread_count === 0 ? "hidden" : "flex"
           }`}
         >
           <span className="absolute inline-flex w-full h-full bg-orange-400 rounded-full opacity-75 animate-ping"></span>
@@ -157,12 +163,12 @@ export default function NotificationDropdown() {
           {visible_notifications.map((notification) => (
             <li
               key={notification.id}
-              className={`group relative border-b border-gray-100 dark:border-gray-800 last:border-b-0`}
+              className="group relative border-b border-gray-100 dark:border-gray-800 last:border-b-0"
             >
               <div
                 className={`flex items-start gap-3 px-5 py-3.5 transition-colors hover:bg-gray-50 dark:hover:bg-white/5 ${
                   !notification.is_read
-                    ? "bg-white dark:bg-white/[0.02]"
+                    ? "bg-white dark:bg-white/2"
                     : ""
                 }`}
               >
