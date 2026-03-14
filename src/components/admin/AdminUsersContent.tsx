@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { listAdminUsers } from "@/services/admin/userService";
+import { listAdminUsers } from "@/services/admin/user.service";
 import type { AdminUser } from "@/services/admin/types";
 
 export default function AdminUsersContent() {

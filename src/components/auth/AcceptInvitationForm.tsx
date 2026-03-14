@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { invitationService } from "@/services/invitation.service";
+import { invitationService } from "@/services/client/invitation.service";
 import { EyeCloseIcon, EyeIcon } from "@/icons";
 import type { Invitation, ApiError } from "@/types/auth";
 

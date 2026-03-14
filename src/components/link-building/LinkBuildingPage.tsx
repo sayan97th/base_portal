@@ -17,7 +17,7 @@ import CheckoutStep, {
   PaymentInfo,
 } from "@/components/shared/CheckoutStep";
 import { dr_tiers as fallback_dr_tiers } from "./drTierData";
-import { linkBuildingService } from "@/services/link-building.service";
+import { linkBuildingService } from "@/services/client/link-building.service";
 import { useNotifications } from "@/context/NotificationsContext";
 import { useBillingAddress } from "@/hooks/useBillingAddress";
 import type { DrTier } from "@/types/link-building";

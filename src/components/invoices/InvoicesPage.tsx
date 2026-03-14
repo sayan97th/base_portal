@@ -10,7 +10,7 @@ import {
   TableRow,
   TableCell,
 } from "../ui/table";
-import { invoicesService } from "@/services/invoices.service";
+import { invoicesService } from "@/services/client/invoices.service";
 import type { InvoiceSummary } from "./invoiceData";
 
 const InvoicesPage: React.FC = () => {

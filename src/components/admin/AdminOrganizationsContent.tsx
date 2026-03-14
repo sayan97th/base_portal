@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { listAdminOrganizations } from "@/services/admin/organizationService";
+import { listAdminOrganizations } from "@/services/admin/organization.service";
 import type { Organization } from "@/services/admin/types";
 
 export default function AdminOrganizationsContent() {

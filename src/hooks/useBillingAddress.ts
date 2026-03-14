@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { profileService } from "@/services/profile.service";
+import { profileService } from "@/services/client/profile.service";
 import type { BillingAddress } from "@/components/shared/CheckoutStep";
 
 export interface UseBillingAddressReturn {

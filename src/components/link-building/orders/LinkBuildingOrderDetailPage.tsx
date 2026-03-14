@@ -10,7 +10,7 @@ import {
   TableRow,
   TableCell,
 } from "@/components/ui/table";
-import { linkBuildingService } from "@/services/link-building.service";
+import { linkBuildingService } from "@/services/client/link-building.service";
 import type {
   LinkBuildingOrderDetail,
   OrderItemDetail,

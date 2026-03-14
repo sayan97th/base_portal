@@ -6,7 +6,7 @@ import NotificationPreferencesSection from "./NotificationPreferencesSection";
 import BillingAddressSection from "./BillingAddressSection";
 import ProfileSettingsSection from "./ProfileSettingsSection";
 import { useAuth } from "@/context/AuthContext";
-import { profileService } from "@/services/profile.service";
+import { profileService } from "@/services/client/profile.service";
 import type { ProfileData } from "@/types/auth";
 
 const default_form_data: ProfileData = {

@@ -5,7 +5,7 @@ import {
   listAdminInvitations,
   sendAdminInvitation,
   revokeAdminInvitation,
-} from "@/services/admin/invitationService";
+} from "@/services/admin/invitation.service";
 import { useAuth } from "@/context/AuthContext";
 import { ROLES } from "@/lib/roles";
 import type { AdminInvitation, SendAdminInvitationData, InvitationRole } from "@/services/admin/types";

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { listRoles } from "@/services/admin/roleService";
+import { listRoles } from "@/services/admin/role.service";
 import type { RoleWithPermissions } from "@/services/admin/types";
 
 export default function AdminRolesContent() {

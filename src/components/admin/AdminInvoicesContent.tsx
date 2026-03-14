@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { listAdminInvoices } from "@/services/admin/invoiceService";
+import { listAdminInvoices } from "@/services/admin/invoice.service";
 import type { AdminInvoice, InvoiceStatus } from "@/services/admin/types";
 
 const STATUS_STYLES: Record<InvoiceStatus, string> = {

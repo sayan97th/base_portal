@@ -8,11 +8,11 @@ import React, {
   useEffect,
   useRef,
 } from "react";
-import { notificationsService } from "@/services/notifications.service";
+import { notificationsService } from "@/services/client/notifications.service";
 import type {
   Notification,
   CreateNotificationPayload,
-} from "@/services/notifications.service";
+} from "@/services/client/notifications.service";
 import { useAuth } from "@/context/AuthContext";
 
 const POLL_INTERVAL_MS = 60_000;

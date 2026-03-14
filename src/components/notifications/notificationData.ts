@@ -1,1 +1,1 @@
-export type { NotificationType, Notification } from "@/services/notifications.service";
+export type { NotificationType, Notification } from "@/services/client/notifications.service";
