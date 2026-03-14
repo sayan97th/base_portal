@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { listAdminInvoices } from "@/services/admin/invoice.service";
 import type { AdminInvoice, InvoiceStatus } from "@/services/admin/types";
 
@@ -76,13 +77,16 @@ export default function AdminInvoicesContent() {
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   Date Issued
                 </th>
+                <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {isLoading
                 ? Array.from({ length: 8 }).map((_, i) => (
                     <tr key={i}>
-                      {Array.from({ length: 6 }).map((__, j) => (
+                      {Array.from({ length: 7 }).map((__, j) => (
                         <td key={j} className="px-6 py-4">
                           <div className="h-4 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
                         </td>
@@ -92,7 +96,7 @@ export default function AdminInvoicesContent() {
                 : invoices.length === 0
                   ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-8 text-center text-sm text-gray-400">
+                      <td colSpan={7} className="px-6 py-8 text-center text-sm text-gray-400">
                         No invoices found.
                       </td>
                     </tr>
@@ -100,35 +104,58 @@ export default function AdminInvoicesContent() {
                   : invoices.map((invoice) => (
                     <tr
                       key={invoice.id}
-                      className="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+                      className="cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-white/2"
                     >
                       <td className="px-6 py-4">
-                        <p className="font-medium text-gray-900 dark:text-white">
-                          {invoice.invoice_number}
-                        </p>
-                        <p className="text-xs text-gray-400 font-mono">
-                          {invoice.unique_id}
-                        </p>
+                        <Link href={`/admin/invoices/${invoice.unique_id}`} className="block">
+                          <p className="font-medium text-gray-900 dark:text-white">
+                            {invoice.invoice_number}
+                          </p>
+                          <p className="text-xs text-gray-400 font-mono">
+                            {invoice.unique_id}
+                          </p>
+                        </Link>
                       </td>
                       <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
-                        <p>{invoice.user.first_name} {invoice.user.last_name}</p>
-                        <p className="text-xs text-gray-400">{invoice.user.email}</p>
+                        <Link href={`/admin/invoices/${invoice.unique_id}`} className="block">
+                          <p>{invoice.user.first_name} {invoice.user.last_name}</p>
+                          <p className="text-xs text-gray-400">{invoice.user.email}</p>
+                        </Link>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[invoice.status]}`}>
-                          {invoice.status}
-                        </span>
+                        <Link href={`/admin/invoices/${invoice.unique_id}`} className="block">
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[invoice.status]}`}>
+                            {invoice.status}
+                          </span>
+                        </Link>
                       </td>
                       <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
-                        {invoice.payment_method}
+                        <Link href={`/admin/invoices/${invoice.unique_id}`} className="block">
+                          {invoice.payment_method}
+                        </Link>
                       </td>
                       <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
-                        ${invoice.total_amount.toFixed(2)}
+                        <Link href={`/admin/invoices/${invoice.unique_id}`} className="block">
+                          ${invoice.total_amount.toFixed(2)}
+                        </Link>
                       </td>
                       <td className="px-6 py-4 text-gray-500 dark:text-gray-400">
-                        {invoice.date_issued
-                          ? new Date(invoice.date_issued).toLocaleDateString()
-                          : <span className="text-gray-400">—</span>}
+                        <Link href={`/admin/invoices/${invoice.unique_id}`} className="block">
+                          {invoice.date_issued
+                            ? new Date(invoice.date_issued).toLocaleDateString()
+                            : <span className="text-gray-400">—</span>}
+                        </Link>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <Link
+                          href={`/admin/invoices/${invoice.unique_id}`}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:border-brand-700 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
+                        >
+                          View Details
+                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                          </svg>
+                        </Link>
                       </td>
                     </tr>
                   ))}
