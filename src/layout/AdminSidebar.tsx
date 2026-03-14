@@ -90,7 +90,7 @@ const admin_sidebar_sections: SidebarSection[] = [
   {
     title: "ACCOUNT",
     items: [
-      { name: "Profile", icon: <UserCircleIcon />, path: "/profile" },
+      { name: "Profile", icon: <UserCircleIcon />, path: "/admin/profile" },
     ],
   },
 ];

@@ -21,6 +21,14 @@ export async function listAdminOrders(
 }
 
 /**
+ * Fetch a single order by ID — admin detail view.
+ * Roles allowed: super_admin, admin, staff.
+ */
+export async function getAdminOrder(order_id: string): Promise<AdminOrder> {
+  return apiClient.get<AdminOrder>(`/api/admin/orders/${order_id}`);
+}
+
+/**
  * List link-building orders — admin filtered view (paginated).
  * Roles allowed: super_admin only.
  * Supports per_page and optional status filter.

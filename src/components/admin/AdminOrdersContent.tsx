@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { listAdminOrders } from "@/services/admin/order.service";
 import type { AdminOrder, OrderStatus } from "@/services/admin/types";
 
@@ -75,13 +76,16 @@ export default function AdminOrdersContent() {
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   Date
                 </th>
+                <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {isLoading
                 ? Array.from({ length: 8 }).map((_, i) => (
                     <tr key={i}>
-                      {Array.from({ length: 5 }).map((__, j) => (
+                      {Array.from({ length: 6 }).map((__, j) => (
                         <td key={j} className="px-6 py-4">
                           <div className="h-4 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
                         </td>
@@ -91,7 +95,7 @@ export default function AdminOrdersContent() {
                 : orders.length === 0
                   ? (
                     <tr>
-                      <td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-400">
+                      <td colSpan={6} className="px-6 py-8 text-center text-sm text-gray-400">
                         No orders found.
                       </td>
                     </tr>
@@ -123,6 +127,14 @@ export default function AdminOrdersContent() {
                       </td>
                       <td className="px-6 py-4 text-gray-500 dark:text-gray-400">
                         {new Date(order.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <Link
+                          href={`/admin/orders/${order.id}`}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-white/3 dark:text-gray-400 dark:hover:bg-white/5"
+                        >
+                          View Details
+                        </Link>
                       </td>
                     </tr>
                   ))}
