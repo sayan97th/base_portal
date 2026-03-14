@@ -11,7 +11,7 @@ const available_roles = [
   { value: ROLES.ADMIN, label: "Admin" },
 ];
 
-export default function StaffInvitationsContent() {
+export default function AdminInvitationsContent() {
   const { isAdmin } = useAuth();
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [isLoading, setIsLoading] = useState(true);

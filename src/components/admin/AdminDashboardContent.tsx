@@ -26,7 +26,7 @@ const stat_cards: StatCard[] = [
     value: "—",
     description: "Registered platform users",
     icon: <GroupIcon />,
-    href: "/staff/users",
+    href: "/admin/users",
     color: "bg-brand-500",
   },
   {
@@ -34,7 +34,7 @@ const stat_cards: StatCard[] = [
     value: "—",
     description: "Active client organizations",
     icon: <TaskIcon />,
-    href: "/staff/organizations",
+    href: "/admin/organizations",
     color: "bg-success-500",
   },
   {
@@ -42,7 +42,7 @@ const stat_cards: StatCard[] = [
     value: "—",
     description: "Orders awaiting action",
     icon: <ListIcon />,
-    href: "/staff/orders",
+    href: "/admin/orders",
     color: "bg-warning-500",
   },
   {
@@ -50,7 +50,7 @@ const stat_cards: StatCard[] = [
     value: "—",
     description: "Invoices awaiting payment",
     icon: <DollarLineIcon />,
-    href: "/staff/invoices",
+    href: "/admin/invoices",
     color: "bg-error-500",
   },
 ];
@@ -59,24 +59,24 @@ const quick_actions = [
   {
     label: "Invite Team Member",
     description: "Send an invitation to a new staff member",
-    href: "/staff/invitations",
+    href: "/admin/invitations",
     icon: <ChatIcon />,
   },
   {
     label: "View All Users",
     description: "Browse and manage platform users",
-    href: "/staff/users",
+    href: "/admin/users",
     icon: <GroupIcon />,
   },
   {
     label: "Manage Organizations",
     description: "Review and edit client organizations",
-    href: "/staff/organizations",
+    href: "/admin/organizations",
     icon: <TaskIcon />,
   },
 ];
 
-export default function StaffDashboardContent() {
+export default function AdminDashboardContent() {
   const { user } = useAuth();
 
   return (
@@ -154,7 +154,7 @@ export default function StaffDashboardContent() {
       {/* Staff portal info banner */}
       <div className="rounded-2xl border border-brand-100 bg-brand-50 p-5 dark:border-brand-900/30 dark:bg-brand-500/5">
         <p className="text-sm font-medium text-brand-700 dark:text-brand-400">
-          You are viewing the Staff Portal.
+          You are viewing the Admin Portal.
         </p>
         <p className="mt-1 text-xs text-brand-600 dark:text-brand-500">
           This area is restricted to authorized team members only. Use the

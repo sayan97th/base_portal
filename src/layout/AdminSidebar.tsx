@@ -36,13 +36,13 @@ type SidebarSection = {
   items: SidebarItem[];
 };
 
-const staff_sidebar_sections: SidebarSection[] = [
+const admin_sidebar_sections: SidebarSection[] = [
   {
     items: [
       {
         name: "Dashboard",
         icon: <GridIcon />,
-        path: "/staff/dashboard",
+        path: "/admin/dashboard",
         highlight: true,
       },
     ],
@@ -53,25 +53,25 @@ const staff_sidebar_sections: SidebarSection[] = [
       {
         name: "Users",
         icon: <GroupIcon />,
-        path: "/staff/users",
+        path: "/admin/users",
         permission: "users.view",
       },
       {
         name: "Organizations",
         icon: <TaskIcon />,
-        path: "/staff/organizations",
+        path: "/admin/organizations",
         permission: "organizations.view",
       },
       {
         name: "Orders",
         icon: <ListIcon />,
-        path: "/staff/orders",
+        path: "/admin/orders",
         permission: "orders.view",
       },
       {
         name: "Invoices",
         icon: <DollarLineIcon />,
-        path: "/staff/invoices",
+        path: "/admin/invoices",
         permission: "invoices.view",
       },
     ],
@@ -82,7 +82,7 @@ const staff_sidebar_sections: SidebarSection[] = [
       {
         name: "Invitations",
         icon: <ChatIcon />,
-        path: "/staff/invitations",
+        path: "/admin/invitations",
         permission: "invitations.manage",
       },
     ],
@@ -95,7 +95,7 @@ const staff_sidebar_sections: SidebarSection[] = [
   },
 ];
 
-const StaffSidebar: React.FC = () => {
+const AdminSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const { hasPermission } = useAuth();
   const pathname = usePathname();
@@ -138,7 +138,7 @@ const StaffSidebar: React.FC = () => {
       <div
         className={`py-8 flex ${!isExpanded && !isHovered ? "lg:justify-center" : "justify-start"}`}
       >
-        <Link href="/staff/dashboard" className="flex items-center gap-2">
+        <Link href="/admin/dashboard" className="flex items-center gap-2">
           {showText ? (
             <div className="flex flex-col">
               <span className="text-xl font-bold text-white">
@@ -148,7 +148,7 @@ const StaffSidebar: React.FC = () => {
                 </span>
               </span>
               <span className="text-xs font-medium text-brand-400 mt-0.5 tracking-wider uppercase">
-                Staff Portal
+                Admin Portal
               </span>
             </div>
           ) : (
@@ -161,7 +161,7 @@ const StaffSidebar: React.FC = () => {
       <div className="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
         <nav className="mb-6">
           <div className="flex flex-col gap-4">
-            {staff_sidebar_sections.map((section, section_index) => (
+            {admin_sidebar_sections.map((section, section_index) => (
               <div key={section_index}>
                 {section.title && showText && (
                   <h2 className="mb-4 text-xs uppercase leading-[20px] text-gray-500">
@@ -282,4 +282,4 @@ const StaffSidebar: React.FC = () => {
   );
 };
 
-export default StaffSidebar;
+export default AdminSidebar;

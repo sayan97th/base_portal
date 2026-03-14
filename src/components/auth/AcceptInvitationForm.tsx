@@ -74,7 +74,7 @@ export default function AcceptInvitationForm({ token }: Props) {
         ...form,
         invitation_token: token,
       });
-      router.push("/staff/dashboard");
+      router.push("/admin/dashboard");
     } catch (err: unknown) {
       const api_err = err as ApiError;
       if (api_err.errors) setFieldErrors(api_err.errors);

@@ -2,53 +2,55 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { apiClient } from "@/lib/api-client";
-import type { Organization } from "@/types/auth";
+import type { User } from "@/types/auth";
 
-type OrgsResponse = {
-  data: Organization[];
+type UsersResponse = {
+  data: User[];
   current_page: number;
   last_page: number;
   total: number;
 };
 
-export default function StaffOrganizationsContent() {
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
+export default function AdminUsersContent() {
+  const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [last_page, setLastPage] = useState(1);
 
-  const fetchOrganizations = useCallback(async (current_page: number) => {
+  const fetchUsers = useCallback(async (current_page: number) => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await apiClient.get<OrgsResponse>(
-        `/api/staff/organizations?page=${current_page}`
+      const data = await apiClient.get<UsersResponse>(
+        `/api/admin/users?page=${current_page}`
       );
-      setOrganizations(data.data);
+      setUsers(data.data);
       setTotal(data.total);
       setLastPage(data.last_page);
     } catch {
-      setError("Failed to load organizations. Please try again.");
+      setError("Failed to load users. Please try again.");
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchOrganizations(page);
-  }, [fetchOrganizations, page]);
+    fetchUsers(page);
+  }, [fetchUsers, page]);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-          Organizations
-        </h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          {total > 0 ? `${total} client organizations` : "Manage client organizations"}
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+            Users
+          </h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            {total > 0 ? `${total} registered users` : "Manage all platform users"}
+          </p>
+        </div>
       </div>
 
       {error && (
@@ -66,22 +68,22 @@ export default function StaffOrganizationsContent() {
                   Name
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  Slug
+                  Email
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  Contact Email
+                  Role
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  Website
+                  Organization
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  Status
+                  Joined
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {isLoading
-                ? Array.from({ length: 6 }).map((_, i) => (
+                ? Array.from({ length: 8 }).map((_, i) => (
                     <tr key={i}>
                       {Array.from({ length: 5 }).map((__, j) => (
                         <td key={j} className="px-6 py-4">
@@ -90,51 +92,49 @@ export default function StaffOrganizationsContent() {
                       ))}
                     </tr>
                   ))
-                : organizations.map((org) => (
-                    <tr
-                      key={org.id}
-                      className="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]"
-                    >
-                      <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
-                        {org.name}
-                      </td>
-                      <td className="px-6 py-4 text-gray-500 dark:text-gray-400 font-mono text-xs">
-                        {org.slug}
-                      </td>
-                      <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
-                        {org.contact_email ?? <span className="text-gray-400">—</span>}
-                      </td>
-                      <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
-                        {org.website ? (
-                          <a
-                            href={org.website}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-brand-500 hover:underline"
-                          >
-                            {org.website}
-                          </a>
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                            org.is_active
-                              ? "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400"
-                              : "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400"
-                          }`}
-                        >
-                          {org.is_active ? "Active" : "Inactive"}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                : users.map((user) => {
+                    const role_names = user.roles.map((r) =>
+                      typeof r === "string" ? r : r.name
+                    );
+                    return (
+                      <tr
+                        key={user.id}
+                        className="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+                      >
+                        <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                          {user.first_name} {user.last_name}
+                        </td>
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
+                          {user.email}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-wrap gap-1">
+                            {role_names.map((r) => (
+                              <span
+                                key={r}
+                                className="inline-flex rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700 dark:bg-brand-500/10 dark:text-brand-400"
+                              >
+                                {r}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
+                          {user.organization?.name ?? (
+                            <span className="text-gray-400">—</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-gray-500 dark:text-gray-500">
+                          {new Date(user.created_at).toLocaleDateString()}
+                        </td>
+                      </tr>
+                    );
+                  })}
             </tbody>
           </table>
         </div>
 
+        {/* Pagination */}
         {!isLoading && last_page > 1 && (
           <div className="flex items-center justify-between border-t border-gray-200 px-6 py-3 dark:border-gray-800">
             <p className="text-xs text-gray-500 dark:text-gray-400">
