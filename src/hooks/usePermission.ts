@@ -21,7 +21,7 @@ export function usePermission() {
     can: (...perms: string[]) => hasPermission(...perms),
     /** True when the user belongs to the internal staff team. */
     isStaff,
-    /** True when the user is an admin or super-admin. */
+    /** True when the user is an admin or super_admin. */
     isAdmin,
     /** Full list of permission strings the current user holds. */
     permissions,

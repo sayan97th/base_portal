@@ -2,7 +2,7 @@
  * Role constants — must match the role names defined in the backend.
  */
 export const ROLES = {
-  SUPER_ADMIN: "super-admin",
+  SUPER_ADMIN: "super_admin",
   ADMIN: "admin",
   STAFF: "staff",
   CLIENT: "client",

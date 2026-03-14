@@ -11,7 +11,7 @@ import type {
 export const invitationService = {
   /**
    * Send an invitation to a new staff member.
-   * Requires admin or super-admin role.
+   * Requires admin or super_admin role.
    */
   async sendInvitation(data: SendInvitationData): Promise<Invitation> {
     return apiClient.post<Invitation>("/api/staff/invitations", data);
@@ -19,7 +19,7 @@ export const invitationService = {
 
   /**
    * List all pending/sent invitations.
-   * Requires admin or super-admin role.
+   * Requires admin or super_admin role.
    */
   async listInvitations(): Promise<Invitation[]> {
     return apiClient.get<Invitation[]>("/api/staff/invitations");

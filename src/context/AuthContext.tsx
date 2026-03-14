@@ -14,7 +14,7 @@ type AuthContextType = {
   isLoading: boolean;
   /** True when the current user belongs to the internal staff team. */
   isStaff: boolean;
-  /** True when the current user has super-admin or admin role. */
+  /** True when the current user has super_admin or admin role. */
   isAdmin: boolean;
   /** Returns true when the user has ALL of the given roles. */
   hasRole: (...roles: RoleName[]) => boolean;
@@ -57,7 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const primary_role = user ? getPrimaryRole(user.roles) : null;
   const isStaffUser = primary_role ? isStaffRole(primary_role) : false;
   const isAdminUser =
-    primary_role === "super-admin" || primary_role === "admin";
+    primary_role === "super_admin" || primary_role === "admin";
 
   // ── Token refresh scheduling ──────────────────────────────────────────────
 
