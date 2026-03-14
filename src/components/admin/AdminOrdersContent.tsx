@@ -1,47 +1,52 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { listAdminUsers } from "@/services/admin/userService";
-import type { AdminUser } from "@/services/admin/types";
+import { listAdminOrders } from "@/services/admin/orderService";
+import type { AdminOrder, OrderStatus } from "@/services/admin/types";
 
-export default function AdminUsersContent() {
-  const [users, setUsers] = useState<AdminUser[]>([]);
+const STATUS_STYLES: Record<OrderStatus, string> = {
+  pending: "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400",
+  processing: "bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400",
+  completed: "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400",
+  cancelled: "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400",
+};
+
+export default function AdminOrdersContent() {
+  const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [last_page, setLastPage] = useState(1);
 
-  const fetchUsers = useCallback(async (current_page: number) => {
+  const fetchOrders = useCallback(async (current_page: number) => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await listAdminUsers(current_page);
-      setUsers(data.data);
+      const data = await listAdminOrders(current_page);
+      setOrders(data.data);
       setTotal(data.total);
       setLastPage(data.last_page);
     } catch {
-      setError("Failed to load users. Please try again.");
+      setError("Failed to load orders. Please try again.");
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchUsers(page);
-  }, [fetchUsers, page]);
+    fetchOrders(page);
+  }, [fetchOrders, page]);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-            Users
-          </h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            {total > 0 ? `${total} registered users` : "Manage all platform users"}
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+          Orders
+        </h1>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          {total > 0 ? `${total} total orders` : "Manage all platform orders"}
+        </p>
       </div>
 
       {error && (
@@ -56,19 +61,19 @@ export default function AdminUsersContent() {
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-800/50">
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  Name
+                  Order
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  Email
+                  Customer
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  Role
+                  Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  Organization
+                  Total
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  Joined
+                  Date
                 </th>
               </tr>
             </thead>
@@ -83,47 +88,48 @@ export default function AdminUsersContent() {
                       ))}
                     </tr>
                   ))
-                : users.map((user) => {
-                    const role_names = user.roles.map((r) => r.name);
-                    return (
-                      <tr
-                        key={user.id}
-                        className="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]"
-                      >
-                        <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
-                          {user.first_name} {user.last_name}
-                        </td>
-                        <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
-                          {user.email}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex flex-wrap gap-1">
-                            {role_names.map((r: string) => (
-                              <span
-                                key={r}
-                                className="inline-flex rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700 dark:bg-brand-500/10 dark:text-brand-400"
-                              >
-                                {r}
-                              </span>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
-                          {user.organization?.name ?? (
-                            <span className="text-gray-400">—</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-gray-500 dark:text-gray-500">
-                          {new Date(user.created_at).toLocaleDateString()}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                : orders.length === 0
+                  ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-400">
+                        No orders found.
+                      </td>
+                    </tr>
+                  )
+                  : orders.map((order) => (
+                    <tr
+                      key={order.id}
+                      className="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+                    >
+                      <td className="px-6 py-4">
+                        <p className="font-medium text-gray-900 dark:text-white">
+                          {order.order_title}
+                        </p>
+                        <p className="text-xs text-gray-400 font-mono">
+                          {order.id.slice(0, 8)}…
+                        </p>
+                      </td>
+                      <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
+                        <p>{order.user.first_name} {order.user.last_name}</p>
+                        <p className="text-xs text-gray-400">{order.user.email}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[order.status]}`}>
+                          {order.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                        ${order.total_amount.toFixed(2)}
+                      </td>
+                      <td className="px-6 py-4 text-gray-500 dark:text-gray-400">
+                        {new Date(order.created_at).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  ))}
             </tbody>
           </table>
         </div>
 
-        {/* Pagination */}
         {!isLoading && last_page > 1 && (
           <div className="flex items-center justify-between border-t border-gray-200 px-6 py-3 dark:border-gray-800">
             <p className="text-xs text-gray-500 dark:text-gray-400">

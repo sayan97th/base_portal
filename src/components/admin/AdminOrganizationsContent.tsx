@@ -1,15 +1,8 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { apiClient } from "@/lib/api-client";
-import type { Organization } from "@/types/auth";
-
-type OrgsResponse = {
-  data: Organization[];
-  current_page: number;
-  last_page: number;
-  total: number;
-};
+import { listAdminOrganizations } from "@/services/admin/organizationService";
+import type { Organization } from "@/services/admin/types";
 
 export default function AdminOrganizationsContent() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -23,9 +16,7 @@ export default function AdminOrganizationsContent() {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await apiClient.get<OrgsResponse>(
-        `/api/admin/organizations?page=${current_page}`
-      );
+      const data = await listAdminOrganizations(current_page);
       setOrganizations(data.data);
       setTotal(data.total);
       setLastPage(data.last_page);

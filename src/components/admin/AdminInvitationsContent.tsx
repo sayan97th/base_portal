@@ -1,10 +1,15 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { invitationService } from "@/services/invitation.service";
+import {
+  listAdminInvitations,
+  sendAdminInvitation,
+  revokeAdminInvitation,
+} from "@/services/admin/invitationService";
 import { useAuth } from "@/context/AuthContext";
 import { ROLES } from "@/lib/roles";
-import type { Invitation, SendInvitationData, ApiError } from "@/types/auth";
+import type { AdminInvitation, SendAdminInvitationData, InvitationRole } from "@/services/admin/types";
+import type { ApiError } from "@/types/auth";
 
 const available_roles = [
   { value: ROLES.STAFF, label: "Staff" },
@@ -13,10 +18,10 @@ const available_roles = [
 
 export default function AdminInvitationsContent() {
   const { isAdmin } = useAuth();
-  const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [invitations, setInvitations] = useState<AdminInvitation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState<SendInvitationData>({ email: "", role: ROLES.STAFF });
+  const [form, setForm] = useState<SendAdminInvitationData>({ email: "", role: "staff" });
   const [isSending, setIsSending] = useState(false);
   const [send_error, setSendError] = useState<string | null>(null);
   const [send_success, setSendSuccess] = useState(false);
@@ -25,7 +30,7 @@ export default function AdminInvitationsContent() {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await invitationService.listInvitations();
+      const data = await listAdminInvitations();
       setInvitations(data);
     } catch {
       setError("Failed to load invitations.");
@@ -45,9 +50,9 @@ export default function AdminInvitationsContent() {
     setIsSending(true);
 
     try {
-      await invitationService.sendInvitation(form);
+      await sendAdminInvitation(form);
       setSendSuccess(true);
-      setForm({ email: "", role: ROLES.STAFF });
+      setForm({ email: "", role: "staff" });
       fetchInvitations();
     } catch (err: unknown) {
       const api_err = err as ApiError;
@@ -59,7 +64,7 @@ export default function AdminInvitationsContent() {
 
   const handleRevoke = async (id: number) => {
     try {
-      await invitationService.revokeInvitation(id);
+      await revokeAdminInvitation(id);
       setInvitations((prev) => prev.filter((inv) => inv.id !== id));
     } catch {
       setError("Failed to revoke invitation.");
@@ -127,7 +132,7 @@ export default function AdminInvitationsContent() {
               <select
                 id="invite_role"
                 value={form.role}
-                onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as InvitationRole }))}
                 className="h-11 w-full rounded-lg border border-gray-300 bg-white px-4 text-sm text-gray-900 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
               >
                 {available_roles.map((r) => (
