@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import Select from "@/components/form/Select";
@@ -297,8 +297,7 @@ export default function AdminProfileForm() {
     await refreshUser();
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     setIsSaving(true);
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -347,7 +346,7 @@ export default function AdminProfileForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
+    <div>
       {/* Alerts */}
       {error_message && (
         <div className="mb-6 rounded-lg border border-error-300 bg-error-50 px-4 py-3 text-sm text-error-600 dark:border-error-500/40 dark:bg-error-500/10 dark:text-error-400">
@@ -534,7 +533,7 @@ export default function AdminProfileForm() {
                   Add an extra layer of security to your account.
                 </p>
               </div>
-              <Button type="button" variant="outline" size="sm">
+              <Button variant="outline" size="sm">
                 Enable 2FA
               </Button>
             </div>
@@ -557,7 +556,7 @@ export default function AdminProfileForm() {
                   id="admin_phone"
                   name="phone"
                   type="text"
-                  defaultValue={form_data.phone}
+                  defaultValue={form_data.phone ?? ""}
                   placeholder="+1 (555) 000-0000"
                   onChange={(e) => handleFieldChange("phone", e.target.value)}
                 />
@@ -580,12 +579,12 @@ export default function AdminProfileForm() {
             <p className="text-xs text-gray-400 dark:text-gray-500">
               Changes will be applied immediately.
             </p>
-            <Button size="md" variant="primary" disabled={is_saving}>
+            <Button size="md" variant="primary" disabled={is_saving} onClick={handleSubmit}>
               {is_saving ? "Saving…" : "Save Changes"}
             </Button>
           </div>
         </div>
       </div>
-    </form>
+    </div>
   );
 }
