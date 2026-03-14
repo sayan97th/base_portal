@@ -1,22 +1,60 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { ROLE_COOKIE_NAME, isStaffRole } from "@/lib/roles";
 
-const authRoutes = ["/signin", "/signup"];
+const auth_routes = ["/signin", "/signup"];
+const invitation_routes = ["/accept-invitation"];
+
+/**
+ * Returns true when the pathname starts with any of the given prefixes.
+ */
+function matchesAny(pathname: string, prefixes: string[]): boolean {
+  return prefixes.some((p) => pathname === p || pathname.startsWith(p + "/"));
+}
 
 export function middleware(request: NextRequest) {
   const token = request.cookies.get("access_token")?.value;
+  const primary_role = request.cookies.get(ROLE_COOKIE_NAME)?.value;
   const { pathname } = request.nextUrl;
 
-  // If user is authenticated and tries to access auth pages, redirect to dashboard
-  if (token && authRoutes.includes(pathname)) {
-    return NextResponse.redirect(new URL("/", request.url));
+  const is_auth_route = matchesAny(pathname, auth_routes);
+  const is_invitation_route = matchesAny(pathname, invitation_routes);
+  const is_staff_route = pathname === "/staff" || pathname.startsWith("/staff/");
+
+  // ── Unauthenticated users ─────────────────────────────────────────────────
+
+  if (!token) {
+    // Allow access to auth pages and invitation acceptance.
+    if (is_auth_route || is_invitation_route) {
+      return NextResponse.next();
+    }
+    // Everything else requires authentication.
+    const signin_url = new URL("/signin", request.url);
+    signin_url.searchParams.set("callbackUrl", pathname);
+    return NextResponse.redirect(signin_url);
   }
 
-  // If user is not authenticated and tries to access protected routes, redirect to signin
-  if (!token && !authRoutes.includes(pathname)) {
-    const signinUrl = new URL("/signin", request.url);
-    signinUrl.searchParams.set("callbackUrl", pathname);
-    return NextResponse.redirect(signinUrl);
+  // ── Authenticated users ───────────────────────────────────────────────────
+
+  // Prevent authenticated users from accessing auth pages.
+  if (is_auth_route) {
+    const destination = primary_role && isStaffRole(primary_role)
+      ? "/staff/dashboard"
+      : "/";
+    return NextResponse.redirect(new URL(destination, request.url));
+  }
+
+  // Staff-only routes: reject regular clients.
+  if (is_staff_route) {
+    if (!primary_role || !isStaffRole(primary_role)) {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
+    return NextResponse.next();
+  }
+
+  // Redirect staff members away from the client portal root to their dashboard.
+  if (pathname === "/" && primary_role && isStaffRole(primary_role)) {
+    return NextResponse.redirect(new URL("/staff/dashboard", request.url));
   }
 
   return NextResponse.next();

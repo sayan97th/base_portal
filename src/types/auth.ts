@@ -102,3 +102,34 @@ export interface ApiError {
   message: string;
   errors?: Record<string, string[]>;
 }
+
+export interface Invitation {
+  id: number;
+  email: string;
+  role: string;
+  token: string;
+  invited_by: number;
+  accepted_at: string | null;
+  expires_at: string;
+  created_at: string;
+  updated_at: string;
+  inviter?: Pick<User, "id" | "first_name" | "last_name" | "email">;
+}
+
+export interface InvitationValidation {
+  valid: boolean;
+  invitation: Invitation;
+}
+
+export interface SendInvitationData {
+  email: string;
+  role: string;
+}
+
+export interface AcceptInvitationData {
+  first_name: string;
+  last_name: string;
+  password: string;
+  password_confirmation: string;
+  invitation_token: string;
+}

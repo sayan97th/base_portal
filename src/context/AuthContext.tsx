@@ -3,6 +3,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { authService } from "@/services/auth.service";
 import { getToken } from "@/lib/api-client";
+import { getPrimaryRole, isStaffRole, setPrimaryRoleCookie } from "@/lib/roles";
+import type { RoleName } from "@/lib/roles";
 import type { User, LoginCredentials, RegisterData, ApiError } from "@/types/auth";
 
 type AuthContextType = {
@@ -10,6 +12,14 @@ type AuthContextType = {
   permissions: string[];
   isAuthenticated: boolean;
   isLoading: boolean;
+  /** True when the current user belongs to the internal staff team. */
+  isStaff: boolean;
+  /** True when the current user has super-admin or admin role. */
+  isAdmin: boolean;
+  /** Returns true when the user has ALL of the given roles. */
+  hasRole: (...roles: RoleName[]) => boolean;
+  /** Returns true when the user has ALL of the given permissions. */
+  hasPermission: (...perms: string[]) => boolean;
   login: (credentials: LoginCredentials) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
@@ -24,16 +34,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ── Derived role helpers ──────────────────────────────────────────────────
+
+  const getUserRoleNames = useCallback((): string[] => {
+    if (!user?.roles) return [];
+    return user.roles.map((r) => (typeof r === "string" ? r : r.name));
+  }, [user]);
+
+  const hasRole = useCallback(
+    (...roles: RoleName[]): boolean => {
+      const user_roles = getUserRoleNames();
+      return roles.every((r) => user_roles.includes(r));
+    },
+    [getUserRoleNames]
+  );
+
+  const hasPermission = useCallback(
+    (...perms: string[]): boolean => perms.every((p) => permissions.includes(p)),
+    [permissions]
+  );
+
+  const primary_role = user ? getPrimaryRole(user.roles) : null;
+  const isStaffUser = primary_role ? isStaffRole(primary_role) : false;
+  const isAdminUser =
+    primary_role === "super-admin" || primary_role === "admin";
+
+  // ── Token refresh scheduling ──────────────────────────────────────────────
+
   const scheduleRefresh = useCallback(() => {
-    if (refreshTimerRef.current) {
-      clearTimeout(refreshTimerRef.current);
-    }
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
 
     const expiresAt = localStorage.getItem("token_expires_at");
     if (!expiresAt) return;
 
     const expiresIn = parseInt(expiresAt) - Date.now();
-    // Refresh 5 minutes before expiry
     const refreshIn = Math.max(expiresIn - 5 * 60 * 1000, 0);
 
     refreshTimerRef.current = setTimeout(async () => {
@@ -44,9 +78,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch {
         setUser(null);
         setPermissions([]);
+        setPrimaryRoleCookie(null);
       }
     }, refreshIn);
   }, []);
+
+  // ── Init ──────────────────────────────────────────────────────────────────
 
   const initAuth = useCallback(async () => {
     const token = getToken();
@@ -59,6 +96,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const data = await authService.getMe();
       setUser(data.user);
       setPermissions(data.permissions);
+      // Ensure the role cookie is always in sync on page load.
+      setPrimaryRoleCookie(getPrimaryRole(data.user.roles));
       scheduleRefresh();
     } catch {
       setUser(null);
@@ -71,21 +110,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     initAuth();
     return () => {
-      if (refreshTimerRef.current) {
-        clearTimeout(refreshTimerRef.current);
-      }
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
     };
   }, [initAuth]);
+
+  // ── Auth actions ──────────────────────────────────────────────────────────
 
   const login = async (credentials: LoginCredentials) => {
     const data = await authService.login(credentials);
     setUser(data.user);
-    // Fetch full permissions after login
     try {
       const meData = await authService.getMe();
       setPermissions(meData.permissions);
     } catch {
-      // permissions will be empty if /me fails
+      // permissions remain empty if /me fails
     }
     scheduleRefresh();
   };
@@ -97,7 +135,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const meData = await authService.getMe();
       setPermissions(meData.permissions);
     } catch {
-      // permissions will be empty if /me fails
+      // permissions remain empty if /me fails
     }
     scheduleRefresh();
   };
@@ -107,8 +145,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const data = await authService.getMe();
       setUser(data.user);
       setPermissions(data.permissions);
+      setPrimaryRoleCookie(getPrimaryRole(data.user.roles));
     } catch {
-      // Keep current state if refresh fails
+      // keep current state if refresh fails
     }
   };
 
@@ -116,9 +155,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await authService.logout();
     setUser(null);
     setPermissions([]);
-    if (refreshTimerRef.current) {
-      clearTimeout(refreshTimerRef.current);
-    }
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
   };
 
   return (
@@ -128,6 +165,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         permissions,
         isAuthenticated: !!user,
         isLoading,
+        isStaff: isStaffUser,
+        isAdmin: isAdminUser,
+        hasRole,
+        hasPermission,
         login,
         register,
         logout,

@@ -77,7 +77,13 @@ export default function SignUpForm() {
               Sign Up
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Enter your email and password to sign up!
+              Create your client account to get started.
+            </p>
+            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+              Are you a team member?{" "}
+              <span className="text-gray-500 dark:text-gray-400">
+                Staff accounts require an invitation sent by an administrator.
+              </span>
             </p>
           </div>
           <div>

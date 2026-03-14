@@ -1,4 +1,5 @@
 import { apiClient, setToken, removeToken } from "@/lib/api-client";
+import { getPrimaryRole, setPrimaryRoleCookie } from "@/lib/roles";
 import type {
   AuthResponse,
   LoginCredentials,
@@ -6,20 +7,24 @@ import type {
   RegisterData,
 } from "@/types/auth";
 
+function persistSession(data: AuthResponse): void {
+  setToken(data.access_token);
+  const expiresAt = Date.now() + data.expires_in * 1000;
+  localStorage.setItem("token_expires_at", expiresAt.toString());
+  const primary_role = getPrimaryRole(data.user.roles);
+  setPrimaryRoleCookie(primary_role);
+}
+
 export const authService = {
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     const data = await apiClient.post<AuthResponse>("/api/auth/login", credentials);
-    setToken(data.access_token);
-    const expiresAt = Date.now() + data.expires_in * 1000;
-    localStorage.setItem("token_expires_at", expiresAt.toString());
+    persistSession(data);
     return data;
   },
 
   async register(registerData: RegisterData): Promise<AuthResponse> {
     const data = await apiClient.post<AuthResponse>("/api/auth/register", registerData);
-    setToken(data.access_token);
-    const expiresAt = Date.now() + data.expires_in * 1000;
-    localStorage.setItem("token_expires_at", expiresAt.toString());
+    persistSession(data);
     return data;
   },
 
@@ -29,9 +34,7 @@ export const authService = {
 
   async refresh(): Promise<AuthResponse> {
     const data = await apiClient.post<AuthResponse>("/api/auth/refresh");
-    setToken(data.access_token);
-    const expiresAt = Date.now() + data.expires_in * 1000;
-    localStorage.setItem("token_expires_at", expiresAt.toString());
+    persistSession(data);
     return data;
   },
 
@@ -40,6 +43,7 @@ export const authService = {
       await apiClient.post("/api/auth/logout");
     } finally {
       removeToken();
+      setPrimaryRoleCookie(null);
     }
   },
 };
