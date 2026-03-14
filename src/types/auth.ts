@@ -98,6 +98,16 @@ export interface UpdateProfileResponse {
   message: string;
 }
 
+export interface ChangePasswordData {
+  current_password: string;
+  password: string;
+  password_confirmation: string;
+}
+
+export interface ChangePasswordResponse {
+  message: string;
+}
+
 export interface ApiError {
   message: string;
   errors?: Record<string, string[]>;

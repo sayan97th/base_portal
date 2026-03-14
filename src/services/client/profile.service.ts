@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api-client";
-import type { ProfileData, ProfileResponse, UpdateProfileResponse } from "@/types/auth";
+import type { ProfileData, ProfileResponse, UpdateProfileResponse, ChangePasswordData, ChangePasswordResponse } from "@/types/auth";
 
 export const profileService = {
   async fetchUserProfile(): Promise<ProfileResponse> {
@@ -18,5 +18,9 @@ export const profileService = {
 
   async deleteProfilePhoto(): Promise<UpdateProfileResponse> {
     return apiClient.delete<UpdateProfileResponse>("/api/profile/photo");
+  },
+
+  async changePassword(data: ChangePasswordData): Promise<ChangePasswordResponse> {
+    return apiClient.put<ChangePasswordResponse>("/api/profile/password", data);
   },
 };
