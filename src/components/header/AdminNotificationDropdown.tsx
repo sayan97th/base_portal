@@ -69,29 +69,34 @@ function getTypeConfig(type: AdminNotificationType) {
 
 function NotificationRow({
   notification,
-  active_menu_id,
-  menu_ref,
-  onToggleMenu,
   onMarkAsRead,
   onArchive,
 }: {
   notification: AdminNotification;
-  active_menu_id: number | null;
-  menu_ref: React.RefObject<HTMLDivElement | null>;
-  onToggleMenu: (id: number, e: React.MouseEvent) => void;
-  onMarkAsRead: (id: number, e: React.MouseEvent) => void;
-  onArchive: (id: number, e: React.MouseEvent) => void;
+  onMarkAsRead: (id: number) => void;
+  onArchive: (id: number) => void;
 }) {
+  const [is_menu_open, setIsMenuOpen] = useState(false);
+  const menu_ref = useRef<HTMLDivElement>(null);
   const config = getTypeConfig(notification.type);
   const user_full_name = notification.user
     ? `${notification.user.first_name} ${notification.user.last_name}`.trim()
     : null;
 
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menu_ref.current && !menu_ref.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   return (
     <div
-      className={`flex items-start gap-3 px-5 py-3.5 transition-colors hover:bg-gray-50 dark:hover:bg-white/5 ${
-        !notification.is_read ? "bg-white dark:bg-white/2" : ""
-      }`}
+      className={`flex items-start gap-3 px-5 py-3.5 transition-colors hover:bg-gray-50 dark:hover:bg-white/5 ${!notification.is_read ? "bg-white dark:bg-white/2" : ""
+        }`}
     >
       {/* Type Icon */}
       <div
@@ -103,11 +108,10 @@ function NotificationRow({
       {/* Content */}
       <div className="min-w-0 flex-1">
         <p
-          className={`text-sm leading-relaxed ${
-            !notification.is_read
-              ? "font-medium text-gray-800 dark:text-white/90"
-              : "text-gray-600 dark:text-gray-300"
-          }`}
+          className={`text-sm leading-relaxed ${!notification.is_read
+            ? "font-medium text-gray-800 dark:text-white/90"
+            : "text-gray-600 dark:text-gray-300"
+            }`}
         >
           {notification.message}
         </p>
@@ -139,7 +143,10 @@ function NotificationRow({
       {/* Kebab Menu */}
       <div className="relative shrink-0" ref={menu_ref}>
         <button
-          onClick={(e) => onToggleMenu(notification.id, e)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsMenuOpen((prev) => !prev);
+          }}
           className="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 opacity-0 transition-all hover:bg-gray-100 hover:text-gray-600 group-hover:opacity-100 dark:hover:bg-gray-700 dark:hover:text-gray-300"
           aria-label="Notification actions"
         >
@@ -148,11 +155,14 @@ function NotificationRow({
           </svg>
         </button>
 
-        {active_menu_id === notification.id && (
+        {is_menu_open && (
           <div className="absolute right-0 top-full z-50 mt-1 w-40 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-theme-lg dark:border-gray-700 dark:bg-gray-800">
             {!notification.is_read && (
               <button
-                onClick={(e) => onMarkAsRead(notification.id, e)}
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  onMarkAsRead(notification.id);
+                }}
                 className="flex w-full items-center gap-2 px-3.5 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700"
               >
                 <svg
@@ -172,7 +182,10 @@ function NotificationRow({
               </button>
             )}
             <button
-              onClick={(e) => onArchive(notification.id, e)}
+              onClick={() => {
+                setIsMenuOpen(false);
+                onArchive(notification.id);
+              }}
               className="flex w-full items-center gap-2 px-3.5 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700"
             >
               <svg
@@ -199,8 +212,6 @@ function NotificationRow({
 
 export default function AdminNotificationDropdown() {
   const [is_open, setIsOpen] = useState(false);
-  const [active_menu_id, setActiveMenuId] = useState<number | null>(null);
-  const menu_ref = useRef<HTMLDivElement>(null);
 
   const { notifications, unread_count, markAsRead, archiveNotification } =
     useAdminNotifications();
@@ -209,40 +220,19 @@ export default function AdminNotificationDropdown() {
     .filter((n) => !n.is_archived)
     .slice(0, DROPDOWN_ITEMS_LIMIT);
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (menu_ref.current && !menu_ref.current.contains(event.target as Node)) {
-        setActiveMenuId(null);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
   function toggleDropdown() {
     setIsOpen(!is_open);
-    setActiveMenuId(null);
   }
 
   function closeDropdown() {
     setIsOpen(false);
-    setActiveMenuId(null);
   }
 
-  function handleToggleMenu(id: number, e: React.MouseEvent) {
-    e.stopPropagation();
-    setActiveMenuId((prev) => (prev === id ? null : id));
-  }
-
-  async function handleMarkAsRead(id: number, e: React.MouseEvent) {
-    e.stopPropagation();
-    setActiveMenuId(null);
+  async function handleMarkAsRead(id: number) {
     await markAsRead(id);
   }
 
-  async function handleArchive(id: number, e: React.MouseEvent) {
-    e.stopPropagation();
-    setActiveMenuId(null);
+  async function handleArchive(id: number) {
     await archiveNotification(id);
   }
 
@@ -253,9 +243,8 @@ export default function AdminNotificationDropdown() {
         onClick={toggleDropdown}
       >
         <span
-          className={`absolute right-0 top-0.5 z-10 h-2 w-2 rounded-full bg-orange-400 ${
-            unread_count === 0 ? "hidden" : "flex"
-          }`}
+          className={`absolute right-0 top-0.5 z-10 h-2 w-2 rounded-full bg-orange-400 ${unread_count === 0 ? "hidden" : "flex"
+            }`}
         >
           <span className="absolute inline-flex w-full h-full bg-orange-400 rounded-full opacity-75 animate-ping" />
         </span>
@@ -325,9 +314,6 @@ export default function AdminNotificationDropdown() {
               >
                 <NotificationRow
                   notification={notification}
-                  active_menu_id={active_menu_id}
-                  menu_ref={menu_ref}
-                  onToggleMenu={handleToggleMenu}
                   onMarkAsRead={handleMarkAsRead}
                   onArchive={handleArchive}
                 />
