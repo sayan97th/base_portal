@@ -35,6 +35,7 @@ export interface CreateOrderPayload {
   order_title?: string | null;
   order_notes?: string | null;
   total_amount: number;
+  coupon_id?: string;
   items: OrderItem[];
   billing: OrderBilling;
   payment: {
@@ -99,4 +100,29 @@ export interface CreateOrderResponse {
   status: OrderStatus;
   total_amount: number;
   created_at: string;
+}
+
+// ── Coupons ────────────────────────────────────────────────────────────────────
+
+export type CouponDiscountType = "percentage" | "fixed_amount";
+export type CouponAppliesTo = "all" | "specific_product" | "minimum_purchase";
+
+export interface ValidateCouponPayload {
+  code: string;
+  order_amount: number;
+  dr_tier_ids?: string[];
+}
+
+export interface ValidateCouponResponse {
+  valid: boolean;
+  coupon_id: string;
+  code: string;
+  name: string;
+  discount_type: CouponDiscountType;
+  discount_value: number;
+  applies_to: CouponAppliesTo;
+  dr_tier_id: string | null;
+  minimum_purchase_amount: number | null;
+  discount_amount: number;
+  message: string;
 }

@@ -18,6 +18,7 @@ import CheckoutStep, {
 } from "@/components/shared/CheckoutStep";
 import { dr_tiers as fallback_dr_tiers } from "./drTierData";
 import { linkBuildingService } from "@/services/client/link-building.service";
+import { validateCoupon } from "@/services/client/coupons.service";
 import { useNotifications } from "@/context/NotificationsContext";
 import { useBillingAddress } from "@/hooks/useBillingAddress";
 import type { DrTier } from "@/types/client/link-building";
@@ -64,6 +65,22 @@ const LinkBuildingPage: React.FC = () => {
     expiry_year: "",
     cvc: "",
     name_on_card: "",
+  });
+
+  const [coupon_state, setCouponState] = useState<{
+    code: string;
+    discount_amount: number | null;
+    coupon_name: string | null;
+    coupon_id: string | null;
+    error: string | null;
+    is_applying: boolean;
+  }>({
+    code: "",
+    discount_amount: null,
+    coupon_name: null,
+    coupon_id: null,
+    error: null,
+    is_applying: false,
   });
 
   const { saved_billing_address, has_saved_address } = useBillingAddress();
@@ -121,12 +138,14 @@ const LinkBuildingPage: React.FC = () => {
       }));
   }, [selected_quantities, dr_tiers]);
 
-  const total = useMemo(() => {
+  const subtotal = useMemo(() => {
     return dr_tiers.reduce((sum, tier) => {
       const qty = selected_quantities[tier.id] ?? 0;
       return sum + qty * tier.price_per_link;
     }, 0);
   }, [selected_quantities, dr_tiers]);
+
+  const total = Math.max(0, subtotal - (coupon_state.discount_amount ?? 0));
 
   const handleQuantityChange = (tier_id: string, quantity: number) => {
     setSelectedQuantities((prev) => {
@@ -163,6 +182,64 @@ const LinkBuildingPage: React.FC = () => {
 
   const handlePaymentChange = (field: keyof PaymentInfo, value: string) => {
     setPaymentInfo((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleCouponCodeChange = (code: string) => {
+    setCouponState((prev) => ({ ...prev, code, error: null }));
+  };
+
+  const handleApplyCoupon = async () => {
+    if (!coupon_state.code.trim()) return;
+    setCouponState((prev) => ({ ...prev, is_applying: true, error: null }));
+    try {
+      const dr_tier_ids = Object.keys(selected_quantities).filter(
+        (id) => selected_quantities[id] > 0
+      );
+      const response = await validateCoupon({
+        code: coupon_state.code.trim(),
+        order_amount: subtotal,
+        dr_tier_ids,
+      });
+      if (response.valid) {
+        setCouponState((prev) => ({
+          ...prev,
+          discount_amount: response.discount_amount,
+          coupon_name: response.name,
+          coupon_id: response.coupon_id,
+          error: null,
+          is_applying: false,
+        }));
+      } else {
+        setCouponState((prev) => ({
+          ...prev,
+          discount_amount: null,
+          coupon_name: null,
+          coupon_id: null,
+          error: response.message || "Invalid coupon code.",
+          is_applying: false,
+        }));
+      }
+    } catch {
+      setCouponState((prev) => ({
+        ...prev,
+        discount_amount: null,
+        coupon_name: null,
+        coupon_id: null,
+        error: "Could not validate coupon. Please try again.",
+        is_applying: false,
+      }));
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setCouponState({
+      code: "",
+      discount_amount: null,
+      coupon_name: null,
+      coupon_id: null,
+      error: null,
+      is_applying: false,
+    });
   };
 
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
@@ -231,6 +308,7 @@ const LinkBuildingPage: React.FC = () => {
         order_title: order_title || null,
         order_notes: order_notes || null,
         total_amount: total,
+        coupon_id: coupon_state.coupon_id ?? undefined,
         items,
         billing: {
           company: billing_address.company || null,
@@ -372,7 +450,7 @@ const LinkBuildingPage: React.FC = () => {
           <div className="col-span-12 lg:col-span-4">
             <LinkBuildingOrderSummary
               selected_items={selected_items}
-              total={total}
+              total={subtotal}
               action_label={
                 current_step === "selection" ? "Continue" : "Review"
               }
@@ -389,10 +467,15 @@ const LinkBuildingPage: React.FC = () => {
           <div className="col-span-12 lg:col-span-4">
             <LinkBuildingOrderSummary
               selected_items={selected_items}
-              total={total}
+              total={subtotal}
               action_label="Review"
               onAction={() => {}}
               is_action_disabled
+              show_coupon_field
+              coupon={coupon_state}
+              onCouponCodeChange={handleCouponCodeChange}
+              onApplyCoupon={handleApplyCoupon}
+              onRemoveCoupon={handleRemoveCoupon}
             />
           </div>
         )}
