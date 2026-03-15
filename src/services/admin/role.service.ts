@@ -3,7 +3,7 @@ import type {
   RolesListResponse,
   AssignRoleData,
   RoleActionResponse,
-} from "./types";
+} from "@/types/admin";
 
 /**
  * List all roles with their permissions.

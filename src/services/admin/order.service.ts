@@ -6,7 +6,7 @@ import type {
   PaginatedResponse,
   LaravelPaginatedResponse,
   OrderStatus,
-} from "./types";
+} from "@/types/admin";
 
 /**
  * List all orders — staff portal view (paginated).

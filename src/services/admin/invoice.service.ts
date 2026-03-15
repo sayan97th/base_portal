@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api-client";
-import type { AdminInvoice, PaginatedResponse } from "./types";
+import type { AdminInvoice, PaginatedResponse } from "@/types/admin";
 
 /**
  * List all invoices — staff portal view (paginated).

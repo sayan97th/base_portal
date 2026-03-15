@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api-client";
-import type { AdminUser, AdminUserOrderSummary, PaginatedResponse } from "./types";
+import type { AdminUser, AdminUserOrderSummary, PaginatedResponse } from "@/types/admin";
 
 /**
  * List all users (paginated).

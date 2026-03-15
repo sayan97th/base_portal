@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api-client";
-import type { Organization, PaginatedResponse } from "./types";
+import type { Organization, PaginatedResponse } from "@/types/admin";
 
 export interface UpdateOrganizationData {
   name: string;

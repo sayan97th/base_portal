@@ -6,7 +6,7 @@ import type {
   SendAdminInvitationData,
   AcceptAdminInvitationData,
   AcceptInvitationResponse,
-} from "./types";
+} from "@/types/admin";
 
 /**
  * Validate an admin invitation token.
