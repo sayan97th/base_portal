@@ -7,9 +7,10 @@ export const metadata: Metadata = {
 };
 
 interface EditCouponPageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
-export default function EditCouponPage({ params }: EditCouponPageProps) {
-  return <CouponFormPage mode="edit" coupon_id={params.id} />;
+export default async function EditCouponPage({ params }: EditCouponPageProps) {
+  const { id } = await params;
+  return <CouponFormPage mode="edit" coupon_id={id} />;
 }
