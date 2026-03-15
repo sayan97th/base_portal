@@ -120,6 +120,18 @@ const AdminSidebar: React.FC = () => {
 
   const showText = isExpanded || isHovered || isMobileOpen;
 
+  const getVisibleItems = useCallback(
+    (items: SidebarItem[]) =>
+      items.filter((item) =>
+        item.permission ? hasPermission(item.permission) : true
+      ),
+    [hasPermission]
+  );
+
+  const visible_sections = admin_sidebar_sections.filter(
+    (section) => getVisibleItems(section.items).length > 0
+  );
+
   return (
     <aside
       className={`fixed mt-16 flex flex-col lg:mt-0 top-0 px-5 left-0 bg-gray-900 dark:bg-gray-950 text-white h-screen transition-all duration-300 ease-in-out z-50 border-r border-gray-700 dark:border-gray-800
@@ -161,7 +173,7 @@ const AdminSidebar: React.FC = () => {
       <div className="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
         <nav className="mb-6">
           <div className="flex flex-col gap-4">
-            {admin_sidebar_sections.map((section, section_index) => (
+            {visible_sections.map((section, section_index) => (
               <div key={section_index}>
                 {section.title && showText && (
                   <h2 className="mb-4 text-xs uppercase leading-[20px] text-gray-500">
@@ -174,11 +186,7 @@ const AdminSidebar: React.FC = () => {
                   </div>
                 )}
                 <ul className="flex flex-col gap-1">
-                  {section.items
-                    .filter((item) =>
-                      item.permission ? hasPermission(item.permission) : true
-                    )
-                    .map((item) => {
+                  {getVisibleItems(section.items).map((item) => {
                       const has_sub_items =
                         item.sub_items && item.sub_items.length > 0;
                       const is_open =
