@@ -98,6 +98,7 @@ interface NotificationsContextType {
   markAllAsRead: () => Promise<void>;
   snoozeNotification: (id: number, snooze_until?: string) => Promise<void>;
   archiveNotification: (id: number) => Promise<void>;
+  unarchiveNotification: (id: number) => Promise<void>;
 }
 
 const NotificationsContext = createContext<NotificationsContextType | undefined>(
@@ -195,6 +196,16 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     [fetchNotifications]
   );
 
+  const unarchiveNotification = useCallback(
+    async (id: number) => {
+      dispatch({ type: "UPDATE_NOTIFICATION", payload: { id, is_archived: false } });
+      await notificationsService
+        .unarchiveNotification(id)
+        .catch(() => fetchNotifications());
+    },
+    [fetchNotifications]
+  );
+
   return (
     <NotificationsContext.Provider
       value={{
@@ -208,6 +219,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
         markAllAsRead,
         snoozeNotification,
         archiveNotification,
+        unarchiveNotification,
       }}
     >
       {children}

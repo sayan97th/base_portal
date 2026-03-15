@@ -97,6 +97,7 @@ interface AdminNotificationsContextType {
   markAsRead: (id: number) => Promise<void>;
   markAllAsRead: () => Promise<void>;
   archiveNotification: (id: number) => Promise<void>;
+  unarchiveNotification: (id: number) => Promise<void>;
 }
 
 const AdminNotificationsContext = createContext<AdminNotificationsContextType | undefined>(
@@ -167,6 +168,16 @@ export const AdminNotificationsProvider: React.FC<{ children: React.ReactNode }>
     [fetchNotifications]
   );
 
+  const unarchiveNotification = useCallback(
+    async (id: number) => {
+      dispatch({ type: "UPDATE_NOTIFICATION", payload: { id, is_archived: false } });
+      await adminNotificationsService
+        .unarchiveNotification(id)
+        .catch(() => fetchNotifications());
+    },
+    [fetchNotifications]
+  );
+
   return (
     <AdminNotificationsContext.Provider
       value={{
@@ -178,6 +189,7 @@ export const AdminNotificationsProvider: React.FC<{ children: React.ReactNode }>
         markAsRead,
         markAllAsRead,
         archiveNotification,
+        unarchiveNotification,
       }}
     >
       {children}

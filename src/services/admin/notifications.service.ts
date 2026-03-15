@@ -65,6 +65,13 @@ interface AdminArchiveResponse {
   };
 }
 
+interface AdminUnarchiveResponse {
+  data: {
+    id: number;
+    is_archived: boolean;
+  };
+}
+
 export const adminNotificationsService = {
   async getNotifications(
     filters?: AdminNotificationFilters
@@ -105,6 +112,13 @@ export const adminNotificationsService = {
   async archiveNotification(id: number): Promise<{ id: number; is_archived: boolean }> {
     const response = await apiClient.patch<AdminArchiveResponse>(
       `/api/admin/notifications/${id}/archive`
+    );
+    return response.data;
+  },
+
+  async unarchiveNotification(id: number): Promise<{ id: number; is_archived: boolean }> {
+    const response = await apiClient.patch<AdminUnarchiveResponse>(
+      `/api/admin/notifications/${id}/unarchive`
     );
     return response.data;
   },

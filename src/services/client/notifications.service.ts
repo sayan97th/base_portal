@@ -63,6 +63,13 @@ interface ArchiveResponse {
   };
 }
 
+interface UnarchiveResponse {
+  data: {
+    id: number;
+    is_archived: boolean;
+  };
+}
+
 export interface CreateNotificationPayload {
   type: NotificationType;
   message: string;
@@ -122,6 +129,13 @@ export const notificationsService = {
   async archiveNotification(id: number): Promise<{ id: number; is_archived: boolean }> {
     const response = await apiClient.patch<ArchiveResponse>(
       `/api/notifications/${id}/archive`
+    );
+    return response.data;
+  },
+
+  async unarchiveNotification(id: number): Promise<{ id: number; is_archived: boolean }> {
+    const response = await apiClient.patch<UnarchiveResponse>(
+      `/api/notifications/${id}/unarchive`
     );
     return response.data;
   },

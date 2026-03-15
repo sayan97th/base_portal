@@ -5,8 +5,10 @@ import type { AdminNotification, AdminNotificationType } from "@/services/admin/
 
 interface AdminNotificationItemProps {
   notification: AdminNotification;
+  is_archived_view?: boolean;
   onMarkAsRead: (id: number) => void;
   onArchive: (id: number) => void;
+  onUnarchive: (id: number) => void;
 }
 
 const TYPE_CONFIG: Record<
@@ -73,8 +75,10 @@ const TYPE_LABEL: Record<AdminNotificationType, string> = {
 
 const AdminNotificationItem: React.FC<AdminNotificationItemProps> = ({
   notification,
+  is_archived_view = false,
   onMarkAsRead,
   onArchive,
+  onUnarchive,
 }) => {
   const [is_menu_open, setIsMenuOpen] = useState(false);
   const menu_ref = useRef<HTMLDivElement>(null);
@@ -105,6 +109,12 @@ const AdminNotificationItem: React.FC<AdminNotificationItemProps> = ({
   function handleArchive(e: React.MouseEvent) {
     e.stopPropagation();
     onArchive(notification.id);
+    setIsMenuOpen(false);
+  }
+
+  function handleUnarchive(e: React.MouseEvent) {
+    e.stopPropagation();
+    onUnarchive(notification.id);
     setIsMenuOpen(false);
   }
 
@@ -197,9 +207,10 @@ const AdminNotificationItem: React.FC<AdminNotificationItemProps> = ({
 
         {is_menu_open && (
           <div className="absolute right-0 top-full z-50 mt-1 w-44 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-theme-lg dark:border-gray-700 dark:bg-gray-800">
-            {!notification.is_read && (
+            {is_archived_view ? (
+              /* ── Archived view actions ── */
               <button
-                onClick={handleMarkAsRead}
+                onClick={handleUnarchive}
                 className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-gray-600 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700"
               >
                 <svg
@@ -212,32 +223,57 @@ const AdminNotificationItem: React.FC<AdminNotificationItemProps> = ({
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    d="M4.5 10.5l3.5 3.5 7.5-7.5"
+                    d="M3 10h14M10 3l-7 7 7 7"
                   />
                 </svg>
-                Mark as read
+                Restore
               </button>
-            )}
+            ) : (
+              /* ── Active view actions ── */
+              <>
+                {!notification.is_read && (
+                  <button
+                    onClick={handleMarkAsRead}
+                    className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-gray-600 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700"
+                  >
+                    <svg
+                      className="h-4 w-4"
+                      viewBox="0 0 20 20"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.5}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M4.5 10.5l3.5 3.5 7.5-7.5"
+                      />
+                    </svg>
+                    Mark as read
+                  </button>
+                )}
 
-            <button
-              onClick={handleArchive}
-              className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-gray-600 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700"
-            >
-              <svg
-                className="h-4 w-4"
-                viewBox="0 0 20 20"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={1.5}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3 5h14M5 5v10a2 2 0 002 2h6a2 2 0 002-2V5M8 9h4"
-                />
-              </svg>
-              Archive
-            </button>
+                <button
+                  onClick={handleArchive}
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-gray-600 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700"
+                >
+                  <svg
+                    className="h-4 w-4"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M3 5h14M5 5v10a2 2 0 002 2h6a2 2 0 002-2V5M8 9h4"
+                    />
+                  </svg>
+                  Archive
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>

@@ -7,7 +7,10 @@ import { useNotifications } from "@/context/NotificationsContext";
 
 const ITEMS_PER_PAGE = 7;
 
+type ActiveTab = "active" | "archived";
+
 const NotificationsPage: React.FC = () => {
+  const [active_tab, setActiveTab] = useState<ActiveTab>("active");
   const [current_page, setCurrentPage] = useState(1);
 
   const {
@@ -17,13 +20,22 @@ const NotificationsPage: React.FC = () => {
     markAsRead,
     markAllAsRead,
     archiveNotification,
+    unarchiveNotification,
     snoozeNotification,
   } = useNotifications();
 
-  const visible_notifications = useMemo(
+  const active_notifications = useMemo(
     () => notifications.filter((n) => !n.is_archived),
     [notifications]
   );
+
+  const archived_notifications = useMemo(
+    () => notifications.filter((n) => n.is_archived),
+    [notifications]
+  );
+
+  const visible_notifications =
+    active_tab === "active" ? active_notifications : archived_notifications;
 
   const total_pages = Math.ceil(visible_notifications.length / ITEMS_PER_PAGE);
 
@@ -31,6 +43,11 @@ const NotificationsPage: React.FC = () => {
     const start_index = (current_page - 1) * ITEMS_PER_PAGE;
     return visible_notifications.slice(start_index, start_index + ITEMS_PER_PAGE);
   }, [visible_notifications, current_page]);
+
+  function handleTabChange(tab: ActiveTab) {
+    setActiveTab(tab);
+    setCurrentPage(1);
+  }
 
   function goToPreviousPage() {
     setCurrentPage((prev) => Math.max(prev - 1, 1));
@@ -56,14 +73,14 @@ const NotificationsPage: React.FC = () => {
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
             Notifications
           </h1>
-          {unread_count > 0 && (
+          {unread_count > 0 && active_tab === "active" && (
             <span className="inline-flex items-center justify-center rounded-full bg-brand-500 px-2.5 py-0.5 text-xs font-medium text-white">
               {unread_count}
             </span>
           )}
         </div>
 
-        {unread_count > 0 && (
+        {unread_count > 0 && active_tab === "active" && (
           <button
             onClick={markAllAsRead}
             className="text-sm font-medium text-brand-500 transition-colors hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
@@ -71,6 +88,47 @@ const NotificationsPage: React.FC = () => {
             Mark all as read
           </button>
         )}
+      </div>
+
+      {/* Tabs */}
+      <div className="flex items-center gap-1 border-b border-gray-200 dark:border-gray-800">
+        <button
+          onClick={() => handleTabChange("active")}
+          className={`relative px-4 py-2.5 text-sm font-medium transition-colors ${
+            active_tab === "active"
+              ? "text-brand-600 dark:text-brand-400"
+              : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+          }`}
+        >
+          Active
+          {active_notifications.length > 0 && (
+            <span className="ml-2 inline-flex items-center justify-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+              {active_notifications.length}
+            </span>
+          )}
+          {active_tab === "active" && (
+            <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-brand-500" />
+          )}
+        </button>
+
+        <button
+          onClick={() => handleTabChange("archived")}
+          className={`relative px-4 py-2.5 text-sm font-medium transition-colors ${
+            active_tab === "archived"
+              ? "text-brand-600 dark:text-brand-400"
+              : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+          }`}
+        >
+          Archived
+          {archived_notifications.length > 0 && (
+            <span className="ml-2 inline-flex items-center justify-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+              {archived_notifications.length}
+            </span>
+          )}
+          {active_tab === "archived" && (
+            <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-brand-500" />
+          )}
+        </button>
       </div>
 
       {/* Notification List */}
@@ -81,8 +139,10 @@ const NotificationsPage: React.FC = () => {
               <NotificationItem
                 key={notification.id}
                 notification={notification}
+                is_archived_view={active_tab === "archived"}
                 onMarkAsRead={markAsRead}
                 onArchive={archiveNotification}
+                onUnarchive={unarchiveNotification}
                 onSnooze={snoozeNotification}
               />
             ))}
@@ -96,18 +156,32 @@ const NotificationsPage: React.FC = () => {
               stroke="currentColor"
               strokeWidth={1.5}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"
-              />
+              {active_tab === "archived" ? (
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"
+                />
+              ) : (
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"
+                />
+              )}
             </svg>
-            <p className="text-sm font-medium">No notifications</p>
-            <p className="mt-1 text-xs">You&apos;re all caught up!</p>
+            <p className="text-sm font-medium">
+              {active_tab === "archived" ? "No archived notifications" : "No notifications"}
+            </p>
+            <p className="mt-1 text-xs">
+              {active_tab === "archived"
+                ? "Archived notifications will appear here"
+                : "You're all caught up!"}
+            </p>
           </div>
         )}
 
-        {/* Footer with Pagination and Show All */}
+        {/* Footer with Pagination */}
         {visible_notifications.length > 0 && (
           <div className="flex items-center justify-between border-t border-gray-100 px-5 py-3 dark:border-gray-800">
             {/* Pagination */}
@@ -126,6 +200,11 @@ const NotificationsPage: React.FC = () => {
                   />
                 </svg>
               </button>
+              {total_pages > 1 && (
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {current_page} / {total_pages}
+                </span>
+              )}
               <button
                 onClick={goToNextPage}
                 disabled={current_page === total_pages}
@@ -142,20 +221,22 @@ const NotificationsPage: React.FC = () => {
               </button>
             </div>
 
-            {/* Show All Link */}
-            <Link
-              href="/notifications"
-              className="flex items-center gap-1.5 text-sm font-medium text-brand-500 transition-colors hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
-            >
-              Show all
-              <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                <path
-                  fillRule="evenodd"
-                  d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </Link>
+            {/* Show All Link — only on active tab */}
+            {active_tab === "active" && (
+              <Link
+                href="/notifications"
+                className="flex items-center gap-1.5 text-sm font-medium text-brand-500 transition-colors hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
+              >
+                Show all
+                <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path
+                    fillRule="evenodd"
+                    d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </Link>
+            )}
           </div>
         )}
       </div>
