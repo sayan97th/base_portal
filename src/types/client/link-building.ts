@@ -52,6 +52,8 @@ export interface LinkBuildingOrderSummary {
   status: OrderStatus;
   created_at: string;
   items_count: number;
+  updates_count: number;
+  last_update_at: string | null;
 }
 
 export interface OrderPlacementDetail {
