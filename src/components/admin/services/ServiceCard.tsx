@@ -96,14 +96,14 @@ export default function ServiceCard({
       }`}
     >
       {/* Gradient top bar */}
-      <div className={`h-1.5 w-full bg-gradient-to-r ${config.gradient}`} />
+      <div className={`h-1.5 w-full bg-linear-to-r ${config.gradient}`} />
 
       <div className="p-6">
         {/* Header row */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">
             <div
-              className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl ${config.icon_bg} ${config.text_color}`}
+              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${config.icon_bg} ${config.text_color}`}
             >
               {CATEGORY_ICONS[service.category]}
             </div>
@@ -130,7 +130,7 @@ export default function ServiceCard({
           </div>
 
           {/* Status + menu */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             <span
               className={`inline-flex h-6 items-center rounded-full px-2.5 text-xs font-semibold ${
                 service.is_active

@@ -250,7 +250,7 @@ export default function ServiceFormModal({
                 <button
                   type="button"
                   onClick={() => setFormData((p) => ({ ...p, is_active: !p.is_active }))}
-                  className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors ${
+                  className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors ${
                     form_data.is_active ? "bg-brand-500" : "bg-gray-300 dark:bg-gray-600"
                   }`}
                 >
@@ -274,7 +274,7 @@ export default function ServiceFormModal({
                 <button
                   type="button"
                   onClick={() => setFormData((p) => ({ ...p, is_featured: !p.is_featured }))}
-                  className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors ${
+                  className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors ${
                     form_data.is_featured ? "bg-brand-500" : "bg-gray-300 dark:bg-gray-600"
                   }`}
                 >

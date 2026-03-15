@@ -10,8 +10,29 @@ export interface AdminDrTier {
   price_per_link: number;
   is_most_popular: boolean;
   is_active: boolean;
+  is_hidden: boolean;
+  orders_count: number;
+  revenue_total: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface DrTierPurchase {
+  order_id: string;
+  user: {
+    id: number;
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
+  quantity: number;
+  subtotal: number;
+  purchased_at: string;
+}
+
+export interface AdminDrTierDetail extends AdminDrTier {
+  unique_buyers: number;
+  purchases: DrTierPurchase[];
 }
 
 export interface AdminService {

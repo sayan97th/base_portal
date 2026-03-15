@@ -2,6 +2,7 @@ import { apiClient } from "@/lib/api-client";
 import type {
   AdminService,
   AdminDrTier,
+  AdminDrTierDetail,
   CreateServicePayload,
   UpdateServicePayload,
   CreateDrTierPayload,
@@ -48,6 +49,12 @@ export async function listAdminDrTiers(): Promise<AdminDrTier[]> {
   return apiClient.get<AdminDrTier[]>("/api/admin/dr-tiers");
 }
 
+export async function getAdminDrTierDetail(
+  id: string
+): Promise<AdminDrTierDetail> {
+  return apiClient.get<AdminDrTierDetail>(`/api/admin/dr-tiers/${id}`);
+}
+
 export async function createAdminDrTier(
   payload: CreateDrTierPayload
 ): Promise<AdminDrTier> {
@@ -67,6 +74,18 @@ export async function toggleAdminDrTierStatus(
 ): Promise<AdminDrTier> {
   return apiClient.patch<AdminDrTier>(`/api/admin/dr-tiers/${id}`, {
     is_active,
+  });
+}
+
+export async function hideAdminDrTier(id: string): Promise<AdminDrTier> {
+  return apiClient.patch<AdminDrTier>(`/api/admin/dr-tiers/${id}`, {
+    is_hidden: true,
+  });
+}
+
+export async function unhideAdminDrTier(id: string): Promise<AdminDrTier> {
+  return apiClient.patch<AdminDrTier>(`/api/admin/dr-tiers/${id}`, {
+    is_hidden: false,
   });
 }
 
