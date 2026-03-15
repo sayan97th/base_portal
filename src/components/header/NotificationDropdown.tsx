@@ -1,16 +1,175 @@
 "use client";
 
 import Link from "next/link";
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { useNotifications } from "@/context/NotificationsContext";
+import type { Notification } from "@/services/client/notifications.service";
 
 const DROPDOWN_ITEMS_LIMIT = 5;
 
+function NotificationRow({
+  notification,
+  onMarkAsRead,
+  onSnooze,
+  onArchive,
+}: {
+  notification: Notification;
+  onMarkAsRead: (id: number) => void;
+  onSnooze: (id: number) => void;
+  onArchive: (id: number) => void;
+}) {
+  const [is_menu_open, setIsMenuOpen] = useState(false);
+  const menu_ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menu_ref.current && !menu_ref.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div
+      className={`flex items-start gap-3 px-5 py-3.5 transition-colors hover:bg-gray-50 dark:hover:bg-white/5 ${
+        !notification.is_read ? "bg-white dark:bg-white/2" : ""
+      }`}
+    >
+      {/* Bell Icon */}
+      <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-50 dark:bg-brand-500/10">
+        <svg
+          className="h-4 w-4 text-brand-500"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+        >
+          <path
+            fillRule="evenodd"
+            clipRule="evenodd"
+            d="M10.75 2.29248C10.75 1.87827 10.4143 1.54248 10 1.54248C9.58583 1.54248 9.25004 1.87827 9.25004 2.29248V2.83613C6.08266 3.20733 3.62504 5.9004 3.62504 9.16748V14.4591H3.33337C2.91916 14.4591 2.58337 14.7949 2.58337 15.2091C2.58337 15.6234 2.91916 15.9591 3.33337 15.9591H4.37504H15.625H16.6667C17.0809 15.9591 17.4167 15.6234 17.4167 15.2091C17.4167 14.7949 17.0809 14.4591 16.6667 14.4591H16.375V9.16748C16.375 5.9004 13.9174 3.20733 10.75 2.83613V2.29248ZM14.875 14.4591V9.16748C14.875 6.47509 12.6924 4.29248 10 4.29248C7.30765 4.29248 5.12504 6.47509 5.12504 9.16748V14.4591H14.875ZM8.00004 17.7085C8.00004 18.1228 8.33583 18.4585 8.75004 18.4585H11.25C11.6643 18.4585 12 18.1228 12 17.7085C12 17.2943 11.6643 16.9585 11.25 16.9585H8.75004C8.33583 16.9585 8.00004 17.2943 8.00004 17.7085Z"
+          />
+        </svg>
+      </div>
+
+      {/* Content */}
+      <div className="min-w-0 flex-1">
+        <p
+          className={`text-sm leading-relaxed ${
+            !notification.is_read
+              ? "font-medium text-gray-800 dark:text-white/90"
+              : "text-gray-600 dark:text-gray-300"
+          }`}
+        >
+          {notification.message}
+        </p>
+
+        {notification.preview_text && (
+          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500 line-clamp-2">
+            {notification.preview_text}
+          </p>
+        )}
+
+        <span className="mt-1 block text-xs text-gray-400 dark:text-gray-500">
+          {notification.relative_time}
+        </span>
+      </div>
+
+      {/* Kebab Menu */}
+      <div className="relative shrink-0" ref={menu_ref}>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsMenuOpen((prev) => !prev);
+          }}
+          className="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 opacity-0 transition-all hover:bg-gray-100 hover:text-gray-600 group-hover:opacity-100 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+          aria-label="Notification actions"
+        >
+          <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+          </svg>
+        </button>
+
+        {is_menu_open && (
+          <div className="absolute right-0 top-full z-50 mt-1 w-40 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-theme-lg dark:border-gray-700 dark:bg-gray-800">
+            {!notification.is_read && (
+              <button
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  onMarkAsRead(notification.id);
+                }}
+                className="flex w-full items-center gap-2 px-3.5 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700"
+              >
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M4.5 10.5l3.5 3.5 7.5-7.5"
+                  />
+                </svg>
+                Mark as read
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setIsMenuOpen(false);
+                onSnooze(notification.id);
+              }}
+              className="flex w-full items-center gap-2 px-3.5 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              <svg
+                className="h-4 w-4"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M10 2.5a7.5 7.5 0 100 15 7.5 7.5 0 000-15zM10 5.5v5l3 1.5"
+                />
+              </svg>
+              Snooze
+            </button>
+            <button
+              onClick={() => {
+                setIsMenuOpen(false);
+                onArchive(notification.id);
+              }}
+              className="flex w-full items-center gap-2 px-3.5 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              <svg
+                className="h-4 w-4"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3 5h14M5 5v10a2 2 0 002 2h6a2 2 0 002-2V5M8 9h4"
+                />
+              </svg>
+              Archive
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function NotificationDropdown() {
   const [is_open, setIsOpen] = useState(false);
-  const [active_menu_id, setActiveMenuId] = useState<number | null>(null);
-  const menu_ref = useRef<HTMLDivElement>(null);
 
   const {
     notifications,
@@ -24,50 +183,23 @@ export default function NotificationDropdown() {
     .filter((n) => !n.is_archived)
     .slice(0, DROPDOWN_ITEMS_LIMIT);
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        menu_ref.current &&
-        !menu_ref.current.contains(event.target as Node)
-      ) {
-        setActiveMenuId(null);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
   function toggleDropdown() {
     setIsOpen(!is_open);
-    setActiveMenuId(null);
   }
 
   function closeDropdown() {
     setIsOpen(false);
-    setActiveMenuId(null);
   }
 
-  function handleToggleMenu(id: number, e: React.MouseEvent) {
-    e.stopPropagation();
-    setActiveMenuId((prev) => (prev === id ? null : id));
-  }
-
-  async function handleMarkAsRead(id: number, e: React.MouseEvent) {
-    e.stopPropagation();
-    setActiveMenuId(null);
+  async function handleMarkAsRead(id: number) {
     await markAsRead(id);
   }
 
-  async function handleSnooze(id: number, e: React.MouseEvent) {
-    e.stopPropagation();
-    setActiveMenuId(null);
+  async function handleSnooze(id: number) {
     await snoozeNotification(id);
   }
 
-  async function handleArchive(id: number, e: React.MouseEvent) {
-    e.stopPropagation();
-    setActiveMenuId(null);
+  async function handleArchive(id: number) {
     await archiveNotification(id);
   }
 
@@ -146,132 +278,12 @@ export default function NotificationDropdown() {
               key={notification.id}
               className="group relative border-b border-gray-100 dark:border-gray-800 last:border-b-0"
             >
-              <div
-                className={`flex items-start gap-3 px-5 py-3.5 transition-colors hover:bg-gray-50 dark:hover:bg-white/5 ${
-                  !notification.is_read
-                    ? "bg-white dark:bg-white/2"
-                    : ""
-                }`}
-              >
-                {/* Bell Icon */}
-                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-50 dark:bg-brand-500/10">
-                  <svg
-                    className="h-4 w-4 text-brand-500"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      clipRule="evenodd"
-                      d="M10.75 2.29248C10.75 1.87827 10.4143 1.54248 10 1.54248C9.58583 1.54248 9.25004 1.87827 9.25004 2.29248V2.83613C6.08266 3.20733 3.62504 5.9004 3.62504 9.16748V14.4591H3.33337C2.91916 14.4591 2.58337 14.7949 2.58337 15.2091C2.58337 15.6234 2.91916 15.9591 3.33337 15.9591H4.37504H15.625H16.6667C17.0809 15.9591 17.4167 15.6234 17.4167 15.2091C17.4167 14.7949 17.0809 14.4591 16.6667 14.4591H16.375V9.16748C16.375 5.9004 13.9174 3.20733 10.75 2.83613V2.29248ZM14.875 14.4591V9.16748C14.875 6.47509 12.6924 4.29248 10 4.29248C7.30765 4.29248 5.12504 6.47509 5.12504 9.16748V14.4591H14.875ZM8.00004 17.7085C8.00004 18.1228 8.33583 18.4585 8.75004 18.4585H11.25C11.6643 18.4585 12 18.1228 12 17.7085C12 17.2943 11.6643 16.9585 11.25 16.9585H8.75004C8.33583 16.9585 8.00004 17.2943 8.00004 17.7085Z"
-                    />
-                  </svg>
-                </div>
-
-                {/* Content */}
-                <div className="min-w-0 flex-1">
-                  <p
-                    className={`text-sm leading-relaxed ${
-                      !notification.is_read
-                        ? "font-medium text-gray-800 dark:text-white/90"
-                        : "text-gray-600 dark:text-gray-300"
-                    }`}
-                  >
-                    {notification.message}
-                  </p>
-
-                  {notification.preview_text && (
-                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-500 line-clamp-2">
-                      {notification.preview_text}
-                    </p>
-                  )}
-
-                  <span className="mt-1 block text-xs text-gray-400 dark:text-gray-500">
-                    {notification.relative_time}
-                  </span>
-                </div>
-
-                {/* Kebab Menu */}
-                <div className="relative shrink-0" ref={menu_ref}>
-                  <button
-                    onClick={(e) => handleToggleMenu(notification.id, e)}
-                    className="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 opacity-0 transition-all hover:bg-gray-100 hover:text-gray-600 group-hover:opacity-100 dark:hover:bg-gray-700 dark:hover:text-gray-300"
-                    aria-label="Notification actions"
-                  >
-                    <svg
-                      className="h-4 w-4"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                    >
-                      <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                    </svg>
-                  </button>
-
-                  {active_menu_id === notification.id && (
-                    <div className="absolute right-0 top-full z-50 mt-1 w-40 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-theme-lg dark:border-gray-700 dark:bg-gray-800">
-                      {!notification.is_read && (
-                        <button
-                          onClick={(e) => handleMarkAsRead(notification.id, e)}
-                          className="flex w-full items-center gap-2 px-3.5 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700"
-                        >
-                          <svg
-                            className="h-4 w-4"
-                            viewBox="0 0 20 20"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth={1.5}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M4.5 10.5l3.5 3.5 7.5-7.5"
-                            />
-                          </svg>
-                          Mark as read
-                        </button>
-                      )}
-                      <button
-                        onClick={(e) => handleSnooze(notification.id, e)}
-                        className="flex w-full items-center gap-2 px-3.5 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700"
-                      >
-                        <svg
-                          className="h-4 w-4"
-                          viewBox="0 0 20 20"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth={1.5}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M10 2.5a7.5 7.5 0 100 15 7.5 7.5 0 000-15zM10 5.5v5l3 1.5"
-                          />
-                        </svg>
-                        Snooze
-                      </button>
-                      <button
-                        onClick={(e) => handleArchive(notification.id, e)}
-                        className="flex w-full items-center gap-2 px-3.5 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700"
-                      >
-                        <svg
-                          className="h-4 w-4"
-                          viewBox="0 0 20 20"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth={1.5}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M3 5h14M5 5v10a2 2 0 002 2h6a2 2 0 002-2V5M8 9h4"
-                          />
-                        </svg>
-                        Archive
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <NotificationRow
+                notification={notification}
+                onMarkAsRead={handleMarkAsRead}
+                onSnooze={handleSnooze}
+                onArchive={handleArchive}
+              />
             </li>
           ))}
         </ul>
