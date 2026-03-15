@@ -102,6 +102,20 @@ export interface CreateOrderResponse {
   created_at: string;
 }
 
+// ── Order Tracking ─────────────────────────────────────────────────────────────
+
+export interface OrderUpdateEntry {
+  id: string;
+  title: string;
+  message: string;
+  status_change: OrderStatus | null;
+  created_at: string;
+}
+
+export interface OrderUpdatesListResponse {
+  data: OrderUpdateEntry[];
+}
+
 // ── Coupons ────────────────────────────────────────────────────────────────────
 
 export type CouponDiscountType = "percentage" | "fixed_amount";

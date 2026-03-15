@@ -16,6 +16,7 @@ import type {
   OrderItemDetail,
   OrderStatus,
 } from "@/types/client/link-building";
+import OrderProgressTimeline from "@/components/orders/OrderProgressTimeline";
 
 interface LinkBuildingOrderDetailPageProps {
   order_id: string;
@@ -468,6 +469,12 @@ const LinkBuildingOrderDetailPage: React.FC<
                   </p>
                 </div>
               )}
+
+              {/* Order Progress Timeline */}
+              <OrderProgressTimeline
+                order_id={order.id}
+                current_status={order.status}
+              />
             </div>
 
             {/* Right — Summary & Billing */}

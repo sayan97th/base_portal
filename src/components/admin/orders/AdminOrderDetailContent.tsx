@@ -5,6 +5,7 @@ import Link from "next/link";
 import Badge from "@/components/ui/badge/Badge";
 import { getAdminOrder } from "@/services/admin/order.service";
 import type { AdminOrder, AdminInvoice, OrderItem, OrderStatus } from "@/types/admin";
+import OrderTrackingPanel from "./OrderTrackingPanel";
 
 interface AdminOrderDetailContentProps {
   order_id: string;
@@ -199,6 +200,7 @@ const InvoiceCard = ({ invoice }: InvoiceCardProps) => {
 
 const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order_id }) => {
   const [order, setOrder] = useState<AdminOrder | null>(null);
+  const [current_status, setCurrentStatus] = useState<OrderStatus | null>(null);
   const [is_loading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -209,6 +211,7 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
       try {
         const data = await getAdminOrder(order_id);
         setOrder(data);
+        setCurrentStatus(data.status);
       } catch {
         setError("We couldn't load this order. Please try again.");
       } finally {
@@ -218,7 +221,8 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
     load();
   }, [order_id]);
 
-  const status_config = order ? getStatusConfig(order.status) : null;
+  const effective_status = current_status ?? order?.status ?? "pending";
+  const status_config = order ? getStatusConfig(effective_status) : null;
 
   return (
     <div className="space-y-6">
@@ -357,11 +361,11 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
                 <dl className="px-5 py-1">
                   <InfoRow label="Status" value={
                     <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
-                      order.status === "pending" ? "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400" :
-                      order.status === "processing" ? "bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400" :
-                      order.status === "completed" ? "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400" :
+                      effective_status === "pending" ? "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400" :
+                      effective_status === "processing" ? "bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400" :
+                      effective_status === "completed" ? "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400" :
                       "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400"
-                    }`}>{order.status}</span>
+                    }`}>{effective_status}</span>
                   } />
                   <InfoRow label="Items" value={`${order.items.length} item${order.items.length !== 1 ? "s" : ""}`} />
                   <InfoRow label="Placed" value={formatDate(order.created_at)} />
@@ -408,6 +412,13 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
               )}
             </div>
           </div>
+
+          {/* Order Tracking / Activity Panel */}
+          <OrderTrackingPanel
+            order_id={order.id}
+            current_status={effective_status}
+            onStatusChange={(new_status) => setCurrentStatus(new_status)}
+          />
         </>
       )}
     </div>
