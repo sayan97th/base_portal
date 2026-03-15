@@ -19,6 +19,19 @@ export interface UpdateOrganizationData {
   is_active: boolean;
 }
 
+export type OrgAssetField =
+  | "logo_light"
+  | "logo_dark"
+  | "icon_light"
+  | "icon_dark"
+  | "mobile_app_icon";
+
+export interface AssetUploadResponse {
+  url: string;
+  path: string;
+  field: OrgAssetField;
+}
+
 /**
  * List all organizations (paginated).
  * Roles allowed: super_admin, admin, staff.
@@ -46,4 +59,22 @@ export async function updateAdminOrganization(
   data: UpdateOrganizationData
 ): Promise<Organization> {
   return apiClient.put<Organization>(`/api/admin/organizations/${id}`, data);
+}
+
+/**
+ * Upload a single brand asset (logo or icon) for an organization.
+ * Returns the stored file URL and server-side path.
+ */
+export async function uploadOrganizationAsset(
+  id: number,
+  field: OrgAssetField,
+  file: File
+): Promise<AssetUploadResponse> {
+  const form_data = new FormData();
+  form_data.append("field", field);
+  form_data.append("file", file);
+  return apiClient.postFormData<AssetUploadResponse>(
+    `/api/admin/organizations/${id}/assets`,
+    form_data
+  );
 }

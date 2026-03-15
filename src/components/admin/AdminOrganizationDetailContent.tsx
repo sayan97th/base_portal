@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
@@ -10,7 +10,9 @@ import Badge from "@/components/ui/badge/Badge";
 import {
   getAdminOrganization,
   updateAdminOrganization,
+  uploadOrganizationAsset,
   type UpdateOrganizationData,
+  type OrgAssetField,
 } from "@/services/admin/organization.service";
 import type { Organization } from "@/services/admin/types";
 
@@ -156,6 +158,18 @@ const ImageIcon = () => (
   </svg>
 );
 
+const UploadIcon = () => (
+  <svg className="h-8 w-8 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+  </svg>
+);
+
+const XIcon = () => (
+  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+  </svg>
+);
+
 const ClockIcon = () => (
   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -236,51 +250,193 @@ const SectionHeader = ({ title, description, icon }: SectionHeaderProps) => (
   </div>
 );
 
-interface LogoPreviewFieldProps {
+const ACCEPTED_MIME_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/svg+xml", "image/webp"];
+const ACCEPTED_ACCEPT_ATTR = ACCEPTED_MIME_TYPES.join(",");
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // 5 MB
+
+type UploadState = "idle" | "uploading" | "error";
+
+interface ImageUploadFieldProps {
   id: string;
   label: string;
   hint: string;
+  org_id: number;
+  field: OrgAssetField;
   value: string;
-  onChange: (value: string) => void;
+  onChange: (url: string) => void;
 }
 
-const LogoPreviewField = ({ id, label, hint, value, onChange }: LogoPreviewFieldProps) => {
-  const [has_error, setHasError] = useState(false);
+const ImageUploadField = ({ id, label, hint, org_id, field, value, onChange }: ImageUploadFieldProps) => {
+  const file_input_ref = useRef<HTMLInputElement>(null);
+  const [upload_state, setUploadState] = useState<UploadState>("idle");
+  const [upload_error, setUploadError] = useState<string | null>(null);
+  const [drag_over, setDragOver] = useState(false);
+  const [local_preview, setLocalPreview] = useState<string | null>(null);
+  const [img_error, setImgError] = useState(false);
 
   useEffect(() => {
-    setHasError(false);
+    setImgError(false);
+    setLocalPreview(null);
   }, [value]);
 
-  const show_preview = isValidUrl(value) && !has_error;
+  const preview_url = local_preview ?? (isValidUrl(value) ? value : null);
+  const has_image = preview_url !== null && !img_error;
+  const is_uploading = upload_state === "uploading";
+
+  const processFile = useCallback(
+    async (file: File) => {
+      if (!ACCEPTED_MIME_TYPES.includes(file.type)) {
+        setUploadError("Invalid file type. Accepted formats: PNG, JPG, SVG, WebP.");
+        return;
+      }
+      if (file.size > MAX_UPLOAD_BYTES) {
+        setUploadError("File too large. Maximum allowed size is 5 MB.");
+        return;
+      }
+
+      const object_url = URL.createObjectURL(file);
+      setLocalPreview(object_url);
+      setImgError(false);
+      setUploadState("uploading");
+      setUploadError(null);
+
+      try {
+        const result = await uploadOrganizationAsset(org_id, field, file);
+        URL.revokeObjectURL(object_url);
+        setLocalPreview(null);
+        onChange(result.url);
+        setUploadState("idle");
+      } catch (err: unknown) {
+        URL.revokeObjectURL(object_url);
+        setLocalPreview(null);
+        setUploadState("error");
+        const msg = (err as { message?: string })?.message;
+        setUploadError(msg ?? "Upload failed. Please try again.");
+      }
+    },
+    [org_id, field, onChange]
+  );
+
+  const handleFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) processFile(file);
+      e.target.value = "";
+    },
+    [processFile]
+  );
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      setDragOver(false);
+      const file = e.dataTransfer.files?.[0];
+      if (file) processFile(file);
+    },
+    [processFile]
+  );
+
+  const handleClear = useCallback(() => {
+    onChange("");
+    setUploadError(null);
+    setUploadState("idle");
+    setLocalPreview(null);
+  }, [onChange]);
 
   return (
     <div>
       <Label htmlFor={id}>{label}</Label>
       <p className="mb-2 mt-0.5 text-xs text-gray-400 dark:text-gray-500">{hint}</p>
-      <div className="flex items-center gap-3">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
-          {show_preview ? (
-            <img
-              key={value}
-              src={value}
-              alt={label}
-              className="h-full w-full object-contain p-1.5"
-              onError={() => setHasError(true)}
-            />
-          ) : (
-            <ImageIcon />
-          )}
+
+      {/* Hidden file input */}
+      <input
+        ref={file_input_ref}
+        id={id}
+        type="file"
+        accept={ACCEPTED_ACCEPT_ATTR}
+        onChange={handleFileChange}
+        className="sr-only"
+      />
+
+      {has_image || is_uploading ? (
+        /* ── Has image / uploading state ── */
+        <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50">
+          {/* Preview thumbnail */}
+          <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+            {preview_url && (
+              <img
+                src={preview_url}
+                alt={label}
+                className={`h-full w-full object-contain p-1.5 transition-opacity ${is_uploading ? "opacity-30" : "opacity-100"}`}
+                onError={() => setImgError(true)}
+              />
+            )}
+            {is_uploading && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="h-5 w-5 animate-spin rounded-full border-2 border-brand-500/30 border-t-brand-500" />
+              </div>
+            )}
+          </div>
+
+          {/* Info */}
+          <div className="min-w-0 flex-1">
+            {is_uploading ? (
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Uploading…</p>
+            ) : (
+              <p className="break-all text-xs text-gray-400 dark:text-gray-500 line-clamp-2">{value}</p>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="flex shrink-0 items-center gap-1.5">
+            {!is_uploading && (
+              <button
+                type="button"
+                onClick={() => file_input_ref.current?.click()}
+                className="rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-white dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+              >
+                Change
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleClear}
+              disabled={is_uploading}
+              title="Remove image"
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-error-50 hover:text-error-500 disabled:opacity-40 dark:hover:bg-error-500/10 dark:hover:text-error-400"
+            >
+              <XIcon />
+            </button>
+          </div>
         </div>
-        <div className="flex-1">
-          <Input
-            id={id}
-            type="url"
-            value={value}
-            placeholder="https://cdn.example.com/logo.png"
-            onChange={(e) => onChange(e.target.value)}
-          />
+      ) : (
+        /* ── Drop zone ── */
+        <div
+          onDrop={handleDrop}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onClick={() => file_input_ref.current?.click()}
+          className={`flex cursor-pointer flex-col items-center justify-center gap-2.5 rounded-xl border-2 border-dashed px-4 py-7 text-center transition-colors ${
+            drag_over
+              ? "border-brand-400 bg-brand-50 dark:border-brand-500 dark:bg-brand-500/10"
+              : "border-gray-200 bg-gray-50 hover:border-brand-300 hover:bg-brand-50/40 dark:border-gray-700 dark:bg-gray-800/30 dark:hover:border-brand-600 dark:hover:bg-brand-500/5"
+          }`}
+        >
+          <UploadIcon />
+          <div>
+            <p className="text-xs font-medium text-gray-600 dark:text-gray-300">
+              Click to upload or drag and drop
+            </p>
+            <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
+              PNG, JPG, SVG, WebP — Max 5 MB
+            </p>
+          </div>
         </div>
-      </div>
+      )}
+
+      {upload_error && (
+        <p className="mt-1.5 text-xs text-error-500 dark:text-error-400">{upload_error}</p>
+      )}
     </div>
   );
 };
@@ -1018,23 +1174,25 @@ const AdminOrganizationDetailContent: React.FC<AdminOrganizationDetailContentPro
               description="Full-width logo images shown in the application header and printed materials."
               icon={<ImageIcon />}
             />
-            <div className="space-y-5">
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                <LogoPreviewField
-                  id="org_logo_light"
-                  label="Logo (Light Mode)"
-                  hint="Displayed on white or light-colored backgrounds."
-                  value={form_data.logo_light}
-                  onChange={(v) => handleFieldChange("logo_light", v)}
-                />
-                <LogoPreviewField
-                  id="org_logo_dark"
-                  label="Logo (Dark Mode)"
-                  hint="Displayed on dark backgrounds and sidebar headers."
-                  value={form_data.logo_dark}
-                  onChange={(v) => handleFieldChange("logo_dark", v)}
-                />
-              </div>
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <ImageUploadField
+                id="org_logo_light"
+                label="Logo (Light Mode)"
+                hint="Displayed on white or light-colored backgrounds."
+                org_id={org.id}
+                field="logo_light"
+                value={form_data.logo_light}
+                onChange={(v) => handleFieldChange("logo_light", v)}
+              />
+              <ImageUploadField
+                id="org_logo_dark"
+                label="Logo (Dark Mode)"
+                hint="Displayed on dark backgrounds and sidebar headers."
+                org_id={org.id}
+                field="logo_dark"
+                value={form_data.logo_dark}
+                onChange={(v) => handleFieldChange("logo_dark", v)}
+              />
             </div>
           </div>
 
@@ -1047,25 +1205,31 @@ const AdminOrganizationDetailContent: React.FC<AdminOrganizationDetailContentPro
             />
             <div className="space-y-5">
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                <LogoPreviewField
+                <ImageUploadField
                   id="org_icon_light"
                   label="Icon (Light Mode)"
                   hint="Square icon for light-colored backgrounds."
+                  org_id={org.id}
+                  field="icon_light"
                   value={form_data.icon_light}
                   onChange={(v) => handleFieldChange("icon_light", v)}
                 />
-                <LogoPreviewField
+                <ImageUploadField
                   id="org_icon_dark"
                   label="Icon (Dark Mode)"
                   hint="Square icon for dark backgrounds."
+                  org_id={org.id}
+                  field="icon_dark"
                   value={form_data.icon_dark}
                   onChange={(v) => handleFieldChange("icon_dark", v)}
                 />
               </div>
-              <LogoPreviewField
+              <ImageUploadField
                 id="org_mobile_app_icon"
                 label="Mobile App Icon"
                 hint="Icon displayed in mobile browsers, PWA shortcuts, and app launchers."
+                org_id={org.id}
+                field="mobile_app_icon"
                 value={form_data.mobile_app_icon}
                 onChange={(v) => handleFieldChange("mobile_app_icon", v)}
               />
