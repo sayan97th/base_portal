@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import React from "react";
-import AdminInvoiceDetailContent from "@/components/admin/AdminInvoiceDetailContent";
+import AdminInvoiceDetailContent from "@/components/admin/invoices/AdminInvoiceDetailContent";
 
 export const metadata: Metadata = {
   title: "Invoice Details | BASE Admin Portal",

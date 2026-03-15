@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import React from "react";
-import AdminOrganizationDetailContent from "@/components/admin/AdminOrganizationDetailContent";
+import AdminOrganizationDetailContent from "@/components/admin/organizations/AdminOrganizationDetailContent";
 
 interface AdminOrganizationDetailPageProps {
   params: Promise<{ organization_id: string }>;

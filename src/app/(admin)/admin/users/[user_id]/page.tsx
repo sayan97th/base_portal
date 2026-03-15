@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import React from "react";
-import AdminUserDetailContent from "@/components/admin/AdminUserDetailContent";
+import AdminUserDetailContent from "@/components/admin/users/AdminUserDetailContent";
 
 interface AdminUserDetailPageProps {
   params: Promise<{ user_id: string }>;

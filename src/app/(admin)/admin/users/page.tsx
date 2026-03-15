@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import React from "react";
-import AdminUsersContent from "@/components/admin/AdminUsersContent";
+import AdminUsersContent from "@/components/admin/users/AdminUsersContent";
 
 export const metadata: Metadata = {
   title: "Users | BASE Admin Portal",

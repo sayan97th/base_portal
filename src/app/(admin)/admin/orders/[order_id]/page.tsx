@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import AdminOrderDetailContent from "@/components/admin/AdminOrderDetailContent";
+import AdminOrderDetailContent from "@/components/admin/orders/AdminOrderDetailContent";
 
 interface OrderDetailParams {
   params: Promise<{ order_id: string }>;

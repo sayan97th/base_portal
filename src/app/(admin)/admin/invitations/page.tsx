@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import React from "react";
-import AdminInvitationsContent from "@/components/admin/AdminInvitationsContent";
+import AdminInvitationsContent from "@/components/admin/invitations/AdminInvitationsContent";
 
 export const metadata: Metadata = {
   title: "Team Invitations | BASE Admin Portal",
