@@ -1,8 +1,15 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { listAdminOrganizations } from "@/services/admin/organization.service";
 import type { Organization } from "@/services/admin/types";
+
+const ExternalLinkIcon = () => (
+  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+  </svg>
+);
 
 export default function AdminOrganizationsContent() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -68,13 +75,16 @@ export default function AdminOrganizationsContent() {
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   Status
                 </th>
+                <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {isLoading
                 ? Array.from({ length: 6 }).map((_, i) => (
                     <tr key={i}>
-                      {Array.from({ length: 5 }).map((__, j) => (
+                      {Array.from({ length: 6 }).map((__, j) => (
                         <td key={j} className="px-6 py-4">
                           <div className="h-4 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
                         </td>
@@ -84,12 +94,12 @@ export default function AdminOrganizationsContent() {
                 : organizations.map((org) => (
                     <tr
                       key={org.id}
-                      className="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+                      className="transition-colors hover:bg-gray-50 dark:hover:bg-white/2"
                     >
                       <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
                         {org.name}
                       </td>
-                      <td className="px-6 py-4 text-gray-500 dark:text-gray-400 font-mono text-xs">
+                      <td className="px-6 py-4 font-mono text-xs text-gray-500 dark:text-gray-400">
                         {org.slug}
                       </td>
                       <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
@@ -119,6 +129,15 @@ export default function AdminOrganizationsContent() {
                         >
                           {org.is_active ? "Active" : "Inactive"}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <Link
+                          href={`/admin/organizations/${org.id}`}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-white/3 dark:text-gray-400 dark:hover:bg-white/5"
+                        >
+                          <ExternalLinkIcon />
+                          View
+                        </Link>
                       </td>
                     </tr>
                   ))}
