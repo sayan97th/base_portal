@@ -5,7 +5,7 @@ import type {
   DrTier,
   LinkBuildingOrderDetail,
   LinkBuildingOrderSummary,
-} from "@/types/link-building";
+} from "@/types/client/link-building";
 
 interface DrTiersResponse {
   data: DrTier[];

@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { listAdminInvoices } from "@/services/admin/invoice.service";
-import type { AdminInvoice, InvoiceStatus } from "@/services/admin/types";
+import type { AdminInvoice, InvoiceStatus } from "@/types/admin";
 
 const STATUS_STYLES: Record<InvoiceStatus, string> = {
   paid: "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400",

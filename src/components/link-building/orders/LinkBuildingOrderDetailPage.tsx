@@ -15,7 +15,7 @@ import type {
   LinkBuildingOrderDetail,
   OrderItemDetail,
   OrderStatus,
-} from "@/types/link-building";
+} from "@/types/client/link-building";
 
 interface LinkBuildingOrderDetailPageProps {
   order_id: string;

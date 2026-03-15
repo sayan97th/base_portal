@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { getAdminInvoice } from "@/services/admin/invoice.service";
-import type { AdminInvoice } from "@/services/admin/types";
+import type { AdminInvoice } from "@/types/admin";
 
 interface AdminInvoiceDetailContentProps {
   invoice_id: string;

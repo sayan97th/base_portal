@@ -11,7 +11,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { linkBuildingService } from "@/services/client/link-building.service";
-import type { LinkBuildingOrderSummary, OrderStatus } from "@/types/link-building";
+import type { LinkBuildingOrderSummary, OrderStatus } from "@/types/client/link-building";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", {

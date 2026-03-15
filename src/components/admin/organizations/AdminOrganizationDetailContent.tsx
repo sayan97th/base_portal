@@ -14,7 +14,7 @@ import {
   type UpdateOrganizationData,
   type OrgAssetField,
 } from "@/services/admin/organization.service";
-import type { Organization } from "@/services/admin/types";
+import type { Organization } from "@/types/admin";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 

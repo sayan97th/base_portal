@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { listRoles } from "@/services/admin/role.service";
-import type { RoleWithPermissions } from "@/services/admin/types";
+import type { RoleWithPermissions } from "@/types/admin";
 
 export default function AdminRolesContent() {
   const [roles, setRoles] = useState<RoleWithPermissions[]>([]);

@@ -7,7 +7,7 @@ import {
   acceptAdminInvitation,
 } from "@/services/admin/invitation.service";
 import { EyeCloseIcon, EyeIcon } from "@/icons";
-import type { AdminInvitation } from "@/services/admin/types";
+import type { AdminInvitation } from "@/types/admin";
 import type { ApiError } from "@/types/auth";
 
 type Props = {

@@ -20,7 +20,7 @@ import { dr_tiers as fallback_dr_tiers } from "./drTierData";
 import { linkBuildingService } from "@/services/client/link-building.service";
 import { useNotifications } from "@/context/NotificationsContext";
 import { useBillingAddress } from "@/hooks/useBillingAddress";
-import type { DrTier } from "@/types/link-building";
+import type { DrTier } from "@/types/client/link-building";
 
 type Step = "selection" | "keywords" | "checkout";
 

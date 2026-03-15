@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { listAdminUsers } from "@/services/admin/user.service";
-import type { AdminUser } from "@/services/admin/types";
+import type { AdminUser } from "@/types/admin";
 
 export default function AdminUsersContent() {
   const [users, setUsers] = useState<AdminUser[]>([]);

@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { listAdminOrganizations } from "@/services/admin/organization.service";
-import type { Organization } from "@/services/admin/types";
+import type { Organization } from "@/types/admin";
 
 const ExternalLinkIcon = () => (
   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">

@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import Badge from "@/components/ui/badge/Badge";
 import { getAdminUser, listAdminUserOrders } from "@/services/admin/user.service";
-import type { AdminUser, AdminUserOrderSummary, OrderStatus, PaginatedResponse } from "@/services/admin/types";
+import type { AdminUser, AdminUserOrderSummary, OrderStatus, PaginatedResponse } from "@/types/admin";
 
 interface AdminUserDetailContentProps {
   user_id: number;

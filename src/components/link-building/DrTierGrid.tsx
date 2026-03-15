@@ -1,5 +1,5 @@
 import React from "react";
-import type { DrTier } from "@/types/link-building";
+import type { DrTier } from "@/types/client/link-building";
 import DrTierCard from "./DrTierCard";
 
 interface DrTierGridProps {

@@ -1,5 +1,5 @@
-export type { DrTier } from "@/types/link-building";
-import type { DrTier } from "@/types/link-building";
+export type { DrTier } from "@/types/client/link-building";
+import type { DrTier } from "@/types/client/link-building";
 
 export const dr_tiers: DrTier[] = [
   {

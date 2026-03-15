@@ -8,7 +8,7 @@ import {
 } from "@/services/admin/invitation.service";
 import { useAuth } from "@/context/AuthContext";
 import { ROLES } from "@/lib/roles";
-import type { AdminInvitation, SendAdminInvitationData, InvitationRole } from "@/services/admin/types";
+import type { AdminInvitation, SendAdminInvitationData, InvitationRole } from "@/types/admin";
 import type { ApiError } from "@/types/auth";
 
 const available_roles = [

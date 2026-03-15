@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import Badge from "@/components/ui/badge/Badge";
 import { getAdminOrder } from "@/services/admin/order.service";
-import type { AdminOrder, AdminInvoice, OrderItem, OrderStatus } from "@/services/admin/types";
+import type { AdminOrder, AdminInvoice, OrderItem, OrderStatus } from "@/types/admin";
 
 interface AdminOrderDetailContentProps {
   order_id: string;

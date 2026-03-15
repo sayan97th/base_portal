@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { listAdminOrders } from "@/services/admin/order.service";
-import type { AdminOrder, OrderStatus } from "@/services/admin/types";
+import type { AdminOrder, OrderStatus } from "@/types/admin";
 
 const STATUS_STYLES: Record<OrderStatus, string> = {
   pending: "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400",
