@@ -196,6 +196,17 @@ export interface AcceptInvitationResponse {
   user: AdminUser;
 }
 
+// ── User Detail ───────────────────────────────────────────────────────────────
+
+export interface AdminUserOrderSummary {
+  id: string;
+  order_title: string;
+  total_amount: number;
+  status: OrderStatus;
+  created_at: string;
+  items_count: number;
+}
+
 // ── Roles ─────────────────────────────────────────────────────────────────────
 
 export interface RolesListResponse {

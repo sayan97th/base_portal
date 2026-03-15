@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { listAdminUsers } from "@/services/admin/user.service";
 import type { AdminUser } from "@/services/admin/types";
 
@@ -70,13 +71,16 @@ export default function AdminUsersContent() {
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   Joined
                 </th>
+                <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {isLoading
                 ? Array.from({ length: 8 }).map((_, i) => (
                     <tr key={i}>
-                      {Array.from({ length: 5 }).map((__, j) => (
+                      {Array.from({ length: 6 }).map((__, j) => (
                         <td key={j} className="px-6 py-4">
                           <div className="h-4 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
                         </td>
@@ -115,6 +119,14 @@ export default function AdminUsersContent() {
                         </td>
                         <td className="px-6 py-4 text-gray-500 dark:text-gray-500">
                           {new Date(user.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <Link
+                            href={`/admin/users/${user.id}`}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-white/3 dark:text-gray-400 dark:hover:bg-white/5"
+                          >
+                            View User
+                          </Link>
                         </td>
                       </tr>
                     );

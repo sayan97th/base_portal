@@ -323,7 +323,7 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
                     </div>
                     <div className="ml-auto">
                       <Link
-                        href={`/admin/users`}
+                        href={`/admin/users/${order.user_id}`}
                         className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-400 dark:hover:bg-white/[0.05]"
                       >
                         View User
