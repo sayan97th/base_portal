@@ -157,7 +157,7 @@ export default function DrTierDetailModal({
       confirm_class: "bg-success-500 hover:bg-success-600",
     },
     hide: {
-      message: "This tier will be completely hidden from both clients and admin listings. It can be restored later.",
+      message: "This tier will be completely hidden from both clients and admin listings.",
       confirm_label: "Hide from Platform",
       confirm_class: "bg-error-500 hover:bg-error-600",
     },
@@ -212,13 +212,12 @@ export default function DrTierDetailModal({
             <div className="shrink-0 border-b border-gray-100 dark:border-gray-800">
               {/* Gradient bar */}
               <div
-                className={`h-1.5 w-full ${
-                  tier.is_hidden
+                className={`h-1.5 w-full ${tier.is_hidden
                     ? "bg-gray-300 dark:bg-gray-700"
                     : tier.is_active
                       ? "bg-linear-to-r from-brand-400 via-brand-500 to-brand-600"
                       : "bg-linear-to-r from-warning-300 to-warning-400"
-                }`}
+                  }`}
               />
               <div className="flex items-start justify-between gap-4 px-6 py-5">
                 <div>

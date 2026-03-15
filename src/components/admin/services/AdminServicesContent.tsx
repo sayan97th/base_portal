@@ -14,7 +14,7 @@ import DrTierCard from "./DrTierCard";
 import DrTierFormModal from "./DrTierFormModal";
 import DrTierDetailModal from "./DrTierDetailModal";
 
-type StatusFilter = "all" | "active" | "disabled" | "hidden";
+type StatusFilter = "all" | "active" | "disabled";
 
 type ServiceTab = {
   id: string;
@@ -79,7 +79,7 @@ export default function AdminServicesContent() {
 
   // Filters
   const [search_query, setSearchQuery] = useState("");
-  const [status_filter, setStatusFilter] = useState<StatusFilter>("all");
+  const [status_filter, setStatusFilter] = useState<StatusFilter>("active");
 
   // Modals
   const [form_modal_open, setFormModalOpen] = useState(false);
@@ -107,14 +107,14 @@ export default function AdminServicesContent() {
 
   // ── Stats ──────────────────────────────────────────────────────────────────
 
-  const total_count = tiers.length;
-  const active_count = tiers.filter((t) => t.is_active && !t.is_hidden).length;
-  const disabled_count = tiers.filter((t) => !t.is_active && !t.is_hidden).length;
-  const hidden_count = tiers.filter((t) => t.is_hidden).length;
+  const visible_tiers = tiers.filter((t) => !t.is_hidden);
+  const total_count = visible_tiers.length;
+  const active_count = visible_tiers.filter((t) => t.is_active).length;
+  const disabled_count = visible_tiers.filter((t) => !t.is_active).length;
 
   // ── Filters ────────────────────────────────────────────────────────────────
 
-  const filtered_tiers = tiers.filter((t) => {
+  const filtered_tiers = visible_tiers.filter((t) => {
     const matches_search =
       !search_query ||
       t.dr_label.toLowerCase().includes(search_query.toLowerCase()) ||
@@ -122,9 +122,8 @@ export default function AdminServicesContent() {
 
     const matches_status =
       status_filter === "all" ||
-      (status_filter === "active" && t.is_active && !t.is_hidden) ||
-      (status_filter === "disabled" && !t.is_active && !t.is_hidden) ||
-      (status_filter === "hidden" && t.is_hidden);
+      (status_filter === "active" && t.is_active) ||
+      (status_filter === "disabled" && !t.is_active);
 
     return matches_search && matches_status;
   });
@@ -291,7 +290,6 @@ export default function AdminServicesContent() {
                   <div className="h-4 w-px bg-gray-200 dark:bg-gray-700" />
                   <StripStat label="Active" value={active_count} dot_color="bg-success-500" />
                   <StripStat label="Disabled" value={disabled_count} dot_color="bg-warning-400" />
-                  <StripStat label="Hidden" value={hidden_count} dot_color="bg-gray-400" />
                 </div>
 
                 {/* Search & filter row */}
@@ -316,7 +314,7 @@ export default function AdminServicesContent() {
                   </div>
 
                   <div className="flex rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-900">
-                    {(["all", "active", "disabled", "hidden"] as StatusFilter[]).map((f) => (
+                    {(["all", "active", "disabled"] as StatusFilter[]).map((f) => (
                       <button
                         key={f}
                         onClick={() => setStatusFilter(f)}
