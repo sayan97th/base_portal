@@ -209,25 +209,27 @@ export default function NotificationDropdown() {
 
                   {active_menu_id === notification.id && (
                     <div className="absolute right-0 top-full z-50 mt-1 w-40 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-theme-lg dark:border-gray-700 dark:bg-gray-800">
-                      <button
-                        onClick={(e) => handleMarkAsRead(notification.id, e)}
-                        className="flex w-full items-center gap-2 px-3.5 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700"
-                      >
-                        <svg
-                          className="h-4 w-4"
-                          viewBox="0 0 20 20"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth={1.5}
+                      {!notification.is_read && (
+                        <button
+                          onClick={(e) => handleMarkAsRead(notification.id, e)}
+                          className="flex w-full items-center gap-2 px-3.5 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700"
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M4.5 10.5l3.5 3.5 7.5-7.5"
-                          />
-                        </svg>
-                        Mark as read
-                      </button>
+                          <svg
+                            className="h-4 w-4"
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={1.5}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M4.5 10.5l3.5 3.5 7.5-7.5"
+                            />
+                          </svg>
+                          Mark as read
+                        </button>
+                      )}
                       <button
                         onClick={(e) => handleSnooze(notification.id, e)}
                         className="flex w-full items-center gap-2 px-3.5 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700"
