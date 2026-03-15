@@ -298,6 +298,15 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
                 {" "}&middot; Placed on {formatDate(order.created_at)}
               </p>
             </div>
+            <Link
+              href={`/admin/orders/${order.id}/tracking`}
+              className="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-500/25 transition hover:bg-brand-600"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+              </svg>
+              Manage Tracking
+            </Link>
           </div>
 
           {/* Main Grid */}

@@ -576,6 +576,17 @@ const LinkBuildingOrderDetailPage: React.FC<
                 </dl>
               </div>
 
+              {/* Track order CTA */}
+              <Link
+                href={`/link-building/orders/${order.id}/tracking`}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-brand-500/20 transition-colors hover:bg-brand-600"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                </svg>
+                Track Order Progress
+              </Link>
+
               {/* New order CTA */}
               <Link
                 href="/link-building"
