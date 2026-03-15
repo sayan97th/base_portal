@@ -25,6 +25,7 @@ export default function AdminInvitationsContent() {
   const [isSending, setIsSending] = useState(false);
   const [send_error, setSendError] = useState<string | null>(null);
   const [send_success, setSendSuccess] = useState(false);
+  const [show_confirm_dialog, setShowConfirmDialog] = useState(false);
 
   const fetchInvitations = useCallback(async () => {
     setIsLoading(true);
@@ -43,8 +44,13 @@ export default function AdminInvitationsContent() {
     fetchInvitations();
   }, [fetchInvitations]);
 
-  const handleSend = async (e: React.FormEvent) => {
+  const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setShowConfirmDialog(true);
+  };
+
+  const handleConfirmSend = async () => {
+    setShowConfirmDialog(false);
     setSendError(null);
     setSendSuccess(false);
     setIsSending(true);
@@ -104,7 +110,7 @@ export default function AdminInvitationsContent() {
             </div>
           )}
 
-          <form onSubmit={handleSend} className="flex flex-col gap-4 sm:flex-row sm:items-end">
+          <form onSubmit={handleFormSubmit} className="flex flex-col gap-4 sm:flex-row sm:items-end">
             <div className="flex-1">
               <label
                 htmlFor="invite_email"
@@ -187,14 +193,14 @@ export default function AdminInvitationsContent() {
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {isLoading
                 ? Array.from({ length: 4 }).map((_, i) => (
-                    <tr key={i}>
-                      {Array.from({ length: 4 }).map((__, j) => (
-                        <td key={j} className="px-6 py-4">
-                          <div className="h-4 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
-                        </td>
-                      ))}
-                    </tr>
-                  ))
+                  <tr key={i}>
+                    {Array.from({ length: 4 }).map((__, j) => (
+                      <td key={j} className="px-6 py-4">
+                        <div className="h-4 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+                      </td>
+                    ))}
+                  </tr>
+                ))
                 : invitations.length === 0
                   ? (
                     <tr>
@@ -207,56 +213,121 @@ export default function AdminInvitationsContent() {
                     </tr>
                   )
                   : invitations.map((inv) => {
-                      const expired = isExpired(inv.expires_at);
-                      const accepted = !!inv.accepted_at;
-                      return (
-                        <tr
-                          key={inv.id}
-                          className="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]"
-                        >
-                          <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
-                            {inv.email}
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className="inline-flex rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700 dark:bg-brand-500/10 dark:text-brand-400">
-                              {inv.role}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span
-                              className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                                accepted
-                                  ? "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400"
-                                  : expired
-                                    ? "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400"
-                                    : "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400"
+                    const expired = isExpired(inv.expires_at);
+                    const accepted = !!inv.accepted_at;
+                    return (
+                      <tr
+                        key={inv.id}
+                        className="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+                      >
+                        <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                          {inv.email}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="inline-flex rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700 dark:bg-brand-500/10 dark:text-brand-400">
+                            {inv.role}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${accepted
+                                ? "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400"
+                                : expired
+                                  ? "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400"
+                                  : "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400"
                               }`}
-                            >
-                              {accepted ? "Accepted" : expired ? "Expired" : "Pending"}
-                            </span>
+                          >
+                            {accepted ? "Accepted" : expired ? "Expired" : "Pending"}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-gray-500 dark:text-gray-400">
+                          {new Date(inv.expires_at).toLocaleDateString()}
+                        </td>
+                        {isAdmin && (
+                          <td className="px-6 py-4 text-right">
+                            {!accepted && (
+                              <button
+                                onClick={() => handleRevoke(inv.id)}
+                                className="text-xs font-medium text-error-500 transition-colors hover:text-error-700 dark:text-error-400 dark:hover:text-error-300"
+                              >
+                                Revoke
+                              </button>
+                            )}
                           </td>
-                          <td className="px-6 py-4 text-gray-500 dark:text-gray-400">
-                            {new Date(inv.expires_at).toLocaleDateString()}
-                          </td>
-                          {isAdmin && (
-                            <td className="px-6 py-4 text-right">
-                              {!accepted && (
-                                <button
-                                  onClick={() => handleRevoke(inv.id)}
-                                  className="text-xs font-medium text-error-500 transition-colors hover:text-error-700 dark:text-error-400 dark:hover:text-error-300"
-                                >
-                                  Revoke
-                                </button>
-                              )}
-                            </td>
-                          )}
-                        </tr>
-                      );
-                    })}
+                        )}
+                      </tr>
+                    );
+                  })}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Confirmation dialog */}
+      {show_confirm_dialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setShowConfirmDialog(false)}
+          />
+
+          {/* Dialog card */}
+          <div className="relative mx-4 w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-gray-700 dark:bg-gray-900">
+            {/* Icon */}
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 dark:bg-brand-500/10">
+              <svg
+                className="h-6 w-6 text-brand-500"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.8}
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25H4.5a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5H4.5a2.25 2.25 0 00-2.25 2.25m19.5 0L12 13.5 2.25 6.75"
+                />
+              </svg>
+            </div>
+
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Confirm Invitation
+            </h3>
+
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              You&apos;re about to send an invitation to{" "}
+              <span className="font-medium text-gray-800 dark:text-gray-200">
+                {form.email}
+              </span>{" "}
+              granting them access to the administration panel as a{" "}
+              <span className="font-medium capitalize text-brand-600 dark:text-brand-400">
+                {form.role}
+              </span>
+              .
+            </p>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              Once accepted, they will become an active member of this
+              organization.
+            </p>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setShowConfirmDialog(false)}
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-transparent dark:text-gray-300 dark:hover:bg-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmSend}
+                className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600"
+              >
+                Yes, send invitation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
