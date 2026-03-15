@@ -2,9 +2,13 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { invitationService } from "@/services/client/invitation.service";
+import {
+  validateAdminInvitationToken,
+  acceptAdminInvitation,
+} from "@/services/admin/invitation.service";
 import { EyeCloseIcon, EyeIcon } from "@/icons";
-import type { Invitation, ApiError } from "@/types/auth";
+import type { AdminInvitation } from "@/services/admin/types";
+import type { ApiError } from "@/types/auth";
 
 type Props = {
   token: string;
@@ -20,7 +24,7 @@ type FormState = {
 export default function AcceptInvitationForm({ token }: Props) {
   const router = useRouter();
 
-  const [invitation, setInvitation] = useState<Invitation | null>(null);
+  const [invitation, setInvitation] = useState<AdminInvitation | null>(null);
   const [is_validating, setIsValidating] = useState(true);
   const [validation_error, setValidationError] = useState<string | null>(null);
 
@@ -39,7 +43,7 @@ export default function AcceptInvitationForm({ token }: Props) {
   useEffect(() => {
     const validate = async () => {
       try {
-        const result = await invitationService.validateToken(token);
+        const result = await validateAdminInvitationToken(token);
         if (result.valid) {
           setInvitation(result.invitation);
         } else {
@@ -70,7 +74,7 @@ export default function AcceptInvitationForm({ token }: Props) {
     setIsSubmitting(true);
 
     try {
-      await invitationService.acceptInvitation({
+      await acceptAdminInvitation({
         ...form,
         invitation_token: token,
       });
