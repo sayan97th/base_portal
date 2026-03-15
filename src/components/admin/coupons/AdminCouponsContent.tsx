@@ -1,17 +1,13 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import type { Coupon, CreateCouponPayload } from "@/types/admin/coupons";
-import type { AdminDrTier } from "@/types/admin/services";
+import { useRouter } from "next/navigation";
+import type { Coupon } from "@/types/admin/coupons";
 import {
   listAdminCoupons,
-  createAdminCoupon,
-  updateAdminCoupon,
   toggleAdminCouponStatus,
   deleteAdminCoupon,
 } from "@/services/admin/coupons.service";
-import { listAdminDrTiers } from "@/services/admin/services.service";
-import CouponFormModal from "./CouponFormModal";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -191,16 +187,15 @@ function Toast({ message, type, onDismiss }: ToastProps) {
 type StatusFilter = "all" | "active" | "scheduled" | "expired" | "disabled";
 
 export default function AdminCouponsContent() {
+  const router = useRouter();
+
   const [coupons, setCoupons] = useState<Coupon[]>([]);
-  const [dr_tiers, setDrTiers] = useState<AdminDrTier[]>([]);
   const [is_loading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [search_query, setSearchQuery] = useState("");
   const [status_filter, setStatusFilter] = useState<StatusFilter>("all");
 
-  const [form_modal_open, setFormModalOpen] = useState(false);
-  const [editing_coupon, setEditingCoupon] = useState<Coupon | null>(null);
   const [delete_coupon, setDeleteCoupon] = useState<Coupon | null>(null);
   const [is_deleting, setIsDeleting] = useState(false);
 
@@ -215,12 +210,8 @@ export default function AdminCouponsContent() {
     setIsLoading(true);
     setError(null);
     try {
-      const [fetched_coupons, fetched_tiers] = await Promise.all([
-        listAdminCoupons(),
-        listAdminDrTiers(),
-      ]);
+      const fetched_coupons = await listAdminCoupons();
       setCoupons(fetched_coupons);
-      setDrTiers(fetched_tiers);
     } catch {
       setError("Failed to load coupons. Please try again.");
     } finally {
@@ -266,37 +257,13 @@ export default function AdminCouponsContent() {
   }, []);
 
   const handleOpenCreate = () => {
-    setEditingCoupon(null);
-    setFormModalOpen(true);
+    router.push("/admin/coupons/new");
   };
 
   const handleOpenEdit = (coupon: Coupon) => {
-    setEditingCoupon(coupon);
-    setFormModalOpen(true);
+    router.push(`/admin/coupons/${coupon.id}/edit`);
   };
 
-  const handleFormSubmit = async (payload: CreateCouponPayload) => {
-    try {
-      if (editing_coupon) {
-        const updated = await updateAdminCoupon(editing_coupon.id, payload);
-        setCoupons((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
-        showToast("Coupon updated successfully.", "success");
-      } else {
-        const created = await createAdminCoupon(payload);
-        setCoupons((prev) => [created, ...prev]);
-        showToast("Coupon created successfully.", "success");
-      }
-      setFormModalOpen(false);
-      setEditingCoupon(null);
-    } catch (err: unknown) {
-      const message =
-        err && typeof err === "object" && "message" in err
-          ? String((err as { message: string }).message)
-          : "Failed to save coupon.";
-      showToast(message, "error");
-      throw err;
-    }
-  };
 
   const handleToggleStatus = async (coupon: Coupon) => {
     const new_status = !coupon.is_active;
@@ -666,18 +633,6 @@ export default function AdminCouponsContent() {
           </div>
         </div>
       )}
-
-      {/* Form Modal */}
-      <CouponFormModal
-        is_open={form_modal_open}
-        editing_coupon={editing_coupon}
-        dr_tiers={dr_tiers}
-        onClose={() => {
-          setFormModalOpen(false);
-          setEditingCoupon(null);
-        }}
-        onSubmit={handleFormSubmit}
-      />
 
       {/* Delete Confirm Modal */}
       {delete_coupon && (
