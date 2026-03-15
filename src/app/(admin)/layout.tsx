@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import AppHeader from "@/layout/AppHeader";
 import AdminSidebar from "@/layout/AdminSidebar";
 import Backdrop from "@/layout/Backdrop";
+import { AdminNotificationsProvider } from "@/context/AdminNotificationsContext";
 
 export default function AdminLayout({
   children,
@@ -40,17 +41,19 @@ export default function AdminLayout({
     : "lg:ml-[90px]";
 
   return (
-    <div className="min-h-screen xl:flex bg-gray-50 dark:bg-gray-950">
-      <AdminSidebar />
-      <Backdrop />
-      <div
-        className={`flex-1 transition-all duration-300 ease-in-out ${main_content_margin}`}
-      >
-        <AppHeader />
-        <div className="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
-          {children}
+    <AdminNotificationsProvider>
+      <div className="min-h-screen xl:flex bg-gray-50 dark:bg-gray-950">
+        <AdminSidebar />
+        <Backdrop />
+        <div
+          className={`flex-1 transition-all duration-300 ease-in-out ${main_content_margin}`}
+        >
+          <AppHeader />
+          <div className="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
+            {children}
+          </div>
         </div>
       </div>
-    </div>
+    </AdminNotificationsProvider>
   );
 }

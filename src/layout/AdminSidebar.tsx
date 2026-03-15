@@ -13,6 +13,7 @@ import {
   TaskIcon,
   ListIcon,
   DollarLineIcon,
+  BellIcon,
 } from "@/icons/index";
 import { useAuth } from "@/context/AuthContext";
 
@@ -90,6 +91,7 @@ const admin_sidebar_sections: SidebarSection[] = [
   {
     title: "ACCOUNT",
     items: [
+      { name: "Notifications", icon: <BellIcon />, path: "/admin/notifications" },
       { name: "Profile", icon: <UserCircleIcon />, path: "/admin/profile" },
     ],
   },

@@ -1,8 +1,10 @@
 "use client";
 import { ThemeToggleButton } from "@/components/common/ThemeToggleButton";
 import NotificationDropdown from "@/components/header/NotificationDropdown";
+import AdminNotificationDropdown from "@/components/header/AdminNotificationDropdown";
 import UserDropdown from "@/components/header/UserDropdown";
 import { useSidebar } from "@/context/SidebarContext";
+import { useAuth } from "@/context/AuthContext";
 import Image from "next/image";
 import Link from "next/link";
 import React, { useState, useEffect, useRef } from "react";
@@ -11,6 +13,7 @@ const AppHeader: React.FC = () => {
   const [isApplicationMenuOpen, setApplicationMenuOpen] = useState(false);
 
   const { isMobileOpen, toggleSidebar, toggleMobileSidebar } = useSidebar();
+  const { isStaff } = useAuth();
 
   const handleToggle = () => {
     if (window.innerWidth >= 1024) {
@@ -186,7 +189,7 @@ const AppHeader: React.FC = () => {
               </svg>
             </button>
 
-            <NotificationDropdown />
+            {isStaff ? <AdminNotificationDropdown /> : <NotificationDropdown />}
           </div>
           {/* <!-- User Area --> */}
           <UserDropdown />
