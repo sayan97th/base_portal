@@ -199,9 +199,10 @@ function CouponDatePicker({
 interface PreviewCardProps {
   form: FormData;
   dr_tiers: AdminDrTier[];
+  toggles: Toggles;
 }
 
-function PreviewCard({ form, dr_tiers }: PreviewCardProps) {
+function PreviewCard({ form, dr_tiers, toggles }: PreviewCardProps) {
   const value = parseFloat(form.discount_value) || 0;
   const discount_label =
     form.discount_type === "percentage"
@@ -284,7 +285,9 @@ function PreviewCard({ form, dr_tiers }: PreviewCardProps) {
         <div className="rounded-lg bg-white/10 px-3 py-2">
           <p className="text-[10px] uppercase tracking-wider text-brand-300">Usage</p>
           <p className="mt-0.5 text-xs font-semibold text-white">
-            {form.usage_limit ? `Max ${form.usage_limit}` : "Unlimited"}
+            {toggles.has_usage_limit && form.usage_limit
+              ? `Max ${form.usage_limit}`
+              : "No limit"}
           </p>
         </div>
       </div>
@@ -1059,7 +1062,7 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
                 <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   Live Preview
                 </h3>
-                <PreviewCard form={form} dr_tiers={dr_tiers} />
+                <PreviewCard form={form} dr_tiers={dr_tiers} toggles={toggles} />
               </div>
 
               {/* Quick tips */}
