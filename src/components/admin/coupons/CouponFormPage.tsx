@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import flatpickr from "flatpickr";
+import "flatpickr/dist/flatpickr.css";
 import type { Coupon, CreateCouponPayload, DiscountType, AppliesTo } from "@/types/admin/coupons";
 import type { AdminDrTier } from "@/types/admin/services";
 import {
@@ -84,6 +86,112 @@ function couponFromRecord(coupon: Coupon): FormData {
     usage_per_user: coupon.usage_per_user ? String(coupon.usage_per_user) : "1",
     is_active: coupon.is_active,
   };
+}
+
+// ── Coupon Date Picker ────────────────────────────────────────────────────────
+
+interface CouponDatePickerProps {
+  id: string;
+  value: string;
+  onChange: (date_str: string) => void;
+  disabled?: boolean;
+  placeholder?: string;
+  min_date?: string;
+  has_error?: boolean;
+}
+
+function CouponDatePicker({
+  id,
+  value,
+  onChange,
+  disabled = false,
+  placeholder = "Select a date",
+  min_date,
+  has_error = false,
+}: CouponDatePickerProps) {
+  const input_ref = useRef<HTMLInputElement>(null);
+  const fp_ref = useRef<flatpickr.Instance | null>(null);
+  const onChange_ref = useRef(onChange);
+
+  // Keep callback ref always current to avoid stale closures
+  useEffect(() => {
+    onChange_ref.current = onChange;
+  });
+
+  // Initialize / reinitialize when disabled or min_date changes
+  useEffect(() => {
+    if (!input_ref.current) return;
+
+    fp_ref.current?.destroy();
+
+    if (disabled) {
+      fp_ref.current = null;
+      return;
+    }
+
+    const instance = flatpickr(input_ref.current, {
+      mode: "single",
+      dateFormat: "Y-m-d",
+      defaultDate: value || undefined,
+      minDate: min_date || undefined,
+      disableMobile: true,
+      prevArrow:
+        '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>',
+      nextArrow:
+        '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>',
+      onChange: (_, date_str) => {
+        onChange_ref.current(date_str);
+      },
+    });
+
+    fp_ref.current = Array.isArray(instance) ? instance[0] : instance;
+
+    return () => {
+      fp_ref.current?.destroy();
+      fp_ref.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [disabled, min_date]);
+
+  // Sync external value (edit mode — fires after instance is ready)
+  useEffect(() => {
+    if (fp_ref.current) {
+      fp_ref.current.setDate(value || "", false);
+    }
+  }, [value]);
+
+  return (
+    <div className="relative">
+      <input
+        ref={input_ref}
+        id={id}
+        type="text"
+        readOnly
+        disabled={disabled}
+        placeholder={placeholder}
+        className={`w-full cursor-pointer rounded-lg border py-2.5 pl-4 pr-10 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+          has_error
+            ? "border-red-400 dark:border-red-500"
+            : "border-gray-200 dark:border-gray-700"
+        }`}
+      />
+      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500">
+        <svg
+          className="h-4 w-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={1.8}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 9v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008zM9.75 15h.008v.008H9.75V15zm0 2.25h.008v.008H9.75v-.008zM7.5 15h.008v.008H7.5V15zm0 2.25h.008v.008H7.5v-.008zm6.75-4.5h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zm2.25-4.5h.008v.008H16.5v-.008zm0 2.25h.008v.008H16.5V15z"
+          />
+        </svg>
+      </span>
+    </div>
+  );
 }
 
 // ── Live Preview Card ──────────────────────────────────────────────────────────
@@ -627,11 +735,28 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
                       max={form.discount_type === "percentage" ? 100 : undefined}
                       step="0.01"
                       value={form.discount_value}
-                      onChange={(e) => updateField("discount_value", e.target.value)}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const num = parseFloat(raw);
+                        if (!isNaN(num) && num < 0) {
+                          updateField("discount_value", "0.01");
+                          return;
+                        }
+                        if (form.discount_type === "percentage" && !isNaN(num) && num > 100) {
+                          updateField("discount_value", "100");
+                          return;
+                        }
+                        updateField("discount_value", raw);
+                      }}
                       placeholder={form.discount_type === "percentage" ? "10" : "25.00"}
                       className={`${errors.discount_value ? input_error : input_normal} pl-8`}
                     />
                   </div>
+                  <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
+                    {form.discount_type === "percentage"
+                      ? "Allowed range: 0.01% – 100%. Values above 100% are not permitted."
+                      : "Enter a positive dollar amount. No upper limit for fixed discounts."}
+                  </p>
                   <FieldError message={errors.discount_value} />
                 </div>
               </div>
@@ -771,17 +896,18 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
                     <FieldLabel>Start Date</FieldLabel>
                     <Toggle
                       enabled={toggles.has_start_date}
-                      onChange={(v) =>
-                        setToggles((prev) => ({ ...prev, has_start_date: v }))
-                      }
+                      onChange={(v) => {
+                        setToggles((prev) => ({ ...prev, has_start_date: v }));
+                        if (!v) updateField("starts_at", "");
+                      }}
                     />
                   </div>
-                  <input
-                    type="date"
-                    disabled={!toggles.has_start_date}
+                  <CouponDatePicker
+                    id="coupon_start_date"
                     value={form.starts_at}
-                    onChange={(e) => updateField("starts_at", e.target.value)}
-                    className={`${input_normal} disabled:cursor-not-allowed disabled:opacity-40`}
+                    onChange={(date_str) => updateField("starts_at", date_str)}
+                    disabled={!toggles.has_start_date}
+                    placeholder="Pick a start date"
                   />
                   <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
                     Optional — if set, coupon is not valid before this date.
@@ -791,11 +917,14 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
                 {/* Expiry Date */}
                 <div>
                   <FieldLabel required>Expiry Date</FieldLabel>
-                  <input
-                    type="date"
+                  <CouponDatePicker
+                    id="coupon_expiry_date"
                     value={form.expires_at}
-                    onChange={(e) => updateField("expires_at", e.target.value)}
-                    className={errors.expires_at ? input_error : input_normal}
+                    onChange={(date_str) => {
+                      updateField("expires_at", date_str);
+                    }}
+                    placeholder="Pick an expiry date"
+                    has_error={!!errors.expires_at}
                   />
                   <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
                     The coupon will be invalid after this date.
