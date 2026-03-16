@@ -955,7 +955,10 @@ const AdminTrackingDashboard: React.FC = () => {
   const [selected_id, setSelectedId] = useState<string | null>(null);
   const [active_tab, setActiveTab] = useState<TrackingTab>("needs_update");
   const [current_page, setCurrentPage] = useState(1);
+  const [nav_toast, setNavToast] = useState<string | null>(null);
   const list_ref = useRef<HTMLDivElement>(null);
+  // Holds the order ID that should be auto-selected after a programmatic tab switch
+  const pending_select_id_ref = useRef<string | null>(null);
 
   const loadOrders = useCallback(async (tab: TrackingTab) => {
     setIsLoading(true);
@@ -971,8 +974,16 @@ const AdminTrackingDashboard: React.FC = () => {
       });
       setOrders(sorted);
       setTabCounts((prev) => ({ ...prev, [tab]: sorted.length }));
-      setSelectedId(sorted[0]?.id ?? null);
+      // Prefer the order that triggered the tab switch; fall back to first in list
+      const pending_id = pending_select_id_ref.current;
+      pending_select_id_ref.current = null;
+      if (pending_id && sorted.some((o) => o.id === pending_id)) {
+        setSelectedId(pending_id);
+      } else {
+        setSelectedId(sorted[0]?.id ?? null);
+      }
     } catch {
+      pending_select_id_ref.current = null;
       setLoadError("Failed to load orders.");
     } finally {
       setIsLoading(false);
@@ -1011,6 +1022,7 @@ const AdminTrackingDashboard: React.FC = () => {
 
   function switchTab(tab: TrackingTab) {
     if (tab === active_tab) return;
+    pending_select_id_ref.current = null;
     setActiveTab(tab);
     setCurrentPage(1);
     setSelectedId(null);
@@ -1022,16 +1034,46 @@ const AdminTrackingDashboard: React.FC = () => {
 
   const selected_order = orders.find((o) => o.id === selected_id) ?? null;
 
+  function navigateToTab(tab: TrackingTab, order_id: string, toast_msg: string) {
+    pending_select_id_ref.current = order_id;
+    setOrders((prev) => prev.filter((o) => o.id !== order_id));
+    setActiveTab(tab);
+    setCurrentPage(1);
+    setNavToast(toast_msg);
+    setTimeout(() => setNavToast(null), 4000);
+  }
+
   function handleStatusChange(order_id: string, new_status: OrderStatus) {
     const old_order = orders.find((o) => o.id === order_id);
-    if (old_order && old_order.status !== new_status) {
-      setTabCounts((prev) => ({
-        ...prev,
-        [old_order.status]: Math.max(0, (prev[old_order.status] ?? 0) - 1),
-        [new_status]: (prev[new_status] ?? 0) + 1,
-      }));
+    if (!old_order) return;
+
+    const status_actually_changed = old_order.status !== new_status;
+
+    if (status_actually_changed) {
+      if (active_tab === "needs_update") {
+        // Order was in needs_update (pending + 0 updates); decrement both needs_update and pending
+        setTabCounts((prev) => ({
+          ...prev,
+          needs_update: Math.max(0, (prev.needs_update ?? 0) - 1),
+          [old_order.status]: Math.max(0, (prev[old_order.status] ?? 0) - 1),
+          [new_status]: (prev[new_status] ?? 0) + 1,
+        }));
+      } else {
+        setTabCounts((prev) => ({
+          ...prev,
+          [old_order.status]: Math.max(0, (prev[old_order.status] ?? 0) - 1),
+          [new_status]: (prev[new_status] ?? 0) + 1,
+        }));
+      }
     }
-    setOrders((prev) => prev.map((o) => o.id === order_id ? { ...o, status: new_status } : o));
+
+    const target_tab: TrackingTab = new_status;
+    if (active_tab !== target_tab) {
+      const label = STATUS_CFG[new_status].label;
+      navigateToTab(target_tab, order_id, `Order moved to ${label}`);
+    } else {
+      setOrders((prev) => prev.map((o) => o.id === order_id ? { ...o, status: new_status } : o));
+    }
   }
 
   function handleUpdatesCountChange(order_id: string, count: number, last_at: string | null) {
@@ -1042,6 +1084,12 @@ const AdminTrackingDashboard: React.FC = () => {
         ...prev,
         needs_update: Math.max(0, (prev.needs_update ?? 0) - 1),
       }));
+      // If we are on the needs_update tab and no status-change navigation is already
+      // in flight, move the order over to the "pending" tab
+      if (active_tab === "needs_update" && !pending_select_id_ref.current) {
+        navigateToTab("pending", order_id, "Order moved to Pending");
+        return;
+      }
     }
     setOrders((prev) =>
       prev.map((o) => o.id === order_id ? { ...o, updates_count: count, last_update_at: last_at } : o)
@@ -1092,6 +1140,16 @@ const AdminTrackingDashboard: React.FC = () => {
           </Link>
         </div>
       </div>
+
+      {/* ── Navigation toast ────────────────────────────────────────────────── */}
+      {nav_toast && (
+        <div className="flex items-center gap-2 border-b border-success-200 bg-success-50 px-6 py-2 text-xs font-medium text-success-700 dark:border-success-500/20 dark:bg-success-500/10 dark:text-success-400">
+          <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          {nav_toast}
+        </div>
+      )}
 
       {/* ── Status tabs ─────────────────────────────────────────────────────── */}
       <div className="flex gap-0 border-b border-gray-100 bg-white px-6 dark:border-gray-800 dark:bg-gray-900">
