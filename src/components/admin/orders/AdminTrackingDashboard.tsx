@@ -10,6 +10,7 @@ import type {
 } from "@/types/admin";
 import {
   listTrackingOrders,
+  listNeedsUpdateOrders,
   listOrderUpdates,
   createOrderUpdate,
   deleteOrderUpdate,
@@ -960,10 +961,9 @@ const AdminTrackingDashboard: React.FC = () => {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const filter = tab === "needs_update"
-        ? { needs_update: true }
-        : { status: tab as OrderStatus };
-      const res = await listTrackingOrders(filter);
+      const res = tab === "needs_update"
+        ? await listNeedsUpdateOrders()
+        : await listTrackingOrders({ status: tab as OrderStatus });
       const sorted = [...res.data].sort((a, b) => {
         const a_time = a.last_update_at ? new Date(a.last_update_at).getTime() : 0;
         const b_time = b.last_update_at ? new Date(b.last_update_at).getTime() : 0;

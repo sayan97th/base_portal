@@ -1,4 +1,4 @@
-import { apiClient } from "@/lib/api-client";
+import { apiClient, getToken } from "@/lib/api-client";
 import type {
   OrderUpdate,
   OrderUpdatesResponse,
@@ -64,6 +64,30 @@ export async function deleteOrderUpdate(
   return apiClient.delete<void>(
     `/api/admin/orders/${order_id}/updates/${update_id}`
   );
+}
+
+/**
+ * List orders that need an update: status is "pending" and no tracking update
+ * has been sent yet (updates_count = 0).
+ * Calls the dedicated Next.js API route at /api/admin/tracking/needs-update.
+ * Roles allowed: super_admin, admin, staff.
+ */
+export async function listNeedsUpdateOrders(): Promise<TrackingOrdersResponse> {
+  const token = getToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const response = await fetch("/api/admin/tracking/needs-update", { headers });
+  if (!response.ok) {
+    const error_data = await response.json().catch(() => ({
+      message: "Failed to load needs-update orders",
+    }));
+    throw error_data;
+  }
+  return response.json() as Promise<TrackingOrdersResponse>;
 }
 
 /**
