@@ -8,12 +8,22 @@ import type {
 import type { OrderStatus } from "@/types/admin";
 
 /**
- * List all active orders (pending + processing) with tracking metadata.
+ * List orders with tracking metadata.
+ * - Pass `status` to filter by order status.
+ * - Pass `needs_update: true` to return only orders with zero tracking updates (any status).
  * Returns updates_count and last_update_at per order, sorted by urgency.
  * Roles allowed: super_admin, admin, staff.
  */
-export async function listTrackingOrders(): Promise<TrackingOrdersResponse> {
-  return apiClient.get<TrackingOrdersResponse>("/api/admin/tracking/orders");
+export async function listTrackingOrders(
+  filter?: { status?: OrderStatus; needs_update?: boolean }
+): Promise<TrackingOrdersResponse> {
+  const params = new URLSearchParams();
+  if (filter?.status) params.set("status", filter.status);
+  if (filter?.needs_update) params.set("needs_update", "true");
+  const query = params.toString();
+  return apiClient.get<TrackingOrdersResponse>(
+    query ? `/api/admin/tracking/orders?${query}` : `/api/admin/tracking/orders`
+  );
 }
 
 /**
@@ -58,14 +68,16 @@ export async function deleteOrderUpdate(
 
 /**
  * Update the status of an order directly (without creating a tracking entry).
+ * Pass notify_user: true to trigger an email notification to the client.
  * Roles allowed: super_admin, admin, staff.
  */
 export async function updateOrderStatus(
   order_id: string,
-  status: OrderStatus
+  status: OrderStatus,
+  notify_user: boolean = false
 ): Promise<{ message: string; status: OrderStatus }> {
   return apiClient.patch<{ message: string; status: OrderStatus }>(
     `/api/admin/orders/${order_id}/status`,
-    { status }
+    { status, notify_user }
   );
 }
