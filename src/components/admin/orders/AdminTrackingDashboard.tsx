@@ -979,10 +979,35 @@ const AdminTrackingDashboard: React.FC = () => {
     }
   }, []);
 
+  // Pre-load all tab counts in parallel so badges are visible on first render
+  const loadAllTabCounts = useCallback(async () => {
+    const [needs_update_res, pending_res, processing_res, completed_res, cancelled_res] =
+      await Promise.allSettled([
+        listNeedsUpdateOrders(),
+        listTrackingOrders({ status: "pending" }),
+        listTrackingOrders({ status: "processing" }),
+        listTrackingOrders({ status: "completed" }),
+        listTrackingOrders({ status: "cancelled" }),
+      ]);
+    setTabCounts((prev) => ({
+      ...prev,
+      ...(needs_update_res.status === "fulfilled" && { needs_update: needs_update_res.value.data.length }),
+      ...(pending_res.status === "fulfilled"      && { pending:      pending_res.value.data.length }),
+      ...(processing_res.status === "fulfilled"   && { processing:   processing_res.value.data.length }),
+      ...(completed_res.status === "fulfilled"    && { completed:    completed_res.value.data.length }),
+      ...(cancelled_res.status === "fulfilled"    && { cancelled:    cancelled_res.value.data.length }),
+    }));
+  }, []);
+
   // Load on mount and on tab change
   useEffect(() => {
     loadOrders(active_tab);
   }, [active_tab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Pre-load all tab counts once on mount (non-blocking)
+  useEffect(() => {
+    void loadAllTabCounts();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function switchTab(tab: TrackingTab) {
     if (tab === active_tab) return;
@@ -997,11 +1022,27 @@ const AdminTrackingDashboard: React.FC = () => {
 
   const selected_order = orders.find((o) => o.id === selected_id) ?? null;
 
-  function handleStatusChange(order_id: string, status: OrderStatus) {
-    setOrders((prev) => prev.map((o) => o.id === order_id ? { ...o, status } : o));
+  function handleStatusChange(order_id: string, new_status: OrderStatus) {
+    const old_order = orders.find((o) => o.id === order_id);
+    if (old_order && old_order.status !== new_status) {
+      setTabCounts((prev) => ({
+        ...prev,
+        [old_order.status]: Math.max(0, (prev[old_order.status] ?? 0) - 1),
+        [new_status]: (prev[new_status] ?? 0) + 1,
+      }));
+    }
+    setOrders((prev) => prev.map((o) => o.id === order_id ? { ...o, status: new_status } : o));
   }
 
   function handleUpdatesCountChange(order_id: string, count: number, last_at: string | null) {
+    const old_order = orders.find((o) => o.id === order_id);
+    // When the very first update is posted the order leaves the "needs_update" bucket
+    if (old_order && old_order.updates_count === 0 && count > 0) {
+      setTabCounts((prev) => ({
+        ...prev,
+        needs_update: Math.max(0, (prev.needs_update ?? 0) - 1),
+      }));
+    }
     setOrders((prev) =>
       prev.map((o) => o.id === order_id ? { ...o, updates_count: count, last_update_at: last_at } : o)
     );
