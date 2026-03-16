@@ -1,6 +1,6 @@
 import type { Role, Organization, User } from "@/types/auth";
 
-export type { OrderUpdate, OrderUpdatesResponse, CreateOrderUpdatePayload, UpdateAuthor } from "./order-tracking";
+export type { OrderUpdate, OrderUpdatesResponse, CreateOrderUpdatePayload, UpdateAuthor, TrackingOrderSummary, TrackingOrdersResponse } from "./order-tracking";
 
 export type { Role, Organization };
 

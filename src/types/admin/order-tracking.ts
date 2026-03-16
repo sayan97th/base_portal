@@ -1,4 +1,4 @@
-import type { OrderStatus } from "@/types/admin";
+import type { OrderStatus, OrderUser } from "@/types/admin";
 
 export interface UpdateAuthor {
   id: number;
@@ -27,4 +27,20 @@ export interface CreateOrderUpdatePayload {
 
 export interface OrderUpdatesResponse {
   data: OrderUpdate[];
+}
+
+export interface TrackingOrderSummary {
+  id: string;
+  order_title: string | null;
+  total_amount: number;
+  status: OrderStatus;
+  created_at: string;
+  items_count: number;
+  updates_count: number;
+  last_update_at: string | null;
+  user: OrderUser;
+}
+
+export interface TrackingOrdersResponse {
+  data: TrackingOrderSummary[];
 }

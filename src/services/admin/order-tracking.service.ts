@@ -3,8 +3,18 @@ import type {
   OrderUpdate,
   OrderUpdatesResponse,
   CreateOrderUpdatePayload,
+  TrackingOrdersResponse,
 } from "@/types/admin";
 import type { OrderStatus } from "@/types/admin";
+
+/**
+ * List all active orders (pending + processing) with tracking metadata.
+ * Returns updates_count and last_update_at per order, sorted by urgency.
+ * Roles allowed: super_admin, admin, staff.
+ */
+export async function listTrackingOrders(): Promise<TrackingOrdersResponse> {
+  return apiClient.get<TrackingOrdersResponse>("/api/admin/tracking/orders");
+}
 
 /**
  * List all tracking updates for a given order — admin view.
