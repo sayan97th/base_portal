@@ -7,6 +7,7 @@ import { useSidebar } from "@/context/SidebarContext";
 import {
   GridIcon,
   GroupIcon,
+  UserIcon,
   UserCircleIcon,
   ChatIcon,
   ChevronDownIcon,
@@ -55,6 +56,12 @@ const admin_sidebar_sections: SidebarSection[] = [
         name: "Users",
         icon: <GroupIcon />,
         path: "/admin/users",
+        permission: "users.view",
+      },
+      {
+        name: "Clients",
+        icon: <UserIcon />,
+        path: "/admin/clients",
         permission: "users.view",
       },
       {
