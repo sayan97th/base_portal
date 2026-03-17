@@ -2,9 +2,13 @@ import { apiClient, setToken, removeToken } from "@/lib/api-client";
 import { getPrimaryRole, setPrimaryRoleCookie } from "@/lib/roles";
 import type {
   AuthResponse,
+  ForgotPasswordData,
+  ForgotPasswordResponse,
   LoginCredentials,
   MeResponse,
   RegisterData,
+  ResetPasswordData,
+  ResetPasswordResponse,
 } from "@/types/auth";
 
 function persistSession(data: AuthResponse): void {
@@ -45,5 +49,13 @@ export const authService = {
       removeToken();
       setPrimaryRoleCookie(null);
     }
+  },
+
+  async forgotPassword(data: ForgotPasswordData): Promise<ForgotPasswordResponse> {
+    return apiClient.post<ForgotPasswordResponse>("/api/auth/forgot-password", data);
+  },
+
+  async resetPassword(data: ResetPasswordData): Promise<ResetPasswordResponse> {
+    return apiClient.post<ResetPasswordResponse>("/api/auth/reset-password", data);
   },
 };

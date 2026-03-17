@@ -4,6 +4,7 @@ import { ROLE_COOKIE_NAME, isStaffRole } from "@/lib/roles";
 
 const auth_routes = ["/signin", "/signup"];
 const invitation_routes = ["/accept-invitation"];
+const password_reset_routes = ["/reset-password"];
 
 /**
  * Returns true when the pathname starts with any of the given prefixes.
@@ -19,13 +20,14 @@ export function middleware(request: NextRequest) {
 
   const is_auth_route = matchesAny(pathname, auth_routes);
   const is_invitation_route = matchesAny(pathname, invitation_routes);
+  const is_password_reset_route = matchesAny(pathname, password_reset_routes);
   const is_admin_route = pathname === "/admin" || pathname.startsWith("/admin/");
 
   // ── Unauthenticated users ─────────────────────────────────────────────────
 
   if (!token) {
-    // Allow access to auth pages and invitation acceptance.
-    if (is_auth_route || is_invitation_route) {
+    // Allow access to auth pages, invitation acceptance, and password reset.
+    if (is_auth_route || is_invitation_route || is_password_reset_route) {
       return NextResponse.next();
     }
     // Everything else requires authentication.
@@ -38,8 +40,8 @@ export function middleware(request: NextRequest) {
 
   const is_staff = primary_role ? isStaffRole(primary_role) : false;
 
-  // Prevent authenticated users from accessing auth pages.
-  if (is_auth_route) {
+  // Prevent authenticated users from accessing auth/password-reset pages.
+  if (is_auth_route || is_password_reset_route) {
     const destination = is_staff ? "/admin/dashboard" : "/";
     return NextResponse.redirect(new URL(destination, request.url));
   }
