@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import Badge from "@/components/ui/badge/Badge";
 import { getAdminOrder } from "@/services/admin/order.service";
-import type { AdminOrder, AdminInvoice, OrderItem, OrderStatus } from "@/types/admin";
+import type { AdminOrder, AdminInvoice, AdminOrderCoupon, OrderItem, OrderStatus } from "@/types/admin";
 import OrderTrackingPanel from "./OrderTrackingPanel";
 
 interface AdminOrderDetailContentProps {
@@ -25,6 +25,13 @@ function formatCurrency(amount: number): string {
     currency: "USD",
     minimumFractionDigits: 2,
   }).format(amount);
+}
+
+function formatCouponDiscount(coupon: AdminOrderCoupon): string {
+  if (coupon.discount_type === "percentage") {
+    return `${coupon.discount_value}% off`;
+  }
+  return formatCurrency(coupon.discount_value);
 }
 
 function getStatusConfig(status: OrderStatus): {
@@ -175,6 +182,26 @@ const InvoiceCard = ({ invoice }: InvoiceCardProps) => {
         <InfoRow label="Payment Method" value={invoice.payment_method} />
         <InfoRow label="Currency" value={invoice.currency_type.toUpperCase()} />
         <InfoRow label="Subtotal" value={formatCurrency(invoice.subtotal_amount)} />
+        {invoice.discount_amount > 0 && invoice.coupon_code && (
+          <InfoRow
+            label="Coupon"
+            value={
+              <div className="flex flex-col items-end gap-0.5">
+                <span className="font-mono text-xs font-semibold tracking-wide text-success-600 dark:text-success-400">
+                  {invoice.coupon_code}
+                </span>
+                {invoice.coupon_name && (
+                  <span className="text-xs text-gray-400 dark:text-gray-500">
+                    {invoice.coupon_name}
+                  </span>
+                )}
+                <span className="text-sm font-semibold text-success-600 dark:text-success-400">
+                  -{formatCurrency(invoice.discount_amount)}
+                </span>
+              </div>
+            }
+          />
+        )}
         {invoice.credit_amount > 0 && (
           <InfoRow
             label="Credits Applied"
@@ -379,6 +406,25 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
                   <InfoRow label="Items" value={`${order.items.length} item${order.items.length !== 1 ? "s" : ""}`} />
                   <InfoRow label="Placed" value={formatDate(order.created_at)} />
                   <InfoRow label="Last Updated" value={formatDate(order.updated_at)} />
+                  <InfoRow label="Subtotal" value={formatCurrency(order.subtotal_amount)} />
+                  {order.coupon && (
+                    <InfoRow
+                      label="Coupon"
+                      value={
+                        <div className="flex flex-col items-end gap-0.5">
+                          <span className="font-mono text-xs font-semibold tracking-wide text-success-600 dark:text-success-400">
+                            {order.coupon.coupon_code}
+                          </span>
+                          <span className="text-xs text-gray-400 dark:text-gray-500">
+                            {order.coupon.coupon_name} &middot; {formatCouponDiscount(order.coupon)}
+                          </span>
+                          <span className="text-sm font-semibold text-success-600 dark:text-success-400">
+                            -{formatCurrency(order.discount_amount)}
+                          </span>
+                        </div>
+                      }
+                    />
+                  )}
                   <InfoRow
                     label="Total"
                     value={<span className="text-base font-bold text-gray-900 dark:text-white">{formatCurrency(order.total_amount)}</span>}

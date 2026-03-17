@@ -13,6 +13,7 @@ import {
 import { linkBuildingService } from "@/services/client/link-building.service";
 import type {
   LinkBuildingOrderDetail,
+  OrderCouponDetail,
   OrderItemDetail,
   OrderStatus,
 } from "@/types/client/link-building";
@@ -343,6 +344,13 @@ const LinkBuildingOrderDetailPage: React.FC<
 
   const total_links = order?.items.reduce((sum, i) => sum + i.quantity, 0) ?? 0;
 
+  function formatCouponDiscount(coupon: OrderCouponDetail): string {
+    if (coupon.discount_type === "percentage") {
+      return `${coupon.discount_value}% off`;
+    }
+    return formatCurrency(coupon.discount_value);
+  }
+
   const status_config = order ? getStatusConfig(order.status) : null;
 
   const is_new_order = order?.status === "pending";
@@ -515,6 +523,48 @@ const LinkBuildingOrderDetailPage: React.FC<
                       </dt>
                       <dd className="text-sm font-medium text-success-600 dark:text-success-400">
                         Applied
+                      </dd>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between gap-2 border-t border-gray-100 pt-3 dark:border-gray-800">
+                    <dt className="text-sm text-gray-500 dark:text-gray-400">
+                      Subtotal
+                    </dt>
+                    <dd className="text-sm font-medium text-gray-800 dark:text-white/90">
+                      {formatCurrency(order.subtotal_amount)}
+                    </dd>
+                  </div>
+
+                  {order.coupon && (
+                    <div className="flex justify-between gap-2">
+                      <dt className="flex min-w-0 flex-col gap-0.5">
+                        <span className="inline-flex items-center gap-1.5 text-sm text-success-600 dark:text-success-400">
+                          <svg
+                            className="h-3.5 w-3.5 shrink-0"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            strokeWidth={2}
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M9 14.25l1.5 1.5 3-3.75M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9-4.03-9-9-9z"
+                            />
+                          </svg>
+                          Coupon applied
+                        </span>
+                        <span className="ml-5 font-mono text-xs font-semibold tracking-wide text-success-700 dark:text-success-300">
+                          {order.coupon.coupon_code}
+                        </span>
+                        <span className="ml-5 text-xs text-gray-400 dark:text-gray-500">
+                          {order.coupon.coupon_name} &middot;{" "}
+                          {formatCouponDiscount(order.coupon)}
+                        </span>
+                      </dt>
+                      <dd className="text-sm font-semibold text-success-600 dark:text-success-400">
+                        -{formatCurrency(order.discount_amount)}
                       </dd>
                     </div>
                   )}

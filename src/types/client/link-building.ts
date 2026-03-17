@@ -84,11 +84,22 @@ export interface OrderBillingDetail {
   postal_code: string;
 }
 
+export interface OrderCouponDetail {
+  coupon_code: string;
+  coupon_name: string;
+  discount_type: CouponDiscountType;
+  discount_value: number;
+  discount_amount: number;
+}
+
 export interface LinkBuildingOrderDetail {
   id: string;
   order_title: string | null;
   order_notes: string | null;
+  subtotal_amount: number;
+  discount_amount: number;
   total_amount: number;
+  coupon: OrderCouponDetail | null;
   status: OrderStatus;
   payment_intent_id: string | null;
   created_at: string;

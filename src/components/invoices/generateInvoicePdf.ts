@@ -227,7 +227,27 @@ function drawSummarySection(
   doc.text("Subtotal", label_x, y_position);
   doc.text(invoice.subtotal, right_x, y_position, { align: "right" });
 
-  y_position += 8;
+  y_position += 7;
+
+  // Coupon discount (if applied)
+  if (invoice.coupon) {
+    const coupon_label = `Coupon: ${invoice.coupon.coupon_code}`;
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...COLORS.success);
+    doc.text(coupon_label, label_x, y_position);
+    doc.text(`-${invoice.coupon.discount}`, right_x, y_position, {
+      align: "right",
+    });
+    y_position += 5;
+
+    doc.setFontSize(FONT_SIZES.small);
+    doc.setTextColor(...COLORS.secondary);
+    doc.text(invoice.coupon.coupon_name, label_x, y_position);
+    y_position += 6;
+    doc.setFontSize(FONT_SIZES.body);
+  } else {
+    y_position += 1;
+  }
 
   // Separator line
   doc.setDrawColor(...COLORS.border);

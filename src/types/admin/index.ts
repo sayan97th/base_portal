@@ -55,12 +55,23 @@ export interface OrderItem {
   subtotal: number;
 }
 
+export interface AdminOrderCoupon {
+  coupon_code: string;
+  coupon_name: string;
+  discount_type: "percentage" | "fixed_amount";
+  discount_value: number;
+  discount_amount: number;
+}
+
 export interface AdminOrder {
   id: string;
   user_id: number;
   order_title: string;
   order_notes: string | null;
+  subtotal_amount: number;
+  discount_amount: number;
   total_amount: number;
+  coupon: AdminOrderCoupon | null;
   status: OrderStatus;
   payment_intent_id: string | null;
   created_at: string;
@@ -137,6 +148,9 @@ export interface AdminInvoice {
   payment_method: InvoicePaymentMethod;
   currency_type: InvoiceCurrencyType;
   subtotal_amount: number;
+  discount_amount: number;
+  coupon_code: string | null;
+  coupon_name: string | null;
   total_amount: number;
   credit_amount: number;
   date_issued: string | null;

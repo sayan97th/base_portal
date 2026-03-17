@@ -16,6 +16,12 @@ export interface InvoiceBilledTo {
   country: string | null;
 }
 
+export interface InvoiceCoupon {
+  coupon_code: string;
+  coupon_name: string;
+  discount: string;
+}
+
 export interface InvoiceDetail {
   invoice_number: string;
   unique_id: string;
@@ -25,6 +31,7 @@ export interface InvoiceDetail {
   payment_method: string;
   status: InvoiceStatus;
   subtotal: string;
+  coupon: InvoiceCoupon | null;
   total: string;
   credit: string;
   billed_to: InvoiceBilledTo | null;
@@ -79,6 +86,7 @@ export const invoice_details: Record<string, InvoiceDetail> = {
       { item_name: "Organic Performance Brief (Credits)", price: "99 credits", quantity: 1, item_total: "99 credits" },
     ],
     subtotal: "99 credits",
+    coupon: null,
     credit: "-99 credits",
   },
   "53A0EC35": {
@@ -102,6 +110,7 @@ export const invoice_details: Record<string, InvoiceDetail> = {
       { item_name: "Link Building - DR 50+", price: "$715.00", quantity: 1, item_total: "$715.00" },
     ],
     subtotal: "$715.00",
+    coupon: null,
     credit: "$0.00",
   },
   C26149E9: {
@@ -125,6 +134,7 @@ export const invoice_details: Record<string, InvoiceDetail> = {
       { item_name: "Link Building - DR 50+", price: "$715.00", quantity: 1, item_total: "$715.00" },
     ],
     subtotal: "$715.00",
+    coupon: null,
     credit: "$0.00",
   },
   "2507C497": {
@@ -148,6 +158,7 @@ export const invoice_details: Record<string, InvoiceDetail> = {
       { item_name: "Link Building - DR 50+", price: "$715.00", quantity: 1, item_total: "$715.00" },
     ],
     subtotal: "$715.00",
+    coupon: null,
     credit: "$0.00",
   },
   "235BE096": {
@@ -171,6 +182,7 @@ export const invoice_details: Record<string, InvoiceDetail> = {
       { item_name: "Content Optimization", price: "$0.00", quantity: 1, item_total: "$0.00" },
     ],
     subtotal: "$0.00",
+    coupon: null,
     credit: "$0.00",
   },
   "7B47EB9B": {
@@ -194,6 +206,7 @@ export const invoice_details: Record<string, InvoiceDetail> = {
       { item_name: "New Content Article (Credits)", price: "200 credits", quantity: 1, item_total: "200 credits" },
     ],
     subtotal: "200 credits",
+    coupon: null,
     credit: "-200 credits",
   },
   "8A3B233D": {
@@ -217,6 +230,7 @@ export const invoice_details: Record<string, InvoiceDetail> = {
       { item_name: "Link Building Bundle (Credits)", price: "683 credits", quantity: 1, item_total: "683 credits" },
     ],
     subtotal: "683 credits",
+    coupon: null,
     credit: "-683 credits",
   },
   "874FD062": {
@@ -240,6 +254,7 @@ export const invoice_details: Record<string, InvoiceDetail> = {
       { item_name: "SEO Package Credits", price: "925 credits", quantity: 1, item_total: "925 credits" },
     ],
     subtotal: "925 credits",
+    coupon: null,
     credit: "-925 credits",
   },
   A7FB1724: {
@@ -263,6 +278,7 @@ export const invoice_details: Record<string, InvoiceDetail> = {
       { item_name: "Premium Mention (Credits)", price: "250 credits", quantity: 1, item_total: "250 credits" },
     ],
     subtotal: "250 credits",
+    coupon: null,
     credit: "-250 credits",
   },
   A60C185C: {
@@ -286,6 +302,7 @@ export const invoice_details: Record<string, InvoiceDetail> = {
       { item_name: "Account Setup", price: "$0.00", quantity: 1, item_total: "$0.00" },
     ],
     subtotal: "$0.00",
+    coupon: null,
     credit: "$0.00",
   },
   A273B943: {
@@ -309,6 +326,7 @@ export const invoice_details: Record<string, InvoiceDetail> = {
       { item_name: "Content Refresh Bundle (Credits)", price: "625 credits", quantity: 1, item_total: "625 credits" },
     ],
     subtotal: "625 credits",
+    coupon: null,
     credit: "-625 credits",
   },
   "6061E693": {
@@ -332,6 +350,7 @@ export const invoice_details: Record<string, InvoiceDetail> = {
       { item_name: "Account Maintenance", price: "$0.00", quantity: 1, item_total: "$0.00" },
     ],
     subtotal: "$0.00",
+    coupon: null,
     credit: "$0.00",
   },
   "2FCE73DE": {
@@ -355,6 +374,7 @@ export const invoice_details: Record<string, InvoiceDetail> = {
       { item_name: "Platform Access", price: "$0.00", quantity: 1, item_total: "$0.00" },
     ],
     subtotal: "$0.00",
+    coupon: null,
     credit: "$0.00",
   },
   "23861878": {
@@ -378,6 +398,7 @@ export const invoice_details: Record<string, InvoiceDetail> = {
       { item_name: "Onboarding Fee", price: "$0.00", quantity: 1, item_total: "$0.00" },
     ],
     subtotal: "$0.00",
+    coupon: null,
     credit: "$0.00",
   },
   C3210330: {
@@ -401,6 +422,7 @@ export const invoice_details: Record<string, InvoiceDetail> = {
       { item_name: "Full Scale SEO Plan", price: "$6,007.50", quantity: 1, item_total: "$6,007.50" },
     ],
     subtotal: "$6,007.50",
+    coupon: null,
     credit: "$0.00",
   },
 };

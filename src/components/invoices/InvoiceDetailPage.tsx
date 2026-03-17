@@ -307,6 +307,24 @@ const InvoiceDetailPage: React.FC<InvoiceDetailPageProps> = ({ invoice_id }) => 
                 {invoice.subtotal}
               </dd>
             </div>
+            {invoice.coupon && (
+              <div className="flex justify-between">
+                <dt className="flex flex-col gap-0.5">
+                  <span className="font-medium text-success-600 dark:text-success-400">
+                    Coupon discount
+                  </span>
+                  <span className="font-mono text-xs font-semibold tracking-wide text-success-700 dark:text-success-300">
+                    {invoice.coupon.coupon_code}
+                  </span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500">
+                    {invoice.coupon.coupon_name}
+                  </span>
+                </dt>
+                <dd className="font-semibold text-success-600 dark:text-success-400">
+                  -{invoice.coupon.discount}
+                </dd>
+              </div>
+            )}
             <div className="flex justify-between border-t border-gray-200 pt-2 dark:border-gray-700">
               <dt className="font-semibold text-gray-900 dark:text-white">
                 Total
