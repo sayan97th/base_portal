@@ -35,6 +35,11 @@ const DrTierCard: React.FC<DrTierCardProps> = ({
     }
   };
 
+  const handleCheckToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onQuantityChange(is_selected ? 0 : 1);
+  };
+
   const handleIncrement = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (tier.max_quantity === undefined || quantity < tier.max_quantity) {
@@ -56,16 +61,18 @@ const DrTierCard: React.FC<DrTierCardProps> = ({
           : "border-gray-200 hover:border-gray-300 dark:border-gray-800 dark:hover:border-gray-700"
       }`}
     >
-      {/* Selected checkmark badge */}
-      <div
+      {/* Selected checkmark badge — clickable to toggle for all tiers */}
+      <button
+        onClick={handleCheckToggle}
+        aria-label={is_selected ? "Deselect" : "Select"}
         className={`absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full transition-all duration-200 ${
           is_selected
-            ? "scale-100 bg-coral-500 text-white opacity-100"
-            : "scale-75 bg-gray-100 text-gray-300 opacity-0 group-hover:opacity-50 dark:bg-gray-700 dark:text-gray-500"
+            ? "scale-100 bg-coral-500 text-white opacity-100 hover:bg-coral-600"
+            : "scale-75 bg-gray-100 text-gray-300 opacity-0 group-hover:scale-100 group-hover:opacity-50 hover:opacity-100! dark:bg-gray-700 dark:text-gray-500"
         }`}
       >
         <CheckIcon />
-      </div>
+      </button>
 
       {/* Most popular badge */}
       {tier.is_most_popular && (
