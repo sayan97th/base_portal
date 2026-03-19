@@ -279,13 +279,6 @@ const LinkBuildingOrderSummary: React.FC<LinkBuildingOrderSummaryProps> = ({
                   </svg>
                   Complete Purchase
                 </span>
-                <span className="font-mono text-xs font-bold opacity-75">
-                  $
-                  {checkout_action.total.toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </span>
               </span>
             )}
           </button>
