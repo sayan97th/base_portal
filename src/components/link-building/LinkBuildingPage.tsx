@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Elements } from "@stripe/react-stripe-js";
@@ -15,6 +15,7 @@ import KeywordEntryStep, {
 } from "./KeywordEntryStep";
 import CheckoutStep, {
   BillingAddress,
+  type CheckoutStepHandle,
 } from "@/components/shared/CheckoutStep";
 import { dr_tiers as fallback_dr_tiers } from "./drTierData";
 import { linkBuildingService } from "@/services/client/link-building.service";
@@ -77,6 +78,11 @@ const LinkBuildingPage: React.FC = () => {
   });
 
   const { saved_billing_address, has_saved_address } = useBillingAddress();
+
+  // Ref to imperatively trigger submit from the order summary button
+  const checkout_ref = useRef<CheckoutStepHandle>(null);
+  // Tracks CheckoutStep's internal processing state so the summary button stays in sync
+  const [checkout_is_processing, setCheckoutIsProcessing] = useState(false);
 
   const loadDrTiers = useCallback(async () => {
     setDrTiersLoading(true);
@@ -357,65 +363,84 @@ const LinkBuildingPage: React.FC = () => {
           My Orders
         </Link>
       </div>
-      <div className="grid grid-cols-12 gap-6">
-        {/* Main content */}
-        <div className="col-span-12 space-y-6 lg:col-span-8">
-          {current_step === "selection" && (
-            <>
-              <LinkBuildingHeader />
-              {dr_tiers_error && (
-                <p className="text-sm text-amber-600 dark:text-amber-400">
-                  {dr_tiers_error}
-                </p>
-              )}
-              {dr_tiers_loading ? (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-36 animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-800"
-                    />
-                  ))}
+      {/* ── Selection & Keywords steps ── */}
+      {current_step !== "checkout" && (
+        <div className="grid grid-cols-12 gap-6">
+          <div className="col-span-12 space-y-6 lg:col-span-8">
+            {current_step === "selection" && (
+              <>
+                <LinkBuildingHeader />
+                {dr_tiers_error && (
+                  <p className="text-sm text-amber-600 dark:text-amber-400">
+                    {dr_tiers_error}
+                  </p>
+                )}
+                {dr_tiers_loading ? (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="h-36 animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-800"
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <DrTierGrid
+                    dr_tiers={dr_tiers}
+                    selected_quantities={selected_quantities}
+                    onQuantityChange={handleQuantityChange}
+                  />
+                )}
+              </>
+            )}
+
+            {current_step === "keywords" && (
+              <>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handlePrevious}
+                    className="text-sm font-medium text-brand-500 transition-colors hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
+                  >
+                    &laquo; Back
+                  </button>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Enter your target keywords and landing pages for each placement.
+                  </p>
                 </div>
-              ) : (
-                <DrTierGrid
-                  dr_tiers={dr_tiers}
-                  selected_quantities={selected_quantities}
-                  onQuantityChange={handleQuantityChange}
+                <KeywordEntryStep
+                  selected_items={selected_items}
+                  keyword_data={computed_keyword_rows}
+                  order_title={order_title}
+                  order_notes={order_notes}
+                  onKeywordChange={handleKeywordChange}
+                  onOrderTitleChange={setOrderTitle}
+                  onOrderNotesChange={setOrderNotes}
                 />
-              )}
-            </>
-          )}
+              </>
+            )}
+          </div>
 
-          {current_step === "keywords" && (
-            <>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={handlePrevious}
-                  className="text-sm font-medium text-brand-500 transition-colors hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
-                >
-                  &laquo; Back
-                </button>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Enter your target keywords and landing pages for each
-                  placement.
-                </p>
-              </div>
-              <KeywordEntryStep
-                selected_items={selected_items}
-                keyword_data={computed_keyword_rows}
-                order_title={order_title}
-                order_notes={order_notes}
-                onKeywordChange={handleKeywordChange}
-                onOrderTitleChange={setOrderTitle}
-                onOrderNotesChange={setOrderNotes}
-              />
-            </>
-          )}
+          <div className="col-span-12 lg:col-span-4">
+            <LinkBuildingOrderSummary
+              selected_items={selected_items}
+              total={subtotal}
+              action_label={current_step === "selection" ? "Continue" : "Review"}
+              onAction={current_step === "selection" ? handleContinue : handleReview}
+              is_action_disabled={selected_items.length === 0}
+              onQuantityChange={handleQuantityChange}
+            />
+          </div>
+        </div>
+      )}
 
-          {current_step === "checkout" && (
-            <Elements stripe={getStripe()}>
+      {/* ── Checkout step — Elements wraps both columns so the summary button
+           can trigger CheckoutStep's Stripe hooks via the imperative ref ── */}
+      {current_step === "checkout" && (
+        <Elements stripe={getStripe()}>
+          <div className="grid grid-cols-12 gap-6">
+            <div className="col-span-12 lg:col-span-8">
               <CheckoutStep
+                ref={checkout_ref}
                 billing_address={billing_address}
                 onBillingChange={handleBillingChange}
                 onPrevious={handlePrevious}
@@ -425,46 +450,32 @@ const LinkBuildingPage: React.FC = () => {
                 total_amount={total}
                 saved_billing_address={saved_billing_address}
                 onApplySavedAddress={handleApplySavedAddress}
+                onProcessingChange={setCheckoutIsProcessing}
               />
-            </Elements>
-          )}
-        </div>
+            </div>
 
-        {/* Sidebar */}
-        {current_step !== "checkout" && (
-          <div className="col-span-12 lg:col-span-4">
-            <LinkBuildingOrderSummary
-              selected_items={selected_items}
-              total={subtotal}
-              action_label={
-                current_step === "selection" ? "Continue" : "Review"
-              }
-              onAction={
-                current_step === "selection" ? handleContinue : handleReview
-              }
-              is_action_disabled={selected_items.length === 0}
-              onQuantityChange={handleQuantityChange}
-            />
+            <div className="col-span-12 lg:col-span-4">
+              <LinkBuildingOrderSummary
+                selected_items={selected_items}
+                total={subtotal}
+                action_label="Review"
+                onAction={() => {}}
+                is_action_disabled
+                show_coupon_field
+                coupon={coupon_state}
+                onCouponCodeChange={handleCouponCodeChange}
+                onApplyCoupon={handleApplyCoupon}
+                onRemoveCoupon={handleRemoveCoupon}
+                checkout_action={{
+                  total,
+                  is_processing: checkout_is_processing || is_submitting,
+                  onSubmit: () => checkout_ref.current?.triggerSubmit(),
+                }}
+              />
+            </div>
           </div>
-        )}
-
-        {current_step === "checkout" && (
-          <div className="col-span-12 lg:col-span-4">
-            <LinkBuildingOrderSummary
-              selected_items={selected_items}
-              total={subtotal}
-              action_label="Review"
-              onAction={() => {}}
-              is_action_disabled
-              show_coupon_field
-              coupon={coupon_state}
-              onCouponCodeChange={handleCouponCodeChange}
-              onApplyCoupon={handleApplyCoupon}
-              onRemoveCoupon={handleRemoveCoupon}
-            />
-          </div>
-        )}
-      </div>
+        </Elements>
+      )}
     </div>
   );
 };

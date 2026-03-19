@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from "react";
 import {
   useStripe,
   useElements,
@@ -25,6 +25,11 @@ export interface BillingAddress {
   company: string;
 }
 
+/** Imperative handle exposed via forwardRef so parents can trigger submit. */
+export type CheckoutStepHandle = {
+  triggerSubmit: () => void;
+};
+
 interface CheckoutStepProps {
   billing_address: BillingAddress;
   onBillingChange: (field: keyof BillingAddress, value: string) => void;
@@ -35,6 +40,9 @@ interface CheckoutStepProps {
   total_amount: number;
   saved_billing_address?: BillingAddress | null;
   onApplySavedAddress?: () => void;
+  /** Called whenever the internal processing state changes so the parent can
+   *  reflect it on an external submit button (e.g. in the order summary). */
+  onProcessingChange?: (is_processing: boolean) => void;
 }
 
 interface StripeElementErrors {
@@ -181,7 +189,7 @@ function SectionHeader({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-const CheckoutStep: React.FC<CheckoutStepProps> = ({
+const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function CheckoutStep({
   billing_address,
   onBillingChange,
   onPrevious,
@@ -191,7 +199,8 @@ const CheckoutStep: React.FC<CheckoutStepProps> = ({
   total_amount,
   saved_billing_address,
   onApplySavedAddress,
-}) => {
+  onProcessingChange,
+}, ref) {
   const stripe = useStripe();
   const elements = useElements();
 
@@ -239,7 +248,7 @@ const CheckoutStep: React.FC<CheckoutStepProps> = ({
     }));
   };
 
-  const handleComplete = async () => {
+  const handleComplete = useCallback(async () => {
     if (!stripe || !elements) return;
 
     if (!is_using_saved) {
@@ -252,6 +261,7 @@ const CheckoutStep: React.FC<CheckoutStepProps> = ({
     }
 
     setIsProcessing(true);
+    onProcessingChange?.(true);
     setStripeError(null);
 
     try {
@@ -291,6 +301,7 @@ const CheckoutStep: React.FC<CheckoutStepProps> = ({
       if (error) {
         setStripeError(error.message ?? "Payment failed. Please try again.");
         setIsProcessing(false);
+        onProcessingChange?.(false);
         return;
       }
 
@@ -318,21 +329,24 @@ const CheckoutStep: React.FC<CheckoutStepProps> = ({
       } else {
         setStripeError("Payment could not be completed. Please try again.");
         setIsProcessing(false);
+        onProcessingChange?.(false);
       }
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "An unexpected error occurred.";
       setStripeError(message);
       setIsProcessing(false);
+      onProcessingChange?.(false);
     }
-  };
+  }, [
+    stripe, elements, is_using_saved, name_on_card, total_amount,
+    payment_profiles, selected_profile_id, billing_address, save_for_future,
+    onComplete, onProcessingChange,
+  ]);
+
+  useImperativeHandle(ref, () => ({ triggerSubmit: handleComplete }), [handleComplete]);
 
   const is_busy = is_processing || is_loading;
-
-  const formatted_total = total_amount.toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
 
   return (
     <div className="space-y-5">
@@ -823,38 +837,8 @@ const CheckoutStep: React.FC<CheckoutStepProps> = ({
         </div>
       )}
 
-      {/* ── Complete Purchase button ── */}
-      <button
-        onClick={handleComplete}
-        disabled={is_busy || !stripe || !elements}
-        className="group relative w-full overflow-hidden rounded-xl bg-coral-500 px-6 py-4 text-sm font-semibold text-white shadow-lg shadow-coral-500/20 transition-all hover:bg-coral-600 hover:shadow-coral-500/30 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none dark:disabled:bg-gray-700"
-      >
-        {/* Sheen on hover */}
-        <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity group-hover:opacity-100"
-          style={{ background: "linear-gradient(105deg, rgba(255,255,255,0) 40%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0) 60%)" }}
-        />
-        {is_processing || is_loading ? (
-          <span className="flex items-center justify-center gap-2">
-            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            {is_processing ? "Processing payment…" : "Placing order…"}
-          </span>
-        ) : (
-          <span className="flex items-center justify-center gap-3">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
-            </svg>
-            Complete Purchase
-            <span className="rounded-lg bg-white/20 px-2.5 py-0.5 font-mono text-sm font-bold tracking-wide">
-              ${formatted_total}
-            </span>
-          </span>
-        )}
-      </button>
     </div>
   );
-};
+});
 
 export default CheckoutStep;
