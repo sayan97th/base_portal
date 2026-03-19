@@ -5,18 +5,321 @@ import Button from "../ui/button/Button";
 import { ChevronLeftIcon } from "@/icons/index";
 import type { PaymentMethod } from "./BillingPage";
 
+// ─── Brand configuration ──────────────────────────────────────────────────────
+
+const brand_gradients: Record<string, string> = {
+  visa: "linear-gradient(135deg, #1a237e 0%, #1565c0 60%, #0288d1 100%)",
+  mastercard: "linear-gradient(135deg, #b71c1c 0%, #e53935 55%, #ff8f00 100%)",
+  amex: "linear-gradient(135deg, #004d40 0%, #00796b 55%, #0097a7 100%)",
+  discover: "linear-gradient(135deg, #e65100 0%, #f57c00 55%, #ffb300 100%)",
+  unknown: "linear-gradient(135deg, #4527a0 0%, #7b1fa2 55%, #6a1b9a 100%)",
+};
+
+const brand_labels: Record<string, string> = {
+  visa: "VISA",
+  mastercard: "MC",
+  amex: "AMEX",
+  discover: "DISC",
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function detectCardBrand(number: string): string {
+  const digits = number.replace(/\s/g, "");
+  if (/^4/.test(digits)) return "visa";
+  if (/^5[1-5]/.test(digits)) return "mastercard";
+  if (/^3[47]/.test(digits)) return "amex";
+  if (/^6(?:011|5)/.test(digits)) return "discover";
+  return "unknown";
+}
+
+function formatCardNumber(value: string): string {
+  const digits = value.replace(/\D/g, "").substring(0, 16);
+  return digits.replace(/(\d{4})(?=\d)/g, "$1 ");
+}
+
+function formatExpiryDate(value: string): string {
+  const digits = value.replace(/\D/g, "").substring(0, 4);
+  if (digits.length >= 3) return `${digits.substring(0, 2)} / ${digits.substring(2)}`;
+  return digits;
+}
+
+function getDisplayNumber(raw: string): string {
+  const digits = raw.replace(/\s/g, "");
+  const padded = digits.padEnd(16, "•");
+  return `${padded.slice(0, 4)} ${padded.slice(4, 8)} ${padded.slice(8, 12)} ${padded.slice(12, 16)}`;
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+const input_class =
+  "h-11 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 text-sm text-gray-900 placeholder:text-gray-400 transition-all focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-white/3 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-brand-400 dark:focus:bg-white/5";
+
+function FormField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function CardBrandBadge({ brand }: { brand: string }) {
+  const badge_colors: Record<string, string> = {
+    visa: "#1a237e",
+    mastercard: "#c62828",
+    amex: "#004d40",
+    discover: "#e65100",
+  };
+
+  if (!brand_labels[brand]) return null;
+
+  return (
+    <span
+      className="rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white"
+      style={{ backgroundColor: badge_colors[brand] }}
+    >
+      {brand_labels[brand]}
+    </span>
+  );
+}
+
+// ─── Credit Card Preview ──────────────────────────────────────────────────────
+
+interface CreditCardPreviewProps {
+  card_number: string;
+  cardholder_name: string;
+  expiry_date: string;
+  brand: string;
+  cvc: string;
+  is_flipped: boolean;
+}
+
+function CardBrandMark({ brand, size = "md" }: { brand: string; size?: "sm" | "md" }) {
+  const text_size = size === "sm" ? "text-base" : "text-2xl";
+
+  if (brand === "visa") {
+    return (
+      <span
+        className={`font-bold italic text-white drop-shadow ${text_size}`}
+        style={{ fontFamily: "Georgia, serif", letterSpacing: "-1px" }}
+      >
+        VISA
+      </span>
+    );
+  }
+  if (brand === "mastercard") {
+    const circle_size = size === "sm" ? "h-5 w-5" : "h-8 w-8";
+    return (
+      <div className="flex">
+        <div className={`${circle_size} rounded-full bg-red-500 opacity-90`} />
+        <div className={`${circle_size} -ml-3 rounded-full bg-yellow-400 opacity-80`} />
+      </div>
+    );
+  }
+  if (brand === "amex") {
+    return (
+      <div className="rounded border border-white/40 px-1.5 py-0.5">
+        <span className={`font-bold tracking-widest text-white ${size === "sm" ? "text-[9px]" : "text-xs"}`}>
+          AMEX
+        </span>
+      </div>
+    );
+  }
+  if (brand === "discover") {
+    return (
+      <div className="flex items-center gap-1">
+        <span className={`font-bold tracking-widest text-white ${size === "sm" ? "text-[8px]" : "text-[10px]"}`}>
+          DISCOVER
+        </span>
+        <div className={`rounded-full bg-orange-400 ${size === "sm" ? "h-3 w-3" : "h-5 w-5"}`} />
+      </div>
+    );
+  }
+  return (
+    <svg
+      className={`text-white/70 ${size === "sm" ? "h-4 w-4" : "h-5 w-5"}`}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.5}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+      />
+    </svg>
+  );
+}
+
+function CreditCardPreview({
+  card_number,
+  cardholder_name,
+  expiry_date,
+  brand,
+  cvc,
+  is_flipped,
+}: CreditCardPreviewProps) {
+  const gradient = brand_gradients[brand] ?? brand_gradients.unknown;
+
+  return (
+    <div className="relative h-52 w-80" style={{ perspective: "1000px" }}>
+      {/* Flip inner */}
+      <div
+        className="relative h-full w-full"
+        style={{
+          transformStyle: "preserve-3d",
+          transform: is_flipped ? "rotateY(180deg)" : "rotateY(0deg)",
+          transition: "transform 0.65s cubic-bezier(0.4, 0, 0.2, 1)",
+        }}
+      >
+        {/* ── Front face ─────────────────────────────────────────────────── */}
+        <div
+          className="absolute inset-0 overflow-hidden rounded-2xl p-6 shadow-2xl"
+          style={{
+            backgroundImage: gradient,
+            backfaceVisibility: "hidden",
+          }}
+        >
+          {/* Glossy sheen */}
+          <div
+            className="pointer-events-none absolute inset-0 rounded-2xl"
+            style={{
+              background:
+                "linear-gradient(135deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.04) 50%, rgba(0,0,0,0.08) 100%)",
+            }}
+          />
+          {/* Decorative circles */}
+          <div
+            className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full"
+            style={{ background: "rgba(255,255,255,0.06)" }}
+          />
+          <div
+            className="pointer-events-none absolute -bottom-14 -left-10 h-44 w-44 rounded-full"
+            style={{ background: "rgba(255,255,255,0.04)" }}
+          />
+
+          {/* Top row: chip + brand */}
+          <div className="relative flex items-start justify-between">
+            {/* EMV chip */}
+            <div
+              className="h-9 w-12 overflow-hidden rounded-md"
+              style={{
+                background:
+                  "linear-gradient(135deg, #d4a846 0%, #f5d278 40%, #c9952a 100%)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.3), 0 1px 3px rgba(0,0,0,0.3)",
+              }}
+            >
+              <div className="grid h-full grid-cols-3 gap-px p-[3px] opacity-50">
+                {Array.from({ length: 9 }).map((_, i) => (
+                  <div key={i} className="rounded-[1px] bg-yellow-900/40" />
+                ))}
+              </div>
+            </div>
+            <CardBrandMark brand={brand} />
+          </div>
+
+          {/* Card number */}
+          <div className="relative mt-5">
+            <p
+              className="font-mono text-lg font-light tracking-[0.22em] text-white drop-shadow"
+              style={{ textShadow: "0 1px 3px rgba(0,0,0,0.4)" }}
+            >
+              {card_number}
+            </p>
+          </div>
+
+          {/* Bottom row: name + expiry */}
+          <div className="relative mt-5 flex items-end justify-between">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/50">
+                Card Holder
+              </p>
+              <p
+                className="mt-0.5 truncate font-mono text-sm font-semibold tracking-wider text-white"
+                style={{ textShadow: "0 1px 2px rgba(0,0,0,0.3)" }}
+              >
+                {cardholder_name || "FULL NAME"}
+              </p>
+            </div>
+            <div className="shrink-0 text-right">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/50">
+                Expires
+              </p>
+              <p
+                className="mt-0.5 font-mono text-sm font-semibold tracking-wider text-white"
+                style={{ textShadow: "0 1px 2px rgba(0,0,0,0.3)" }}
+              >
+                {expiry_date || "MM / YY"}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Back face ──────────────────────────────────────────────────── */}
+        <div
+          className="absolute inset-0 overflow-hidden rounded-2xl shadow-2xl"
+          style={{
+            backgroundImage: gradient,
+            backfaceVisibility: "hidden",
+            transform: "rotateY(180deg)",
+          }}
+        >
+          <div
+            className="pointer-events-none absolute inset-0 rounded-2xl"
+            style={{
+              background:
+                "linear-gradient(135deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.04) 50%, rgba(0,0,0,0.08) 100%)",
+            }}
+          />
+
+          {/* Magnetic stripe */}
+          <div className="mt-8 h-10 w-full bg-black/70" />
+
+          {/* Signature strip + CVC */}
+          <div className="mx-5 mt-4 flex items-center gap-3">
+            <div
+              className="h-10 flex-1 rounded-l-md"
+              style={{
+                backgroundImage:
+                  "repeating-linear-gradient(90deg, #e2e8f0 0px, #e2e8f0 7px, #f8fafc 7px, #f8fafc 14px)",
+              }}
+            />
+            <div className="flex flex-col items-center rounded-r-md bg-white px-4 py-1.5 shadow-inner">
+              <p className="text-[9px] font-medium uppercase tracking-widest text-gray-400">
+                CVV
+              </p>
+              <p className="font-mono text-base font-bold tracking-widest text-gray-800">
+                {cvc || "•••"}
+              </p>
+            </div>
+          </div>
+
+          {/* Brand on back */}
+          <div className="mx-5 mt-4 flex justify-end">
+            <CardBrandMark brand={brand} />
+          </div>
+
+          <p className="mt-3 px-5 text-[9px] leading-relaxed text-white/40">
+            This card is property of the issuing bank. If found, please return to the nearest branch.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
 interface PaymentMethodFormProps {
   onBack: () => void;
   onSubmit: (method: PaymentMethod) => void;
 }
 
-type PaymentTab = "card" | "bank";
-
-const PaymentMethodForm: React.FC<PaymentMethodFormProps> = ({
-  onBack,
-  onSubmit,
-}) => {
-  const [active_tab, setActiveTab] = useState<PaymentTab>("card");
+const PaymentMethodForm: React.FC<PaymentMethodFormProps> = ({ onBack, onSubmit }) => {
   const [card_number, setCardNumber] = useState("");
   const [expiry_date, setExpiryDate] = useState("");
   const [security_code, setSecurityCode] = useState("");
@@ -24,34 +327,7 @@ const PaymentMethodForm: React.FC<PaymentMethodFormProps> = ({
   const [zip_code, setZipCode] = useState("");
   const [cardholder_name, setCardholderName] = useState("");
   const [is_submitting, setIsSubmitting] = useState(false);
-
-  // Bank account fields
-  const [routing_number, setRoutingNumber] = useState("");
-  const [account_number, setAccountNumber] = useState("");
-  const [account_holder_name, setAccountHolderName] = useState("");
-  const [account_type, setAccountType] = useState("checking");
-
-  function formatCardNumber(value: string): string {
-    const digits = value.replace(/\D/g, "").substring(0, 16);
-    return digits.replace(/(\d{4})(?=\d)/g, "$1 ");
-  }
-
-  function formatExpiryDate(value: string): string {
-    const digits = value.replace(/\D/g, "").substring(0, 4);
-    if (digits.length >= 3) {
-      return `${digits.substring(0, 2)} / ${digits.substring(2)}`;
-    }
-    return digits;
-  }
-
-  function detectCardBrand(number: string): string {
-    const digits = number.replace(/\s/g, "");
-    if (/^4/.test(digits)) return "visa";
-    if (/^5[1-5]/.test(digits)) return "mastercard";
-    if (/^3[47]/.test(digits)) return "amex";
-    if (/^6(?:011|5)/.test(digits)) return "discover";
-    return "visa";
-  }
+  const [is_cvc_focused, setIsCvcFocused] = useState(false);
 
   function handleCardNumberChange(e: React.ChangeEvent<HTMLInputElement>) {
     setCardNumber(formatCardNumber(e.target.value));
@@ -62,13 +338,11 @@ const PaymentMethodForm: React.FC<PaymentMethodFormProps> = ({
   }
 
   function handleSecurityCodeChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const digits = e.target.value.replace(/\D/g, "").substring(0, 4);
-    setSecurityCode(digits);
+    setSecurityCode(e.target.value.replace(/\D/g, "").substring(0, 4));
   }
 
   function handleZipCodeChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const value = e.target.value.replace(/[^a-zA-Z0-9\s-]/g, "").substring(0, 10);
-    setZipCode(value);
+    setZipCode(e.target.value.replace(/[^a-zA-Z0-9\s-]/g, "").substring(0, 10));
   }
 
   function isCardFormValid(): boolean {
@@ -82,20 +356,11 @@ const PaymentMethodForm: React.FC<PaymentMethodFormProps> = ({
     );
   }
 
-  function isBankFormValid(): boolean {
-    return (
-      routing_number.length === 9 &&
-      account_number.length >= 4 &&
-      account_holder_name.trim().length > 0
-    );
-  }
-
   function handleSubmitCard(e: React.FormEvent) {
     e.preventDefault();
     if (!isCardFormValid()) return;
 
     setIsSubmitting(true);
-
     const digits = card_number.replace(/\s/g, "");
     const expiry_parts = expiry_date.replace(/\s/g, "").split("/");
 
@@ -104,58 +369,18 @@ const PaymentMethodForm: React.FC<PaymentMethodFormProps> = ({
       card_brand: detectCardBrand(digits),
       last_four: digits.slice(-4),
       expiry_month: expiry_parts[0],
-      expiry_year: expiry_parts[1],
-      is_default: false,
-    };
-
-    // Simulate API delay
-    setTimeout(() => {
-      onSubmit(new_method);
-      setIsSubmitting(false);
-    }, 600);
-  }
-
-  function handleSubmitBank(e: React.FormEvent) {
-    e.preventDefault();
-    if (!isBankFormValid()) return;
-
-    setIsSubmitting(true);
-
-    const new_method: PaymentMethod = {
-      id: crypto.randomUUID(),
-      card_brand: "bank",
-      last_four: account_number.slice(-4),
-      expiry_month: "--",
-      expiry_year: "--",
+      expiry_year: expiry_parts[1]?.trim() ?? "",
       is_default: false,
     };
 
     setTimeout(() => {
       onSubmit(new_method);
       setIsSubmitting(false);
-    }, 600);
+    }, 800);
   }
 
-  const tabs: { key: PaymentTab; label: string; icon: React.ReactNode }[] = [
-    {
-      key: "card",
-      label: "Card",
-      icon: (
-        <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z" />
-        </svg>
-      ),
-    },
-    {
-      key: "bank",
-      label: "US bank account",
-      icon: (
-        <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M4 10h3v7H4zm6.5 0h3v7h-3zM2 19h20v3H2zm15-9h3v7h-3zm-5-9L2 6v2h20V6z" />
-        </svg>
-      ),
-    },
-  ];
+  const current_brand = detectCardBrand(card_number);
+  const display_number = getDisplayNumber(card_number);
 
   const country_options = [
     { value: "US", label: "United States" },
@@ -169,120 +394,107 @@ const PaymentMethodForm: React.FC<PaymentMethodFormProps> = ({
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Back link */}
+    <div className="space-y-8">
+      {/* Back */}
       <button
         onClick={onBack}
-        className="inline-flex items-center gap-1 text-sm font-medium text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 transition-colors hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"
       >
         <ChevronLeftIcon />
-        Billing information
+        Back to Billing
       </button>
 
-      {/* Title */}
-      <h1 className="text-center text-2xl font-semibold text-gray-900 dark:text-white">
-        Add payment method
-      </h1>
+      {/* Page header */}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Add Payment Method</h1>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          Your card information is encrypted and stored securely.
+        </p>
+      </div>
 
-      {/* Form Card */}
-      <div className="mx-auto max-w-2xl rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03] lg:p-10">
-        {/* Payment method tabs */}
-        <div className="mb-8 flex gap-3">
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-2 rounded-lg border-2 px-5 py-3 text-sm font-medium transition-all ${
-                active_tab === tab.key
-                  ? "border-brand-500 bg-brand-50 text-brand-600 dark:border-brand-400 dark:bg-brand-500/10 dark:text-brand-400"
-                  : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-700"
-              }`}
-            >
-              <span className={active_tab === tab.key ? "text-brand-500 dark:text-brand-400" : "text-gray-400 dark:text-gray-500"}>
-                {tab.icon}
-              </span>
-              {tab.label}
-            </button>
-          ))}
+      <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
+        {/* Card preview */}
+        <div className="flex flex-col items-center gap-4 lg:sticky lg:top-8 lg:w-80 lg:shrink-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
+            Live Preview
+          </p>
+          <CreditCardPreview
+            card_number={display_number}
+            cardholder_name={cardholder_name}
+            expiry_date={expiry_date}
+            brand={current_brand}
+            cvc={security_code}
+            is_flipped={is_cvc_focused}
+          />
+          <p className="text-center text-xs text-gray-400 dark:text-gray-500">
+            Click the security code field to flip your card
+          </p>
         </div>
 
-        {/* Card Form */}
-        {active_tab === "card" && (
+        {/* Form */}
+        <div className="min-w-0 flex-1 rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03] lg:p-8">
           <form onSubmit={handleSubmitCard} className="space-y-5">
-            {/* Cardholder Name */}
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Cardholder name
-              </label>
+            {/* Cardholder name */}
+            <FormField label="Cardholder Name">
               <input
                 type="text"
                 value={cardholder_name}
-                onChange={(e) => setCardholderName(e.target.value)}
-                placeholder="Full name on card"
-                className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-brand-400"
+                onChange={(e) => setCardholderName(e.target.value.toUpperCase())}
+                placeholder="FULL NAME ON CARD"
+                className={input_class}
               />
-            </div>
+            </FormField>
 
-            {/* Card Number */}
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Card number
-              </label>
+            {/* Card number */}
+            <FormField label="Card Number">
               <div className="relative">
                 <input
                   type="text"
                   value={card_number}
                   onChange={handleCardNumberChange}
-                  placeholder="1234 1234 1234 1234"
+                  placeholder="1234 5678 9012 3456"
                   inputMode="numeric"
-                  className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 pr-14 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-brand-400"
+                  className={`${input_class} pr-16`}
                 />
                 <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <CardBrandIcon brand={detectCardBrand(card_number)} />
+                  <CardBrandBadge brand={current_brand} />
                 </div>
               </div>
-            </div>
+            </FormField>
 
             {/* Expiry + CVC */}
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Expiration date
-                </label>
+              <FormField label="Expiration Date">
                 <input
                   type="text"
                   value={expiry_date}
                   onChange={handleExpiryChange}
                   placeholder="MM / YY"
                   inputMode="numeric"
-                  className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-brand-400"
+                  className={input_class}
                 />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Security code
-                </label>
+              </FormField>
+              <FormField label="Security Code">
                 <input
                   type="text"
                   value={security_code}
                   onChange={handleSecurityCodeChange}
+                  onFocus={() => setIsCvcFocused(true)}
+                  onBlur={() => setIsCvcFocused(false)}
                   placeholder="CVC"
                   inputMode="numeric"
-                  className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-brand-400"
+                  className={input_class}
                 />
-              </div>
+              </FormField>
             </div>
 
             {/* Country + ZIP */}
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Country
-                </label>
+              <FormField label="Country">
                 <select
                   value={country}
                   onChange={(e) => setCountry(e.target.value)}
-                  className="h-11 w-full appearance-none rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:text-white dark:focus:border-brand-400"
+                  className={`${input_class} cursor-pointer`}
                 >
                   {country_options.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -290,146 +502,82 @@ const PaymentMethodForm: React.FC<PaymentMethodFormProps> = ({
                     </option>
                   ))}
                 </select>
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  ZIP code
-                </label>
+              </FormField>
+              <FormField label="ZIP / Postal Code">
                 <input
                   type="text"
                   value={zip_code}
                   onChange={handleZipCodeChange}
                   placeholder="12345"
-                  className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-brand-400"
+                  className={input_class}
                 />
-              </div>
+              </FormField>
             </div>
 
-            {/* Disclaimer */}
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              By providing your card information, you allow Base Search Marketing
-              to charge your card for future payments in accordance with their
-              terms.
-            </p>
+            {/* Security notice */}
+            <div className="flex items-start gap-3 rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/2">
+              <svg
+                className="mt-0.5 h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"
+                />
+              </svg>
+              <p className="text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+                By providing your card information, you authorize us to charge your card for future
+                payments per our terms. Protected with 256-bit SSL encryption.
+              </p>
+            </div>
 
-            {/* Submit */}
-            <div className="flex justify-end pt-2">
+            {/* Actions */}
+            <div className="flex items-center justify-between pt-2">
+              <button
+                type="button"
+                onClick={onBack}
+                className="text-sm font-medium text-gray-500 transition-colors hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"
+              >
+                Cancel
+              </button>
               <Button
                 variant="primary"
                 size="md"
                 disabled={!isCardFormValid() || is_submitting}
               >
-                {is_submitting ? "Processing..." : "Add payment method"}
+                {is_submitting ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                      />
+                    </svg>
+                    Processing...
+                  </span>
+                ) : (
+                  "Add Payment Method"
+                )}
               </Button>
             </div>
           </form>
-        )}
-
-        {/* Bank Account Form */}
-        {active_tab === "bank" && (
-          <form onSubmit={handleSubmitBank} className="space-y-5">
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Account holder name
-              </label>
-              <input
-                type="text"
-                value={account_holder_name}
-                onChange={(e) => setAccountHolderName(e.target.value)}
-                placeholder="Full name"
-                className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-brand-400"
-              />
-            </div>
-
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Account type
-              </label>
-              <select
-                value={account_type}
-                onChange={(e) => setAccountType(e.target.value)}
-                className="h-11 w-full appearance-none rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:text-white dark:focus:border-brand-400"
-              >
-                <option value="checking">Checking</option>
-                <option value="savings">Savings</option>
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Routing number
-                </label>
-                <input
-                  type="text"
-                  value={routing_number}
-                  onChange={(e) =>
-                    setRoutingNumber(e.target.value.replace(/\D/g, "").substring(0, 9))
-                  }
-                  placeholder="110000000"
-                  inputMode="numeric"
-                  className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-brand-400"
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Account number
-                </label>
-                <input
-                  type="text"
-                  value={account_number}
-                  onChange={(e) =>
-                    setAccountNumber(e.target.value.replace(/\D/g, "").substring(0, 17))
-                  }
-                  placeholder="000123456789"
-                  inputMode="numeric"
-                  className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-brand-400"
-                />
-              </div>
-            </div>
-
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              By providing your bank account information, you authorize Base
-              Search Marketing to debit your account for future payments in
-              accordance with their terms.
-            </p>
-
-            <div className="flex justify-end pt-2">
-              <Button
-                variant="primary"
-                size="md"
-                disabled={!isBankFormValid() || is_submitting}
-              >
-                {is_submitting ? "Processing..." : "Add payment method"}
-              </Button>
-            </div>
-          </form>
-        )}
+        </div>
       </div>
     </div>
   );
 };
-
-function CardBrandIcon({ brand }: { brand: string }) {
-  const colors: Record<string, string> = {
-    visa: "text-blue-600",
-    mastercard: "text-orange-500",
-    amex: "text-indigo-600",
-    discover: "text-amber-500",
-  };
-
-  const labels: Record<string, string> = {
-    visa: "VISA",
-    mastercard: "MC",
-    amex: "AMEX",
-    discover: "DISC",
-  };
-
-  return (
-    <span className={`text-xs font-bold ${colors[brand] || "text-gray-400"}`}>
-      {labels[brand] || ""}
-    </span>
-  );
-}
 
 export default PaymentMethodForm;
