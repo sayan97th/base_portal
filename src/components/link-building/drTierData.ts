@@ -10,6 +10,7 @@ export const dr_tiers: DrTier[] = [
     price_per_link: 260,
     is_most_popular: false,
     is_active: true,
+    max_quantity: 1,
   },
   {
     id: "dr_40",
@@ -46,6 +47,7 @@ export const dr_tiers: DrTier[] = [
     price_per_link: 630,
     is_most_popular: false,
     is_active: true,
+    max_quantity: 1,
   },
 ];
 

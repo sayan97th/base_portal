@@ -6,6 +6,8 @@ export interface DrTier {
   price_per_link: number;
   is_most_popular: boolean;
   is_active: boolean;
+  /** When set to 1, the card becomes a simple toggle (no quantity counter). Unlimited if omitted. */
+  max_quantity?: number;
 }
 
 export interface OrderPlacement {
