@@ -266,17 +266,25 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
 
     try {
       const amount_cents = Math.round(total_amount * 100);
-      const { client_secret } = await createPaymentIntent({ amount_cents });
 
       let confirm_result;
 
       if (is_using_saved) {
         const profile = payment_profiles.find((p) => p.id === selected_profile_id);
         if (!profile) throw new Error("Selected payment method not found.");
+
+        // Pass the PM id so the server can attach the Stripe Customer to the
+        // PaymentIntent — Stripe requires this for customer-attached cards.
+        const { client_secret } = await createPaymentIntent({
+          amount_cents,
+          stripe_payment_method_id: profile.stripe_payment_method_id,
+        });
+
         confirm_result = await stripe.confirmCardPayment(client_secret, {
           payment_method: profile.stripe_payment_method_id,
         });
       } else {
+        const { client_secret } = await createPaymentIntent({ amount_cents });
         const card_number_element = elements.getElement(CardNumberElement)!;
         const country_code = country_code_map[billing_address.country] ?? "US";
         confirm_result = await stripe.confirmCardPayment(client_secret, {

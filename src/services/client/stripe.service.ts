@@ -1,6 +1,9 @@
 interface CreatePaymentIntentPayload {
   amount_cents: number;
   metadata?: Record<string, string>;
+  /** When paying with a saved card, pass its Stripe PM ID so the server can
+   *  attach the correct Stripe Customer to the PaymentIntent. */
+  stripe_payment_method_id?: string;
 }
 
 interface CreatePaymentIntentResponse {
