@@ -6,6 +6,136 @@ import { PlusIcon } from "@/icons/index";
 import PaymentMethodCard from "./PaymentMethodCard";
 import type { PaymentMethod } from "./BillingPage";
 
+// ─── Confirmation dialog ───────────────────────────────────────────────────────
+
+type DialogAction = {
+  type: "remove" | "set_default";
+  method_id: string;
+  card_brand: string;
+  last_four: string;
+};
+
+const brand_labels_map: Record<string, string> = {
+  visa: "Visa",
+  mastercard: "Mastercard",
+  amex: "American Express",
+  discover: "Discover",
+};
+
+function ConfirmationDialog({
+  action,
+  onConfirm,
+  onCancel,
+}: {
+  action: DialogAction;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const brand_label = brand_labels_map[action.card_brand] ?? action.card_brand;
+  const card_display = `${brand_label} ending in ${action.last_four}`;
+
+  const is_remove = action.type === "remove";
+
+  const title = is_remove ? "Remove Payment Method" : "Switch Default Card";
+
+  const description = is_remove
+    ? `You're about to permanently remove your ${card_display} from your account. Once gone, this card will no longer be available for future charges, renewals, or subscriptions. This action is irreversible.`
+    : `You're about to set your ${card_display} as your primary payment method. All upcoming charges, renewals, and subscription payments will be billed to this card going forward.`;
+
+  const confirm_label = is_remove ? "Yes, Remove It" : "Yes, Make It Default";
+
+  const icon = is_remove ? (
+    <svg
+      className="h-6 w-6 text-red-500"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+      />
+    </svg>
+  ) : (
+    <svg
+      className="h-6 w-6 text-brand-500"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"
+      />
+    </svg>
+  );
+
+  const icon_bg = is_remove
+    ? "bg-red-100 dark:bg-red-500/10"
+    : "bg-brand-100 dark:bg-brand-500/10";
+
+  const confirm_btn = is_remove
+    ? "bg-red-500 hover:bg-red-600 focus:ring-red-500 text-white"
+    : "bg-brand-500 hover:bg-brand-600 focus:ring-brand-500 text-white";
+
+  return (
+    /* Backdrop */
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="dialog-title"
+    >
+      {/* Overlay */}
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={onCancel}
+      />
+
+      {/* Panel */}
+      <div className="relative w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-gray-700 dark:bg-gray-900">
+        {/* Icon */}
+        <div className={`mx-auto flex h-12 w-12 items-center justify-center rounded-full ${icon_bg}`}>
+          {icon}
+        </div>
+
+        {/* Text */}
+        <div className="mt-4 text-center">
+          <h2
+            id="dialog-title"
+            className="text-base font-semibold text-gray-900 dark:text-white"
+          >
+            {title}
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+            {description}
+          </p>
+        </div>
+
+        {/* Actions */}
+        <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-center">
+          <button
+            onClick={onCancel}
+            className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/5"
+          >
+            Cancel, Keep It
+          </button>
+          <button
+            onClick={onConfirm}
+            className={`rounded-xl px-5 py-2.5 text-sm font-semibold shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${confirm_btn}`}
+          >
+            {confirm_label}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface BillingInformationProps {
   payment_methods: PaymentMethod[];
   is_loading?: boolean;
@@ -185,11 +315,30 @@ const BillingInformation: React.FC<BillingInformationProps> = ({
   onSetDefault,
   onDismissError,
 }) => {
+  const [pending_action, setPendingAction] = React.useState<DialogAction | null>(null);
+
+  const handleConfirm = () => {
+    if (!pending_action) return;
+    if (pending_action.type === "remove") onRemoveMethod(pending_action.method_id);
+    else onSetDefault(pending_action.method_id);
+    setPendingAction(null);
+  };
+
+  const handleCancel = () => setPendingAction(null);
+
   if (is_loading) return <LoadingSkeleton />;
 
   const default_method = payment_methods.find((m) => m.is_default);
 
   return (
+    <>
+      {pending_action && (
+        <ConfirmationDialog
+          action={pending_action}
+          onConfirm={handleConfirm}
+          onCancel={handleCancel}
+        />
+      )}
     <div className="space-y-8">
       {/* Error banner */}
       {error && (
@@ -283,8 +432,22 @@ const BillingInformation: React.FC<BillingInformationProps> = ({
               <PaymentMethodCard
                 key={method.id}
                 payment_method={method}
-                onRemove={() => onRemoveMethod(method.id)}
-                onSetDefault={() => onSetDefault(method.id)}
+                onRemove={() =>
+                  setPendingAction({
+                    type: "remove",
+                    method_id: method.id,
+                    card_brand: method.card_brand,
+                    last_four: method.last_four,
+                  })
+                }
+                onSetDefault={() =>
+                  setPendingAction({
+                    type: "set_default",
+                    method_id: method.id,
+                    card_brand: method.card_brand,
+                    last_four: method.last_four,
+                  })
+                }
               />
             ))}
           </div>
@@ -313,6 +476,7 @@ const BillingInformation: React.FC<BillingInformationProps> = ({
         </div>
       )}
     </div>
+    </>
   );
 };
 
