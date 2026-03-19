@@ -8,9 +8,12 @@ import type { PaymentMethod } from "./BillingPage";
 
 interface BillingInformationProps {
   payment_methods: PaymentMethod[];
+  is_loading?: boolean;
+  error?: string | null;
   onAddMethod: () => void;
   onRemoveMethod: (id: string) => void;
   onSetDefault: (id: string) => void;
+  onDismissError?: () => void;
 }
 
 // ─── Stat card ────────────────────────────────────────────────────────────────
@@ -59,6 +62,40 @@ function StatCard({
   );
 }
 
+// ─── Loading skeleton ─────────────────────────────────────────────────────────
+
+function LoadingSkeleton() {
+  return (
+    <div className="space-y-8 animate-pulse">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-2">
+          <div className="h-7 w-48 rounded-lg bg-gray-200 dark:bg-gray-700" />
+          <div className="h-4 w-64 rounded-lg bg-gray-200 dark:bg-gray-700" />
+        </div>
+        <div className="h-9 w-40 rounded-xl bg-gray-200 dark:bg-gray-700" />
+      </div>
+      <div className="overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800">
+        {[1, 2].map((i) => (
+          <div
+            key={i}
+            className="flex items-center gap-4 border-b border-gray-100 px-5 py-4 last:border-0 dark:border-gray-800 lg:px-8"
+          >
+            <div className="h-13 w-20 rounded-xl bg-gray-200 dark:bg-gray-700" />
+            <div className="flex-1 space-y-2">
+              <div className="h-4 w-40 rounded bg-gray-200 dark:bg-gray-700" />
+              <div className="h-3 w-24 rounded bg-gray-200 dark:bg-gray-700" />
+            </div>
+            <div className="flex gap-2">
+              <div className="h-7 w-24 rounded-lg bg-gray-200 dark:bg-gray-700" />
+              <div className="h-7 w-16 rounded-lg bg-gray-200 dark:bg-gray-700" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Empty state ──────────────────────────────────────────────────────────────
 
 function EmptyState({ onAddMethod }: { onAddMethod: () => void }) {
@@ -66,7 +103,6 @@ function EmptyState({ onAddMethod }: { onAddMethod: () => void }) {
     <div className="flex flex-col items-center justify-center px-6 py-20">
       {/* Stacked card illustration */}
       <div className="relative mb-8 h-24 w-36">
-        {/* Card shadow / back */}
         <div
           className="absolute bottom-0 right-0 h-20 w-32 rounded-2xl opacity-25"
           style={{
@@ -74,7 +110,6 @@ function EmptyState({ onAddMethod }: { onAddMethod: () => void }) {
             transform: "rotate(8deg)",
           }}
         />
-        {/* Card mid */}
         <div
           className="absolute bottom-1 right-1 h-20 w-32 rounded-2xl opacity-50"
           style={{
@@ -82,7 +117,6 @@ function EmptyState({ onAddMethod }: { onAddMethod: () => void }) {
             transform: "rotate(4deg)",
           }}
         />
-        {/* Card front */}
         <div
           className="absolute bottom-2 right-2 flex h-20 w-32 flex-col justify-between overflow-hidden rounded-2xl p-3 shadow-xl"
           style={{ background: "linear-gradient(135deg, #4527a0 0%, #7b1fa2 55%, #6a1b9a 100%)" }}
@@ -98,11 +132,9 @@ function EmptyState({ onAddMethod }: { onAddMethod: () => void }) {
             <div
               className="h-3 w-5 rounded-sm"
               style={{
-                background:
-                  "linear-gradient(135deg, #d4a846 0%, #f5d278 50%, #c9952a 100%)",
+                background: "linear-gradient(135deg, #d4a846 0%, #f5d278 50%, #c9952a 100%)",
               }}
             />
-            {/* Plus icon hint */}
             <div className="flex h-5 w-5 items-center justify-center rounded-full border border-white/40">
               <svg
                 className="h-2.5 w-2.5 text-white"
@@ -146,14 +178,51 @@ function EmptyState({ onAddMethod }: { onAddMethod: () => void }) {
 
 const BillingInformation: React.FC<BillingInformationProps> = ({
   payment_methods,
+  is_loading = false,
+  error = null,
   onAddMethod,
   onRemoveMethod,
   onSetDefault,
+  onDismissError,
 }) => {
+  if (is_loading) return <LoadingSkeleton />;
+
   const default_method = payment_methods.find((m) => m.is_default);
 
   return (
     <div className="space-y-8">
+      {/* Error banner */}
+      {error && (
+        <div className="flex items-start justify-between gap-4 rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-500/20 dark:bg-red-500/10">
+          <div className="flex items-start gap-3">
+            <svg
+              className="mt-0.5 h-4 w-4 shrink-0 text-red-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+              />
+            </svg>
+            <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+          </div>
+          {onDismissError && (
+            <button
+              onClick={onDismissError}
+              className="shrink-0 text-red-400 transition-colors hover:text-red-600 dark:hover:text-red-300"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -239,7 +308,7 @@ const BillingInformation: React.FC<BillingInformationProps> = ({
             />
           </svg>
           <p className="text-xs text-gray-400 dark:text-gray-500">
-            Your payment information is encrypted and stored securely.
+            Your payment information is encrypted and stored securely via Stripe.
           </p>
         </div>
       )}

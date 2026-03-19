@@ -1,71 +1,132 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { Elements } from "@stripe/react-stripe-js";
 import BillingInformation from "./BillingInformation";
 import PaymentMethodForm from "./PaymentMethodForm";
+import { getStripe } from "@/lib/stripe";
+import { getToken } from "@/lib/api-client";
+import { paymentProfileService } from "@/services/client/payment-profile.service";
+import type { PaymentProfile } from "@/types/client/payment-profile";
 
-export type PaymentMethod = {
-  id: string;
-  card_brand: string;
-  last_four: string;
-  expiry_month: string;
-  expiry_year: string;
-  is_default: boolean;
-};
+// Re-export for backward compatibility with billing sub-components
+export type PaymentMethod = PaymentProfile;
 
 type BillingView = "list" | "add";
 
 const BillingPage: React.FC = () => {
   const [current_view, setCurrentView] = useState<BillingView>("list");
-  const [payment_methods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [payment_methods, setPaymentMethods] = useState<PaymentProfile[]>([]);
+  const [is_loading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [setup_client_secret, setSetupClientSecret] = useState<string | null>(null);
 
-  function handleAddPaymentMethod(method: PaymentMethod) {
-    setPaymentMethods((prev) => {
-      if (prev.length === 0) {
-        return [{ ...method, is_default: true }];
+  const fetchPaymentProfiles = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const profiles = await paymentProfileService.fetchPaymentProfiles();
+      setPaymentMethods(profiles);
+    } catch {
+      setError("Failed to load payment methods. Please refresh the page.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPaymentProfiles();
+  }, [fetchPaymentProfiles]);
+
+  async function handleShowAddForm() {
+    setError(null);
+    try {
+      const token = getToken();
+      const response = await fetch("/api/stripe/setup-intent", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to initialize payment form.");
       }
-      if (method.is_default) {
-        return [
-          ...prev.map((m) => ({ ...m, is_default: false })),
-          method,
-        ];
-      }
-      return [...prev, method];
-    });
+
+      const data = await response.json();
+      setSetupClientSecret(data.client_secret);
+      setCurrentView("add");
+    } catch {
+      setError("Unable to open the payment form. Please try again.");
+    }
+  }
+
+  function handleBack() {
     setCurrentView("list");
+    setSetupClientSecret(null);
+    setError(null);
   }
 
-  function handleRemovePaymentMethod(id: string) {
-    setPaymentMethods((prev) => {
-      const filtered = prev.filter((m) => m.id !== id);
-      if (filtered.length > 0 && !filtered.some((m) => m.is_default)) {
-        filtered[0].is_default = true;
-      }
-      return [...filtered];
-    });
+  async function handlePaymentMethodAdded(profile: PaymentProfile) {
+    // Re-fetch to ensure list reflects the latest backend state (including is_default logic)
+    await fetchPaymentProfiles();
+    setCurrentView("list");
+    setSetupClientSecret(null);
+
+    // Suppress the stale profile param lint warning — it is used by the caller
+    void profile;
   }
 
-  function handleSetDefault(id: string) {
-    setPaymentMethods((prev) =>
-      prev.map((m) => ({ ...m, is_default: m.id === id }))
-    );
+  async function handleRemovePaymentMethod(id: string) {
+    try {
+      await paymentProfileService.deletePaymentProfile(id);
+      setPaymentMethods((prev) => {
+        const filtered = prev.filter((m) => m.id !== id);
+        // Ensure at least one card stays as default
+        if (filtered.length > 0 && !filtered.some((m) => m.is_default)) {
+          filtered[0] = { ...filtered[0], is_default: true };
+        }
+        return filtered;
+      });
+    } catch {
+      setError("Failed to remove the payment method. Please try again.");
+    }
   }
 
-  if (current_view === "add") {
+  async function handleSetDefault(id: string) {
+    try {
+      await paymentProfileService.setDefaultPaymentProfile(id);
+      setPaymentMethods((prev) =>
+        prev.map((m) => ({ ...m, is_default: m.id === id }))
+      );
+    } catch {
+      setError("Failed to update the default payment method. Please try again.");
+    }
+  }
+
+  if (current_view === "add" && setup_client_secret) {
     return (
-      <PaymentMethodForm
-        onBack={() => setCurrentView("list")}
-        onSubmit={handleAddPaymentMethod}
-      />
+      <Elements stripe={getStripe()}>
+        <PaymentMethodForm
+          client_secret={setup_client_secret}
+          is_first_card={payment_methods.length === 0}
+          onBack={handleBack}
+          onSuccess={handlePaymentMethodAdded}
+        />
+      </Elements>
     );
   }
 
   return (
     <BillingInformation
       payment_methods={payment_methods}
-      onAddMethod={() => setCurrentView("add")}
+      is_loading={is_loading}
+      error={error}
+      onAddMethod={handleShowAddForm}
       onRemoveMethod={handleRemovePaymentMethod}
       onSetDefault={handleSetDefault}
+      onDismissError={() => setError(null)}
     />
   );
 };
