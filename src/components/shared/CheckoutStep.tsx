@@ -1,7 +1,16 @@
 "use client";
 
 import React, { useState } from "react";
+import {
+  useStripe,
+  useElements,
+  CardNumberElement,
+  CardExpiryElement,
+  CardCvcElement,
+} from "@stripe/react-stripe-js";
+import { StripeElementChangeEvent } from "@stripe/stripe-js";
 import SearchableSelect from "./SearchableSelect";
+import { createPaymentIntent } from "@/services/client/stripe.service";
 
 export interface BillingAddress {
   address: string;
@@ -12,33 +21,22 @@ export interface BillingAddress {
   company: string;
 }
 
-export interface PaymentInfo {
-  card_number: string;
-  expiry_month: string;
-  expiry_year: string;
-  cvc: string;
-  name_on_card: string;
-}
-
 interface CheckoutStepProps {
   billing_address: BillingAddress;
-  payment_info: PaymentInfo;
   onBillingChange: (field: keyof BillingAddress, value: string) => void;
-  onPaymentChange: (field: keyof PaymentInfo, value: string) => void;
   onPrevious: () => void;
-  onComplete: () => void;
+  onComplete: (payment_intent_id: string) => void;
   is_loading?: boolean;
   error_message?: string | null;
-  /** Saved billing address from the user's profile, if available. */
+  total_amount: number;
   saved_billing_address?: BillingAddress | null;
-  /** Called when the user clicks "Use saved address". */
   onApplySavedAddress?: () => void;
 }
 
-interface CardErrors {
+interface StripeElementErrors {
   card_number?: string;
-  expiry?: string;
-  cvc?: string;
+  card_expiry?: string;
+  card_cvc?: string;
 }
 
 const us_states = [
@@ -60,144 +58,159 @@ const countries = [
   "Japan", "South Korea", "India", "Singapore",
 ];
 
+/** Maps full country names to ISO 3166-1 alpha-2 codes required by Stripe. */
+const country_code_map: Record<string, string> = {
+  "United States": "US",
+  "Canada": "CA",
+  "United Kingdom": "GB",
+  "Australia": "AU",
+  "Germany": "DE",
+  "France": "FR",
+  "Spain": "ES",
+  "Italy": "IT",
+  "Netherlands": "NL",
+  "Brazil": "BR",
+  "Mexico": "MX",
+  "Japan": "JP",
+  "South Korea": "KR",
+  "India": "IN",
+  "Singapore": "SG",
+};
+
 const input_class =
   "h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800";
-
-const input_error_class =
-  "h-11 w-full rounded-lg border border-error-500 bg-transparent px-4 py-2.5 text-sm text-error-800 shadow-theme-xs placeholder:text-gray-400 focus:border-error-500 focus:outline-hidden focus:ring-3 focus:ring-error-500/10 dark:border-error-500 dark:bg-gray-900 dark:text-error-400 dark:placeholder:text-white/30";
 
 const select_class =
   "h-11 w-full appearance-none rounded-lg border border-gray-300 bg-white px-4 py-2.5 pr-10 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800";
 
 const label_class = "mt-1.5 text-xs text-gray-500 dark:text-gray-400";
 
-function formatCardNumber(raw: string): string {
-  const digits = raw.replace(/\D/g, "").slice(0, 16);
-  return digits.replace(/(\d{4})(?=\d)/g, "$1 ");
-}
-
-function validateCardNumber(value: string): boolean {
-  const digits = value.replace(/\D/g, "");
-  if (digits.length < 13 || digits.length > 16) return false;
-
-  let sum = 0;
-  let is_even = false;
-  for (let i = digits.length - 1; i >= 0; i--) {
-    let digit = parseInt(digits[i], 10);
-    if (is_even) {
-      digit *= 2;
-      if (digit > 9) digit -= 9;
-    }
-    sum += digit;
-    is_even = !is_even;
-  }
-  return sum % 10 === 0;
-}
-
-function validateExpiry(month: string, year: string): boolean {
-  if (!month || !year) return false;
-  const m = parseInt(month, 10);
-  const y = parseInt(year, 10);
-  if (m < 1 || m > 12) return false;
-
-  const now = new Date();
-  const current_year = now.getFullYear() % 100;
-  const current_month = now.getMonth() + 1;
-
-  if (y < current_year) return false;
-  if (y === current_year && m < current_month) return false;
-  return true;
-}
-
-function validateCvc(value: string): boolean {
-  const digits = value.replace(/\D/g, "");
-  return digits.length >= 3 && digits.length <= 4;
-}
+const stripe_element_style = {
+  style: {
+    base: {
+      fontSize: "14px",
+      color: "#1d2939",
+      fontFamily:
+        "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+      fontSmoothing: "antialiased",
+      "::placeholder": { color: "#9ca3af" },
+    },
+    invalid: {
+      color: "#ef4444",
+      iconColor: "#ef4444",
+    },
+  },
+};
 
 const CheckoutStep: React.FC<CheckoutStepProps> = ({
   billing_address,
-  payment_info,
   onBillingChange,
-  onPaymentChange,
   onPrevious,
   onComplete,
   is_loading = false,
   error_message,
+  total_amount,
   saved_billing_address,
   onApplySavedAddress,
 }) => {
-  const [card_errors, setCardErrors] = useState<CardErrors>({});
+  const stripe = useStripe();
+  const elements = useElements();
 
-  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatCardNumber(e.target.value);
-    onPaymentChange("card_number", formatted);
-    if (card_errors.card_number) {
-      setCardErrors((prev) => ({ ...prev, card_number: undefined }));
+  const [name_on_card, setNameOnCard] = useState("");
+  const [stripe_errors, setStripeErrors] = useState<StripeElementErrors>({});
+  const [is_processing, setIsProcessing] = useState(false);
+  const [stripe_error, setStripeError] = useState<string | null>(null);
+
+  const handleElementChange = (
+    field: keyof StripeElementErrors,
+    event: StripeElementChangeEvent
+  ) => {
+    if (event.error) {
+      setStripeErrors((prev) => ({ ...prev, [field]: event.error!.message }));
+    } else {
+      setStripeErrors((prev) => ({ ...prev, [field]: undefined }));
     }
   };
 
-  const handleExpiryMonthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value.replace(/\D/g, "").slice(0, 2);
-    onPaymentChange("expiry_month", raw);
-    if (card_errors.expiry) {
-      setCardErrors((prev) => ({ ...prev, expiry: undefined }));
-    }
-  };
+  const handleComplete = async () => {
+    if (!stripe || !elements) return;
 
-  const handleExpiryYearChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value.replace(/\D/g, "").slice(0, 2);
-    onPaymentChange("expiry_year", raw);
-    if (card_errors.expiry) {
-      setCardErrors((prev) => ({ ...prev, expiry: undefined }));
-    }
-  };
+    const card_number_element = elements.getElement(CardNumberElement);
+    if (!card_number_element) return;
 
-  const handleCvcChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value.replace(/\D/g, "").slice(0, 4);
-    onPaymentChange("cvc", raw);
-    if (card_errors.cvc) {
-      setCardErrors((prev) => ({ ...prev, cvc: undefined }));
-    }
-  };
-
-  const handleComplete = () => {
-    const errors: CardErrors = {};
-
-    if (!validateCardNumber(payment_info.card_number)) {
-      errors.card_number = "Please enter a valid card number";
-    }
-    if (
-      !validateExpiry(payment_info.expiry_month, payment_info.expiry_year)
-    ) {
-      errors.expiry = "Please enter a valid expiration date";
-    }
-    if (!validateCvc(payment_info.cvc)) {
-      errors.cvc = "Please enter a valid CVC";
-    }
-
-    if (Object.keys(errors).length > 0) {
-      setCardErrors(errors);
+    if (!name_on_card.trim()) {
+      setStripeError("Please enter the name on your card.");
       return;
     }
 
-    setCardErrors({});
-    onComplete();
+    setIsProcessing(true);
+    setStripeError(null);
+
+    try {
+      // Step 1: Create a PaymentIntent on the server
+      const amount_cents = Math.round(total_amount * 100);
+      const { client_secret } = await createPaymentIntent({ amount_cents });
+
+      // Step 2: Confirm the card payment using Stripe.js
+      const country_code = country_code_map[billing_address.country] ?? "US";
+
+      const { error, paymentIntent } = await stripe.confirmCardPayment(
+        client_secret,
+        {
+          payment_method: {
+            card: card_number_element,
+            billing_details: {
+              name: name_on_card,
+              address: {
+                line1: billing_address.address,
+                city: billing_address.city,
+                state: billing_address.state,
+                postal_code: billing_address.postal_code,
+                country: country_code,
+              },
+            },
+          },
+        }
+      );
+
+      if (error) {
+        setStripeError(error.message ?? "Payment failed. Please try again.");
+        setIsProcessing(false);
+        return;
+      }
+
+      if (paymentIntent?.status === "succeeded" || paymentIntent?.status === "requires_capture") {
+        // Step 3: Hand off the PaymentIntent ID to the parent to create the order
+        onComplete(paymentIntent.id);
+      } else {
+        setStripeError("Payment could not be completed. Please try again.");
+        setIsProcessing(false);
+      }
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "An unexpected error occurred.";
+      setStripeError(message);
+      setIsProcessing(false);
+    }
   };
+
+  const is_busy = is_processing || is_loading;
 
   return (
     <div className="space-y-8">
       {/* Previous Link */}
       <button
         onClick={onPrevious}
-        className="text-sm font-medium text-brand-500 transition-colors hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
+        disabled={is_busy}
+        className="text-sm font-medium text-brand-500 transition-colors hover:text-brand-600 disabled:opacity-50 dark:text-brand-400 dark:hover:text-brand-300"
       >
         &laquo; Previous
       </button>
 
       {/* Info Text */}
       <p className="text-sm text-gray-600 dark:text-gray-400">
-        Need to change your Quantities? Click &quot;Previous&quot; to edit your
-        quantities. All information already inserted will automatically be saved.
+        Need to change your quantities? Click &quot;Previous&quot; to edit. All
+        information already inserted will automatically be saved.
       </p>
 
       {/* Billing Address */}
@@ -206,7 +219,7 @@ const CheckoutStep: React.FC<CheckoutStepProps> = ({
           Billing address
         </h2>
 
-        {/* Saved address banner — shown only when a profile address exists */}
+        {/* Saved address banner */}
         {saved_billing_address && (
           <div className="mb-4 flex items-start justify-between gap-4 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 dark:border-brand-800 dark:bg-brand-900/20">
             <div className="flex items-start gap-3">
@@ -296,7 +309,7 @@ const CheckoutStep: React.FC<CheckoutStepProps> = ({
                   </option>
                 ))}
               </select>
-              <div className="pointer-events-none absolute right-3 top-3 translate-y-0">
+              <div className="pointer-events-none absolute right-3 top-3">
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                   <path
                     d="M3 4.5L6 7.5L9 4.5"
@@ -311,7 +324,6 @@ const CheckoutStep: React.FC<CheckoutStepProps> = ({
               <p className={label_class}>Country</p>
             </div>
 
-            {/* Searchable State Select */}
             <SearchableSelect
               value={billing_address.state}
               options={us_states}
@@ -324,7 +336,9 @@ const CheckoutStep: React.FC<CheckoutStepProps> = ({
               <input
                 type="text"
                 value={billing_address.postal_code}
-                onChange={(e) => onBillingChange("postal_code", e.target.value)}
+                onChange={(e) =>
+                  onBillingChange("postal_code", e.target.value)
+                }
                 placeholder="Postal / Zip Code"
                 className={input_class}
               />
@@ -341,7 +355,7 @@ const CheckoutStep: React.FC<CheckoutStepProps> = ({
               placeholder="Company"
               className={input_class}
             />
-            <p className={label_class}>Company</p>
+            <p className={label_class}>Company (optional)</p>
           </div>
         </div>
       </div>
@@ -351,8 +365,8 @@ const CheckoutStep: React.FC<CheckoutStepProps> = ({
         <h2 className="mb-4 text-base font-semibold text-gray-800 dark:text-white/90">
           Payment Method
         </h2>
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-          {/* Card Icons */}
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3">
+          {/* Card brand icons */}
           <div className="mb-5 flex items-center gap-3">
             <div className="flex h-5 w-5 items-center justify-center rounded-full border-2 border-coral-500">
               <div className="h-2.5 w-2.5 rounded-full bg-coral-500" />
@@ -378,108 +392,101 @@ const CheckoutStep: React.FC<CheckoutStepProps> = ({
             </div>
           </div>
 
-          {/* Card Number + MM/YY + CVC */}
+          {/* Stripe Card Elements */}
           <div className="mb-4">
+            {/* Card Number + Expiry + CVC in a single bordered row */}
             <div className="flex gap-0 overflow-hidden rounded-lg border border-gray-300 shadow-theme-xs dark:border-gray-700">
               {/* Card Number */}
-              <input
-                type="text"
-                value={payment_info.card_number}
-                onChange={handleCardNumberChange}
-                placeholder="Card number"
-                inputMode="numeric"
-                className={`h-11 flex-1 border-0 bg-transparent px-4 py-2.5 text-sm focus:outline-hidden dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 ${
-                  card_errors.card_number
-                    ? "text-error-500 placeholder:text-error-300"
-                    : "text-gray-800 placeholder:text-gray-400"
-                }`}
-              />
-              {/* MM / YY */}
-              <div className="flex items-center border-l border-gray-300 dark:border-gray-700">
-                <input
-                  type="text"
-                  value={payment_info.expiry_month}
-                  onChange={handleExpiryMonthChange}
-                  placeholder="MM"
-                  inputMode="numeric"
-                  maxLength={2}
-                  className={`h-11 w-10 border-0 bg-transparent px-0 py-2.5 text-center text-sm focus:outline-hidden dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 ${
-                    card_errors.expiry
-                      ? "text-error-500 placeholder:text-error-300"
-                      : "text-gray-800 placeholder:text-gray-400"
-                  }`}
-                />
-                <span className="text-sm text-gray-400">/</span>
-                <input
-                  type="text"
-                  value={payment_info.expiry_year}
-                  onChange={handleExpiryYearChange}
-                  placeholder="YY"
-                  inputMode="numeric"
-                  maxLength={2}
-                  className={`h-11 w-10 border-0 bg-transparent px-0 py-2.5 text-center text-sm focus:outline-hidden dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 ${
-                    card_errors.expiry
-                      ? "text-error-500 placeholder:text-error-300"
-                      : "text-gray-800 placeholder:text-gray-400"
-                  }`}
+              <div className="flex h-11 flex-1 items-center bg-white px-4 dark:bg-gray-900">
+                <CardNumberElement
+                  options={stripe_element_style}
+                  className="w-full"
+                  onChange={(e) => handleElementChange("card_number", e)}
                 />
               </div>
+
+              {/* Expiry */}
+              <div className="flex h-11 w-24 shrink-0 items-center border-l border-gray-300 bg-white px-3 dark:border-gray-700 dark:bg-gray-900">
+                <CardExpiryElement
+                  options={stripe_element_style}
+                  className="w-full"
+                  onChange={(e) => handleElementChange("card_expiry", e)}
+                />
+              </div>
+
               {/* CVC */}
-              <input
-                type="text"
-                value={payment_info.cvc}
-                onChange={handleCvcChange}
-                placeholder="CVC"
-                inputMode="numeric"
-                maxLength={4}
-                className={`h-11 w-16 border-l border-gray-300 bg-transparent px-3 py-2.5 text-center text-sm focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 ${
-                  card_errors.cvc
-                    ? "text-error-500 placeholder:text-error-300"
-                    : "text-gray-800 placeholder:text-gray-400"
-                }`}
-              />
+              <div className="flex h-11 w-16 shrink-0 items-center border-l border-gray-300 bg-white px-3 dark:border-gray-700 dark:bg-gray-900">
+                <CardCvcElement
+                  options={stripe_element_style}
+                  className="w-full"
+                  onChange={(e) => handleElementChange("card_cvc", e)}
+                />
+              </div>
             </div>
-            {/* Error Messages */}
-            {(card_errors.card_number ||
-              card_errors.expiry ||
-              card_errors.cvc) && (
+
+            {/* Stripe element errors */}
+            {(stripe_errors.card_number ||
+              stripe_errors.card_expiry ||
+              stripe_errors.card_cvc) && (
               <p className="mt-1.5 text-xs text-error-500">
-                {card_errors.card_number ||
-                  card_errors.expiry ||
-                  card_errors.cvc}
+                {stripe_errors.card_number ||
+                  stripe_errors.card_expiry ||
+                  stripe_errors.card_cvc}
               </p>
             )}
-            <p className={label_class}>Card number</p>
+            <p className={label_class}>Card number · Expiry · CVC</p>
           </div>
 
-          {/* Name on Card */}
+          {/* Name on card */}
           <div>
             <input
               type="text"
-              value={payment_info.name_on_card}
-              onChange={(e) =>
-                onPaymentChange("name_on_card", e.target.value)
-              }
+              value={name_on_card}
+              onChange={(e) => setNameOnCard(e.target.value)}
               placeholder="Name on card"
               className={input_class}
             />
             <p className={label_class}>Name on card</p>
           </div>
         </div>
+
+        {/* Secure payment badge */}
+        <div className="mt-3 flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500">
+          <svg
+            className="h-3.5 w-3.5"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={1.8}
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"
+            />
+          </svg>
+          Payments are secured and encrypted by Stripe
+        </div>
       </div>
 
-      {/* Submit Error */}
-      {error_message && (
-        <p className="text-sm text-error-500">{error_message}</p>
+      {/* Error messages */}
+      {(stripe_error || error_message) && (
+        <div className="rounded-lg border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-900 dark:bg-error-900/20 dark:text-error-400">
+          {stripe_error || error_message}
+        </div>
       )}
 
       {/* Complete Purchase Button */}
       <button
         onClick={handleComplete}
-        disabled={is_loading}
+        disabled={is_busy || !stripe || !elements}
         className="w-full rounded-lg bg-coral-500 px-6 py-3.5 text-sm font-medium text-white shadow-theme-xs transition-colors hover:bg-coral-600 disabled:cursor-not-allowed disabled:bg-coral-300"
       >
-        {is_loading ? "Processing..." : "Complete Purchase"}
+        {is_processing
+          ? "Processing payment..."
+          : is_loading
+          ? "Placing order..."
+          : "Complete Purchase"}
       </button>
     </div>
   );

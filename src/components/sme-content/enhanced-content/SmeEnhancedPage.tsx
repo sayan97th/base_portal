@@ -5,10 +5,11 @@ import SmeEnhancedHeader from "./SmeEnhancedHeader";
 import EmailField from "@/components/shared/EmailField";
 import SmeEnhancedGrid from "./SmeEnhancedGrid";
 import OrderSummary, { SummaryItem } from "@/components/shared/OrderSummary";
+import { Elements } from "@stripe/react-stripe-js";
 import CheckoutStep, {
   BillingAddress,
-  PaymentInfo,
 } from "@/components/shared/CheckoutStep";
+import { getStripe } from "@/lib/stripe";
 import { sme_enhanced_tiers } from "./smeEnhancedData";
 
 type Step = "selection" | "checkout";
@@ -27,13 +28,6 @@ const SmeEnhancedPage: React.FC = () => {
     company: "",
   });
 
-  const [payment_info, setPaymentInfo] = useState<PaymentInfo>({
-    card_number: "",
-    expiry_month: "",
-    expiry_year: "",
-    cvc: "",
-    name_on_card: "",
-  });
 
   // Placeholder email — replace with actual user data when auth is integrated
   const user_email = "marketing@basesearchmarketing.com";
@@ -75,12 +69,6 @@ const SmeEnhancedPage: React.FC = () => {
     setBillingAddress((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handlePaymentChange = (
-    field: keyof PaymentInfo,
-    value: string
-  ) => {
-    setPaymentInfo((prev) => ({ ...prev, [field]: value }));
-  };
 
   const handleNext = () => {
     if (selected_items.length === 0) return;
@@ -93,12 +81,11 @@ const SmeEnhancedPage: React.FC = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleComplete = () => {
+  const handleComplete = (_payment_intent_id: string) => {
     // TODO: Submit order to API
     console.log("Order completed:", {
       selected_quantities,
       billing_address,
-      payment_info,
       total,
     });
   };
@@ -129,14 +116,15 @@ const SmeEnhancedPage: React.FC = () => {
           )}
 
           {current_step === "checkout" && (
-            <CheckoutStep
-              billing_address={billing_address}
-              payment_info={payment_info}
-              onBillingChange={handleBillingChange}
-              onPaymentChange={handlePaymentChange}
-              onPrevious={handlePrevious}
-              onComplete={handleComplete}
-            />
+            <Elements stripe={getStripe()}>
+              <CheckoutStep
+                billing_address={billing_address}
+                onBillingChange={handleBillingChange}
+                onPrevious={handlePrevious}
+                onComplete={handleComplete}
+                total_amount={total}
+              />
+            </Elements>
           )}
         </div>
 

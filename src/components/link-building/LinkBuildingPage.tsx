@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Elements } from "@stripe/react-stripe-js";
 import LinkBuildingHeader from "./LinkBuildingHeader";
 import DrTierGrid from "./DrTierGrid";
 import LinkBuildingOrderSummary, {
@@ -14,13 +15,13 @@ import KeywordEntryStep, {
 } from "./KeywordEntryStep";
 import CheckoutStep, {
   BillingAddress,
-  PaymentInfo,
 } from "@/components/shared/CheckoutStep";
 import { dr_tiers as fallback_dr_tiers } from "./drTierData";
 import { linkBuildingService } from "@/services/client/link-building.service";
 import { validateCoupon } from "@/services/client/coupons.service";
 import { useNotifications } from "@/context/NotificationsContext";
 import { useBillingAddress } from "@/hooks/useBillingAddress";
+import { getStripe } from "@/lib/stripe";
 import type { DrTier } from "@/types/client/link-building";
 
 type Step = "selection" | "keywords" | "checkout";
@@ -59,14 +60,6 @@ const LinkBuildingPage: React.FC = () => {
     postal_code: "",
     company: "",
   });
-  const [payment_info, setPaymentInfo] = useState<PaymentInfo>({
-    card_number: "",
-    expiry_month: "",
-    expiry_year: "",
-    cvc: "",
-    name_on_card: "",
-  });
-
   const [coupon_state, setCouponState] = useState<{
     code: string;
     discount_amount: number | null;
@@ -180,10 +173,6 @@ const LinkBuildingPage: React.FC = () => {
     setBillingAddress((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handlePaymentChange = (field: keyof PaymentInfo, value: string) => {
-    setPaymentInfo((prev) => ({ ...prev, [field]: value }));
-  };
-
   const handleCouponCodeChange = (code: string) => {
     setCouponState((prev) => ({ ...prev, code, error: null }));
   };
@@ -276,16 +265,11 @@ const LinkBuildingPage: React.FC = () => {
     scrollToTop();
   };
 
-  const handleComplete = async () => {
+  const handleComplete = async (payment_intent_id: string) => {
     setIsSubmitting(true);
     setSubmitError(null);
 
     try {
-      // TODO: Replace with actual Stripe.js tokenization before production.
-      // payment_method_id should be obtained via stripe.createPaymentMethod()
-      // using the card element — never send raw card data to your backend.
-      const payment_method_id = "pm_placeholder";
-
       const items = dr_tiers
         .filter((tier) => (selected_quantities[tier.id] ?? 0) > 0)
         .map((tier) => {
@@ -318,7 +302,7 @@ const LinkBuildingPage: React.FC = () => {
           country: billing_address.country,
           postal_code: billing_address.postal_code,
         },
-        payment: { payment_method_id },
+        payment: { payment_method_id: payment_intent_id },
       });
 
       const total_links = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -430,18 +414,19 @@ const LinkBuildingPage: React.FC = () => {
           )}
 
           {current_step === "checkout" && (
-            <CheckoutStep
-              billing_address={billing_address}
-              payment_info={payment_info}
-              onBillingChange={handleBillingChange}
-              onPaymentChange={handlePaymentChange}
-              onPrevious={handlePrevious}
-              onComplete={handleComplete}
-              is_loading={is_submitting}
-              error_message={submit_error}
-              saved_billing_address={saved_billing_address}
-              onApplySavedAddress={handleApplySavedAddress}
-            />
+            <Elements stripe={getStripe()}>
+              <CheckoutStep
+                billing_address={billing_address}
+                onBillingChange={handleBillingChange}
+                onPrevious={handlePrevious}
+                onComplete={handleComplete}
+                is_loading={is_submitting}
+                error_message={submit_error}
+                total_amount={total}
+                saved_billing_address={saved_billing_address}
+                onApplySavedAddress={handleApplySavedAddress}
+              />
+            </Elements>
           )}
         </div>
 
