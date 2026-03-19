@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   useStripe,
   useElements,
@@ -11,6 +11,10 @@ import {
 import { StripeElementChangeEvent } from "@stripe/stripe-js";
 import SearchableSelect from "./SearchableSelect";
 import { createPaymentIntent } from "@/services/client/stripe.service";
+import { paymentProfileService } from "@/services/client/payment-profile.service";
+import type { PaymentProfile } from "@/types/client/payment-profile";
+
+// ─── Public interface ─────────────────────────────────────────────────────────
 
 export interface BillingAddress {
   address: string;
@@ -39,6 +43,8 @@ interface StripeElementErrors {
   card_cvc?: string;
 }
 
+// ─── Static data ──────────────────────────────────────────────────────────────
+
 const us_states = [
   "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado",
   "Connecticut", "Delaware", "District Of Columbia", "Florida", "Georgia",
@@ -60,47 +66,120 @@ const countries = [
 
 /** Maps full country names to ISO 3166-1 alpha-2 codes required by Stripe. */
 const country_code_map: Record<string, string> = {
-  "United States": "US",
-  "Canada": "CA",
-  "United Kingdom": "GB",
-  "Australia": "AU",
-  "Germany": "DE",
-  "France": "FR",
-  "Spain": "ES",
-  "Italy": "IT",
-  "Netherlands": "NL",
-  "Brazil": "BR",
-  "Mexico": "MX",
-  "Japan": "JP",
-  "South Korea": "KR",
-  "India": "IN",
-  "Singapore": "SG",
+  "United States": "US", "Canada": "CA", "United Kingdom": "GB",
+  "Australia": "AU", "Germany": "DE", "France": "FR", "Spain": "ES",
+  "Italy": "IT", "Netherlands": "NL", "Brazil": "BR", "Mexico": "MX",
+  "Japan": "JP", "South Korea": "KR", "India": "IN", "Singapore": "SG",
 };
 
-const input_class =
-  "h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800";
+const brand_gradients: Record<string, string> = {
+  visa:       "linear-gradient(135deg, #1a237e 0%, #0288d1 100%)",
+  mastercard: "linear-gradient(135deg, #b71c1c 0%, #ff8f00 100%)",
+  amex:       "linear-gradient(135deg, #004d40 0%, #0097a7 100%)",
+  discover:   "linear-gradient(135deg, #e65100 0%, #ffb300 100%)",
+};
 
-const select_class =
-  "h-11 w-full appearance-none rounded-lg border border-gray-300 bg-white px-4 py-2.5 pr-10 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800";
+const brand_labels: Record<string, string> = {
+  visa: "Visa", mastercard: "Mastercard",
+  amex: "American Express", discover: "Discover",
+};
 
-const label_class = "mt-1.5 text-xs text-gray-500 dark:text-gray-400";
+// ─── Stripe element style ─────────────────────────────────────────────────────
 
 const stripe_element_style = {
   style: {
     base: {
       fontSize: "14px",
-      color: "#1d2939",
-      fontFamily:
-        "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+      color: "#111827",
+      fontFamily: "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
       fontSmoothing: "antialiased",
       "::placeholder": { color: "#9ca3af" },
     },
-    invalid: {
-      color: "#ef4444",
-      iconColor: "#ef4444",
-    },
+    invalid: { color: "#ef4444", iconColor: "#ef4444" },
   },
 };
+
+// ─── CSS class constants ──────────────────────────────────────────────────────
+
+const input_class =
+  "h-11 w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition-all focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-white/[0.03] dark:text-white dark:placeholder:text-gray-500 dark:focus:border-brand-400 dark:focus:bg-white/5";
+
+const label_class =
+  "mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300";
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function MiniCard({ brand, last_four }: { brand: string; last_four: string }) {
+  const gradient = brand_gradients[brand] ?? "linear-gradient(135deg, #4527a0 0%, #6a1b9a 100%)";
+  return (
+    <div
+      className="relative flex h-11 w-[68px] shrink-0 flex-col justify-between overflow-hidden rounded-lg p-1.5 shadow-md"
+      style={{ backgroundImage: gradient }}
+    >
+      <div
+        className="pointer-events-none absolute inset-0 rounded-lg"
+        style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0) 60%)" }}
+      />
+      <div
+        className="pointer-events-none absolute -bottom-3 -right-3 h-10 w-10 rounded-full opacity-20"
+        style={{ background: "rgba(255,255,255,0.6)" }}
+      />
+      <div
+        className="relative h-2 w-3.5 rounded-[2px]"
+        style={{ background: "linear-gradient(135deg, #d4a846 0%, #f5d278 50%, #c9952a 100%)" }}
+      />
+      <p className="relative font-mono text-[8px] font-semibold tracking-wider text-white/90">
+        •••• {last_four}
+      </p>
+    </div>
+  );
+}
+
+function RadioDot({ checked }: { checked: boolean }) {
+  return (
+    <div
+      className={`relative h-4 w-4 shrink-0 rounded-full border-2 transition-colors ${
+        checked ? "border-brand-500" : "border-gray-300 dark:border-gray-600"
+      }`}
+    >
+      {checked && (
+        <div className="absolute inset-[3px] rounded-full bg-brand-500" />
+      )}
+    </div>
+  );
+}
+
+function SectionCard({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900/60">
+      {children}
+    </div>
+  );
+}
+
+function SectionHeader({
+  title,
+  subtitle,
+  action,
+}: {
+  title: string;
+  subtitle?: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-4 dark:border-gray-800">
+      <div>
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h2>
+        {subtitle && (
+          <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{subtitle}</p>
+        )}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 const CheckoutStep: React.FC<CheckoutStepProps> = ({
   billing_address,
@@ -116,47 +195,81 @@ const CheckoutStep: React.FC<CheckoutStepProps> = ({
   const stripe = useStripe();
   const elements = useElements();
 
+  // New card entry state
   const [name_on_card, setNameOnCard] = useState("");
   const [stripe_errors, setStripeErrors] = useState<StripeElementErrors>({});
+  const [save_for_future, setSaveForFuture] = useState(false);
+
+  // Payment processing state
   const [is_processing, setIsProcessing] = useState(false);
   const [stripe_error, setStripeError] = useState<string | null>(null);
+
+  // Saved payment profiles
+  const [payment_profiles, setPaymentProfiles] = useState<PaymentProfile[]>([]);
+  const [profiles_loading, setProfilesLoading] = useState(true);
+  const [selected_profile_id, setSelectedProfileId] = useState<string | "new">("new");
+
+  useEffect(() => {
+    async function loadProfiles() {
+      try {
+        const profiles = await paymentProfileService.fetchPaymentProfiles();
+        setPaymentProfiles(profiles);
+        const default_profile = profiles.find((p) => p.is_default) ?? profiles[0];
+        if (default_profile) {
+          setSelectedProfileId(default_profile.id);
+        }
+      } catch {
+        // Silently fail — user can still enter a new card
+      } finally {
+        setProfilesLoading(false);
+      }
+    }
+    loadProfiles();
+  }, []);
+
+  const is_using_saved = selected_profile_id !== "new";
 
   const handleElementChange = (
     field: keyof StripeElementErrors,
     event: StripeElementChangeEvent
   ) => {
-    if (event.error) {
-      setStripeErrors((prev) => ({ ...prev, [field]: event.error!.message }));
-    } else {
-      setStripeErrors((prev) => ({ ...prev, [field]: undefined }));
-    }
+    setStripeErrors((prev) => ({
+      ...prev,
+      [field]: event.error ? event.error.message : undefined,
+    }));
   };
 
   const handleComplete = async () => {
     if (!stripe || !elements) return;
 
-    const card_number_element = elements.getElement(CardNumberElement);
-    if (!card_number_element) return;
-
-    if (!name_on_card.trim()) {
-      setStripeError("Please enter the name on your card.");
-      return;
+    if (!is_using_saved) {
+      const card_number_element = elements.getElement(CardNumberElement);
+      if (!card_number_element) return;
+      if (!name_on_card.trim()) {
+        setStripeError("Please enter the name on your card.");
+        return;
+      }
     }
 
     setIsProcessing(true);
     setStripeError(null);
 
     try {
-      // Step 1: Create a PaymentIntent on the server
       const amount_cents = Math.round(total_amount * 100);
       const { client_secret } = await createPaymentIntent({ amount_cents });
 
-      // Step 2: Confirm the card payment using Stripe.js
-      const country_code = country_code_map[billing_address.country] ?? "US";
+      let confirm_result;
 
-      const { error, paymentIntent } = await stripe.confirmCardPayment(
-        client_secret,
-        {
+      if (is_using_saved) {
+        const profile = payment_profiles.find((p) => p.id === selected_profile_id);
+        if (!profile) throw new Error("Selected payment method not found.");
+        confirm_result = await stripe.confirmCardPayment(client_secret, {
+          payment_method: profile.stripe_payment_method_id,
+        });
+      } else {
+        const card_number_element = elements.getElement(CardNumberElement)!;
+        const country_code = country_code_map[billing_address.country] ?? "US";
+        confirm_result = await stripe.confirmCardPayment(client_secret, {
           payment_method: {
             card: card_number_element,
             billing_details: {
@@ -170,8 +283,10 @@ const CheckoutStep: React.FC<CheckoutStepProps> = ({
               },
             },
           },
-        }
-      );
+        });
+      }
+
+      const { error, paymentIntent } = confirm_result;
 
       if (error) {
         setStripeError(error.message ?? "Payment failed. Please try again.");
@@ -179,8 +294,26 @@ const CheckoutStep: React.FC<CheckoutStepProps> = ({
         return;
       }
 
-      if (paymentIntent?.status === "succeeded" || paymentIntent?.status === "requires_capture") {
-        // Step 3: Hand off the PaymentIntent ID to the parent to create the order
+      if (
+        paymentIntent?.status === "succeeded" ||
+        paymentIntent?.status === "requires_capture"
+      ) {
+        // Optionally save the new card for future use
+        if (!is_using_saved && save_for_future && paymentIntent.payment_method) {
+          try {
+            const pm_id =
+              typeof paymentIntent.payment_method === "string"
+                ? paymentIntent.payment_method
+                : paymentIntent.payment_method.id;
+            await paymentProfileService.createPaymentProfile({
+              stripe_payment_method_id: pm_id,
+              cardholder_name: name_on_card.trim() || null,
+              is_default: payment_profiles.length === 0,
+            });
+          } catch {
+            // Don't block the order if card saving fails
+          }
+        }
         onComplete(paymentIntent.id);
       } else {
         setStripeError("Payment could not be completed. Please try again.");
@@ -196,56 +329,363 @@ const CheckoutStep: React.FC<CheckoutStepProps> = ({
 
   const is_busy = is_processing || is_loading;
 
+  const formatted_total = total_amount.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
   return (
-    <div className="space-y-8">
-      {/* Previous Link */}
+    <div className="space-y-5">
+      {/* ── Back button ── */}
       <button
         onClick={onPrevious}
         disabled={is_busy}
-        className="text-sm font-medium text-brand-500 transition-colors hover:text-brand-600 disabled:opacity-50 dark:text-brand-400 dark:hover:text-brand-300"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 transition-colors hover:text-gray-800 disabled:opacity-50 dark:text-gray-400 dark:hover:text-white"
       >
-        &laquo; Previous
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+        </svg>
+        Back to Keywords
       </button>
 
-      {/* Info Text */}
-      <p className="text-sm text-gray-600 dark:text-gray-400">
-        Need to change your quantities? Click &quot;Previous&quot; to edit. All
-        information already inserted will automatically be saved.
-      </p>
+      {/* ── Payment Method Section ── */}
+      <SectionCard>
+        <SectionHeader
+          title="Payment Method"
+          subtitle={
+            profiles_loading
+              ? "Loading your saved cards…"
+              : payment_profiles.length > 0
+              ? "Select a saved card or add a new one"
+              : "Enter your card details to complete the purchase"
+          }
+          action={
+            <div className="hidden items-center gap-1 sm:flex">
+              {[
+                { bg: "#1a1f71", label: "VISA",  italic: true  },
+                { bg: "#eb001b", label: "MC",     italic: false },
+                { bg: "#006fcf", label: "AMEX",   italic: false },
+                { bg: "#ff6000", label: "DISC",   italic: false },
+              ].map(({ bg, label, italic }) => (
+                <span
+                  key={label}
+                  className="flex h-5 items-center rounded px-1.5"
+                  style={{ background: bg }}
+                >
+                  <span
+                    className={`text-[8px] font-bold text-white ${italic ? "italic" : ""}`}
+                  >
+                    {label}
+                  </span>
+                </span>
+              ))}
+            </div>
+          }
+        />
 
-      {/* Billing Address */}
-      <div>
-        <h2 className="mb-4 text-base font-semibold text-gray-800 dark:text-white/90">
-          Billing address
-        </h2>
+        {/* Loading skeleton */}
+        {profiles_loading && (
+          <div className="animate-pulse divide-y divide-gray-100 dark:divide-gray-800">
+            {[0, 1].map((i) => (
+              <div key={i} className="flex items-center gap-4 px-6 py-4">
+                <div className="h-4 w-4 rounded-full bg-gray-200 dark:bg-gray-700" />
+                <div className="h-11 w-[68px] rounded-lg bg-gray-200 dark:bg-gray-700" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3.5 w-36 rounded bg-gray-200 dark:bg-gray-700" />
+                  <div className="h-3 w-20 rounded bg-gray-200 dark:bg-gray-700" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
-        {/* Saved address banner */}
-        {saved_billing_address && (
-          <div className="mb-4 flex items-start justify-between gap-4 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 dark:border-brand-800 dark:bg-brand-900/20">
-            <div className="flex items-start gap-3">
+        {/* Payment options list */}
+        {!profiles_loading && (
+          <div className="divide-y divide-gray-100 dark:divide-gray-800">
+            {/* Saved profiles */}
+            {payment_profiles.map((profile) => {
+              const is_selected = selected_profile_id === profile.id;
+              const brand_label = brand_labels[profile.card_brand] ?? profile.card_brand;
+              return (
+                <label
+                  key={profile.id}
+                  className={`flex cursor-pointer items-center gap-4 px-6 py-4 transition-colors ${
+                    is_selected
+                      ? "bg-brand-50/70 dark:bg-brand-500/5"
+                      : "hover:bg-gray-50 dark:hover:bg-white/2"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="payment_profile"
+                    value={profile.id}
+                    checked={is_selected}
+                    onChange={() => setSelectedProfileId(profile.id)}
+                    className="sr-only"
+                  />
+                  <RadioDot checked={is_selected} />
+                  <MiniCard brand={profile.card_brand} last_four={profile.last_four} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                        {brand_label}
+                      </span>
+                      <span className="font-mono text-sm text-gray-500 dark:text-gray-400">
+                        •••• {profile.last_four}
+                      </span>
+                      {profile.is_default && (
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
+                          Default
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                      Expires {profile.expiry_month} / {profile.expiry_year}
+                    </p>
+                  </div>
+                  {is_selected && (
+                    <svg
+                      className="h-4 w-4 shrink-0 text-brand-500"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={2.5}
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                    </svg>
+                  )}
+                </label>
+              );
+            })}
+
+            {/* "Add new card" option */}
+            <div>
+              <label
+                className={`flex cursor-pointer items-center gap-4 px-6 py-4 transition-colors ${
+                  !is_using_saved
+                    ? "bg-brand-50/70 dark:bg-brand-500/5"
+                    : "hover:bg-gray-50 dark:hover:bg-white/2"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="payment_profile"
+                  value="new"
+                  checked={!is_using_saved}
+                  onChange={() => setSelectedProfileId("new")}
+                  className="sr-only"
+                />
+                <RadioDot checked={!is_using_saved} />
+                <div className="flex h-11 w-[68px] shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600">
+                  <svg
+                    className="h-5 w-5 text-gray-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.5}
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                    {payment_profiles.length > 0 ? "Use a different card" : "Add a new card"}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Enter your card details below
+                  </p>
+                </div>
+              </label>
+
+              {/* Inline card form — visible when "new" is selected */}
+              {!is_using_saved && (
+                <div className="border-t border-gray-100 bg-gray-50/40 px-6 pb-6 pt-5 dark:border-gray-800 dark:bg-white/1">
+                  <div className="space-y-4">
+                    {/* Card number */}
+                    <div>
+                      <label className={label_class}>Card Number</label>
+                      <div
+                        className={`flex h-11 items-center overflow-hidden rounded-lg border bg-white px-4 shadow-sm transition-all focus-within:ring-2 dark:bg-gray-900 ${
+                          stripe_errors.card_number
+                            ? "border-red-400 focus-within:border-red-400 focus-within:ring-red-400/20"
+                            : "border-gray-200 focus-within:border-brand-400 focus-within:ring-brand-500/20 dark:border-gray-700 dark:focus-within:border-brand-400"
+                        }`}
+                      >
+                        <CardNumberElement
+                          options={{ ...stripe_element_style, showIcon: true }}
+                          className="w-full"
+                          onChange={(e) => handleElementChange("card_number", e)}
+                        />
+                      </div>
+                      {stripe_errors.card_number && (
+                        <p className="mt-1 text-xs text-red-500">{stripe_errors.card_number}</p>
+                      )}
+                    </div>
+
+                    {/* Expiry + CVC */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={label_class}>Expiration Date</label>
+                        <div
+                          className={`flex h-11 items-center overflow-hidden rounded-lg border bg-white px-4 shadow-sm transition-all focus-within:ring-2 dark:bg-gray-900 ${
+                            stripe_errors.card_expiry
+                              ? "border-red-400 focus-within:border-red-400 focus-within:ring-red-400/20"
+                              : "border-gray-200 focus-within:border-brand-400 focus-within:ring-brand-500/20 dark:border-gray-700 dark:focus-within:border-brand-400"
+                          }`}
+                        >
+                          <CardExpiryElement
+                            options={stripe_element_style}
+                            className="w-full"
+                            onChange={(e) => handleElementChange("card_expiry", e)}
+                          />
+                        </div>
+                        {stripe_errors.card_expiry && (
+                          <p className="mt-1 text-xs text-red-500">{stripe_errors.card_expiry}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className={label_class}>Security Code (CVC)</label>
+                        <div
+                          className={`flex h-11 items-center overflow-hidden rounded-lg border bg-white px-4 shadow-sm transition-all focus-within:ring-2 dark:bg-gray-900 ${
+                            stripe_errors.card_cvc
+                              ? "border-red-400 focus-within:border-red-400 focus-within:ring-red-400/20"
+                              : "border-gray-200 focus-within:border-brand-400 focus-within:ring-brand-500/20 dark:border-gray-700 dark:focus-within:border-brand-400"
+                          }`}
+                        >
+                          <CardCvcElement
+                            options={stripe_element_style}
+                            className="w-full"
+                            onChange={(e) => handleElementChange("card_cvc", e)}
+                          />
+                        </div>
+                        {stripe_errors.card_cvc && (
+                          <p className="mt-1 text-xs text-red-500">{stripe_errors.card_cvc}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Name on card */}
+                    <div>
+                      <label className={label_class} htmlFor="checkout_name_on_card">
+                        Name on Card
+                      </label>
+                      <input
+                        id="checkout_name_on_card"
+                        type="text"
+                        value={name_on_card}
+                        onChange={(e) => setNameOnCard(e.target.value)}
+                        placeholder="Full name as it appears on card"
+                        className={input_class}
+                      />
+                    </div>
+
+                    {/* Save for future purchases */}
+                    <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-brand-100 bg-brand-50/60 p-3.5 transition-colors hover:bg-brand-50 dark:border-brand-500/20 dark:bg-brand-500/5 dark:hover:bg-brand-500/10">
+                      <input
+                        type="checkbox"
+                        checked={save_for_future}
+                        onChange={(e) => setSaveForFuture(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 cursor-pointer rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-700"
+                      />
+                      <div>
+                        <span className="text-sm font-semibold text-gray-800 dark:text-white">
+                          Save this card for future purchases
+                        </span>
+                        <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                          Your card is securely stored by Stripe for faster checkouts.
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Section footer: security notice */}
+        <div className="flex items-center justify-between border-t border-gray-100 px-6 py-3 dark:border-gray-800">
+          <div className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500">
+            <svg
+              className="h-3.5 w-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"
+              />
+            </svg>
+            256-bit SSL encryption · Secured by Stripe
+          </div>
+          <div className="flex items-center gap-1 text-[10px] font-semibold text-gray-400 dark:text-gray-500">
+            <svg
+              className="h-3 w-3"
+              viewBox="0 0 32 32"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path d="M0 0h32v32H0z" fill="none" />
+              <path d="M16 3C8.268 3 2 9.268 2 17c0 5.4 2.952 10.13 7.333 12.666V22h-2v-5h2v-3.8C9.333 9.72 11.887 7 15.36 7H20v5h-2.667c-1.474 0-1.666.933-1.666 1.867V17H20l-.667 5h-3.666v7.666C19.948 28.73 24 23.33 24 17c0-7.732-6.268-14-8-14z" />
+            </svg>
+            Powered by Stripe
+          </div>
+        </div>
+      </SectionCard>
+
+      {/* ── Billing Address Section ── */}
+      <SectionCard>
+        <SectionHeader
+          title="Billing Address"
+          subtitle="Address associated with your payment method"
+          action={
+            saved_billing_address && onApplySavedAddress ? (
+              <button
+                type="button"
+                onClick={onApplySavedAddress}
+                className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 shadow-sm transition-colors hover:bg-brand-100 dark:border-brand-700/40 dark:bg-brand-500/10 dark:text-brand-300 dark:hover:bg-brand-500/20"
+              >
+                <svg
+                  className="h-3 w-3"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"
+                  />
+                </svg>
+                Use saved address
+              </button>
+            ) : null
+          }
+        />
+
+        <div className="px-6 py-5">
+          {/* Saved address info banner */}
+          {saved_billing_address && (
+            <div className="mb-5 flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50/60 p-3.5 dark:border-blue-500/20 dark:bg-blue-500/5">
               <svg
-                className="mt-0.5 h-4 w-4 shrink-0 text-brand-500 dark:text-brand-400"
+                className="mt-0.5 h-4 w-4 shrink-0 text-blue-500 dark:text-blue-400"
                 fill="none"
                 viewBox="0 0 24 24"
                 strokeWidth={1.8}
                 stroke="currentColor"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z"
-                />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
               </svg>
-              <div>
-                <p className="text-sm font-medium text-brand-700 dark:text-brand-300">
-                  Saved billing address found
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">
+                  Saved address on file
                 </p>
-                <p className="mt-0.5 text-xs text-brand-600 dark:text-brand-400">
+                <p className="mt-0.5 truncate text-xs text-blue-600 dark:text-blue-400">
                   {[
                     saved_billing_address.address,
                     saved_billing_address.city,
@@ -258,235 +698,160 @@ const CheckoutStep: React.FC<CheckoutStepProps> = ({
                 </p>
               </div>
             </div>
-            {onApplySavedAddress && (
-              <button
-                type="button"
-                onClick={onApplySavedAddress}
-                className="shrink-0 rounded-lg border border-brand-300 bg-white px-3 py-1.5 text-xs font-medium text-brand-700 shadow-theme-xs transition-colors hover:bg-brand-50 dark:border-brand-700 dark:bg-transparent dark:text-brand-300 dark:hover:bg-brand-900/30"
-              >
-                Use saved address
-              </button>
-            )}
-          </div>
-        )}
+          )}
 
-        <div className="space-y-4">
-          {/* Address + City */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <input
-                type="text"
-                value={billing_address.address}
-                onChange={(e) => onBillingChange("address", e.target.value)}
-                placeholder="Address"
-                className={input_class}
-              />
-              <p className={label_class}>Address</p>
-            </div>
-            <div>
-              <input
-                type="text"
-                value={billing_address.city}
-                onChange={(e) => onBillingChange("city", e.target.value)}
-                placeholder="City"
-                className={input_class}
-              />
-              <p className={label_class}>City</p>
-            </div>
-          </div>
-
-          {/* Country + State + Postal */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="relative">
-              <select
-                value={billing_address.country}
-                onChange={(e) => onBillingChange("country", e.target.value)}
-                className={select_class}
-              >
-                {countries.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute right-3 top-3">
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                  <path
-                    d="M3 4.5L6 7.5L9 4.5"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="text-gray-500"
-                  />
-                </svg>
+          <div className="space-y-4">
+            {/* Address + City */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className={label_class}>Street Address</label>
+                <input
+                  type="text"
+                  value={billing_address.address}
+                  onChange={(e) => onBillingChange("address", e.target.value)}
+                  placeholder="123 Main St"
+                  className={input_class}
+                />
               </div>
-              <p className={label_class}>Country</p>
+              <div>
+                <label className={label_class}>City</label>
+                <input
+                  type="text"
+                  value={billing_address.city}
+                  onChange={(e) => onBillingChange("city", e.target.value)}
+                  placeholder="New York"
+                  className={input_class}
+                />
+              </div>
             </div>
 
-            <SearchableSelect
-              value={billing_address.state}
-              options={us_states}
-              onChange={(val) => onBillingChange("state", val)}
-              label="State / Province / Region"
-              placeholder="Search..."
-            />
+            {/* Country + State + Postal */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div>
+                <label className={label_class}>Country</label>
+                <div className="relative">
+                  <select
+                    value={billing_address.country}
+                    onChange={(e) => onBillingChange("country", e.target.value)}
+                    className={`${input_class} cursor-pointer appearance-none pr-10`}
+                  >
+                    {countries.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute right-3 top-3.5">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path
+                        d="M3 4.5L6 7.5L9 4.5"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="text-gray-500"
+                      />
+                    </svg>
+                  </div>
+                </div>
+              </div>
 
-            <div>
+              <SearchableSelect
+                value={billing_address.state}
+                options={us_states}
+                onChange={(val) => onBillingChange("state", val)}
+                label="State / Province"
+                placeholder="Search state…"
+              />
+
+              <div>
+                <label className={label_class}>Postal / ZIP Code</label>
+                <input
+                  type="text"
+                  value={billing_address.postal_code}
+                  onChange={(e) => onBillingChange("postal_code", e.target.value)}
+                  placeholder="10001"
+                  className={input_class}
+                />
+              </div>
+            </div>
+
+            {/* Company */}
+            <div className="max-w-xs">
+              <label className={label_class}>
+                Company{" "}
+                <span className="font-normal text-gray-400">(optional)</span>
+              </label>
               <input
                 type="text"
-                value={billing_address.postal_code}
-                onChange={(e) =>
-                  onBillingChange("postal_code", e.target.value)
-                }
-                placeholder="Postal / Zip Code"
+                value={billing_address.company}
+                onChange={(e) => onBillingChange("company", e.target.value)}
+                placeholder="Your company name"
                 className={input_class}
               />
-              <p className={label_class}>Postal / Zip Code</p>
             </div>
-          </div>
-
-          {/* Company */}
-          <div className="max-w-sm">
-            <input
-              type="text"
-              value={billing_address.company}
-              onChange={(e) => onBillingChange("company", e.target.value)}
-              placeholder="Company"
-              className={input_class}
-            />
-            <p className={label_class}>Company (optional)</p>
           </div>
         </div>
-      </div>
+      </SectionCard>
 
-      {/* Payment Method */}
-      <div>
-        <h2 className="mb-4 text-base font-semibold text-gray-800 dark:text-white/90">
-          Payment Method
-        </h2>
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3">
-          {/* Card brand icons */}
-          <div className="mb-5 flex items-center gap-3">
-            <div className="flex h-5 w-5 items-center justify-center rounded-full border-2 border-coral-500">
-              <div className="h-2.5 w-2.5 rounded-full bg-coral-500" />
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="flex h-7 items-center rounded bg-[#1a1f71] px-1.5">
-                <span className="text-[10px] font-bold italic text-white">
-                  VISA
-                </span>
-              </span>
-              <span className="flex h-7 items-center rounded bg-[#eb001b] px-1">
-                <span className="text-[10px] font-bold text-white">MC</span>
-              </span>
-              <span className="flex h-7 items-center rounded bg-[#ff6000] px-1">
-                <span className="text-[10px] font-bold text-white">DISC</span>
-              </span>
-              <span className="flex h-7 items-center rounded bg-[#006fcf] px-1">
-                <span className="text-[10px] font-bold text-white">AMEX</span>
-              </span>
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                and more...
-              </span>
-            </div>
-          </div>
+      {/* ── Helper note ── */}
+      <p className="text-xs text-gray-400 dark:text-gray-500">
+        Need to change your selection? Click{" "}
+        <span className="font-medium text-gray-500 dark:text-gray-400">
+          &quot;Back to Keywords&quot;
+        </span>{" "}
+        above — all entered information will be preserved.
+      </p>
 
-          {/* Stripe Card Elements */}
-          <div className="mb-4">
-            {/* Card Number + Expiry + CVC in a single bordered row */}
-            <div className="flex gap-0 overflow-hidden rounded-lg border border-gray-300 shadow-theme-xs dark:border-gray-700">
-              {/* Card Number */}
-              <div className="flex h-11 flex-1 items-center bg-white px-4 dark:bg-gray-900">
-                <CardNumberElement
-                  options={stripe_element_style}
-                  className="w-full"
-                  onChange={(e) => handleElementChange("card_number", e)}
-                />
-              </div>
-
-              {/* Expiry */}
-              <div className="flex h-11 w-24 shrink-0 items-center border-l border-gray-300 bg-white px-3 dark:border-gray-700 dark:bg-gray-900">
-                <CardExpiryElement
-                  options={stripe_element_style}
-                  className="w-full"
-                  onChange={(e) => handleElementChange("card_expiry", e)}
-                />
-              </div>
-
-              {/* CVC */}
-              <div className="flex h-11 w-16 shrink-0 items-center border-l border-gray-300 bg-white px-3 dark:border-gray-700 dark:bg-gray-900">
-                <CardCvcElement
-                  options={stripe_element_style}
-                  className="w-full"
-                  onChange={(e) => handleElementChange("card_cvc", e)}
-                />
-              </div>
-            </div>
-
-            {/* Stripe element errors */}
-            {(stripe_errors.card_number ||
-              stripe_errors.card_expiry ||
-              stripe_errors.card_cvc) && (
-              <p className="mt-1.5 text-xs text-error-500">
-                {stripe_errors.card_number ||
-                  stripe_errors.card_expiry ||
-                  stripe_errors.card_cvc}
-              </p>
-            )}
-            <p className={label_class}>Card number · Expiry · CVC</p>
-          </div>
-
-          {/* Name on card */}
-          <div>
-            <input
-              type="text"
-              value={name_on_card}
-              onChange={(e) => setNameOnCard(e.target.value)}
-              placeholder="Name on card"
-              className={input_class}
-            />
-            <p className={label_class}>Name on card</p>
-          </div>
-        </div>
-
-        {/* Secure payment badge */}
-        <div className="mt-3 flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500">
+      {/* ── Error messages ── */}
+      {(stripe_error || error_message) && (
+        <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-500/20 dark:bg-red-500/10">
           <svg
-            className="h-3.5 w-3.5"
+            className="mt-0.5 h-4 w-4 shrink-0 text-red-500"
             fill="none"
             viewBox="0 0 24 24"
-            strokeWidth={1.8}
+            strokeWidth={2}
             stroke="currentColor"
           >
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
-              d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"
+              d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008z"
             />
           </svg>
-          Payments are secured and encrypted by Stripe
-        </div>
-      </div>
-
-      {/* Error messages */}
-      {(stripe_error || error_message) && (
-        <div className="rounded-lg border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-900 dark:bg-error-900/20 dark:text-error-400">
-          {stripe_error || error_message}
+          <p className="text-sm text-red-700 dark:text-red-400">
+            {stripe_error || error_message}
+          </p>
         </div>
       )}
 
-      {/* Complete Purchase Button */}
+      {/* ── Complete Purchase button ── */}
       <button
         onClick={handleComplete}
         disabled={is_busy || !stripe || !elements}
-        className="w-full rounded-lg bg-coral-500 px-6 py-3.5 text-sm font-medium text-white shadow-theme-xs transition-colors hover:bg-coral-600 disabled:cursor-not-allowed disabled:bg-coral-300"
+        className="group relative w-full overflow-hidden rounded-xl bg-coral-500 px-6 py-4 text-sm font-semibold text-white shadow-lg shadow-coral-500/20 transition-all hover:bg-coral-600 hover:shadow-coral-500/30 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none dark:disabled:bg-gray-700"
       >
-        {is_processing
-          ? "Processing payment..."
-          : is_loading
-          ? "Placing order..."
-          : "Complete Purchase"}
+        {/* Sheen on hover */}
+        <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity group-hover:opacity-100"
+          style={{ background: "linear-gradient(105deg, rgba(255,255,255,0) 40%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0) 60%)" }}
+        />
+        {is_processing || is_loading ? (
+          <span className="flex items-center justify-center gap-2">
+            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            {is_processing ? "Processing payment…" : "Placing order…"}
+          </span>
+        ) : (
+          <span className="flex items-center justify-center gap-3">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
+            </svg>
+            Complete Purchase
+            <span className="rounded-lg bg-white/20 px-2.5 py-0.5 font-mono text-sm font-bold tracking-wide">
+              ${formatted_total}
+            </span>
+          </span>
+        )}
       </button>
     </div>
   );
