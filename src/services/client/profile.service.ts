@@ -1,13 +1,27 @@
 import { apiClient } from "@/lib/api-client";
-import type { ProfileData, ProfileResponse, UpdateProfileResponse, ChangePasswordData, ChangePasswordResponse } from "@/types/auth";
+import type {
+  ProfileData,
+  PartialProfileData,
+  ProfileResponse,
+  UpdateProfileResponse,
+  ChangePasswordData,
+  ChangePasswordResponse,
+} from "@/types/auth";
 
 export const profileService = {
+  /** GET /api/profile — fetch the full profile on page load. */
   async fetchUserProfile(): Promise<ProfileResponse> {
     return apiClient.get<ProfileResponse>("/api/profile");
   },
 
+  /** PUT /api/profile — full profile update (all fields sent). */
   async updateUserProfile(data: ProfileData): Promise<UpdateProfileResponse> {
     return apiClient.put<UpdateProfileResponse>("/api/profile", data);
+  },
+
+  /** PATCH /api/profile — partial update, only send the fields that changed. */
+  async patchUserProfile(data: PartialProfileData): Promise<UpdateProfileResponse> {
+    return apiClient.patch<UpdateProfileResponse>("/api/profile", data);
   },
 
   async uploadProfilePhoto(file: File): Promise<UpdateProfileResponse> {

@@ -157,19 +157,6 @@ const empty_billing: BillingAddressFields = {
   company: "",
 };
 
-const default_profile_data: ProfileData = {
-  business_email: "",
-  first_name: "",
-  last_name: "",
-  notification_channel: "email_and_portal",
-  team_order_updates: false,
-  push_notifications_enabled: false,
-  phone: null,
-  timezone: "",
-  interested_in: "",
-  ...empty_billing,
-};
-
 // ─── Sub-components ────────────────────────────────────────────────────────────
 
 function FieldLabel({ htmlFor, children }: { htmlFor: string; children: React.ReactNode }) {
@@ -224,44 +211,38 @@ function LoadingSkeleton() {
 export default function UserAddressCard() {
   const { isOpen, openModal, closeModal } = useModal();
 
-  const [full_profile, setFullProfile] = useState<ProfileData>(default_profile_data);
+  // Only billing address fields are stored — no need to hold the full profile.
+  const [saved_billing, setSavedBilling] = useState<BillingAddressFields>(empty_billing);
   const [edit_form, setEditForm] = useState<BillingAddressFields>(empty_billing);
   const [is_loading, setIsLoading] = useState(true);
   const [is_saving, setIsSaving] = useState(false);
   const [error_message, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    loadProfile();
+    loadBillingAddress();
   }, []);
 
-  async function loadProfile() {
+  async function loadBillingAddress() {
     setIsLoading(true);
     try {
       const data = await profileService.fetchUserProfile();
-      const profile: ProfileData = { ...default_profile_data };
-      for (const key of Object.keys(default_profile_data) as Array<keyof ProfileData>) {
-        const value = (data as unknown as Record<string, unknown>)[key];
-        if (value !== null && value !== undefined) {
-          (profile as unknown as Record<string, unknown>)[key] = value;
-        }
-      }
-      setFullProfile(profile);
+      setSavedBilling({
+        address: data.address ?? "",
+        city: data.city ?? "",
+        country: data.country ?? "",
+        state_province: data.state_province ?? "",
+        postal_code: data.postal_code ?? "",
+        company: data.company ?? "",
+      });
     } catch {
-      // Pre-fill is optional — fail silently
+      // Display falls back to empty state — fail silently
     } finally {
       setIsLoading(false);
     }
   }
 
   function handleOpenModal() {
-    setEditForm({
-      address: full_profile.address,
-      city: full_profile.city,
-      country: full_profile.country,
-      state_province: full_profile.state_province,
-      postal_code: full_profile.postal_code,
-      company: full_profile.company,
-    });
+    setEditForm({ ...saved_billing });
     setErrorMessage(null);
     openModal();
   }
@@ -279,9 +260,10 @@ export default function UserAddressCard() {
     setIsSaving(true);
     setErrorMessage(null);
     try {
-      const updated = { ...full_profile, ...edit_form };
-      await profileService.updateUserProfile(updated);
-      setFullProfile(updated);
+      // PATCH — only billing address fields are sent, leaving the rest of the
+      // profile untouched on the server.
+      await profileService.patchUserProfile(edit_form);
+      setSavedBilling(edit_form);
       closeModal();
     } catch {
       setErrorMessage("Failed to save billing address. Please try again.");
@@ -293,20 +275,20 @@ export default function UserAddressCard() {
   if (is_loading) return <LoadingSkeleton />;
 
   const has_data = !!(
-    full_profile.address ||
-    full_profile.city ||
-    full_profile.postal_code
+    saved_billing.address ||
+    saved_billing.city ||
+    saved_billing.postal_code
   );
 
-  const country_label = full_profile.country
-    ? getCountryLabel(full_profile.country)
+  const country_label = saved_billing.country
+    ? getCountryLabel(saved_billing.country)
     : null;
 
-  const state_label = full_profile.state_province
-    ? getStateLabel(full_profile.state_province, full_profile.country)
+  const state_label = saved_billing.state_province
+    ? getStateLabel(saved_billing.state_province, saved_billing.country)
     : null;
 
-  const city_state_country = [full_profile.city, state_label, country_label]
+  const city_state_country = [saved_billing.city, state_label, country_label]
     .filter(Boolean)
     .join(", ");
 
@@ -322,10 +304,10 @@ export default function UserAddressCard() {
 
             {has_data ? (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-7 2xl:gap-x-32">
-                <AddressInfoRow label="Address" value={full_profile.address} />
+                <AddressInfoRow label="Address" value={saved_billing.address} />
                 <AddressInfoRow label="City / State / Country" value={city_state_country || null} />
-                <AddressInfoRow label="Postal Code" value={full_profile.postal_code} />
-                <AddressInfoRow label="Company" value={full_profile.company} />
+                <AddressInfoRow label="Postal Code" value={saved_billing.postal_code} />
+                <AddressInfoRow label="Company" value={saved_billing.company} />
               </div>
             ) : (
               <p className="text-sm text-gray-500 dark:text-gray-400">

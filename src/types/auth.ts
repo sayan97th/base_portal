@@ -69,6 +69,7 @@ export interface RegisterData {
   invitation_token?: string;
 }
 
+/** Shape sent on PUT /api/profile — full profile update (all fields required). */
 export interface ProfileData {
   first_name: string;
   last_name: string;
@@ -87,7 +88,29 @@ export interface ProfileData {
   company: string;
 }
 
-export interface ProfileResponse extends ProfileData {
+/** Shape sent on PATCH /api/profile — partial update (only changed fields). */
+export type PartialProfileData = Partial<ProfileData>;
+
+/**
+ * Shape received from GET /api/profile.
+ * All fields are nullable because the user may not have filled them yet.
+ */
+export interface ProfileResponse {
+  first_name: string | null;
+  last_name: string | null;
+  business_email: string | null;
+  phone: string | null;
+  timezone: string | null;
+  interested_in: string | null;
+  notification_channel: string | null;
+  team_order_updates: boolean | null;
+  push_notifications_enabled: boolean | null;
+  address: string | null;
+  city: string | null;
+  country: string | null;
+  state_province: string | null;
+  postal_code: string | null;
+  company: string | null;
   profile_photo_path: string | null;
   profile_photo_url: string | null;
 }
