@@ -271,7 +271,7 @@ const LinkBuildingPage: React.FC = () => {
     scrollToTop();
   };
 
-  const handleComplete = async (payment_intent_id: string) => {
+  const handleComplete = async (payment_intent_id: string, is_using_saved_method: boolean) => {
     setIsSubmitting(true);
     setSubmitError(null);
 
@@ -300,14 +300,16 @@ const LinkBuildingPage: React.FC = () => {
         total_amount: total,
         coupon_id: coupon_state.coupon_id ?? undefined,
         items,
-        billing: {
-          company: billing_address.company || null,
-          address: billing_address.address,
-          city: billing_address.city,
-          state: billing_address.state,
-          country: billing_address.country,
-          postal_code: billing_address.postal_code,
-        },
+        billing: is_using_saved_method
+          ? { company: null, address: "", city: "", state: "", country: "", postal_code: "" }
+          : {
+              company: billing_address.company || null,
+              address: billing_address.address,
+              city: billing_address.city,
+              state: billing_address.state,
+              country: billing_address.country,
+              postal_code: billing_address.postal_code,
+            },
         payment: { payment_method_id: payment_intent_id },
       });
 

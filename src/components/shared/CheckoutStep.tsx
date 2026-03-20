@@ -34,7 +34,7 @@ interface CheckoutStepProps {
   billing_address: BillingAddress;
   onBillingChange: (field: keyof BillingAddress, value: string) => void;
   onPrevious: () => void;
-  onComplete: (payment_intent_id: string) => void;
+  onComplete: (payment_intent_id: string, is_using_saved_method: boolean) => void;
   is_loading?: boolean;
   error_message?: string | null;
   total_amount: number;
@@ -394,7 +394,7 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
             // Don't block the order if card saving fails
           }
         }
-        onComplete(paymentIntent.id);
+        onComplete(paymentIntent.id, is_using_saved);
       } else {
         setStripeError("Payment could not be completed. Please try again.");
         setIsProcessing(false);
