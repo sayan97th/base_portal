@@ -51,6 +51,13 @@ interface StripeElementErrors {
   card_cvc?: string;
 }
 
+interface BillingAddressErrors {
+  address?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+}
+
 // ─── Static data ──────────────────────────────────────────────────────────────
 
 const us_states = [
@@ -109,11 +116,29 @@ const stripe_element_style = {
 
 // ─── CSS class constants ──────────────────────────────────────────────────────
 
-const input_class =
-  "h-11 w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition-all focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-white/[0.03] dark:text-white dark:placeholder:text-gray-500 dark:focus:border-brand-400 dark:focus:bg-white/5";
-
 const label_class =
   "mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300";
+
+function getInputClass(has_error?: boolean) {
+  const base =
+    "h-11 w-full rounded-lg border px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition-all focus:bg-white focus:outline-none focus:ring-2 dark:text-white dark:placeholder:text-gray-500";
+  if (has_error) {
+    return `${base} border-red-400 bg-red-50/40 focus:border-red-400 focus:ring-red-400/20 dark:border-red-500/60 dark:bg-red-500/5 dark:focus:border-red-400`;
+  }
+  return `${base} border-gray-200 bg-gray-50 focus:border-brand-500 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-white/[0.03] dark:focus:border-brand-400 dark:focus:bg-white/5`;
+}
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return (
+    <p className="mt-1.5 flex items-center gap-1 text-xs font-medium text-red-500 dark:text-red-400">
+      <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008z" />
+      </svg>
+      {message}
+    </p>
+  );
+}
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -206,8 +231,12 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
 
   // New card entry state
   const [name_on_card, setNameOnCard] = useState("");
+  const [name_on_card_error, setNameOnCardError] = useState<string | undefined>();
   const [stripe_errors, setStripeErrors] = useState<StripeElementErrors>({});
   const [save_for_future, setSaveForFuture] = useState(false);
+
+  // Billing address validation errors
+  const [billing_errors, setBillingErrors] = useState<BillingAddressErrors>({});
 
   // Payment processing state
   const [is_processing, setIsProcessing] = useState(false);
@@ -248,16 +277,48 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
     }));
   };
 
+  const validateNewCardFields = useCallback((): boolean => {
+    let has_errors = false;
+
+    if (!name_on_card.trim()) {
+      setNameOnCardError("Please enter the name on your card.");
+      has_errors = true;
+    } else {
+      setNameOnCardError(undefined);
+    }
+
+    const errors: BillingAddressErrors = {};
+    if (!billing_address.address.trim()) errors.address = "Street address is required.";
+    if (!billing_address.city.trim()) errors.city = "City is required.";
+    if (!billing_address.state.trim()) errors.state = "State / Province is required.";
+    if (!billing_address.postal_code.trim()) errors.postal_code = "Postal / ZIP code is required.";
+    setBillingErrors(errors);
+    if (Object.keys(errors).length > 0) has_errors = true;
+
+    return !has_errors;
+  }, [name_on_card, billing_address]);
+
+  const handleBillingFieldChange = useCallback(
+    (field: keyof BillingAddress, value: string) => {
+      onBillingChange(field, value);
+      if (field in billing_errors) {
+        setBillingErrors((prev) => {
+          const next = { ...prev };
+          delete next[field as keyof BillingAddressErrors];
+          return next;
+        });
+      }
+    },
+    [onBillingChange, billing_errors]
+  );
+
   const handleComplete = useCallback(async () => {
     if (!stripe || !elements) return;
 
     if (!is_using_saved) {
       const card_number_element = elements.getElement(CardNumberElement);
       if (!card_number_element) return;
-      if (!name_on_card.trim()) {
-        setStripeError("Please enter the name on your card.");
-        return;
-      }
+      if (!validateNewCardFields()) return;
     }
 
     setIsProcessing(true);
@@ -347,9 +408,9 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
       onProcessingChange?.(false);
     }
   }, [
-    stripe, elements, is_using_saved, name_on_card, total_amount,
+    stripe, elements, is_using_saved, validateNewCardFields, total_amount,
     payment_profiles, selected_profile_id, billing_address, save_for_future,
-    onComplete, onProcessingChange,
+    name_on_card, onComplete, onProcessingChange,
   ]);
 
   useImperativeHandle(ref, () => ({ triggerSubmit: handleComplete }), [handleComplete]);
@@ -595,10 +656,14 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
                         id="checkout_name_on_card"
                         type="text"
                         value={name_on_card}
-                        onChange={(e) => setNameOnCard(e.target.value)}
+                        onChange={(e) => {
+                          setNameOnCard(e.target.value);
+                          if (e.target.value.trim()) setNameOnCardError(undefined);
+                        }}
                         placeholder="Full name as it appears on card"
-                        className={input_class}
+                        className={getInputClass(!!name_on_card_error)}
                       />
+                      <FieldError message={name_on_card_error} />
                     </div>
 
                     {/* Save for future purchases */}
@@ -658,161 +723,152 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
         </div>
       </SectionCard>
 
-      {/* ── Billing Address Section ── */}
-      <SectionCard>
-        <SectionHeader
-          title="Billing Address"
-          subtitle="Address associated with your payment method"
-          action={
-            saved_billing_address && onApplySavedAddress ? (
-              <button
-                type="button"
-                onClick={onApplySavedAddress}
-                className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 shadow-sm transition-colors hover:bg-brand-100 dark:border-brand-700/40 dark:bg-brand-500/10 dark:text-brand-300 dark:hover:bg-brand-500/20"
-              >
-                <svg
-                  className="h-3 w-3"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={2}
-                  stroke="currentColor"
+      {/* ── Billing Address Section — only required for new card payments ── */}
+      {!is_using_saved && (
+        <SectionCard>
+          <SectionHeader
+            title="Billing Address"
+            subtitle="Address associated with your new card"
+            action={
+              saved_billing_address && onApplySavedAddress ? (
+                <button
+                  type="button"
+                  onClick={onApplySavedAddress}
+                  className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 shadow-sm transition-colors hover:bg-brand-100 dark:border-brand-700/40 dark:bg-brand-500/10 dark:text-brand-300 dark:hover:bg-brand-500/20"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"
-                  />
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                  </svg>
+                  Use saved address
+                </button>
+              ) : null
+            }
+          />
+
+          <div className="px-6 py-5">
+            {/* Saved address info banner */}
+            {saved_billing_address && (
+              <div className="mb-5 flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50/60 p-3.5 dark:border-blue-500/20 dark:bg-blue-500/5">
+                <svg className="mt-0.5 h-4 w-4 shrink-0 text-blue-500 dark:text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
                 </svg>
-                Use saved address
-              </button>
-            ) : null
-          }
-        />
-
-        <div className="px-6 py-5">
-          {/* Saved address info banner */}
-          {saved_billing_address && (
-            <div className="mb-5 flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50/60 p-3.5 dark:border-blue-500/20 dark:bg-blue-500/5">
-              <svg
-                className="mt-0.5 h-4 w-4 shrink-0 text-blue-500 dark:text-blue-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.8}
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
-              </svg>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">
-                  Saved address on file
-                </p>
-                <p className="mt-0.5 truncate text-xs text-blue-600 dark:text-blue-400">
-                  {[
-                    saved_billing_address.address,
-                    saved_billing_address.city,
-                    saved_billing_address.state,
-                    saved_billing_address.postal_code,
-                    saved_billing_address.country,
-                  ]
-                    .filter(Boolean)
-                    .join(", ")}
-                </p>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">Saved address on file</p>
+                  <p className="mt-0.5 truncate text-xs text-blue-600 dark:text-blue-400">
+                    {[
+                      saved_billing_address.address,
+                      saved_billing_address.city,
+                      saved_billing_address.state,
+                      saved_billing_address.postal_code,
+                      saved_billing_address.country,
+                    ]
+                      .filter(Boolean)
+                      .join(", ")}
+                  </p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          <div className="space-y-4">
-            {/* Address + City */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className={label_class}>Street Address</label>
-                <input
-                  type="text"
-                  value={billing_address.address}
-                  onChange={(e) => onBillingChange("address", e.target.value)}
-                  placeholder="123 Main St"
-                  className={input_class}
-                />
-              </div>
-              <div>
-                <label className={label_class}>City</label>
-                <input
-                  type="text"
-                  value={billing_address.city}
-                  onChange={(e) => onBillingChange("city", e.target.value)}
-                  placeholder="New York"
-                  className={input_class}
-                />
-              </div>
-            </div>
-
-            {/* Country + State + Postal */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div>
-                <label className={label_class}>Country</label>
-                <div className="relative">
-                  <select
-                    value={billing_address.country}
-                    onChange={(e) => onBillingChange("country", e.target.value)}
-                    className={`${input_class} cursor-pointer appearance-none pr-10`}
-                  >
-                    {countries.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                  <div className="pointer-events-none absolute right-3 top-3.5">
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                      <path
-                        d="M3 4.5L6 7.5L9 4.5"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="text-gray-500"
-                      />
-                    </svg>
-                  </div>
+            <div className="space-y-4">
+              {/* Address + City */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className={label_class}>
+                    Street Address <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={billing_address.address}
+                    onChange={(e) => handleBillingFieldChange("address", e.target.value)}
+                    placeholder="123 Main St"
+                    className={getInputClass(!!billing_errors.address)}
+                  />
+                  <FieldError message={billing_errors.address} />
+                </div>
+                <div>
+                  <label className={label_class}>
+                    City <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={billing_address.city}
+                    onChange={(e) => handleBillingFieldChange("city", e.target.value)}
+                    placeholder="New York"
+                    className={getInputClass(!!billing_errors.city)}
+                  />
+                  <FieldError message={billing_errors.city} />
                 </div>
               </div>
 
-              <SearchableSelect
-                value={billing_address.state}
-                options={us_states}
-                onChange={(val) => onBillingChange("state", val)}
-                label="State / Province"
-                placeholder="Search state…"
-              />
+              {/* Country + State + Postal */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div>
+                  <label className={label_class}>Country</label>
+                  <div className="relative">
+                    <select
+                      value={billing_address.country}
+                      onChange={(e) => handleBillingFieldChange("country", e.target.value)}
+                      className={`${getInputClass()} cursor-pointer appearance-none pr-10`}
+                    >
+                      {countries.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                    <div className="pointer-events-none absolute right-3 top-3.5">
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
 
-              <div>
-                <label className={label_class}>Postal / ZIP Code</label>
+                <div>
+                  <label className={label_class}>
+                    State / Province <span className="text-red-400">*</span>
+                  </label>
+                  <SearchableSelect
+                    value={billing_address.state}
+                    options={us_states}
+                    onChange={(val) => handleBillingFieldChange("state", val)}
+                    placeholder="Search state…"
+                  />
+                  <FieldError message={billing_errors.state} />
+                </div>
+
+                <div>
+                  <label className={label_class}>
+                    Postal / ZIP Code <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={billing_address.postal_code}
+                    onChange={(e) => handleBillingFieldChange("postal_code", e.target.value)}
+                    placeholder="10001"
+                    className={getInputClass(!!billing_errors.postal_code)}
+                  />
+                  <FieldError message={billing_errors.postal_code} />
+                </div>
+              </div>
+
+              {/* Company */}
+              <div className="max-w-xs">
+                <label className={label_class}>
+                  Company{" "}
+                  <span className="font-normal text-gray-400">(optional)</span>
+                </label>
                 <input
                   type="text"
-                  value={billing_address.postal_code}
-                  onChange={(e) => onBillingChange("postal_code", e.target.value)}
-                  placeholder="10001"
-                  className={input_class}
+                  value={billing_address.company}
+                  onChange={(e) => handleBillingFieldChange("company", e.target.value)}
+                  placeholder="Your company name"
+                  className={getInputClass()}
                 />
               </div>
             </div>
-
-            {/* Company */}
-            <div className="max-w-xs">
-              <label className={label_class}>
-                Company{" "}
-                <span className="font-normal text-gray-400">(optional)</span>
-              </label>
-              <input
-                type="text"
-                value={billing_address.company}
-                onChange={(e) => onBillingChange("company", e.target.value)}
-                placeholder="Your company name"
-                className={input_class}
-              />
-            </div>
           </div>
-        </div>
-      </SectionCard>
+        </SectionCard>
+      )}
 
       {/* ── Helper note ── */}
       <p className="text-xs text-gray-400 dark:text-gray-500">
