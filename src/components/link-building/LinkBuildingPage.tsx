@@ -61,18 +61,21 @@ const LinkBuildingPage: React.FC = () => {
     postal_code: "",
     company: "",
   });
-  const [coupon_state, setCouponState] = useState<{
-    code: string;
-    discount_amount: number | null;
-    coupon_name: string | null;
-    coupon_id: string | null;
+  const [coupons_state, setCouponsState] = useState<{
+    input_code: string;
+    applied_coupons: Array<{
+      coupon_id: string;
+      code: string;
+      coupon_name: string;
+      discount_amount: number;
+      discount_type: string;
+      discount_value: number;
+    }>;
     error: string | null;
     is_applying: boolean;
   }>({
-    code: "",
-    discount_amount: null,
-    coupon_name: null,
-    coupon_id: null,
+    input_code: "",
+    applied_coupons: [],
     error: null,
     is_applying: false,
   });
@@ -144,7 +147,11 @@ const LinkBuildingPage: React.FC = () => {
     }, 0);
   }, [selected_quantities, dr_tiers]);
 
-  const total = Math.max(0, subtotal - (coupon_state.discount_amount ?? 0));
+  const total_discount = coupons_state.applied_coupons.reduce(
+    (sum, c) => sum + c.discount_amount,
+    0
+  );
+  const total = Math.max(0, subtotal - total_discount);
 
   const handleQuantityChange = (tier_id: string, quantity: number) => {
     setSelectedQuantities((prev) => {
@@ -180,61 +187,80 @@ const LinkBuildingPage: React.FC = () => {
   };
 
   const handleCouponCodeChange = (code: string) => {
-    setCouponState((prev) => ({ ...prev, code, error: null }));
+    setCouponsState((prev) => ({ ...prev, input_code: code, error: null }));
   };
 
   const handleApplyCoupon = async () => {
-    if (!coupon_state.code.trim()) return;
-    setCouponState((prev) => ({ ...prev, is_applying: true, error: null }));
+    const trimmed_code = coupons_state.input_code.trim();
+    if (!trimmed_code) return;
+
+    // Reject duplicate codes (case-insensitive)
+    const already_applied = coupons_state.applied_coupons.some(
+      (c) => c.code.toUpperCase() === trimmed_code.toUpperCase()
+    );
+    if (already_applied) {
+      setCouponsState((prev) => ({
+        ...prev,
+        error: "This promo code has already been applied.",
+      }));
+      return;
+    }
+
+    setCouponsState((prev) => ({ ...prev, is_applying: true, error: null }));
     try {
       const dr_tier_ids = Object.keys(selected_quantities).filter(
         (id) => selected_quantities[id] > 0
       );
+      // Validate against remaining amount after previously applied discounts
+      const applied_discount = coupons_state.applied_coupons.reduce(
+        (sum, c) => sum + c.discount_amount,
+        0
+      );
       const response = await validateCoupon({
-        code: coupon_state.code.trim(),
-        order_amount: subtotal,
+        code: trimmed_code,
+        order_amount: Math.max(0, subtotal - applied_discount),
         dr_tier_ids,
       });
       if (response.valid) {
-        setCouponState((prev) => ({
+        setCouponsState((prev) => ({
           ...prev,
-          discount_amount: response.discount_amount,
-          coupon_name: response.name,
-          coupon_id: response.coupon_id,
+          input_code: "",
           error: null,
           is_applying: false,
+          applied_coupons: [
+            ...prev.applied_coupons,
+            {
+              coupon_id: response.coupon_id,
+              code: response.code,
+              coupon_name: response.name,
+              discount_amount: response.discount_amount,
+              discount_type: response.discount_type,
+              discount_value: response.discount_value,
+            },
+          ],
         }));
       } else {
-        setCouponState((prev) => ({
+        setCouponsState((prev) => ({
           ...prev,
-          discount_amount: null,
-          coupon_name: null,
-          coupon_id: null,
-          error: response.message || "Invalid coupon code.",
+          error: response.message || "Invalid promo code.",
           is_applying: false,
         }));
       }
     } catch {
-      setCouponState((prev) => ({
+      setCouponsState((prev) => ({
         ...prev,
-        discount_amount: null,
-        coupon_name: null,
-        coupon_id: null,
-        error: "Could not validate coupon. Please try again.",
+        error: "Could not validate promo code. Please try again.",
         is_applying: false,
       }));
     }
   };
 
-  const handleRemoveCoupon = () => {
-    setCouponState({
-      code: "",
-      discount_amount: null,
-      coupon_name: null,
-      coupon_id: null,
+  const handleRemoveCoupon = (code: string) => {
+    setCouponsState((prev) => ({
+      ...prev,
+      applied_coupons: prev.applied_coupons.filter((c) => c.code !== code),
       error: null,
-      is_applying: false,
-    });
+    }));
   };
 
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
@@ -464,7 +490,7 @@ const LinkBuildingPage: React.FC = () => {
                 onAction={() => {}}
                 is_action_disabled
                 show_coupon_field
-                coupon={coupon_state}
+                coupon_state={coupons_state}
                 onCouponCodeChange={handleCouponCodeChange}
                 onApplyCoupon={handleApplyCoupon}
                 onRemoveCoupon={handleRemoveCoupon}

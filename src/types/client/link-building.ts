@@ -37,7 +37,7 @@ export interface CreateOrderPayload {
   order_title?: string | null;
   order_notes?: string | null;
   total_amount: number;
-  coupon_id?: string;
+  coupon_ids?: string[];
   items: OrderItem[];
   billing: OrderBilling;
   payment: {
