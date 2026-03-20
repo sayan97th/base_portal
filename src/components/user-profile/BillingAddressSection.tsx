@@ -117,7 +117,6 @@ interface BillingAddressSectionProps {
   state_province: string;
   postal_code: string;
   company: string;
-  tax_id: string;
   onFieldChange: (field: string, value: string) => void;
 }
 
@@ -128,7 +127,6 @@ export default function BillingAddressSection({
   state_province,
   postal_code,
   company,
-  tax_id,
   onFieldChange,
 }: BillingAddressSectionProps) {
   return (
@@ -218,34 +216,19 @@ export default function BillingAddressSection({
           </div>
         </div>
 
-        {/* Company / Tax ID */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <div>
-            <Input
-              id="company"
-              name="company"
-              type="text"
-              defaultValue={company}
-              placeholder="Company"
-              onChange={(e) => onFieldChange("company", e.target.value)}
-            />
-            <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-              Company
-            </p>
-          </div>
-          <div>
-            <Input
-              id="tax_id"
-              name="tax_id"
-              type="text"
-              defaultValue={tax_id}
-              placeholder="Tax ID"
-              onChange={(e) => onFieldChange("tax_id", e.target.value)}
-            />
-            <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-              Tax ID
-            </p>
-          </div>
+        {/* Company */}
+        <div>
+          <Input
+            id="company"
+            name="company"
+            type="text"
+            defaultValue={company}
+            placeholder="Company"
+            onChange={(e) => onFieldChange("company", e.target.value)}
+          />
+          <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+            Company
+          </p>
         </div>
       </div>
     </section>

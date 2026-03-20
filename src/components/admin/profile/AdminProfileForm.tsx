@@ -313,7 +313,6 @@ export default function AdminProfileForm() {
         state_province: "",
         postal_code: "",
         company: "",
-        tax_id: "",
         interested_in: "",
       });
       await refreshUser();

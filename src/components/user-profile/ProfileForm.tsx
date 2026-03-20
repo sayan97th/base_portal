@@ -82,7 +82,6 @@ const default_form_data: ProfileData = {
   state_province: "",
   postal_code: "",
   company: "",
-  tax_id: "",
   phone: "",
   timezone: "",
   interested_in: "",
@@ -630,7 +629,6 @@ export default function ProfileForm() {
               state_province={form_data.state_province}
               postal_code={form_data.postal_code}
               company={form_data.company}
-              tax_id={form_data.tax_id}
               onFieldChange={handleFieldChange}
             />
           </div>

@@ -85,7 +85,6 @@ export interface ProfileData {
   state_province: string;
   postal_code: string;
   company: string;
-  tax_id: string;
 }
 
 export interface ProfileResponse extends ProfileData {
