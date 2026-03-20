@@ -324,7 +324,7 @@ const LinkBuildingPage: React.FC = () => {
         order_title: order_title || null,
         order_notes: order_notes || null,
         total_amount: total,
-        coupon_id: coupon_state.coupon_id ?? undefined,
+        coupon_ids: coupons_state.applied_coupons.map((c) => c.coupon_id),
         items,
         billing: is_using_saved_method
           ? { company: null, address: "", city: "", state: "", country: "", postal_code: "" }
