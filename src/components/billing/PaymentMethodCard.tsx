@@ -92,6 +92,19 @@ const PaymentMethodCard: React.FC<PaymentMethodCardProps> = ({
           <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
             Expires {payment_method.expiry_month} / {payment_method.expiry_year}
           </p>
+          {payment_method.billing_address && (
+            <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
+              {[
+                payment_method.billing_address.address_line1,
+                payment_method.billing_address.city,
+                payment_method.billing_address.state,
+                payment_method.billing_address.postal_code,
+                payment_method.billing_address.country,
+              ]
+                .filter(Boolean)
+                .join(", ")}
+            </p>
+          )}
         </div>
       </div>
 
