@@ -42,7 +42,7 @@ const DrTierCard: React.FC<DrTierCardProps> = ({
 
   const handleIncrement = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (tier.max_quantity === undefined || quantity < tier.max_quantity) {
+    if (tier.max_quantity == null || quantity < tier.max_quantity) {
       onQuantityChange(quantity + 1);
     }
   };
