@@ -140,6 +140,7 @@ export interface ValidateCouponPayload {
   code: string;
   order_amount: number;
   dr_tier_ids?: string[];
+  dr_tier_amounts?: Record<string, number>;
 }
 
 export interface ValidateCouponResponse {

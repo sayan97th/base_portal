@@ -27,6 +27,9 @@ import type { DrTier } from "@/types/client/link-building";
 
 type Step = "selection" | "keywords" | "checkout";
 
+const BULK_DISCOUNT_THRESHOLD = 10;
+const BULK_DISCOUNT_RATE = 0.1;
+
 const empty_keyword_row = (): KeywordRow => ({
   keyword: "",
   landing_page: "",
@@ -147,11 +150,26 @@ const LinkBuildingPage: React.FC = () => {
     }, 0);
   }, [selected_quantities, dr_tiers]);
 
+  const total_links = useMemo(
+    () => Object.values(selected_quantities).reduce((sum, qty) => sum + qty, 0),
+    [selected_quantities]
+  );
+
+  const bulk_discount_amount = useMemo(
+    () =>
+      total_links >= BULK_DISCOUNT_THRESHOLD
+        ? Math.round(subtotal * BULK_DISCOUNT_RATE * 100) / 100
+        : 0,
+    [total_links, subtotal]
+  );
+
+  const amount_after_bulk = Math.max(0, subtotal - bulk_discount_amount);
+
   const total_discount = coupons_state.applied_coupons.reduce(
     (sum, c) => sum + c.discount_amount,
     0
   );
-  const total = Math.max(0, subtotal - total_discount);
+  const total = Math.max(0, amount_after_bulk - total_discount);
 
   const handleQuantityChange = (tier_id: string, quantity: number) => {
     setSelectedQuantities((prev) => {
@@ -211,15 +229,26 @@ const LinkBuildingPage: React.FC = () => {
       const dr_tier_ids = Object.keys(selected_quantities).filter(
         (id) => selected_quantities[id] > 0
       );
-      // Validate against remaining amount after previously applied discounts
+
+      // Per-tier subtotals needed so the backend can compute specific_product discounts correctly
+      const dr_tier_amounts: Record<string, number> = {};
+      dr_tiers
+        .filter((t) => (selected_quantities[t.id] ?? 0) > 0)
+        .forEach((t) => {
+          dr_tier_amounts[t.id] =
+            Math.round(t.price_per_link * selected_quantities[t.id] * 100) / 100;
+        });
+
+      // Validate against remaining amount after bulk discount and previously applied coupon discounts
       const applied_discount = coupons_state.applied_coupons.reduce(
         (sum, c) => sum + c.discount_amount,
         0
       );
       const response = await validateCoupon({
         code: trimmed_code,
-        order_amount: Math.max(0, subtotal - applied_discount),
+        order_amount: Math.max(0, amount_after_bulk - applied_discount),
         dr_tier_ids,
+        dr_tier_amounts,
       });
       if (response.valid) {
         setCouponsState((prev) => ({
@@ -485,7 +514,8 @@ const LinkBuildingPage: React.FC = () => {
             <div className="col-span-12 lg:col-span-4">
               <LinkBuildingOrderSummary
                 selected_items={selected_items}
-                total={subtotal}
+                total={amount_after_bulk}
+                bulk_discount_amount={bulk_discount_amount}
                 action_label="Review"
                 onAction={() => {}}
                 is_action_disabled

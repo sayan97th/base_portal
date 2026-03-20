@@ -36,6 +36,7 @@ export interface CheckoutAction {
 interface LinkBuildingOrderSummaryProps {
   selected_items: OrderSummaryItem[];
   total: number;
+  bulk_discount_amount?: number;
   action_label: string;
   onAction: () => void;
   is_action_disabled?: boolean;
@@ -51,6 +52,7 @@ interface LinkBuildingOrderSummaryProps {
 const LinkBuildingOrderSummary: React.FC<LinkBuildingOrderSummaryProps> = ({
   selected_items,
   total,
+  bulk_discount_amount = 0,
   action_label,
   onAction,
   is_action_disabled = false,
@@ -64,6 +66,9 @@ const LinkBuildingOrderSummary: React.FC<LinkBuildingOrderSummaryProps> = ({
 }) => {
   const total_discount =
     coupon_state?.applied_coupons.reduce((sum, c) => sum + c.discount_amount, 0) ?? 0;
+  const has_any_discount = bulk_discount_amount > 0 || total_discount > 0;
+  // When bulk discount applies, total is already amount_after_bulk; add it back to show the raw subtotal
+  const raw_subtotal = total + bulk_discount_amount;
   const final_total = Math.max(0, total - total_discount);
 
   return (
@@ -334,7 +339,7 @@ const LinkBuildingOrderSummary: React.FC<LinkBuildingOrderSummaryProps> = ({
 
       {/* ── Subtotal / Discounts / Total ── */}
       <div className="mb-5 border-t border-gray-100 pt-4 dark:border-gray-800 space-y-2">
-        {total_discount > 0 && (
+        {has_any_discount && (
           <>
             <div className="flex items-center justify-between">
               <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -342,12 +347,28 @@ const LinkBuildingOrderSummary: React.FC<LinkBuildingOrderSummaryProps> = ({
               </p>
               <p className="text-sm font-medium text-gray-700 dark:text-white/70">
                 $
-                {total.toLocaleString("en-US", {
+                {raw_subtotal.toLocaleString("en-US", {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}
               </p>
             </div>
+
+            {/* Bulk discount line */}
+            {bulk_discount_amount > 0 && (
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-violet-600 dark:text-violet-400">
+                  Bulk Discount (10% off)
+                </p>
+                <p className="text-sm font-semibold text-violet-600 dark:text-violet-400 tabular-nums">
+                  &minus;$
+                  {bulk_discount_amount.toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </p>
+              </div>
+            )}
 
             {/* Per-coupon breakdown */}
             {coupon_state && coupon_state.applied_coupons.length > 1
@@ -368,7 +389,7 @@ const LinkBuildingOrderSummary: React.FC<LinkBuildingOrderSummaryProps> = ({
                     </p>
                   </div>
                 ))
-              : (
+              : total_discount > 0 && (
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
                     Coupon Discount
