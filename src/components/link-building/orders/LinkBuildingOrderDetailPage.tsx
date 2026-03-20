@@ -13,6 +13,7 @@ import {
 import { linkBuildingService } from "@/services/client/link-building.service";
 import type {
   LinkBuildingOrderDetail,
+  OrderCouponDetail,
   OrderItemDetail,
   OrderStatus,
 } from "@/types/client/link-building";
@@ -54,6 +55,23 @@ function getStatusConfig(status: OrderStatus): {
       return { color: "error", label: "Cancelled", dot: "bg-error-500" };
   }
 }
+
+const TagIcon = () => (
+  <svg
+    className="h-3.5 w-3.5"
+    fill="none"
+    viewBox="0 0 24 24"
+    strokeWidth={2}
+    stroke="currentColor"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"
+    />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" />
+  </svg>
+);
 
 const BackIcon = () => (
   <svg
@@ -501,6 +519,15 @@ const LinkBuildingOrderDetailPage: React.FC<
 
                   <div className="flex justify-between gap-2 border-t border-gray-100 pt-3 dark:border-gray-800">
                     <dt className="text-sm text-gray-500 dark:text-gray-400">
+                      Subtotal
+                    </dt>
+                    <dd className="text-sm font-medium text-gray-800 dark:text-white/90">
+                      {formatCurrency(order.subtotal_before_discount ?? order.items.reduce((s, i) => s + i.subtotal, 0))}
+                    </dd>
+                  </div>
+
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-sm text-gray-500 dark:text-gray-400">
                       Total links
                     </dt>
                     <dd className="text-sm font-medium text-gray-800 dark:text-white/90">
@@ -519,6 +546,42 @@ const LinkBuildingOrderDetailPage: React.FC<
                     </div>
                   )}
 
+                  {order.coupons && order.coupons.length > 0 && (
+                    <>
+                      <div className="border-t border-dashed border-gray-200 pt-3 dark:border-gray-700">
+                        <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                          <TagIcon />
+                          Coupon discounts applied
+                        </p>
+                        <div className="space-y-2">
+                          {order.coupons.map((coupon: OrderCouponDetail) => (
+                            <div
+                              key={coupon.coupon_id}
+                              className="flex items-start justify-between gap-2 rounded-lg border border-success-200 bg-success-50 px-3 py-2 dark:border-success-500/20 dark:bg-success-500/10"
+                            >
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="inline-flex items-center rounded border border-success-300 bg-white px-1.5 py-0.5 font-mono text-xs font-semibold tracking-wider text-success-700 dark:border-success-500/30 dark:bg-success-500/5 dark:text-success-400">
+                                    {coupon.code}
+                                  </span>
+                                </div>
+                                <p className="mt-0.5 truncate text-xs text-success-600 dark:text-success-500">
+                                  {coupon.name}
+                                  {coupon.discount_type === "percentage"
+                                    ? ` — ${coupon.discount_value}% off`
+                                    : ""}
+                                </p>
+                              </div>
+                              <span className="shrink-0 text-sm font-semibold text-success-700 dark:text-success-400">
+                                -{formatCurrency(coupon.discount_amount)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+
                   <div className="flex justify-between gap-2 border-t border-gray-200 pt-3 dark:border-gray-700">
                     <dt className="text-base font-semibold text-gray-900 dark:text-white">
                       Total
@@ -527,6 +590,17 @@ const LinkBuildingOrderDetailPage: React.FC<
                       {formatCurrency(order.total_amount)}
                     </dd>
                   </div>
+
+                  {order.coupons && order.coupons.length > 0 && (
+                    <div className="flex justify-between gap-2 rounded-lg bg-success-50 px-3 py-2 dark:bg-success-500/10">
+                      <dt className="text-sm font-medium text-success-700 dark:text-success-400">
+                        Total savings
+                      </dt>
+                      <dd className="text-sm font-semibold text-success-700 dark:text-success-400">
+                        -{formatCurrency(order.coupons.reduce((s, c) => s + c.discount_amount, 0))}
+                      </dd>
+                    </div>
+                  )}
                 </dl>
               </div>
 

@@ -16,6 +16,14 @@ export interface InvoiceBilledTo {
   country: string | null;
 }
 
+export interface InvoiceCouponDiscount {
+  code: string;
+  name: string;
+  discount_type: "percentage" | "fixed_amount";
+  discount_value: number;
+  discount_amount: string;
+}
+
 export interface InvoiceDetail {
   invoice_number: string;
   unique_id: string;
@@ -25,10 +33,12 @@ export interface InvoiceDetail {
   payment_method: string;
   status: InvoiceStatus;
   subtotal: string;
+  discount?: string;
   total: string;
   credit: string;
   billed_to: InvoiceBilledTo | null;
   line_items: InvoiceLineItem[];
+  coupon_discounts?: InvoiceCouponDiscount[];
 }
 
 export interface InvoiceSummary {

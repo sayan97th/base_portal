@@ -14,6 +14,8 @@ const COLORS = {
   border: [229, 231, 235] as [number, number, number],
   table_header_bg: [249, 250, 251] as [number, number, number],
   success: [22, 163, 74] as [number, number, number],
+  success_bg: [240, 253, 244] as [number, number, number],
+  success_border: [187, 247, 208] as [number, number, number],
   error: [220, 38, 38] as [number, number, number],
   white: [255, 255, 255] as [number, number, number],
 };
@@ -216,7 +218,7 @@ function drawSummarySection(
   y_position: number
 ): number {
   const right_x = PAGE_WIDTH - PAGE_MARGIN;
-  const label_x = right_x - 60;
+  const label_x = right_x - 70;
 
   y_position += 5;
 
@@ -227,14 +229,74 @@ function drawSummarySection(
   doc.text("Subtotal", label_x, y_position);
   doc.text(invoice.subtotal, right_x, y_position, { align: "right" });
 
-  y_position += 8;
+  // Coupon discounts
+  if (invoice.coupon_discounts && invoice.coupon_discounts.length > 0) {
+    y_position += 6;
 
-  // Separator line
+    // Section label
+    doc.setFontSize(FONT_SIZES.small);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...COLORS.secondary);
+    doc.text("Coupon Discounts", label_x, y_position);
+
+    y_position += 5;
+
+    invoice.coupon_discounts.forEach((coupon) => {
+      const coupon_label =
+        coupon.discount_type === "percentage"
+          ? `${coupon.code}  (${coupon.discount_value}% off)`
+          : `${coupon.code}`;
+
+      // Badge background
+      const badge_text_width = doc.getTextWidth(coupon.code);
+      const badge_w = badge_text_width + 6;
+      const badge_h = 5;
+      doc.setFillColor(...COLORS.success_bg);
+      doc.setDrawColor(...COLORS.success_border);
+      doc.setLineWidth(0.2);
+      doc.roundedRect(label_x, y_position - 3.5, badge_w, badge_h, 1, 1, "FD");
+
+      // Badge text
+      doc.setFontSize(FONT_SIZES.small);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...COLORS.success);
+      doc.text(coupon.code, label_x + 3, y_position);
+
+      // Coupon description after badge
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(...COLORS.secondary);
+      const after_badge_x = label_x + badge_w + 3;
+      const description =
+        coupon.discount_type === "percentage"
+          ? `${coupon.discount_value}% off`
+          : "Fixed discount";
+      doc.text(description, after_badge_x, y_position);
+
+      // Discount amount
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...COLORS.success);
+      doc.text(`-${coupon.discount_amount}`, right_x, y_position, {
+        align: "right",
+      });
+
+      y_position += 6;
+    });
+
+    // Coupon line separator
+    doc.setDrawColor(...COLORS.border);
+    doc.setLineWidth(0.2);
+    doc.line(label_x, y_position - 1, right_x, y_position - 1);
+  }
+
+  y_position += 5;
+
+  // Separator line before total
   doc.setDrawColor(...COLORS.border);
   doc.setLineWidth(0.3);
   doc.line(label_x, y_position - 3, right_x, y_position - 3);
 
   // Total
+  doc.setFontSize(FONT_SIZES.body);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...COLORS.primary);
   doc.text("Total", label_x, y_position);

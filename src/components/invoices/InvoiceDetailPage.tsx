@@ -307,6 +307,38 @@ const InvoiceDetailPage: React.FC<InvoiceDetailPageProps> = ({ invoice_id }) => 
                 {invoice.subtotal}
               </dd>
             </div>
+
+            {invoice.coupon_discounts && invoice.coupon_discounts.length > 0 && (
+              <>
+                <div className="border-t border-dashed border-gray-200 pt-2 dark:border-gray-700">
+                  <p className="mb-1.5 flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" />
+                    </svg>
+                    Coupons applied
+                  </p>
+                  {invoice.coupon_discounts.map((coupon) => (
+                    <div key={coupon.code} className="flex items-center justify-between gap-2 py-0.5">
+                      <dt className="flex items-center gap-1.5">
+                        <span className="inline-flex items-center rounded border border-success-300 bg-success-50 px-1.5 py-0.5 font-mono text-xs font-semibold tracking-wider text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400">
+                          {coupon.code}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {coupon.discount_type === "percentage"
+                            ? `${coupon.discount_value}% off`
+                            : "Fixed discount"}
+                        </span>
+                      </dt>
+                      <dd className="font-medium text-success-600 dark:text-success-400">
+                        -{coupon.discount_amount}
+                      </dd>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
             <div className="flex justify-between border-t border-gray-200 pt-2 dark:border-gray-700">
               <dt className="font-semibold text-gray-900 dark:text-white">
                 Total

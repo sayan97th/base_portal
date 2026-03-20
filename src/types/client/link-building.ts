@@ -86,10 +86,20 @@ export interface OrderBillingDetail {
   postal_code: string;
 }
 
+export interface OrderCouponDetail {
+  coupon_id: string;
+  code: string;
+  name: string;
+  discount_type: CouponDiscountType;
+  discount_value: number;
+  discount_amount: number;
+}
+
 export interface LinkBuildingOrderDetail {
   id: string;
   order_title: string | null;
   order_notes: string | null;
+  subtotal_before_discount: number;
   total_amount: number;
   status: OrderStatus;
   payment_intent_id: string | null;
@@ -97,6 +107,7 @@ export interface LinkBuildingOrderDetail {
   updated_at: string;
   items: OrderItemDetail[];
   billing: OrderBillingDetail;
+  coupons?: OrderCouponDetail[];
 }
 
 export interface CreateOrderResponse {
