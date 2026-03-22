@@ -12,6 +12,7 @@ import type { ProfileData } from "@/types/auth";
 import NotificationPreferencesSection from "./NotificationPreferencesSection";
 import BillingAddressSection from "./BillingAddressSection";
 import ChangePasswordSection from "@/components/admin/profile/ChangePasswordSection";
+import TwoFactorSection from "./TwoFactorSection";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -651,31 +652,7 @@ export default function ProfileForm() {
           </div>
 
           {/* Security */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-            <SectionHeader
-              icon={
-                <svg className="h-4 w-4 text-brand-600 dark:text-brand-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
-                </svg>
-              }
-              title="Security"
-              description="Manage two-factor authentication for your account."
-            />
-
-            <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 dark:border-gray-700 dark:bg-gray-800/50">
-              <div>
-                <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                  Two-Factor Authentication
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Add an extra layer of security to your account.
-                </p>
-              </div>
-              <Button variant="outline" size="sm">
-                Enable 2FA
-              </Button>
-            </div>
-          </div>
+          <TwoFactorSection />
 
           {/* Change Password */}
           <ChangePasswordSection />

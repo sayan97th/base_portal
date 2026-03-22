@@ -184,3 +184,32 @@ export interface ResetPasswordData {
 export interface ResetPasswordResponse {
   message: string;
 }
+
+// ── Two-Factor Authentication ──────────────────────────────────────────────────
+
+export interface TwoFactorStatusResponse {
+  is_enabled: boolean;
+  enabled_at?: string | null;
+}
+
+export interface TwoFactorSetupResponse {
+  qr_code_url: string;
+  secret: string;
+}
+
+export interface TwoFactorVerifyData {
+  code: string;
+}
+
+export interface TwoFactorVerifyResponse {
+  message: string;
+  recovery_codes: string[];
+}
+
+export interface TwoFactorDisableData {
+  code: string;
+}
+
+export interface TwoFactorDisableResponse {
+  message: string;
+}
