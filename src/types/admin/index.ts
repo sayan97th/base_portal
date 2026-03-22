@@ -60,6 +60,7 @@ export interface AdminOrder {
   user_id: number;
   order_title: string;
   order_notes: string | null;
+  subtotal_before_discount?: number;
   total_amount: number;
   status: OrderStatus;
   payment_intent_id: string | null;
@@ -69,6 +70,7 @@ export interface AdminOrder {
   items: OrderItem[];
   billing: OrderBilling | null;
   invoice: AdminInvoice | null;
+  coupons?: OrderCouponDetail[];
 }
 
 export interface AdminLinkBuildingOrder {
@@ -109,6 +111,24 @@ export interface LaravelPaginatedResponse<T> {
 export type InvoiceStatus = "paid" | "void";
 export type InvoiceCurrencyType = "usd" | "credits";
 export type InvoicePaymentMethod = "Account Balance" | "Credit Card";
+export type CouponDiscountType = "percentage" | "fixed_amount";
+
+export interface InvoiceCouponDiscount {
+  code: string;
+  name: string;
+  discount_type: CouponDiscountType;
+  discount_value: number;
+  discount_amount: number;
+}
+
+export interface OrderCouponDetail {
+  coupon_id: string;
+  code: string;
+  name: string;
+  discount_type: CouponDiscountType;
+  discount_value: number;
+  discount_amount: number;
+}
 
 export interface InvoiceBilledTo {
   company_name: string | null;
@@ -137,6 +157,7 @@ export interface AdminInvoice {
   payment_method: InvoicePaymentMethod;
   currency_type: InvoiceCurrencyType;
   subtotal_amount: number;
+  discount_amount?: number;
   total_amount: number;
   credit_amount: number;
   date_issued: string | null;
@@ -147,6 +168,7 @@ export interface AdminInvoice {
   user: OrderUser;
   line_items: InvoiceLineItem[];
   billed_to: InvoiceBilledTo | null;
+  coupon_discounts?: InvoiceCouponDiscount[];
 }
 
 // ── Invitations ───────────────────────────────────────────────────────────────

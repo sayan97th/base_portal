@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { getAdminInvoice } from "@/services/admin/invoice.service";
-import type { AdminInvoice } from "@/types/admin";
+import type { AdminInvoice, InvoiceCouponDiscount } from "@/types/admin";
 
 interface AdminInvoiceDetailContentProps {
   invoice_id: string;
@@ -50,7 +50,7 @@ const StatusBadge: React.FC<{ status: "paid" | "void" }> = ({ status }) => {
 };
 
 interface InfoRowProps {
-  label: string;
+  label: React.ReactNode;
   value: React.ReactNode;
   border?: boolean;
 }
@@ -237,21 +237,34 @@ function generateAdminInvoicePdf(invoice: AdminInvoice): void {
     doc.setTextColor(...COLORS.secondary);
     doc.text("Subtotal", sum_label_x, y);
     doc.text(formatCurrency(invoice.subtotal_amount), right_x, y, { align: "right" });
-    y += 8;
+    y += 7;
+    if (invoice.coupon_discounts && invoice.coupon_discounts.length > 0) {
+      invoice.coupon_discounts.forEach((coupon) => {
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(...COLORS.secondary);
+        const coupon_label = coupon.discount_type === "percentage"
+          ? `Coupon ${coupon.code} (${coupon.discount_value}% off)`
+          : `Coupon ${coupon.code}`;
+        doc.text(coupon_label, sum_label_x, y);
+        doc.setTextColor(...COLORS.success);
+        doc.text(`-${formatCurrency(coupon.discount_amount)}`, right_x, y, { align: "right" });
+        y += 7;
+      });
+    }
+    if (invoice.credit_amount > 0) {
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(...COLORS.secondary);
+      doc.text("Credits Applied", sum_label_x, y);
+      doc.setTextColor(...COLORS.success);
+      doc.text(`-${formatCurrency(invoice.credit_amount)}`, right_x, y, { align: "right" });
+      y += 7;
+    }
     doc.setDrawColor(...COLORS.border);
     doc.line(sum_label_x, y - 3, right_x, y - 3);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...COLORS.primary);
     doc.text("Total", sum_label_x, y);
     doc.text(formatCurrency(invoice.total_amount), right_x, y, { align: "right" });
-    if (invoice.credit_amount > 0) {
-      y += 7;
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(...COLORS.secondary);
-      doc.text("Credits Applied", sum_label_x, y);
-      doc.setTextColor(...COLORS.success);
-      doc.text(`-${formatCurrency(invoice.credit_amount)}`, right_x, y, { align: "right" });
-    }
 
     doc.save(`invoice_${invoice.invoice_number}_${invoice.unique_id}.pdf`);
   });
@@ -471,6 +484,34 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
                   <span className="text-gray-500 dark:text-gray-400">Subtotal</span>
                   <span className="text-gray-700 dark:text-gray-300">{formatAmount(invoice.subtotal_amount)}</span>
                 </div>
+                {invoice.coupon_discounts && invoice.coupon_discounts.length > 0 && (
+                  <div className="space-y-1 border-t border-dashed border-gray-200 pt-2 dark:border-gray-700">
+                    <p className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" />
+                      </svg>
+                      Coupons Applied
+                    </p>
+                    {invoice.coupon_discounts.map((coupon: InvoiceCouponDiscount) => (
+                      <div key={coupon.code} className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="inline-flex items-center rounded border border-success-300 bg-success-50 px-1.5 py-0.5 font-mono text-xs font-semibold tracking-wider text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400">
+                            {coupon.code}
+                          </span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            {coupon.discount_type === "percentage"
+                              ? `${coupon.discount_value}% off`
+                              : "Fixed discount"}
+                          </span>
+                        </div>
+                        <span className="text-sm font-medium text-success-600 dark:text-success-400">
+                          -{formatAmount(coupon.discount_amount)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {invoice.credit_amount > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500 dark:text-gray-400">Credits Applied</span>
@@ -538,6 +579,26 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
               <InfoRow label="Payment Method" value={invoice.payment_method} />
               <InfoRow label="Currency" value={invoice.currency_type.toUpperCase()} />
               <InfoRow label="Subtotal" value={formatAmount(invoice.subtotal_amount)} />
+              {invoice.coupon_discounts && invoice.coupon_discounts.length > 0 && (
+                <>
+                  {invoice.coupon_discounts.map((coupon: InvoiceCouponDiscount) => (
+                    <InfoRow
+                      key={coupon.code}
+                      label={
+                        <span className="flex items-center gap-1.5">
+                          <span className="inline-flex items-center rounded border border-success-300 bg-success-50 px-1.5 py-0.5 font-mono text-xs font-semibold tracking-wider text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400">
+                            {coupon.code}
+                          </span>
+                          <span className="text-xs">
+                            {coupon.discount_type === "percentage" ? `${coupon.discount_value}%` : "Fixed"}
+                          </span>
+                        </span>
+                      }
+                      value={<span className="text-success-600 dark:text-success-400">-{formatAmount(coupon.discount_amount)}</span>}
+                    />
+                  ))}
+                </>
+              )}
               {invoice.credit_amount > 0 && (
                 <InfoRow
                   label="Credits Applied"

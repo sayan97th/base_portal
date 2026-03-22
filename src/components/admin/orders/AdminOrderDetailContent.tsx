@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import Badge from "@/components/ui/badge/Badge";
 import { getAdminOrder } from "@/services/admin/order.service";
-import type { AdminOrder, AdminInvoice, OrderItem, OrderStatus } from "@/types/admin";
+import type { AdminOrder, AdminInvoice, OrderItem, OrderStatus, OrderCouponDetail, InvoiceCouponDiscount } from "@/types/admin";
 import OrderTrackingPanel from "./OrderTrackingPanel";
 
 interface AdminOrderDetailContentProps {
@@ -175,6 +175,26 @@ const InvoiceCard = ({ invoice }: InvoiceCardProps) => {
         <InfoRow label="Payment Method" value={invoice.payment_method} />
         <InfoRow label="Currency" value={invoice.currency_type.toUpperCase()} />
         <InfoRow label="Subtotal" value={formatCurrency(invoice.subtotal_amount)} />
+        {invoice.coupon_discounts && invoice.coupon_discounts.length > 0 && (
+          <>
+            {invoice.coupon_discounts.map((coupon: InvoiceCouponDiscount) => (
+              <InfoRow
+                key={coupon.code}
+                label={
+                  <span className="flex items-center gap-1.5">
+                    <span className="inline-flex items-center rounded border border-success-300 bg-success-50 px-1.5 py-0.5 font-mono text-xs font-semibold tracking-wider text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400">
+                      {coupon.code}
+                    </span>
+                    <span className="text-xs">
+                      {coupon.discount_type === "percentage" ? `${coupon.discount_value}%` : "Fixed"}
+                    </span>
+                  </span>
+                }
+                value={<span className="text-success-600 dark:text-success-400">-{formatCurrency(coupon.discount_amount)}</span>}
+              />
+            ))}
+          </>
+        )}
         {invoice.credit_amount > 0 && (
           <InfoRow
             label="Credits Applied"
