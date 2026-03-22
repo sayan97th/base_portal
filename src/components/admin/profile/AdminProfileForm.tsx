@@ -9,6 +9,7 @@ import { useAuth } from "@/context/AuthContext";
 import { profileService } from "@/services/client/profile.service";
 import type { ProfileData } from "@/types/auth";
 import ChangePasswordSection from "./ChangePasswordSection";
+import TwoFactorSection from "@/components/user-profile/TwoFactorSection";
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
@@ -516,27 +517,8 @@ export default function AdminProfileForm() {
             </div>
           </div>
 
-          {/* Security — 2FA only */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-            <SectionHeader
-              title="Security"
-              description="Manage two-factor authentication for your account."
-            />
-
-            <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 dark:border-gray-700 dark:bg-gray-800/50">
-              <div>
-                <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                  Two-Factor Authentication
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Add an extra layer of security to your account.
-                </p>
-              </div>
-              <Button variant="outline" size="sm">
-                Enable 2FA
-              </Button>
-            </div>
-          </div>
+          {/* Security — 2FA */}
+          <TwoFactorSection />
 
           {/* Change Password — separate dedicated section */}
           <ChangePasswordSection />
