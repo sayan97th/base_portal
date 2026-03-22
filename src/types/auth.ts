@@ -37,6 +37,7 @@ export interface User {
   profile_photo_url: string | null;
   organization_id: number | null;
   email_verified_at: string | null;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
   roles: Role[] | string[];
@@ -152,6 +153,8 @@ export interface ChangePasswordResponse {
 export interface ApiError {
   message: string;
   errors?: Record<string, string[]>;
+  code?: string;
+  status_code?: number;
 }
 
 export interface Invitation {

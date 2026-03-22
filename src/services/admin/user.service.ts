@@ -1,6 +1,11 @@
 import { apiClient } from "@/lib/api-client";
 import type { AdminUser, AdminUserOrderSummary, PaginatedResponse } from "@/types/admin";
 
+export interface BanUserResponse {
+  message: string;
+  user: AdminUser;
+}
+
 export type UserTypeFilter = "staff" | "client";
 
 /**
@@ -27,6 +32,25 @@ export async function listAdminUsers(
  */
 export async function getAdminUser(user_id: number): Promise<AdminUser> {
   return apiClient.get<AdminUser>(`/api/admin/users/${user_id}`);
+}
+
+/**
+ * Disable a user account (ban). Optionally provide a reason.
+ * Roles allowed: super_admin, admin.
+ */
+export async function banUser(
+  user_id: number,
+  reason?: string
+): Promise<BanUserResponse> {
+  return apiClient.patch<BanUserResponse>(`/api/admin/users/${user_id}/ban`, { reason });
+}
+
+/**
+ * Re-enable a previously disabled user account (unban).
+ * Roles allowed: super_admin, admin.
+ */
+export async function unbanUser(user_id: number): Promise<BanUserResponse> {
+  return apiClient.patch<BanUserResponse>(`/api/admin/users/${user_id}/unban`);
 }
 
 /**

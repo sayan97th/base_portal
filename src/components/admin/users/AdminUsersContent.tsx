@@ -2,8 +2,10 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { listAdminUsers } from "@/services/admin/user.service";
+import { listAdminUsers, banUser, unbanUser } from "@/services/admin/user.service";
 import type { AdminUser } from "@/types/admin";
+import type { ApiError } from "@/types/auth";
+import BanUserModal from "@/components/admin/users/BanUserModal";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -51,6 +53,16 @@ function UserAvatar({ user }: { user: AdminUser }) {
   );
 }
 
+function AccountStatusBadge({ is_active }: { is_active: boolean }) {
+  if (is_active) return null;
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600 ring-1 ring-red-200 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/20">
+      <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+      Disabled
+    </span>
+  );
+}
+
 function SkeletonRows() {
   return (
     <>
@@ -71,7 +83,7 @@ function SkeletonRows() {
             </td>
           ))}
           <td className="px-5 py-3.5 text-right">
-            <div className="ml-auto h-7 w-14 animate-pulse rounded-lg bg-gray-100 dark:bg-gray-800" />
+            <div className="ml-auto h-7 w-28 animate-pulse rounded-lg bg-gray-100 dark:bg-gray-800" />
           </td>
         </tr>
       ))}
@@ -88,6 +100,12 @@ export default function AdminUsersContent() {
   const [total, setTotal] = useState(0);
   const [is_loading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // ── Ban modal state ──────────────────────────────────────────────────────
+  const [ban_target, setBanTarget] = useState<AdminUser | null>(null);
+  const [ban_mode, setBanMode] = useState<"ban" | "unban">("ban");
+  const [is_ban_loading, setIsBanLoading] = useState(false);
+  const [ban_error, setBanError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -112,6 +130,38 @@ export default function AdminUsersContent() {
       cancelled = true;
     };
   }, [page]);
+
+  const openBanModal = (user: AdminUser) => {
+    setBanMode(user.is_active ? "ban" : "unban");
+    setBanTarget(user);
+    setBanError(null);
+  };
+
+  const closeBanModal = () => {
+    if (!is_ban_loading) setBanTarget(null);
+  };
+
+  const handleBanConfirm = async (reason?: string) => {
+    if (!ban_target) return;
+    setIsBanLoading(true);
+    setBanError(null);
+
+    try {
+      const response = ban_target.is_active
+        ? await banUser(ban_target.id, reason)
+        : await unbanUser(ban_target.id);
+
+      setUsers((prev) =>
+        prev.map((u) => (u.id === ban_target.id ? response.user : u))
+      );
+      setBanTarget(null);
+    } catch (err: unknown) {
+      const api_error = err as ApiError;
+      setBanError(api_error.message || "Something went wrong. Please try again.");
+    } finally {
+      setIsBanLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -152,6 +202,13 @@ export default function AdminUsersContent() {
         </div>
       )}
 
+      {/* ── Ban action error ── */}
+      {ban_error && (
+        <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">
+          {ban_error}
+        </div>
+      )}
+
       {/* ── Table ── */}
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
         <div className="overflow-x-auto">
@@ -189,14 +246,29 @@ export default function AdminUsersContent() {
                 </tr>
               ) : (
                 users.map((user) => (
-                  <tr key={user.id} className="transition-colors hover:bg-gray-50/70 dark:hover:bg-white/2">
+                  <tr
+                    key={user.id}
+                    className={`transition-colors hover:bg-gray-50/70 dark:hover:bg-white/2 ${!user.is_active ? "bg-red-50/30 dark:bg-red-500/3" : ""}`}
+                  >
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
-                        <UserAvatar user={user} />
+                        <div className="relative">
+                          <UserAvatar user={user} />
+                          {!user.is_active && (
+                            <span className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 ring-1 ring-white dark:ring-gray-900">
+                              <svg className="h-2 w-2 text-white" fill="currentColor" viewBox="0 0 8 8">
+                                <path d="M4 0a4 4 0 100 8A4 4 0 004 0zm1.5 5.5l-1-1-1 1-.7-.7 1-1-1-1 .7-.7 1 1 1-1 .7.7-1 1 1 1-.7.7z"/>
+                              </svg>
+                            </span>
+                          )}
+                        </div>
                         <div className="min-w-0">
-                          <p className="truncate font-medium text-gray-900 dark:text-white">
-                            {user.first_name} {user.last_name}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="truncate font-medium text-gray-900 dark:text-white">
+                              {user.first_name} {user.last_name}
+                            </p>
+                            <AccountStatusBadge is_active={user.is_active} />
+                          </div>
                           <p className="truncate text-xs text-gray-500 dark:text-gray-400">{user.email}</p>
                         </div>
                       </div>
@@ -224,12 +296,38 @@ export default function AdminUsersContent() {
                       })}
                     </td>
                     <td className="px-5 py-3.5 text-right">
-                      <Link
-                        href={`/admin/users/${user.id}`}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 shadow-xs transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-white/3 dark:text-gray-400 dark:hover:bg-white/5"
-                      >
-                        View
-                      </Link>
+                      <div className="inline-flex items-center gap-2">
+                        <Link
+                          href={`/admin/users/${user.id}`}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 shadow-xs transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-white/3 dark:text-gray-400 dark:hover:bg-white/5"
+                        >
+                          View
+                        </Link>
+                        <button
+                          onClick={() => openBanModal(user)}
+                          className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium shadow-xs transition-colors ${
+                            user.is_active
+                              ? "border-red-200 bg-red-50 text-red-600 hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
+                              : "border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500/20"
+                          }`}
+                        >
+                          {user.is_active ? (
+                            <>
+                              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" />
+                              </svg>
+                              Disable
+                            </>
+                          ) : (
+                            <>
+                              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                              </svg>
+                              Enable
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -267,6 +365,18 @@ export default function AdminUsersContent() {
           </div>
         )}
       </div>
+
+      {/* ── Ban / Unban modal ── */}
+      {ban_target && (
+        <BanUserModal
+          user={ban_target}
+          mode={ban_mode}
+          is_open={!!ban_target}
+          is_loading={is_ban_loading}
+          onConfirm={handleBanConfirm}
+          onClose={closeBanModal}
+        />
+      )}
     </div>
   );
 }

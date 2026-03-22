@@ -105,7 +105,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     const errorData = await response.json().catch(() => ({
       message: "An unexpected error occurred",
     }));
-    throw errorData;
+    throw { ...errorData, status_code: response.status };
   }
 
   return response.json();
@@ -148,7 +148,7 @@ async function requestFormData<T>(endpoint: string, form_data: FormData, method:
     const error_data = await response.json().catch(() => ({
       message: "An unexpected error occurred",
     }));
-    throw error_data;
+    throw { ...error_data, status_code: response.status };
   }
 
   return response.json();

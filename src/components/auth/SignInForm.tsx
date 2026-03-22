@@ -80,7 +80,7 @@ const OtpInput = ({ value, onChange, error }: OtpInputProps) => {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
-type View = "credentials" | "two_factor";
+type View = "credentials" | "two_factor" | "account_disabled";
 
 export default function SignInForm() {
   const search_params = useSearchParams();
@@ -123,6 +123,10 @@ export default function SignInForm() {
       window.location.href = redirect_url;
     } catch (err: unknown) {
       const api_error = err as ApiError;
+      if (api_error.status_code === 403 || api_error.code === "account_disabled") {
+        setView("account_disabled");
+        return;
+      }
       if (api_error.errors) {
         setFieldErrors(api_error.errors);
       }
@@ -282,6 +286,75 @@ export default function SignInForm() {
                   </Link>
                 </p>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Account disabled step ────────────────────────────────────────── */}
+        {view === "account_disabled" && (
+          <div>
+            <div className="mb-8 flex flex-col items-center text-center">
+              {/* Ban icon */}
+              <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-red-100 dark:bg-red-500/15">
+                <svg className="h-10 w-10 text-red-500 dark:text-red-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" />
+                </svg>
+              </div>
+              <h1 className="mb-2 font-semibold text-gray-800 text-title-sm dark:text-white/90 sm:text-title-md">
+                Account Disabled
+              </h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Your account has been suspended and you no longer have access to this platform.
+              </p>
+            </div>
+
+            {/* Info card */}
+            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-500/20 dark:bg-red-500/10">
+              <div className="flex gap-3">
+                <div className="shrink-0">
+                  <svg className="h-5 w-5 text-red-500 dark:text-red-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+                  </svg>
+                </div>
+                <div className="space-y-1 text-sm text-red-700 dark:text-red-300">
+                  <p className="font-medium">Why was my account disabled?</p>
+                  <ul className="space-y-0.5 text-red-600 dark:text-red-400">
+                    <li>• Violation of our Terms of Service or Acceptable Use Policy</li>
+                    <li>• Suspicious or unauthorized activity detected</li>
+                    <li>• Administrative decision by our team</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Contact support */}
+            <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-white/3">
+              <p className="mb-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+                Think this is a mistake?
+              </p>
+              <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
+                If you believe your account was disabled in error, please reach out to our support team. We will review your case and get back to you as soon as possible.
+              </p>
+              <a
+                href="mailto:support@97thfloor.com"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-gray-700 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+                </svg>
+                Contact Support
+              </a>
+            </div>
+
+            {/* Back link */}
+            <div className="mt-5 text-center">
+              <button
+                type="button"
+                onClick={() => setView("credentials")}
+                className="text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+              >
+                ← Use a different account
+              </button>
             </div>
           </div>
         )}
