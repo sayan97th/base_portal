@@ -67,7 +67,7 @@ const SkeletonBlock = ({ className }: { className?: string }) => (
 );
 
 interface InfoRowProps {
-  label: string;
+  label: React.ReactNode;
   value: React.ReactNode;
 }
 
@@ -80,74 +80,125 @@ const InfoRow = ({ label, value }: InfoRowProps) => (
 
 interface OrderItemsTableProps {
   items: OrderItem[];
+  coupons?: OrderCouponDetail[];
+  total_amount?: number;
 }
 
-const OrderItemsTable = ({ items }: OrderItemsTableProps) => (
-  <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-    <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
-      <h3 className="text-sm font-semibold text-gray-800 dark:text-white/90">
-        Order Items
-        <span className="ml-2 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-          {items.length}
-        </span>
-      </h3>
-    </div>
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-100 bg-gray-50 dark:border-gray-800 dark:bg-gray-800/50">
-            <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              #
-            </th>
-            <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              DR Tier
-            </th>
-            <th className="px-5 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Qty
-            </th>
-            <th className="px-5 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Unit Price
-            </th>
-            <th className="px-5 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Subtotal
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-          {items.map((item, index) => (
-            <tr key={item.id} className="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
-              <td className="px-5 py-3.5 text-xs text-gray-400 dark:text-gray-500">{index + 1}</td>
-              <td className="px-5 py-3.5">
-                <span className="inline-flex items-center gap-1.5 rounded-md bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700 dark:bg-brand-500/10 dark:text-brand-400">
-                  DR Tier #{item.dr_tier_id}
-                </span>
-              </td>
-              <td className="px-5 py-3.5 text-right font-medium text-gray-800 dark:text-white/90">
-                {item.quantity}
-              </td>
-              <td className="px-5 py-3.5 text-right text-gray-600 dark:text-gray-400">
-                {formatCurrency(item.unit_price)}
-              </td>
-              <td className="px-5 py-3.5 text-right font-semibold text-gray-900 dark:text-white">
-                {formatCurrency(item.subtotal)}
-              </td>
+const OrderItemsTable = ({ items, coupons, total_amount }: OrderItemsTableProps) => {
+  const items_subtotal = items.reduce((sum, i) => sum + i.subtotal, 0);
+  const has_coupons = coupons && coupons.length > 0;
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+      <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
+        <h3 className="text-sm font-semibold text-gray-800 dark:text-white/90">
+          Order Items
+          <span className="ml-2 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+            {items.length}
+          </span>
+        </h3>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-100 bg-gray-50 dark:border-gray-800 dark:bg-gray-800/50">
+              <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                #
+              </th>
+              <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                DR Tier
+              </th>
+              <th className="px-5 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                Qty
+              </th>
+              <th className="px-5 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                Unit Price
+              </th>
+              <th className="px-5 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                Subtotal
+              </th>
             </tr>
-          ))}
-        </tbody>
-        <tfoot>
-          <tr className="border-t border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50">
-            <td colSpan={4} className="px-5 py-3.5 text-right text-sm font-semibold text-gray-700 dark:text-gray-300">
-              Total
-            </td>
-            <td className="px-5 py-3.5 text-right text-sm font-bold text-gray-900 dark:text-white">
-              {formatCurrency(items.reduce((sum, i) => sum + i.subtotal, 0))}
-            </td>
-          </tr>
-        </tfoot>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+            {items.map((item, index) => (
+              <tr key={item.id} className="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                <td className="px-5 py-3.5 text-xs text-gray-400 dark:text-gray-500">{index + 1}</td>
+                <td className="px-5 py-3.5">
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700 dark:bg-brand-500/10 dark:text-brand-400">
+                    DR Tier #{item.dr_tier_id}
+                  </span>
+                </td>
+                <td className="px-5 py-3.5 text-right font-medium text-gray-800 dark:text-white/90">
+                  {item.quantity}
+                </td>
+                <td className="px-5 py-3.5 text-right text-gray-600 dark:text-gray-400">
+                  {formatCurrency(item.unit_price)}
+                </td>
+                <td className="px-5 py-3.5 text-right font-semibold text-gray-900 dark:text-white">
+                  {formatCurrency(item.subtotal)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            {has_coupons ? (
+              <>
+                <tr className="border-t border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50">
+                  <td colSpan={4} className="px-5 py-3 text-right text-sm text-gray-500 dark:text-gray-400">
+                    Subtotal
+                  </td>
+                  <td className="px-5 py-3 text-right text-sm text-gray-700 dark:text-gray-300">
+                    {formatCurrency(items_subtotal)}
+                  </td>
+                </tr>
+                {coupons.map((coupon) => (
+                  <tr key={coupon.coupon_id} className="bg-success-50/40 dark:bg-success-500/5">
+                    <td colSpan={4} className="px-5 py-2.5 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <svg className="h-3.5 w-3.5 text-success-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" />
+                        </svg>
+                        <span className="inline-flex items-center rounded border border-success-300 bg-success-50 px-1.5 py-0.5 font-mono text-xs font-semibold tracking-wider text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400">
+                          {coupon.code}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {coupon.discount_type === "percentage"
+                            ? `${coupon.discount_value}% off`
+                            : "Fixed discount"}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-2.5 text-right text-sm font-medium text-success-600 dark:text-success-400">
+                      -{formatCurrency(coupon.discount_amount)}
+                    </td>
+                  </tr>
+                ))}
+                <tr className="border-t border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50">
+                  <td colSpan={4} className="px-5 py-3.5 text-right text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    Total
+                  </td>
+                  <td className="px-5 py-3.5 text-right text-sm font-bold text-gray-900 dark:text-white">
+                    {formatCurrency(total_amount ?? items_subtotal)}
+                  </td>
+                </tr>
+              </>
+            ) : (
+              <tr className="border-t border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50">
+                <td colSpan={4} className="px-5 py-3.5 text-right text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  Total
+                </td>
+                <td className="px-5 py-3.5 text-right text-sm font-bold text-gray-900 dark:text-white">
+                  {formatCurrency(items_subtotal)}
+                </td>
+              </tr>
+            )}
+          </tfoot>
+        </table>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 interface InvoiceCardProps {
   invoice: AdminInvoice;
@@ -367,7 +418,7 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
               </div>
 
               {/* Order Items */}
-              <OrderItemsTable items={order.items} />
+              <OrderItemsTable items={order.items} coupons={order.coupons} total_amount={order.total_amount} />
 
               {/* Notes */}
               {order.order_notes && (
@@ -399,10 +450,51 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
                   <InfoRow label="Items" value={`${order.items.length} item${order.items.length !== 1 ? "s" : ""}`} />
                   <InfoRow label="Placed" value={formatDate(order.created_at)} />
                   <InfoRow label="Last Updated" value={formatDate(order.updated_at)} />
-                  <InfoRow
-                    label="Total"
-                    value={<span className="text-base font-bold text-gray-900 dark:text-white">{formatCurrency(order.total_amount)}</span>}
-                  />
+                  {order.coupons && order.coupons.length > 0 ? (
+                    <>
+                      <InfoRow
+                        label="Subtotal"
+                        value={formatCurrency(order.subtotal_before_discount ?? order.total_amount)}
+                      />
+                      <div className="border-t border-dashed border-gray-100 py-2 dark:border-gray-800">
+                        <p className="mb-1.5 flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" />
+                          </svg>
+                          Coupons Applied
+                        </p>
+                        {order.coupons.map((coupon: OrderCouponDetail) => (
+                          <div key={coupon.coupon_id} className="flex items-center justify-between gap-2 py-0.5">
+                            <dt className="flex items-center gap-1.5">
+                              <span className="inline-flex items-center rounded border border-success-300 bg-success-50 px-1.5 py-0.5 font-mono text-xs font-semibold tracking-wider text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400">
+                                {coupon.code}
+                              </span>
+                              <span className="text-xs text-gray-500 dark:text-gray-400">
+                                {coupon.discount_type === "percentage"
+                                  ? `${coupon.discount_value}% off`
+                                  : "Fixed discount"}
+                              </span>
+                            </dt>
+                            <dd className="text-sm font-medium text-success-600 dark:text-success-400">
+                              -{formatCurrency(coupon.discount_amount)}
+                            </dd>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex items-center justify-between border-t border-gray-100 py-2.5 dark:border-gray-800">
+                        <dt className="text-sm text-gray-500 dark:text-gray-400">Total</dt>
+                        <dd className="text-base font-bold text-gray-900 dark:text-white">
+                          {formatCurrency(order.total_amount)}
+                        </dd>
+                      </div>
+                    </>
+                  ) : (
+                    <InfoRow
+                      label="Total"
+                      value={<span className="text-base font-bold text-gray-900 dark:text-white">{formatCurrency(order.total_amount)}</span>}
+                    />
+                  )}
                 </dl>
               </div>
 
