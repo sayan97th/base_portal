@@ -7,6 +7,10 @@ import { getPrimaryRole, isStaffRole, setPrimaryRoleCookie } from "@/lib/roles";
 import type { RoleName } from "@/lib/roles";
 import type { User, LoginCredentials, RegisterData, ApiError } from "@/types/auth";
 
+export type LoginResult =
+  | { requires_two_factor: false }
+  | { requires_two_factor: true; two_factor_token: string };
+
 type AuthContextType = {
   user: User | null;
   permissions: string[];
@@ -20,7 +24,8 @@ type AuthContextType = {
   hasRole: (...roles: RoleName[]) => boolean;
   /** Returns true when the user has ALL of the given permissions. */
   hasPermission: (...perms: string[]) => boolean;
-  login: (credentials: LoginCredentials) => Promise<void>;
+  login: (credentials: LoginCredentials) => Promise<LoginResult>;
+  loginWithTwoFactor: (two_factor_token: string, code: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -116,8 +121,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // ── Auth actions ──────────────────────────────────────────────────────────
 
-  const login = async (credentials: LoginCredentials) => {
+  const login = async (credentials: LoginCredentials): Promise<LoginResult> => {
     const data = await authService.login(credentials);
+
+    // 2FA challenge — return the temp token so the UI can show the OTP step.
+    if ("requires_two_factor" in data && data.requires_two_factor) {
+      return { requires_two_factor: true, two_factor_token: data.two_factor_token };
+    }
+
+    setUser(data.user);
+    try {
+      const meData = await authService.getMe();
+      setPermissions(meData.permissions);
+    } catch {
+      // permissions remain empty if /me fails
+    }
+    scheduleRefresh();
+    return { requires_two_factor: false };
+  };
+
+  const loginWithTwoFactor = async (two_factor_token: string, code: string): Promise<void> => {
+    const data = await authService.loginWithTwoFactor({ two_factor_token, code });
     setUser(data.user);
     try {
       const meData = await authService.getMe();
@@ -170,6 +194,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         hasRole,
         hasPermission,
         login,
+        loginWithTwoFactor,
         register,
         logout,
         refreshUser,

@@ -50,6 +50,25 @@ export interface AuthResponse {
   user: User;
 }
 
+/** Returned by POST /api/auth/login when the user has 2FA enabled. */
+export interface LoginChallengeResponse {
+  requires_two_factor: true;
+  two_factor_token: string;
+}
+
+/**
+ * Union of possible login responses:
+ * - Full AuthResponse when 2FA is not enabled.
+ * - LoginChallengeResponse when 2FA is enabled and an OTP is still required.
+ */
+export type LoginResponse = AuthResponse | LoginChallengeResponse;
+
+/** Payload sent to POST /api/auth/2fa-challenge. */
+export interface TwoFactorChallengeData {
+  two_factor_token: string;
+  code: string;
+}
+
 export interface MeResponse {
   user: User;
   permissions: string[];

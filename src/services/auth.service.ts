@@ -2,6 +2,8 @@ import { apiClient, setToken, removeToken } from "@/lib/api-client";
 import { getPrimaryRole, setPrimaryRoleCookie } from "@/lib/roles";
 import type {
   AuthResponse,
+  LoginResponse,
+  TwoFactorChallengeData,
   ForgotPasswordData,
   ForgotPasswordResponse,
   LoginCredentials,
@@ -20,10 +22,19 @@ function persistSession(data: AuthResponse): void {
 }
 
 export const authService = {
-  async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    const data = await apiClient.post<AuthResponse>("/api/auth/login", credentials);
-    persistSession(data);
+  async login(credentials: LoginCredentials): Promise<LoginResponse> {
+    const data = await apiClient.post<LoginResponse>("/api/auth/login", credentials);
+    // Only persist the session when 2FA is not required.
+    if (!("requires_two_factor" in data && data.requires_two_factor)) {
+      persistSession(data as AuthResponse);
+    }
     return data;
+  },
+
+  async loginWithTwoFactor(data: TwoFactorChallengeData): Promise<AuthResponse> {
+    const response = await apiClient.post<AuthResponse>("/api/auth/2fa-challenge", data);
+    persistSession(response);
+    return response;
   },
 
   async register(registerData: RegisterData): Promise<AuthResponse> {
