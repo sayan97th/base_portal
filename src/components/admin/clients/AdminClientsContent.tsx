@@ -195,7 +195,7 @@ export default function AdminClientsContent() {
                     </td>
                     <td className="px-5 py-3.5 text-right">
                       <Link
-                        href={`/admin/users/${client.id}`}
+                        href={`/admin/users/${client.id}?from=clients`}
                         className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 shadow-xs transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-white/3 dark:text-gray-400 dark:hover:bg-white/5"
                       >
                         View

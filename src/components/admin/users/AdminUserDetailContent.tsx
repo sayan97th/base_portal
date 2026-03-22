@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import Badge from "@/components/ui/badge/Badge";
 import { getAdminUser, listAdminUserOrders } from "@/services/admin/user.service";
 import type { AdminUser, AdminUserOrderSummary, OrderStatus, PaginatedResponse } from "@/types/admin";
@@ -303,6 +304,11 @@ const UserOrdersTable = ({
 // ── Main component ────────────────────────────────────────────────────────────
 
 const AdminUserDetailContent: React.FC<AdminUserDetailContentProps> = ({ user_id }) => {
+  const search_params = useSearchParams();
+  const from_source = search_params.get("from");
+  const back_href = from_source === "clients" ? "/admin/clients" : "/admin/users";
+  const back_label = from_source === "clients" ? "Back to Clients" : "Back to Users";
+
   const [user, setUser] = useState<AdminUser | null>(null);
   const [is_loading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -391,11 +397,11 @@ const AdminUserDetailContent: React.FC<AdminUserDetailContentProps> = ({ user_id
     return (
       <div className="space-y-6">
         <Link
-          href="/admin/users"
+          href={back_href}
           className="inline-flex items-center gap-1.5 text-sm text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-200"
         >
           <BackIcon />
-          Back to Users
+          {back_label}
         </Link>
         <div className="rounded-xl border border-error-200 bg-error-50 p-6 dark:border-error-500/20 dark:bg-error-500/10">
           <p className="text-sm font-medium text-error-600 dark:text-error-400">
@@ -420,11 +426,11 @@ const AdminUserDetailContent: React.FC<AdminUserDetailContentProps> = ({ user_id
     <div className="space-y-6">
       {/* Back Link */}
       <Link
-        href="/admin/users"
+        href={back_href}
         className="inline-flex items-center gap-1.5 text-sm text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-200"
       >
         <BackIcon />
-        Back to Users
+        {back_label}
       </Link>
 
       {/* ── Hero Header Card ─────────────────────────────────────────────── */}
