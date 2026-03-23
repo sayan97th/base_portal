@@ -1,19 +1,14 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import type { OrderReport, CreateReportRowPayload } from "@/types/admin/order-report";
+import type { OrderReport, UpdateReportRowPayload } from "@/types/admin/order-report";
 import {
   getOrderReport,
-  createReportTable,
-  deleteReportTable,
-  addReportRow,
   updateReportRow,
-  deleteReportRow,
   sendOrderReport,
 } from "@/services/admin/order-report.service";
 import ReportTableCard from "./ReportTableCard";
-import AddTableModal from "./AddTableModal";
 
 interface AdminOrderReportContentProps {
   order_id: string;
@@ -95,7 +90,7 @@ function SendConfirmModal({
         </p>
         {total_rows === 0 && (
           <div className="mt-3 rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-xs font-medium text-warning-700 dark:border-warning-500/20 dark:bg-warning-500/10 dark:text-warning-400">
-            Warning: The report has no rows. Are you sure you want to send an empty report?
+            Warning: The report has no rows yet. Are you sure you want to send an empty report?
           </div>
         )}
         <div className="mt-5 flex gap-3">
@@ -125,9 +120,6 @@ export default function AdminOrderReportContent({ order_id }: AdminOrderReportCo
   const [is_loading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [is_add_table_open, setIsAddTableOpen] = useState(false);
-  const [is_saving_table, setIsSavingTable] = useState(false);
-
   const [is_send_modal_open, setIsSendModalOpen] = useState(false);
   const [is_sending, setIsSending] = useState(false);
   const [send_success, setSendSuccess] = useState(false);
@@ -149,46 +141,9 @@ export default function AdminOrderReportContent({ order_id }: AdminOrderReportCo
     fetchReport();
   }, [fetchReport]);
 
-  // ── Table CRUD ──────────────────────────────────────────────────────────────
+  // ── Row Edit ────────────────────────────────────────────────────────────────
 
-  async function handleCreateTable(title: string, description: string) {
-    setIsSavingTable(true);
-    try {
-      const new_table = await createReportTable(order_id, { title, description: description || undefined });
-      setReport((prev) =>
-        prev ? { ...prev, tables: [...prev.tables, { ...new_table, rows: [] }] } : prev
-      );
-      setIsAddTableOpen(false);
-    } catch {
-      // Keep modal open on failure so user can retry
-    } finally {
-      setIsSavingTable(false);
-    }
-  }
-
-  async function handleDeleteTable(table_id: string) {
-    await deleteReportTable(order_id, table_id);
-    setReport((prev) =>
-      prev ? { ...prev, tables: prev.tables.filter((t) => t.id !== table_id) } : prev
-    );
-  }
-
-  // ── Row CRUD ────────────────────────────────────────────────────────────────
-
-  async function handleAddRow(table_id: string, payload: CreateReportRowPayload) {
-    const new_row = await addReportRow(order_id, table_id, payload);
-    setReport((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        tables: prev.tables.map((t) =>
-          t.id === table_id ? { ...t, rows: [...t.rows, new_row] } : t
-        ),
-      };
-    });
-  }
-
-  async function handleEditRow(table_id: string, row_id: string, payload: CreateReportRowPayload) {
+  async function handleEditRow(table_id: string, row_id: string, payload: UpdateReportRowPayload) {
     const updated_row = await updateReportRow(order_id, table_id, row_id, payload);
     setReport((prev) => {
       if (!prev) return prev;
@@ -198,19 +153,6 @@ export default function AdminOrderReportContent({ order_id }: AdminOrderReportCo
           t.id === table_id
             ? { ...t, rows: t.rows.map((r) => (r.id === row_id ? updated_row : r)) }
             : t
-        ),
-      };
-    });
-  }
-
-  async function handleDeleteRow(table_id: string, row_id: string) {
-    await deleteReportRow(order_id, table_id, row_id);
-    setReport((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        tables: prev.tables.map((t) =>
-          t.id === table_id ? { ...t, rows: t.rows.filter((r) => r.id !== row_id) } : t
         ),
       };
     });
@@ -233,14 +175,7 @@ export default function AdminOrderReportContent({ order_id }: AdminOrderReportCo
     }
   }
 
-  // ── Derived stats ───────────────────────────────────────────────────────────
-
-  const total_tables = report?.tables.length ?? 0;
   const total_rows = report?.tables.reduce((acc, t) => acc + t.rows.length, 0) ?? 0;
-  const live_rows = report?.tables.reduce(
-    (acc, t) => acc + t.rows.filter((r) => r.status === "live").length,
-    0
-  ) ?? 0;
 
   return (
     <>
@@ -265,7 +200,7 @@ export default function AdminOrderReportContent({ order_id }: AdminOrderReportCo
                 Order Report
               </h1>
               <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
-                Build and deliver the deliverables report to the client
+                Fill in delivery details and send the report to the client
               </p>
             </div>
           </div>
@@ -279,16 +214,6 @@ export default function AdminOrderReportContent({ order_id }: AdminOrderReportCo
                 Sent {new Date(report.sent_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
               </div>
             )}
-
-            <button
-              onClick={() => setIsAddTableOpen(true)}
-              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 dark:border-gray-700 dark:bg-white/[0.04] dark:text-gray-300 dark:hover:bg-white/[0.07]"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-              </svg>
-              Add Table
-            </button>
 
             <button
               onClick={() => setIsSendModalOpen(true)}
@@ -329,57 +254,20 @@ export default function AdminOrderReportContent({ order_id }: AdminOrderReportCo
         {/* Loading State */}
         {is_loading && <LoadingSkeleton />}
 
-        {/* Stats Strip */}
+        {/* Tables */}
         {!is_loading && report && (
           <>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-                <p className="text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                  Tables
-                </p>
-                <p className="mt-1.5 text-3xl font-bold text-gray-900 dark:text-white">
-                  {total_tables}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-                <p className="text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                  Total Rows
-                </p>
-                <p className="mt-1.5 text-3xl font-bold text-gray-900 dark:text-white">
-                  {total_rows}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-                <p className="text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                  Live Links
-                </p>
-                <p className="mt-1.5 text-3xl font-bold text-success-600 dark:text-success-400">
-                  {live_rows}
-                </p>
-              </div>
-            </div>
-
-            {/* Tables */}
             {report.tables.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-white py-16 text-center dark:border-gray-700 dark:bg-white/[0.02]">
                 <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
                   <TableIcon />
                 </div>
                 <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                  No tables yet
+                  No link building data yet
                 </h3>
                 <p className="mt-1.5 max-w-xs text-sm text-gray-500 dark:text-gray-400">
-                  Create your first table to start adding link building results for this order.
+                  Tables are automatically generated from the client&apos;s link building order. No items have been submitted yet.
                 </p>
-                <button
-                  onClick={() => setIsAddTableOpen(true)}
-                  className="mt-5 inline-flex items-center gap-2 rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-500/25 transition hover:bg-brand-600"
-                >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                  </svg>
-                  Create First Table
-                </button>
               </div>
             ) : (
               <div className="space-y-5">
@@ -387,11 +275,7 @@ export default function AdminOrderReportContent({ order_id }: AdminOrderReportCo
                   <ReportTableCard
                     key={table.id}
                     table={table}
-                    order_id={order_id}
-                    onAddRow={handleAddRow}
                     onEditRow={handleEditRow}
-                    onDeleteRow={handleDeleteRow}
-                    onDeleteTable={handleDeleteTable}
                   />
                 ))}
               </div>
@@ -399,14 +283,6 @@ export default function AdminOrderReportContent({ order_id }: AdminOrderReportCo
           </>
         )}
       </div>
-
-      {/* Modals */}
-      <AddTableModal
-        is_open={is_add_table_open}
-        is_saving={is_saving_table}
-        onClose={() => setIsAddTableOpen(false)}
-        onSave={handleCreateTable}
-      />
 
       <SendConfirmModal
         is_open={is_send_modal_open}
