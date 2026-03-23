@@ -5,7 +5,7 @@ import { authService } from "@/services/auth.service";
 import { getToken } from "@/lib/api-client";
 import { getPrimaryRole, isStaffRole, setPrimaryRoleCookie } from "@/lib/roles";
 import type { RoleName } from "@/lib/roles";
-import type { User, LoginCredentials, RegisterData, ApiError } from "@/types/auth";
+import type { User, AuthResponse, LoginCredentials, RegisterData, ApiError } from "@/types/auth";
 
 export type LoginResult =
   | { requires_two_factor: false }
@@ -129,7 +129,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { requires_two_factor: true, two_factor_token: data.two_factor_token };
     }
 
-    setUser(data.user);
+    const auth_data = data as AuthResponse;
+    setUser(auth_data.user);
     try {
       const meData = await authService.getMe();
       setPermissions(meData.permissions);
