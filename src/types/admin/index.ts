@@ -1,5 +1,18 @@
 import type { Role, Organization, User } from "@/types/auth";
 
+export type {
+  ReportRowStatus,
+  ReportRow,
+  ReportTable,
+  OrderReport,
+  CreateReportTablePayload,
+  UpdateReportTablePayload,
+  CreateReportRowPayload,
+  UpdateReportRowPayload,
+  SendReportPayload,
+  SendReportResponse,
+} from "./order-report";
+
 export type { OrderUpdate, OrderUpdatesResponse, CreateOrderUpdatePayload, UpdateAuthor, TrackingOrderSummary, TrackingOrdersResponse } from "./order-tracking";
 
 export type { Role, Organization };
