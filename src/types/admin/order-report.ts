@@ -69,7 +69,7 @@ export interface SendReportResponse {
 }
 
 export interface ImportOrderItemsPayload {
-  item_ids: number[];
+  placement_ids: string[];
 }
 
 export interface ImportOrderItemsResponse {

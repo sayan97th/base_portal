@@ -343,10 +343,10 @@ export default function AdminOrderReportContent({ order_id }: AdminOrderReportCo
 
   // ── Import Order Items ──────────────────────────────────────────────────────
 
-  async function handleImportItems(item_ids: number[]) {
+  async function handleImportItems(placement_ids: string[]) {
     setIsImporting(true);
     try {
-      const result = await importOrderItems(order_id, { item_ids });
+      const result = await importOrderItems(order_id, { placement_ids });
       setReport(result.report);
       setIsImportModalOpen(false);
       showToast(
@@ -365,13 +365,18 @@ export default function AdminOrderReportContent({ order_id }: AdminOrderReportCo
   const current_status = order?.status ?? "pending";
   const is_already_completed = current_status === "completed";
 
-  // Show "Incomplete" indicator when order has items but report has zero rows
   const total_report_rows = report?.tables.reduce((acc, t) => acc + t.rows.length, 0) ?? 0;
+
+  // Count total placements from the order (what should be in the report)
+  const total_order_placements =
+    order?.items.reduce((acc, item) => acc + (item.placements?.length ?? item.quantity), 0) ?? 0;
+
+  // Show "Incomplete" indicator when there are more placements than imported rows
   const has_incomplete_import =
     !is_loading &&
     !!order &&
-    order.items.length > 0 &&
-    total_report_rows === 0;
+    total_order_placements > 0 &&
+    total_report_rows < total_order_placements;
 
   return (
     <>
@@ -456,13 +461,14 @@ export default function AdminOrderReportContent({ order_id }: AdminOrderReportCo
                 Report rows are missing
               </p>
               <p className="mt-0.5 text-xs text-warning-600 dark:text-warning-500">
-                This order has {order?.items.length} purchased item{order?.items.length !== 1 ? "s" : ""} but no rows have been imported yet.{" "}
+                The order has <strong>{total_order_placements}</strong> placement{total_order_placements !== 1 ? "s" : ""} but only{" "}
+                <strong>{total_report_rows}</strong> {total_report_rows === 1 ? "row has" : "rows have"} been imported.{" "}
                 <button
                   type="button"
                   onClick={() => setIsImportModalOpen(true)}
                   className="font-semibold underline underline-offset-2 hover:text-warning-800 dark:hover:text-warning-300"
                 >
-                  Import order items now
+                  Import missing placements now
                 </button>
               </p>
             </div>

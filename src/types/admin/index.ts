@@ -60,12 +60,30 @@ export interface OrderBilling {
   postal_code: string;
 }
 
+export interface OrderItemDrTier {
+  id: string;
+  dr_label: string;
+  traffic_range: string;
+  word_count: number;
+  price_per_link: number;
+}
+
+export interface OrderPlacementDetail {
+  id: string;
+  row_index: number;
+  keyword: string | null;
+  landing_page: string | null;
+  exact_match: boolean;
+}
+
 export interface OrderItem {
   id: number;
   dr_tier_id: number;
   quantity: number;
   unit_price: number;
   subtotal: number;
+  dr_tier?: OrderItemDrTier;
+  placements?: OrderPlacementDetail[];
 }
 
 export interface AdminOrder {
