@@ -2,12 +2,16 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
-import type { OrderReport, UpdateReportRowPayload } from "@/types/admin/order-report";
+import type { OrderReport, ReportTable, UpdateReportRowPayload, CreateReportRowPayload } from "@/types/admin/order-report";
 import type { OrderStatus, AdminOrder } from "@/types/admin";
 import {
   getOrderReport,
   updateReportRow,
   importOrderItems,
+  createReportTable,
+  deleteReportTable,
+  addReportRow,
+  deleteReportRow,
 } from "@/services/admin/order-report.service";
 import { getAdminOrder } from "@/services/admin/order.service";
 import { updateOrderStatus } from "@/services/admin/order-tracking.service";
@@ -15,6 +19,8 @@ import ReportTableCard from "./ReportTableCard";
 import CompleteOrderModal from "./CompleteOrderModal";
 import ChangeOrderStatusModal from "./ChangeOrderStatusModal";
 import ImportOrderItemsModal from "./ImportOrderItemsModal";
+import AddTableModal from "./AddTableModal";
+import DeleteTableConfirmModal from "./DeleteTableConfirmModal";
 
 interface AdminOrderReportContentProps {
   order_id: string;
@@ -55,6 +61,12 @@ const DotsIcon = () => (
 const ImportIcon = () => (
   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+  </svg>
+);
+
+const AddTableIcon = () => (
+  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 10.5v6m3-3H9m4.06-7.19l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
   </svg>
 );
 
@@ -115,27 +127,45 @@ function LoadingSkeleton() {
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
 
-type ToastVariant = "success" | "info";
+type ToastVariant = "success" | "info" | "error";
 
 function Toast({ message, variant = "success" }: { message: string; variant?: ToastVariant }) {
-  const styles: Record<ToastVariant, { wrapper: string; icon_color: string; text: string }> = {
+  const styles: Record<ToastVariant, { wrapper: string; icon_color: string; text: string; icon: React.ReactNode }> = {
     success: {
       wrapper: "border-success-200 bg-success-50 dark:border-success-500/20 dark:bg-success-500/10",
       icon_color: "text-success-500",
       text: "text-success-700 dark:text-success-400",
+      icon: (
+        <svg className="h-5 w-5 shrink-0 text-success-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
     },
     info: {
       wrapper: "border-blue-200 bg-blue-50 dark:border-blue-500/20 dark:bg-blue-500/10",
       icon_color: "text-blue-500",
       text: "text-blue-700 dark:text-blue-400",
+      icon: (
+        <svg className="h-5 w-5 shrink-0 text-blue-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+        </svg>
+      ),
+    },
+    error: {
+      wrapper: "border-error-200 bg-error-50 dark:border-error-500/20 dark:bg-error-500/10",
+      icon_color: "text-error-500",
+      text: "text-error-700 dark:text-error-400",
+      icon: (
+        <svg className="h-5 w-5 shrink-0 text-error-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
     },
   };
   const s = styles[variant];
   return (
     <div className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${s.wrapper}`}>
-      <svg className={`h-5 w-5 shrink-0 ${s.icon_color}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
+      {s.icon}
       <p className={`text-sm font-medium ${s.text}`}>{message}</p>
     </div>
   );
@@ -147,9 +177,10 @@ interface ActionsMenuProps {
   disabled: boolean;
   has_incomplete_import: boolean;
   onImport: () => void;
+  onAddTable: () => void;
 }
 
-function ActionsMenu({ disabled, has_incomplete_import, onImport }: ActionsMenuProps) {
+function ActionsMenu({ disabled, has_incomplete_import, onImport, onAddTable }: ActionsMenuProps) {
   const [is_open, setIsOpen] = useState(false);
   const menu_ref = useRef<HTMLDivElement>(null);
 
@@ -178,17 +209,45 @@ function ActionsMenu({ disabled, has_incomplete_import, onImport }: ActionsMenuP
         }`}
       >
         <DotsIcon />
-        {/* Incomplete import indicator dot */}
         {has_incomplete_import && !disabled && (
           <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-warning-500 ring-2 ring-white dark:ring-gray-800" />
         )}
       </button>
 
       {is_open && (
-        <div className="absolute right-0 top-full z-20 mt-2 w-56 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
-          {/* Section label */}
+        <div className="absolute right-0 top-full z-20 mt-2 w-60 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
+          {/* Section: Tables */}
           <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-            Report Tools
+            Tables
+          </div>
+
+          {/* Add Table */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsOpen(false);
+              onAddTable();
+            }}
+            className="group flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
+          >
+            <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-brand-50 text-brand-600 transition-colors group-hover:bg-brand-100 dark:bg-brand-500/10 dark:text-brand-400 dark:group-hover:bg-brand-500/20">
+              <AddTableIcon />
+            </span>
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                Add New Table
+              </span>
+              <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
+                Create a new section to organize rows
+              </p>
+            </div>
+          </button>
+
+          <div className="h-px bg-gray-100 dark:bg-gray-800" />
+
+          {/* Section: Data */}
+          <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+            Data
           </div>
 
           {/* Import order items */}
@@ -219,13 +278,6 @@ function ActionsMenu({ disabled, has_incomplete_import, onImport }: ActionsMenuP
               </p>
             </div>
           </button>
-
-          <div className="h-px bg-gray-100 dark:bg-gray-800" />
-
-          {/* Footer hint */}
-          <div className="px-3 py-2 text-[10px] text-gray-400 dark:text-gray-600">
-            More actions available soon
-          </div>
         </div>
       )}
     </div>
@@ -251,6 +303,14 @@ export default function AdminOrderReportContent({ order_id }: AdminOrderReportCo
   // Import modal
   const [is_import_modal_open, setIsImportModalOpen] = useState(false);
   const [is_importing, setIsImporting] = useState(false);
+
+  // Add table modal
+  const [is_add_table_modal_open, setIsAddTableModalOpen] = useState(false);
+  const [is_adding_table, setIsAddingTable] = useState(false);
+
+  // Delete table confirm modal
+  const [table_to_delete, setTableToDelete] = useState<ReportTable | null>(null);
+  const [is_deleting_table, setIsDeletingTable] = useState(false);
 
   // Toast
   const [toast, setToast] = useState<{ message: string; variant: ToastVariant } | null>(null);
@@ -296,6 +356,86 @@ export default function AdminOrderReportContent({ order_id }: AdminOrderReportCo
         ),
       };
     });
+  }
+
+  // ── Add Row ─────────────────────────────────────────────────────────────────
+
+  async function handleAddRow(table_id: string, payload: CreateReportRowPayload) {
+    const new_row = await addReportRow(order_id, table_id, payload);
+    setReport((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        tables: prev.tables.map((t) =>
+          t.id === table_id ? { ...t, rows: [...t.rows, new_row] } : t
+        ),
+      };
+    });
+    showToast("Row added successfully.", "success");
+  }
+
+  // ── Delete Row ──────────────────────────────────────────────────────────────
+
+  async function handleDeleteRow(table_id: string, row_id: string) {
+    await deleteReportRow(order_id, table_id, row_id);
+    setReport((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        tables: prev.tables.map((t) =>
+          t.id === table_id
+            ? { ...t, rows: t.rows.filter((r) => r.id !== row_id) }
+            : t
+        ),
+      };
+    });
+    showToast("Row deleted.", "info");
+  }
+
+  // ── Add Table ───────────────────────────────────────────────────────────────
+
+  async function handleAddTable(title: string, description: string) {
+    setIsAddingTable(true);
+    try {
+      const new_table = await createReportTable(order_id, {
+        title,
+        description: description || undefined,
+      });
+      setReport((prev) => {
+        if (!prev) return prev;
+        return { ...prev, tables: [...prev.tables, new_table] };
+      });
+      setIsAddTableModalOpen(false);
+      showToast(`Table "${title}" created successfully.`, "success");
+    } catch {
+      // keep modal open on error
+    } finally {
+      setIsAddingTable(false);
+    }
+  }
+
+  // ── Delete Table ─────────────────────────────────────────────────────────────
+
+  async function handleDeleteTable() {
+    if (!table_to_delete) return;
+    setIsDeletingTable(true);
+    try {
+      await deleteReportTable(order_id, table_to_delete.id);
+      const deleted_title = table_to_delete.title;
+      setReport((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          tables: prev.tables.filter((t) => t.id !== table_to_delete.id),
+        };
+      });
+      setTableToDelete(null);
+      showToast(`Table "${deleted_title}" deleted.`, "info");
+    } catch {
+      // keep modal open on error
+    } finally {
+      setIsDeletingTable(false);
+    }
   }
 
   // ── Complete Order ──────────────────────────────────────────────────────────
@@ -367,11 +507,9 @@ export default function AdminOrderReportContent({ order_id }: AdminOrderReportCo
 
   const total_report_rows = report?.tables.reduce((acc, t) => acc + t.rows.length, 0) ?? 0;
 
-  // Count total placements from the order (what should be in the report)
   const total_order_placements =
     order?.items.reduce((acc, item) => acc + (item.placements?.length ?? item.quantity), 0) ?? 0;
 
-  // Show "Incomplete" indicator when there are more placements than imported rows
   const has_incomplete_import =
     !is_loading &&
     !!order &&
@@ -408,10 +546,8 @@ export default function AdminOrderReportContent({ order_id }: AdminOrderReportCo
 
           {/* Actions */}
           <div className="flex flex-wrap items-center gap-2.5">
-            {/* Current status badge */}
             {!is_loading && order && <OrderStatusBadge status={current_status} />}
 
-            {/* Change Status button */}
             <button
               onClick={() => setIsStatusModalOpen(true)}
               disabled={is_loading || !order}
@@ -421,7 +557,6 @@ export default function AdminOrderReportContent({ order_id }: AdminOrderReportCo
               Change Status
             </button>
 
-            {/* Mark as Completed */}
             {!is_already_completed && (
               <button
                 onClick={() => setIsCompleteModalOpen(true)}
@@ -433,7 +568,6 @@ export default function AdminOrderReportContent({ order_id }: AdminOrderReportCo
               </button>
             )}
 
-            {/* Completed static badge */}
             {is_already_completed && !is_loading && (
               <div className="inline-flex items-center gap-2 rounded-xl border border-success-200 bg-success-50 px-4 py-2.5 text-sm font-semibold text-success-700 dark:border-success-500/20 dark:bg-success-500/10 dark:text-success-400">
                 <CheckCircleIcon />
@@ -441,11 +575,11 @@ export default function AdminOrderReportContent({ order_id }: AdminOrderReportCo
               </div>
             )}
 
-            {/* 3-dot menu */}
             <ActionsMenu
               disabled={is_loading || !order}
               has_incomplete_import={has_incomplete_import}
               onImport={() => setIsImportModalOpen(true)}
+              onAddTable={() => setIsAddTableModalOpen(true)}
             />
           </div>
         </div>
@@ -498,16 +632,23 @@ export default function AdminOrderReportContent({ order_id }: AdminOrderReportCo
         {!is_loading && report && (
           <>
             {report.tables.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-white py-16 text-center dark:border-gray-700 dark:bg-white/[0.02]">
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-white py-16 text-center dark:border-gray-700 dark:bg-white/2">
                 <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
                   <TableIcon />
                 </div>
                 <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                  No link building data yet
+                  No tables yet
                 </h3>
                 <p className="mt-1.5 max-w-xs text-sm text-gray-500 dark:text-gray-400">
-                  Tables are automatically generated from the client&apos;s link building order. No items have been submitted yet.
+                  Add a table from the menu above or import placements from the original order to get started.
                 </p>
+                <button
+                  onClick={() => setIsAddTableModalOpen(true)}
+                  className="mt-5 inline-flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-600"
+                >
+                  <AddTableIcon />
+                  Add First Table
+                </button>
               </div>
             ) : (
               <div className="space-y-5">
@@ -516,8 +657,22 @@ export default function AdminOrderReportContent({ order_id }: AdminOrderReportCo
                     key={table.id}
                     table={table}
                     onEditRow={handleEditRow}
+                    onAddRow={handleAddRow}
+                    onDeleteRow={handleDeleteRow}
+                    onDeleteTable={setTableToDelete}
                   />
                 ))}
+
+                {/* Add another table — inline CTA at the bottom */}
+                <button
+                  onClick={() => setIsAddTableModalOpen(true)}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-gray-300 py-4 text-sm font-medium text-gray-400 transition-colors hover:border-brand-400 hover:bg-brand-50/40 hover:text-brand-600 dark:border-gray-700 dark:hover:border-brand-500/40 dark:hover:bg-brand-500/5 dark:hover:text-brand-400"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                  </svg>
+                  Add Another Table
+                </button>
               </div>
             )}
           </>
@@ -551,6 +706,23 @@ export default function AdminOrderReportContent({ order_id }: AdminOrderReportCo
         existing_row_count={total_report_rows}
         onConfirm={handleImportItems}
         onClose={() => setIsImportModalOpen(false)}
+      />
+
+      {/* Add Table Modal */}
+      <AddTableModal
+        is_open={is_add_table_modal_open}
+        is_saving={is_adding_table}
+        onSave={handleAddTable}
+        onClose={() => setIsAddTableModalOpen(false)}
+      />
+
+      {/* Delete Table Confirm Modal */}
+      <DeleteTableConfirmModal
+        is_open={!!table_to_delete}
+        is_deleting={is_deleting_table}
+        table={table_to_delete}
+        onConfirm={handleDeleteTable}
+        onClose={() => setTableToDelete(null)}
       />
     </>
   );
