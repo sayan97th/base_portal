@@ -45,13 +45,13 @@ export interface UpdateReportTablePayload {
 }
 
 export interface CreateReportRowPayload {
-  order_number: string;
-  link_type: string;
-  keyword: string;
-  landing_page: string;
-  exact_match: boolean;
-  request_date: string;
-  status: ReportRowStatus;
+  order_number?: string;
+  link_type?: string;
+  keyword?: string;
+  landing_page?: string;
+  exact_match?: boolean;
+  request_date?: string;
+  status?: ReportRowStatus;
   live_link?: string;
   live_link_date?: string;
   dr?: number;

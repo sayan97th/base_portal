@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
+import ModalShell from "@/components/ui/modal/ModalShell";
 import type { CreateReportRowPayload, ReportRowStatus } from "@/types/admin/order-report";
 
 interface AddRowModalProps {
@@ -11,39 +12,125 @@ interface AddRowModalProps {
   onSave: (payload: CreateReportRowPayload) => Promise<void>;
 }
 
-const STATUS_OPTIONS: { value: ReportRowStatus; label: string; description: string; color: string }[] = [
-  {
-    value: "pending",
-    label: "Pending",
-    description: "Awaiting link placement",
-    color: "text-warning-600 dark:text-warning-400",
-  },
-  {
-    value: "live",
-    label: "Live",
-    description: "Link is live and active",
-    color: "text-success-600 dark:text-success-400",
-  },
-  {
-    value: "rejected",
-    label: "Rejected",
-    description: "Link placement was rejected",
-    color: "text-error-600 dark:text-error-400",
-  },
-];
+interface RowForm {
+  link_type: string;
+  keyword: string;
+  landing_page: string;
+  exact_match: boolean;
+  request_date: string;
+  status: ReportRowStatus;
+  live_link: string;
+  live_link_date: string;
+  dr: string;
+}
 
-const INITIAL_FORM: CreateReportRowPayload = {
-  order_number: "",
+const INITIAL_FORM: RowForm = {
   link_type: "",
   keyword: "",
   landing_page: "",
   exact_match: false,
-  request_date: new Date().toISOString().split("T")[0],
+  request_date: "",
   status: "pending",
   live_link: "",
   live_link_date: "",
-  dr: undefined,
+  dr: "",
 };
+
+const STATUS_OPTIONS: {
+  value: ReportRowStatus;
+  label: string;
+  active_classes: string;
+  dot: string;
+}[] = [
+  {
+    value: "pending",
+    label: "Pending",
+    active_classes:
+      "border-warning-300 bg-warning-50 text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-400",
+    dot: "bg-warning-500",
+  },
+  {
+    value: "live",
+    label: "Live",
+    active_classes:
+      "border-success-300 bg-success-50 text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400",
+    dot: "bg-success-500",
+  },
+  {
+    value: "rejected",
+    label: "Rejected",
+    active_classes:
+      "border-error-300 bg-error-50 text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400",
+    dot: "bg-error-500",
+  },
+];
+
+function generateOrderNumber(): string {
+  const ts = Date.now().toString(36).toUpperCase().slice(-4);
+  const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `R-${ts}${rand}`;
+}
+
+// ── Shared input class helper ──────────────────────────────────────────────────
+
+const input_base =
+  "w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500 dark:focus:border-brand-400";
+
+// ── Field wrapper ──────────────────────────────────────────────────────────────
+
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-baseline gap-1.5">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+          {label}
+        </label>
+        {hint && (
+          <span className="text-xs text-gray-400 dark:text-gray-500">{hint}</span>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ── Section heading ────────────────────────────────────────────────────────────
+
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+        {children}
+      </span>
+      <div className="h-px flex-1 bg-gray-100 dark:bg-gray-800" />
+    </div>
+  );
+}
+
+// ── DR indicator badge ─────────────────────────────────────────────────────────
+
+function DrBadge({ value }: { value: number }) {
+  const label = value >= 70 ? "High" : value >= 40 ? "Med" : "Low";
+  const color =
+    value >= 70
+      ? "text-success-500"
+      : value >= 40
+      ? "text-warning-500"
+      : "text-gray-400";
+  return (
+    <span className={`text-xs font-semibold ${color}`}>{label}</span>
+  );
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function AddRowModal({
   is_open,
@@ -52,383 +139,303 @@ export default function AddRowModal({
   onClose,
   onSave,
 }: AddRowModalProps) {
-  const [form, setForm] = useState<CreateReportRowPayload>(INITIAL_FORM);
-  const [errors, setErrors] = useState<Partial<Record<keyof CreateReportRowPayload, string>>>({});
+  const [form, setForm] = useState<RowForm>(INITIAL_FORM);
 
   useEffect(() => {
     if (is_open) {
       setForm(INITIAL_FORM);
-      setErrors({});
     }
   }, [is_open]);
 
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    },
-    [onClose]
-  );
-
-  useEffect(() => {
-    if (is_open) {
-      document.addEventListener("keydown", handleKeyDown);
-      return () => document.removeEventListener("keydown", handleKeyDown);
-    }
-  }, [is_open, handleKeyDown]);
-
-  function validate(): boolean {
-    const new_errors: Partial<Record<keyof CreateReportRowPayload, string>> = {};
-    if (!form.order_number.trim()) new_errors.order_number = "Order number is required.";
-    if (!form.link_type.trim()) new_errors.link_type = "Link type is required.";
-    if (!form.keyword.trim()) new_errors.keyword = "Keyword is required.";
-    if (!form.landing_page.trim()) new_errors.landing_page = "Landing page is required.";
-    if (!form.request_date) new_errors.request_date = "Request date is required.";
-    if (form.dr !== undefined && (form.dr < 0 || form.dr > 100)) {
-      new_errors.dr = "DR must be between 0 and 100.";
-    }
-    setErrors(new_errors);
-    return Object.keys(new_errors).length === 0;
+  function setField<K extends keyof RowForm>(key: K, value: RowForm[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }));
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!validate()) return;
+
+    const dr_num =
+      form.dr !== "" && !isNaN(Number(form.dr)) ? Number(form.dr) : undefined;
 
     const payload: CreateReportRowPayload = {
-      ...form,
-      order_number: form.order_number.trim(),
-      link_type: form.link_type.trim(),
-      keyword: form.keyword.trim(),
-      landing_page: form.landing_page.trim(),
-      live_link: form.live_link?.trim() || undefined,
-      live_link_date: form.live_link_date?.trim() || undefined,
-      dr: form.dr !== undefined && form.dr !== null && String(form.dr) !== "" ? Number(form.dr) : undefined,
+      order_number: generateOrderNumber(),
+      status: form.status,
     };
+
+    if (form.link_type.trim()) payload.link_type = form.link_type.trim();
+    if (form.keyword.trim()) payload.keyword = form.keyword.trim();
+    if (form.landing_page.trim()) payload.landing_page = form.landing_page.trim();
+    if (form.request_date) payload.request_date = form.request_date;
+    if (form.live_link.trim()) payload.live_link = form.live_link.trim();
+    if (form.live_link_date) payload.live_link_date = form.live_link_date;
+    if (dr_num !== undefined) payload.dr = dr_num;
+    payload.exact_match = form.exact_match;
 
     await onSave(payload);
   }
 
-  if (!is_open) return null;
+  const dr_value =
+    form.dr !== "" && !isNaN(Number(form.dr)) ? Number(form.dr) : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 py-8">
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
-
-      {/* Modal */}
-      <div className="relative w-full max-w-2xl rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-900">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-800">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 dark:bg-brand-500/10">
-              <svg
-                className="h-4.5 w-4.5 text-brand-600 dark:text-brand-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={2}
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-              </svg>
-            </div>
-            <div>
-              <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-                Add Row
-              </h2>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {table_title}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+    <ModalShell is_open={is_open} max_width="max-w-xl" on_close={onClose}>
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-gray-800">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-50 dark:bg-brand-500/10">
+            <svg
+              className="h-4.5 w-4.5 text-brand-600 dark:text-brand-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 4.5v15m7.5-7.5h-15"
+              />
             </svg>
-          </button>
-        </div>
-
-        {/* Body */}
-        <form onSubmit={handleSubmit} className="divide-y divide-gray-100 dark:divide-gray-800">
-          {/* Section: Order Info */}
-          <div className="space-y-4 px-6 py-5">
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-              Order Information
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
+              Add Row
+            </h2>
+            <p className="truncate text-xs text-gray-400 dark:text-gray-500">
+              {table_title}
             </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+        >
+          <svg
+            className="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+        </button>
+      </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              {/* Order Number */}
-              <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Order # <span className="text-error-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={form.order_number}
-                  onChange={(e) => setForm((f) => ({ ...f, order_number: e.target.value }))}
-                  placeholder="e.g. ORD-001"
-                  className={`w-full rounded-xl border px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:ring-2 dark:text-white dark:placeholder-gray-500 ${
-                    errors.order_number
-                      ? "border-error-300 bg-error-50 focus:border-error-500 focus:ring-error-500/20 dark:border-error-500/40 dark:bg-error-500/5"
-                      : "border-gray-200 bg-white focus:border-brand-500 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800 dark:focus:border-brand-400"
-                  }`}
-                />
-                {errors.order_number && (
-                  <p className="text-xs text-error-500">{errors.order_number}</p>
-                )}
-              </div>
+      {/* Body */}
+      <form onSubmit={handleSubmit}>
+        <div className="space-y-5 px-5 py-5">
+          {/* ── Placement Info ───────────────────────────────────── */}
+          <SectionHeading>Placement Info</SectionHeading>
 
-              {/* Link Type */}
-              <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Link Type <span className="text-error-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={form.link_type}
-                  onChange={(e) => setForm((f) => ({ ...f, link_type: e.target.value }))}
-                  placeholder="e.g. Guest Post, Niche Edit"
-                  className={`w-full rounded-xl border px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:ring-2 dark:text-white dark:placeholder-gray-500 ${
-                    errors.link_type
-                      ? "border-error-300 bg-error-50 focus:border-error-500 focus:ring-error-500/20 dark:border-error-500/40 dark:bg-error-500/5"
-                      : "border-gray-200 bg-white focus:border-brand-500 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800 dark:focus:border-brand-400"
-                  }`}
-                />
-                {errors.link_type && (
-                  <p className="text-xs text-error-500">{errors.link_type}</p>
-                )}
-              </div>
-
-              {/* Keyword */}
-              <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Keyword <span className="text-error-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={form.keyword}
-                  onChange={(e) => setForm((f) => ({ ...f, keyword: e.target.value }))}
-                  placeholder="Target keyword"
-                  className={`w-full rounded-xl border px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:ring-2 dark:text-white dark:placeholder-gray-500 ${
-                    errors.keyword
-                      ? "border-error-300 bg-error-50 focus:border-error-500 focus:ring-error-500/20 dark:border-error-500/40 dark:bg-error-500/5"
-                      : "border-gray-200 bg-white focus:border-brand-500 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800 dark:focus:border-brand-400"
-                  }`}
-                />
-                {errors.keyword && (
-                  <p className="text-xs text-error-500">{errors.keyword}</p>
-                )}
-              </div>
-
-              {/* Request Date */}
-              <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Request Date <span className="text-error-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  value={form.request_date}
-                  onChange={(e) => setForm((f) => ({ ...f, request_date: e.target.value }))}
-                  className={`w-full rounded-xl border px-4 py-2.5 text-sm text-gray-900 outline-none transition focus:ring-2 dark:text-white dark:bg-gray-800 dark:[color-scheme:dark] ${
-                    errors.request_date
-                      ? "border-error-300 bg-error-50 focus:border-error-500 focus:ring-error-500/20 dark:border-error-500/40 dark:bg-error-500/5"
-                      : "border-gray-200 bg-white focus:border-brand-500 focus:ring-brand-500/20 dark:border-gray-700 dark:focus:border-brand-400"
-                  }`}
-                />
-                {errors.request_date && (
-                  <p className="text-xs text-error-500">{errors.request_date}</p>
-                )}
-              </div>
-            </div>
-
-            {/* Landing Page */}
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Landing Page <span className="text-error-500">*</span>
-              </label>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Link Type" hint="(optional)">
               <input
                 type="text"
-                value={form.landing_page}
-                onChange={(e) => setForm((f) => ({ ...f, landing_page: e.target.value }))}
-                placeholder="https://example.com/target-page"
-                className={`w-full rounded-xl border px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:ring-2 dark:text-white dark:placeholder-gray-500 ${
-                  errors.landing_page
-                    ? "border-error-300 bg-error-50 focus:border-error-500 focus:ring-error-500/20 dark:border-error-500/40 dark:bg-error-500/5"
-                    : "border-gray-200 bg-white focus:border-brand-500 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800 dark:focus:border-brand-400"
-                }`}
+                value={form.link_type}
+                onChange={(e) => setField("link_type", e.target.value)}
+                placeholder="e.g. Guest Post"
+                className={input_base}
               />
-              {errors.landing_page && (
-                <p className="text-xs text-error-500">{errors.landing_page}</p>
-              )}
-            </div>
+            </Field>
 
-            {/* Exact Match */}
-            <label className="flex cursor-pointer items-center gap-3">
-              <div className="relative">
-                <input
-                  type="checkbox"
-                  checked={form.exact_match}
-                  onChange={(e) => setForm((f) => ({ ...f, exact_match: e.target.checked }))}
-                  className="sr-only"
-                />
-                <div
-                  className={`h-5 w-5 rounded-md border-2 transition-colors ${
+            <Field label="Keyword" hint="(optional)">
+              <input
+                type="text"
+                value={form.keyword}
+                onChange={(e) => setField("keyword", e.target.value)}
+                placeholder="Target keyword"
+                className={input_base}
+              />
+            </Field>
+          </div>
+
+          <Field label="Landing Page" hint="(optional)">
+            <input
+              type="text"
+              value={form.landing_page}
+              onChange={(e) => setField("landing_page", e.target.value)}
+              placeholder="https://example.com/page"
+              className={input_base}
+            />
+          </Field>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Request Date" hint="(optional)">
+              <input
+                type="date"
+                value={form.request_date}
+                onChange={(e) => setField("request_date", e.target.value)}
+                className={`${input_base} dark:scheme-dark`}
+              />
+            </Field>
+
+            {/* Exact Match toggle */}
+            <Field label="Exact Match">
+              <button
+                type="button"
+                onClick={() => setField("exact_match", !form.exact_match)}
+                className={`flex w-full items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-sm transition-all ${
+                  form.exact_match
+                    ? "border-brand-300 bg-brand-50 text-brand-700 dark:border-brand-500/40 dark:bg-brand-500/10 dark:text-brand-400"
+                    : "border-gray-200 bg-white text-gray-500 hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:border-gray-600"
+                }`}
+              >
+                {/* Custom checkbox */}
+                <span
+                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
                     form.exact_match
                       ? "border-brand-500 bg-brand-500"
                       : "border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-800"
                   }`}
                 >
                   {form.exact_match && (
-                    <svg className="h-full w-full p-0.5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                    <svg
+                      className="h-2.5 w-2.5 text-white"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={3.5}
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M4.5 12.75l6 6 9-13.5"
+                      />
                     </svg>
                   )}
-                </div>
-              </div>
-              <div>
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Exact Match</span>
-                <p className="text-xs text-gray-400 dark:text-gray-500">The keyword matches exactly as specified</p>
-              </div>
-            </label>
+                </span>
+                <span className="font-medium">
+                  {form.exact_match ? "Exact" : "Partial"}
+                </span>
+              </button>
+            </Field>
           </div>
 
-          {/* Section: Delivery Details */}
-          <div className="space-y-4 px-6 py-5">
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-              Delivery Details
-            </p>
+          {/* ── Status & Delivery ─────────────────────────────────── */}
+          <SectionHeading>Status &amp; Delivery</SectionHeading>
 
-            {/* Status */}
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Status
-              </label>
-              <div className="flex gap-2">
-                {STATUS_OPTIONS.map((opt) => (
+          {/* Status selector */}
+          <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Status
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {STATUS_OPTIONS.map((opt) => {
+                const is_active = form.status === opt.value;
+                return (
                   <button
                     key={opt.value}
                     type="button"
-                    onClick={() => setForm((f) => ({ ...f, status: opt.value }))}
-                    className={`flex-1 rounded-xl border px-3 py-2.5 text-left transition-all ${
-                      form.status === opt.value
-                        ? "border-brand-300 bg-brand-50 ring-2 ring-brand-500/20 dark:border-brand-500/40 dark:bg-brand-500/10"
-                        : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-gray-600 dark:hover:bg-gray-700/50"
+                    onClick={() => setField("status", opt.value)}
+                    className={`flex items-center justify-center gap-1.5 rounded-xl border py-2.5 text-xs font-medium transition-all ${
+                      is_active
+                        ? opt.active_classes
+                        : "border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:bg-gray-700"
                     }`}
                   >
-                    <span className={`block text-xs font-semibold ${opt.color}`}>
-                      {opt.label}
-                    </span>
-                    <span className="mt-0.5 block text-[10px] text-gray-400 dark:text-gray-500 leading-tight">
-                      {opt.description}
-                    </span>
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        is_active ? opt.dot : "bg-gray-300 dark:bg-gray-600"
+                      }`}
+                    />
+                    {opt.label}
                   </button>
-                ))}
-              </div>
+                );
+              })}
             </div>
+          </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              {/* Live Link */}
-              <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Live Link{" "}
-                  <span className="text-xs font-normal text-gray-400">(optional)</span>
-                </label>
+          <Field label="Live Link" hint="(optional)">
+            <input
+              type="text"
+              value={form.live_link}
+              onChange={(e) => setField("live_link", e.target.value)}
+              placeholder="https://publisher.com/article"
+              className={input_base}
+            />
+          </Field>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Live Date" hint="(optional)">
+              <input
+                type="date"
+                value={form.live_link_date}
+                onChange={(e) => setField("live_link_date", e.target.value)}
+                className={`${input_base} dark:scheme-dark`}
+              />
+            </Field>
+
+            <Field label="Domain Rating (DR)" hint="(optional)">
+              <div className="relative">
                 <input
-                  type="text"
-                  value={form.live_link || ""}
-                  onChange={(e) => setForm((f) => ({ ...f, live_link: e.target.value }))}
-                  placeholder="https://domain.com/article"
-                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500 dark:focus:border-brand-400"
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={form.dr}
+                  onChange={(e) => setField("dr", e.target.value)}
+                  placeholder="0–100"
+                  className={input_base}
                 />
-              </div>
-
-              {/* Live Date */}
-              <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Live Date{" "}
-                  <span className="text-xs font-normal text-gray-400">(optional)</span>
-                </label>
-                <input
-                  type="date"
-                  value={form.live_link_date || ""}
-                  onChange={(e) => setForm((f) => ({ ...f, live_link_date: e.target.value }))}
-                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:[color-scheme:dark] dark:focus:border-brand-400"
-                />
-              </div>
-
-              {/* DR */}
-              <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Domain Rating (DR){" "}
-                  <span className="text-xs font-normal text-gray-400">(optional, 0–100)</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={form.dr !== undefined && form.dr !== null ? form.dr : ""}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        dr: e.target.value === "" ? undefined : Number(e.target.value),
-                      }))
-                    }
-                    placeholder="e.g. 45"
-                    className={`w-full rounded-xl border px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:ring-2 dark:text-white dark:placeholder-gray-500 ${
-                      errors.dr
-                        ? "border-error-300 bg-error-50 focus:border-error-500 focus:ring-error-500/20 dark:border-error-500/40 dark:bg-error-500/5"
-                        : "border-gray-200 bg-white focus:border-brand-500 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800 dark:focus:border-brand-400"
-                    }`}
-                  />
-                  {form.dr !== undefined && form.dr !== null && String(form.dr) !== "" && (
-                    <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
-                      <span
-                        className={`text-xs font-semibold ${
-                          form.dr >= 70
-                            ? "text-success-500"
-                            : form.dr >= 40
-                            ? "text-warning-500"
-                            : "text-gray-400"
-                        }`}
-                      >
-                        {form.dr >= 70 ? "High" : form.dr >= 40 ? "Med" : "Low"}
-                      </span>
-                    </div>
-                  )}
-                </div>
-                {errors.dr && (
-                  <p className="text-xs text-error-500">{errors.dr}</p>
+                {dr_value !== null && (
+                  <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                    <DrBadge value={dr_value} />
+                  </div>
                 )}
               </div>
-            </div>
+            </Field>
           </div>
+        </div>
 
-          {/* Footer */}
-          <div className="flex gap-3 px-6 py-4">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={is_saving}
-              className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={is_saving}
-              className="flex-1 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {is_saving ? "Adding..." : "Add Row"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        {/* Footer */}
+        <div className="flex gap-3 border-t border-gray-100 px-5 py-4 dark:border-gray-800">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={is_saving}
+            className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={is_saving}
+            className="flex-1 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {is_saving ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg
+                  className="h-4 w-4 animate-spin"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  />
+                </svg>
+                Adding...
+              </span>
+            ) : (
+              "Add Row"
+            )}
+          </button>
+        </div>
+      </form>
+    </ModalShell>
   );
 }
