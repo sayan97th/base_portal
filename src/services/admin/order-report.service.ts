@@ -9,6 +9,8 @@ import type {
   UpdateReportRowPayload,
   SendReportPayload,
   SendReportResponse,
+  ImportOrderItemsPayload,
+  ImportOrderItemsResponse,
 } from "@/types/admin/order-report";
 
 /**
@@ -96,6 +98,21 @@ export async function deleteReportRow(
 ): Promise<void> {
   return apiClient.delete<void>(
     `/api/admin/orders/${order_id}/report/tables/${table_id}/rows/${row_id}`
+  );
+}
+
+/**
+ * Import (createOrUpdate) report tables and rows from the original order items.
+ * Sends the IDs of the order items to sync. Returns the updated full report.
+ * Roles allowed: super_admin, admin, staff.
+ */
+export async function importOrderItems(
+  order_id: string,
+  payload: ImportOrderItemsPayload
+): Promise<ImportOrderItemsResponse> {
+  return apiClient.post<ImportOrderItemsResponse>(
+    `/api/admin/orders/${order_id}/report/import`,
+    payload
   );
 }
 

@@ -67,3 +67,13 @@ export interface SendReportResponse {
   message: string;
   sent_at: string;
 }
+
+export interface ImportOrderItemsPayload {
+  item_ids: number[];
+}
+
+export interface ImportOrderItemsResponse {
+  message: string;
+  imported_count: number;
+  report: OrderReport;
+}
