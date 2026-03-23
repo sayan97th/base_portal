@@ -1,6 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import flatpickr from "flatpickr";
+import "flatpickr/dist/flatpickr.min.css";
+import type { Instance as FlatpickrInstance } from "flatpickr/dist/types/instance";
 import type { ReportRow, ReportRowStatus, UpdateReportRowPayload } from "@/types/admin/order-report";
 
 interface RowEditorModalProps {
@@ -59,6 +62,9 @@ export default function RowEditorModal({
     dr: undefined,
   });
 
+  const date_input_ref = useRef<HTMLInputElement>(null);
+  const flatpickr_ref = useRef<FlatpickrInstance | null>(null);
+
   useEffect(() => {
     if (is_open && row) {
       setForm({
@@ -87,6 +93,47 @@ export default function RowEditorModal({
       };
     }
   }, [is_open, handleKeyDown]);
+
+  // ── Flatpickr date picker ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!date_input_ref.current) return;
+
+    flatpickr_ref.current = flatpickr(date_input_ref.current, {
+      dateFormat: "M j, Y",
+      allowInput: false,
+      disableMobile: true,
+      onChange: ([selected_date]) => {
+        if (selected_date) {
+          // Store ISO yyyy-mm-dd in state, display format handled by flatpickr
+          const iso = [
+            selected_date.getFullYear(),
+            String(selected_date.getMonth() + 1).padStart(2, "0"),
+            String(selected_date.getDate()).padStart(2, "0"),
+          ].join("-");
+          setField("live_link_date", iso);
+        } else {
+          setField("live_link_date", "");
+        }
+      },
+    });
+
+    return () => {
+      flatpickr_ref.current?.destroy();
+      flatpickr_ref.current = null;
+    };
+  }, []);
+
+  // Keep flatpickr in sync when the form resets on open/row change.
+  // We explicitly build a local-time Date to avoid UTC-offset shifting.
+  useEffect(() => {
+    if (!flatpickr_ref.current) return;
+    if (form.live_link_date) {
+      const [y, m, d] = form.live_link_date.split("-").map(Number);
+      flatpickr_ref.current.setDate(new Date(y, m - 1, d), false);
+    } else {
+      flatpickr_ref.current.clear();
+    }
+  }, [form.live_link_date]);
 
   function setField<K extends keyof DeliveryForm>(key: K, value: DeliveryForm[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -328,12 +375,35 @@ export default function RowEditorModal({
                     <label className="block text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                       Live Date
                     </label>
-                    <input
-                      type="date"
-                      value={form.live_link_date}
-                      onChange={(e) => setField("live_link_date", e.target.value)}
-                      className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:focus:border-brand-400"
-                    />
+                    <div className="relative">
+                      <input
+                        ref={date_input_ref}
+                        type="text"
+                        readOnly
+                        placeholder="Pick a date"
+                        className="w-full cursor-pointer rounded-xl border border-gray-200 bg-white py-2.5 pl-4 pr-9 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500 dark:focus:border-brand-400"
+                      />
+                      <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-400">
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 9v7.5m-9-6h.008v.008H12V13.5zm0 3h.008v.008H12v-.008zm-3 0h.008v.008H9v-.008zm6 0h.008v.008H15v-.008z" />
+                        </svg>
+                      </div>
+                      {form.live_link_date && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setField("live_link_date", "");
+                            flatpickr_ref.current?.clear();
+                          }}
+                          className="absolute inset-y-0 right-8 flex items-center px-1 text-gray-300 transition hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400"
+                          title="Clear date"
+                        >
+                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="space-y-2">
