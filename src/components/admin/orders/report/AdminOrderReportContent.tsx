@@ -655,6 +655,7 @@ export default function AdminOrderReportContent({ order_id }: AdminOrderReportCo
                 {report.tables.map((table) => (
                   <ReportTableCard
                     key={table.id}
+                    order_id={order_id}
                     table={table}
                     onEditRow={handleEditRow}
                     onAddRow={handleAddRow}
