@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { OrderReport } from "@/types/admin/order-report";
+import type { OrderStatus } from "@/types/client/link-building";
 import { fetchClientOrderReport } from "@/services/client/order-report.service";
+import { linkBuildingService } from "@/services/client/link-building.service";
 import ClientReportTableCard from "./ClientReportTableCard";
 
 interface ClientOrderReportContentProps {
@@ -93,8 +95,39 @@ function formatShortDate(iso: string): string {
   });
 }
 
+const ORDER_STATUS_CONFIG: Record<
+  OrderStatus,
+  { label: string; bg: string; text: string; dot: string }
+> = {
+  pending: {
+    label: "Pending",
+    bg: "bg-warning-50 dark:bg-warning-500/10",
+    text: "text-warning-700 dark:text-warning-400",
+    dot: "bg-warning-500",
+  },
+  processing: {
+    label: "Processing",
+    bg: "bg-blue-50 dark:bg-blue-500/10",
+    text: "text-blue-700 dark:text-blue-400",
+    dot: "bg-blue-500",
+  },
+  completed: {
+    label: "Completed",
+    bg: "bg-success-50 dark:bg-success-500/10",
+    text: "text-success-700 dark:text-success-400",
+    dot: "bg-success-500",
+  },
+  cancelled: {
+    label: "Cancelled",
+    bg: "bg-error-50 dark:bg-error-500/10",
+    text: "text-error-700 dark:text-error-400",
+    dot: "bg-error-500",
+  },
+};
+
 export default function ClientOrderReportContent({ order_id }: ClientOrderReportContentProps) {
   const [report, setReport] = useState<OrderReport | null>(null);
+  const [order_status, setOrderStatus] = useState<OrderStatus | null>(null);
   const [is_loading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -103,8 +136,12 @@ export default function ClientOrderReportContent({ order_id }: ClientOrderReport
       setIsLoading(true);
       setError(null);
       try {
-        const data = await fetchClientOrderReport(order_id);
-        setReport(data);
+        const [report_data, order_data] = await Promise.all([
+          fetchClientOrderReport(order_id),
+          linkBuildingService.fetchLinkBuildingOrderDetail(order_id),
+        ]);
+        setReport(report_data);
+        setOrderStatus(order_data.status);
       } catch {
         setError("We couldn't load the report for this order. Please try again.");
       } finally {
@@ -175,6 +212,16 @@ export default function ClientOrderReportContent({ order_id }: ClientOrderReport
 
                 {/* Meta badges */}
                 <div className="flex flex-wrap items-center gap-2">
+                  {/* Order status badge */}
+                  {order_status && (() => {
+                    const cfg = ORDER_STATUS_CONFIG[order_status];
+                    return (
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${cfg.bg} ${cfg.text}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
+                        {cfg.label}
+                      </span>
+                    );
+                  })()}
                   {report.sent_at && (
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-success-200 bg-success-50 px-3 py-1.5 text-xs font-medium text-success-700 dark:border-success-500/20 dark:bg-success-500/10 dark:text-success-400">
                       <SendIcon />

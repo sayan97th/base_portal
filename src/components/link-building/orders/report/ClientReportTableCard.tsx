@@ -77,7 +77,6 @@ export default function ClientReportTableCard({ table, index }: ClientReportTabl
   const rows_count = table.rows.length;
   const live_count = table.rows.filter((r) => r.status === "live").length;
   const pending_count = table.rows.filter((r) => r.status === "pending").length;
-  const live_percentage = rows_count > 0 ? Math.round((live_count / rows_count) * 100) : 0;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
@@ -121,21 +120,7 @@ export default function ClientReportTableCard({ table, index }: ClientReportTabl
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-3">
-          {/* Mini progress for this table */}
-          {rows_count > 0 && (
-            <div className="hidden items-center gap-2 sm:flex">
-              <div className="h-1.5 w-20 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-                <div
-                  className="h-full rounded-full bg-success-500 transition-all duration-500"
-                  style={{ width: `${live_percentage}%` }}
-                />
-              </div>
-              <span className="w-8 text-right text-xs font-medium text-gray-500 dark:text-gray-400">
-                {live_percentage}%
-              </span>
-            </div>
-          )}
+        <div className="flex shrink-0 items-center">
           <ChevronDownIcon rotated={!is_collapsed} />
         </div>
       </button>
