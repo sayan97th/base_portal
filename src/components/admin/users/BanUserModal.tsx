@@ -149,22 +149,22 @@ const BanUserModal: React.FC<BanUserModalProps> = ({
           {/* Consequence description */}
           <div className={`rounded-xl p-3.5 text-sm ${is_ban ? "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300" : "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"}`}>
             {is_ban ? (
-              <ul className="space-y-1">
+              <ul className="space-y-1 text-left">
                 <li className="flex items-start gap-2">
                   <span className="mt-0.5 shrink-0">•</span>
-                  The user will be <strong>signed out immediately</strong> from all active sessions.
+                  <span>The user will be <strong>signed out immediately</strong> from all active sessions.</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="mt-0.5 shrink-0">•</span>
-                  They will be <strong>unable to sign in</strong> and will see an account-disabled notice.
+                  <span>They will be <strong>unable to sign in</strong> and will see an account-disabled notice.</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="mt-0.5 shrink-0">•</span>
-                  Their data is preserved and the account can be re-enabled at any time.
+                  <span>Their data is preserved and the account can be re-enabled at any time.</span>
                 </li>
               </ul>
             ) : (
-              <p>
+              <p className="text-left">
                 The user will be able to <strong>sign in immediately</strong> and access the platform as usual. All previous data and permissions will be restored.
               </p>
             )}
