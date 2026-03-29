@@ -69,6 +69,25 @@ export interface AdminUserFilters {
   role?: UserRoleFilter;
 }
 
+// ── Clients ───────────────────────────────────────────────────────────────────
+
+export type ClientSortField = "first_name" | "email" | "organization" | "created_at";
+
+export type ClientEmailStatusFilter = "verified" | "unverified" | "";
+
+export type ClientAccountStatusFilter = "active" | "disabled" | "";
+
+export interface AdminClientFilters {
+  page?: number;
+  search?: string;
+  sort_field?: ClientSortField;
+  sort_direction?: SortDirection;
+  date_from?: string;
+  date_to?: string;
+  email_status?: ClientEmailStatusFilter;
+  account_status?: ClientAccountStatusFilter;
+}
+
 export interface AdminOrderFilters {
   page?: number;
   per_page?: number;
