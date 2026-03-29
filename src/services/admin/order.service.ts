@@ -2,6 +2,7 @@ import { apiClient } from "@/lib/api-client";
 import type {
   AdminOrder,
   AdminLinkBuildingOrder,
+  AdminOrderFilters,
   LinkBuildingOrderFilters,
   PaginatedResponse,
   LaravelPaginatedResponse,
@@ -10,13 +11,31 @@ import type {
 
 /**
  * List all orders — staff portal view (paginated).
+ * Supports search, status filter, and sort.
  * Roles allowed: super_admin, admin, staff.
  */
 export async function listAdminOrders(
-  page: number = 1
+  filters: AdminOrderFilters = {}
 ): Promise<PaginatedResponse<AdminOrder>> {
+  const {
+    page = 1,
+    per_page = 15,
+    search,
+    status,
+    sort_field,
+    sort_direction,
+  } = filters;
+
+  const params = new URLSearchParams();
+  params.set("page", String(page));
+  params.set("per_page", String(per_page));
+  if (search && search.trim()) params.set("search", search.trim());
+  if (status) params.set("status", status);
+  if (sort_field) params.set("sort_field", sort_field);
+  if (sort_direction) params.set("sort_direction", sort_direction);
+
   return apiClient.get<PaginatedResponse<AdminOrder>>(
-    `/api/admin/orders?page=${page}`
+    `/api/admin/orders?${params.toString()}`
   );
 }
 
