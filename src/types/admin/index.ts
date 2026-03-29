@@ -160,6 +160,24 @@ export interface LaravelPaginatedResponse<T> {
 // ── Invoices ──────────────────────────────────────────────────────────────────
 
 export type InvoiceStatus = "paid" | "void";
+
+export type InvoiceSortField =
+  | "date_issued"
+  | "total_amount"
+  | "status"
+  | "invoice_number"
+  | "customer";
+
+export interface AdminInvoiceFilters {
+  page?: number;
+  per_page?: number;
+  search?: string;
+  status?: InvoiceStatus | "";
+  sort_field?: InvoiceSortField;
+  sort_direction?: SortDirection;
+  date_from?: string;
+  date_to?: string;
+}
 export type InvoiceCurrencyType = "usd" | "credits";
 export type InvoicePaymentMethod = "Account Balance" | "Credit Card";
 export type CouponDiscountType = "percentage" | "fixed_amount";

@@ -1,15 +1,27 @@
 import { apiClient } from "@/lib/api-client";
-import type { AdminInvoice, PaginatedResponse } from "@/types/admin";
+import type { AdminInvoice, AdminInvoiceFilters, PaginatedResponse } from "@/types/admin";
 
 /**
- * List all invoices — staff portal view (paginated).
+ * List all invoices — staff portal view (paginated, filterable, sortable).
  * Roles allowed: super_admin, admin, staff.
  */
 export async function listAdminInvoices(
-  page: number = 1
+  filters: AdminInvoiceFilters = {}
 ): Promise<PaginatedResponse<AdminInvoice>> {
+  const params = new URLSearchParams();
+
+  if (filters.page) params.set("page", String(filters.page));
+  if (filters.per_page) params.set("per_page", String(filters.per_page));
+  if (filters.search?.trim()) params.set("search", filters.search.trim());
+  if (filters.status) params.set("status", filters.status);
+  if (filters.sort_field) params.set("sort_field", filters.sort_field);
+  if (filters.sort_direction) params.set("sort_direction", filters.sort_direction);
+  if (filters.date_from) params.set("date_from", filters.date_from);
+  if (filters.date_to) params.set("date_to", filters.date_to);
+
+  const query = params.toString();
   return apiClient.get<PaginatedResponse<AdminInvoice>>(
-    `/api/admin/invoices?page=${page}`
+    `/api/admin/invoices${query ? `?${query}` : ""}`
   );
 }
 

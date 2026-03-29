@@ -3,26 +3,89 @@
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { listAdminInvoices } from "@/services/admin/invoice.service";
-import type { AdminInvoice, InvoiceStatus } from "@/types/admin";
+import type {
+  AdminInvoice,
+  AdminInvoiceFilters,
+  InvoiceStatus,
+  InvoiceSortField,
+  SortDirection,
+} from "@/types/admin";
+import { useDebounce } from "@/hooks/useDebounce";
+import InvoiceFiltersBar from "./InvoiceFiltersBar";
 
 const STATUS_STYLES: Record<InvoiceStatus, string> = {
   paid: "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400",
   void: "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400",
 };
 
+type SortableColumn = "invoice_number" | "customer" | "status" | "total_amount" | "date_issued";
+
+function SortIcon({
+  field,
+  active_field,
+  direction,
+}: {
+  field: SortableColumn;
+  active_field: InvoiceSortField | undefined;
+  direction: SortDirection;
+}) {
+  const is_active = active_field === field;
+  return (
+    <span
+      className={`ml-1 inline-flex flex-col gap-px transition-opacity ${
+        is_active ? "opacity-100" : "opacity-0 group-hover:opacity-40"
+      }`}
+    >
+      <svg
+        className={`h-2.5 w-2.5 transition-colors ${
+          is_active && direction === "asc" ? "text-brand-500" : "text-gray-400"
+        }`}
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={3}
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+      </svg>
+      <svg
+        className={`-mt-1 h-2.5 w-2.5 transition-colors ${
+          is_active && direction === "desc" ? "text-brand-500" : "text-gray-400"
+        }`}
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={3}
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+      </svg>
+    </span>
+  );
+}
+
 export default function AdminInvoicesContent() {
   const [invoices, setInvoices] = useState<AdminInvoice[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [is_loading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [last_page, setLastPage] = useState(1);
 
-  const fetchInvoices = useCallback(async (current_page: number) => {
+  // Filter & sort state
+  const [search_input, setSearchInput] = useState("");
+  const [status_filter, setStatusFilter] = useState<InvoiceStatus | "">("");
+  const [sort_field, setSortField] = useState<InvoiceSortField | undefined>("date_issued");
+  const [sort_direction, setSortDirection] = useState<SortDirection>("desc");
+  const [date_from, setDateFrom] = useState("");
+  const [date_to, setDateTo] = useState("");
+
+  // Debounce the search so we don't fire a request on every keystroke
+  const debounced_search = useDebounce(search_input, 450);
+
+  const fetchInvoices = useCallback(async (filters: AdminInvoiceFilters) => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await listAdminInvoices(current_page);
+      const data = await listAdminInvoices(filters);
       setInvoices(data.data);
       setTotal(data.total);
       setLastPage(data.last_page);
@@ -33,12 +96,63 @@ export default function AdminInvoicesContent() {
     }
   }, []);
 
+  // Re-fetch whenever page, debounced search, status, sort, or date range changes
   useEffect(() => {
-    fetchInvoices(page);
-  }, [fetchInvoices, page]);
+    fetchInvoices({
+      page,
+      search: debounced_search,
+      status: status_filter || undefined,
+      sort_field,
+      sort_direction,
+      date_from: date_from || undefined,
+      date_to: date_to || undefined,
+    });
+  }, [fetchInvoices, page, debounced_search, status_filter, sort_field, sort_direction, date_from, date_to]);
+
+  function handleSearchChange(value: string) {
+    setSearchInput(value);
+    setPage(1);
+  }
+
+  function handleStatusChange(status: InvoiceStatus | "") {
+    setStatusFilter(status);
+    setPage(1);
+  }
+
+  function handleSortChange(field: InvoiceSortField, direction: SortDirection) {
+    setSortField(field);
+    setSortDirection(direction);
+    setPage(1);
+  }
+
+  function handleColumnSort(field: SortableColumn) {
+    if (sort_field === field) {
+      setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDirection("desc");
+    }
+    setPage(1);
+  }
+
+  function handleDateRangeChange(from: string, to: string) {
+    setDateFrom(from);
+    setDateTo(to);
+    setPage(1);
+  }
+
+  function handleClearAll() {
+    setSearchInput("");
+    setStatusFilter("");
+    setSortField("date_issued");
+    setSortDirection("desc");
+    setDateFrom("");
+    setDateTo("");
+    setPage(1);
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
           Invoices
@@ -47,6 +161,23 @@ export default function AdminInvoicesContent() {
           {total > 0 ? `${total} total invoices` : "Manage all platform invoices"}
         </p>
       </div>
+
+      {/* Filters */}
+      <InvoiceFiltersBar
+        search_value={search_input}
+        on_search_change={handleSearchChange}
+        status_filter={status_filter}
+        on_status_change={handleStatusChange}
+        sort_field={sort_field}
+        sort_direction={sort_direction}
+        on_sort_change={handleSortChange}
+        date_from={date_from}
+        date_to={date_to}
+        on_date_range_change={handleDateRangeChange}
+        total={total}
+        is_loading={is_loading}
+        on_clear_all={handleClearAll}
+      />
 
       {error && (
         <div className="rounded-lg bg-error-50 p-4 text-sm text-error-600 dark:bg-error-500/10 dark:text-error-400">
@@ -59,31 +190,72 @@ export default function AdminInvoicesContent() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-800/50">
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  Invoice
+                {/* Invoice — sortable */}
+                <th
+                  className="group cursor-pointer px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 transition hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  onClick={() => handleColumnSort("invoice_number")}
+                >
+                  <span className="inline-flex items-center">
+                    Invoice
+                    <SortIcon field="invoice_number" active_field={sort_field} direction={sort_direction} />
+                  </span>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  Customer
+
+                {/* Customer — sortable */}
+                <th
+                  className="group cursor-pointer px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 transition hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  onClick={() => handleColumnSort("customer")}
+                >
+                  <span className="inline-flex items-center">
+                    Customer
+                    <SortIcon field="customer" active_field={sort_field} direction={sort_direction} />
+                  </span>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  Status
+
+                {/* Status — sortable */}
+                <th
+                  className="group cursor-pointer px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 transition hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  onClick={() => handleColumnSort("status")}
+                >
+                  <span className="inline-flex items-center">
+                    Status
+                    <SortIcon field="status" active_field={sort_field} direction={sort_direction} />
+                  </span>
                 </th>
+
                 <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   Payment Method
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  Total
+
+                {/* Total — sortable */}
+                <th
+                  className="group cursor-pointer px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 transition hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  onClick={() => handleColumnSort("total_amount")}
+                >
+                  <span className="inline-flex items-center">
+                    Total
+                    <SortIcon field="total_amount" active_field={sort_field} direction={sort_direction} />
+                  </span>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  Date Issued
+
+                {/* Date Issued — sortable */}
+                <th
+                  className="group cursor-pointer px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 transition hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  onClick={() => handleColumnSort("date_issued")}
+                >
+                  <span className="inline-flex items-center">
+                    Date Issued
+                    <SortIcon field="date_issued" active_field={sort_field} direction={sort_direction} />
+                  </span>
                 </th>
+
                 <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   Actions
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {isLoading
+              {is_loading
                 ? Array.from({ length: 8 }).map((_, i) => (
                     <tr key={i}>
                       {Array.from({ length: 7 }).map((__, j) => (
@@ -96,8 +268,28 @@ export default function AdminInvoicesContent() {
                 : invoices.length === 0
                   ? (
                     <tr>
-                      <td colSpan={7} className="px-6 py-8 text-center text-sm text-gray-400">
-                        No invoices found.
+                      <td colSpan={7} className="px-6 py-12 text-center">
+                        <div className="flex flex-col items-center gap-2 text-gray-400">
+                          <svg
+                            className="h-8 w-8 text-gray-300 dark:text-gray-700"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={1.5}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                            />
+                          </svg>
+                          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                            No invoices found
+                          </p>
+                          <p className="text-xs text-gray-400 dark:text-gray-500">
+                            Try adjusting your search or filters
+                          </p>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -111,7 +303,7 @@ export default function AdminInvoicesContent() {
                           <p className="font-medium text-gray-900 dark:text-white">
                             {invoice.invoice_number}
                           </p>
-                          <p className="text-xs text-gray-400 font-mono">
+                          <p className="font-mono text-xs text-gray-400">
                             {invoice.unique_id}
                           </p>
                         </Link>
@@ -163,7 +355,7 @@ export default function AdminInvoicesContent() {
           </table>
         </div>
 
-        {!isLoading && last_page > 1 && (
+        {!is_loading && last_page > 1 && (
           <div className="flex items-center justify-between border-t border-gray-200 px-6 py-3 dark:border-gray-800">
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Page {page} of {last_page}
