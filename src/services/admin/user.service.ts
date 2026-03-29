@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api-client";
-import type { AdminUser, AdminUserOrderSummary, PaginatedResponse } from "@/types/admin";
+import type { AdminUser, AdminUserFilters, AdminUserOrderSummary, PaginatedResponse } from "@/types/admin";
 
 export interface BanUserResponse {
   message: string;
@@ -9,18 +9,24 @@ export interface BanUserResponse {
 export type UserTypeFilter = "staff" | "client";
 
 /**
- * List users (paginated), optionally filtered by type.
+ * List users (paginated), optionally filtered by type, search, sort, and date range.
  * - user_type "staff"  → returns super_admin, admin, staff accounts
  * - user_type "client" → returns client accounts
  * - omitted            → returns all users
  * Roles allowed: super_admin, admin, staff.
  */
 export async function listAdminUsers(
-  page: number = 1,
+  filters: AdminUserFilters = {},
   user_type?: UserTypeFilter
 ): Promise<PaginatedResponse<AdminUser>> {
-  const params = new URLSearchParams({ page: String(page) });
+  const params = new URLSearchParams({ page: String(filters.page ?? 1) });
   if (user_type) params.set("type", user_type);
+  if (filters.search?.trim()) params.set("search", filters.search.trim());
+  if (filters.sort_field) params.set("sort_field", filters.sort_field);
+  if (filters.sort_direction) params.set("sort_direction", filters.sort_direction);
+  if (filters.date_from) params.set("date_from", filters.date_from);
+  if (filters.date_to) params.set("date_to", filters.date_to);
+  if (filters.role) params.set("role", filters.role);
   return apiClient.get<PaginatedResponse<AdminUser>>(
     `/api/admin/users?${params.toString()}`
   );

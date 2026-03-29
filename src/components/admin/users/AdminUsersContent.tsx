@@ -3,9 +3,11 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { listAdminUsers, banUser, unbanUser } from "@/services/admin/user.service";
-import type { AdminUser } from "@/types/admin";
+import type { AdminUser, UserSortField, UserRoleFilter, SortDirection } from "@/types/admin";
 import type { ApiError } from "@/types/auth";
+import { useDebounce } from "@/hooks/useDebounce";
 import BanUserModal from "@/components/admin/users/BanUserModal";
+import UserFiltersBar from "@/components/admin/users/UserFiltersBar";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -43,6 +45,20 @@ function formatRoleLabel(role_name: string): string {
   return role_name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+// ── Column header config ───────────────────────────────────────────────────────
+
+type SortableColumn = { key: UserSortField; label: string; sortable: true };
+type NonSortableColumn = { key: string; label: string; sortable: false };
+type TableColumn = SortableColumn | NonSortableColumn;
+
+const TABLE_COLUMNS: TableColumn[] = [
+  { key: "first_name", label: "User", sortable: true },
+  { key: "roles", label: "Roles", sortable: false },
+  { key: "organization", label: "Organization", sortable: true },
+  { key: "created_at", label: "Joined", sortable: true },
+  { key: "actions", label: "Actions", sortable: false },
+];
+
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
 function UserAvatar({ user }: { user: AdminUser }) {
@@ -59,6 +75,34 @@ function AccountStatusBadge({ is_active }: { is_active: boolean }) {
     <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600 ring-1 ring-red-200 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/20">
       <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
       Disabled
+    </span>
+  );
+}
+
+function SortIndicator({
+  column_key,
+  sort_field,
+  sort_direction,
+}: {
+  column_key: UserSortField;
+  sort_field: UserSortField | undefined;
+  sort_direction: SortDirection;
+}) {
+  const is_active = sort_field === column_key;
+  return (
+    <span className={`ml-1 inline-flex flex-col gap-px transition-opacity ${is_active ? "opacity-100" : "opacity-30 group-hover:opacity-60"}`}>
+      <svg
+        className={`h-2.5 w-2.5 transition-colors ${is_active && sort_direction === "asc" ? "text-brand-500" : "text-current"}`}
+        fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+      </svg>
+      <svg
+        className={`h-2.5 w-2.5 transition-colors ${is_active && sort_direction === "desc" ? "text-brand-500" : "text-current"}`}
+        fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+      </svg>
     </span>
   );
 }
@@ -101,16 +145,44 @@ export default function AdminUsersContent() {
   const [is_loading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // ── Filter state ─────────────────────────────────────────────────────────
+  const [search_input, setSearchInput] = useState("");
+  const [sort_field, setSortField] = useState<UserSortField | undefined>(undefined);
+  const [sort_direction, setSortDirection] = useState<SortDirection>("asc");
+  const [role_filter, setRoleFilter] = useState<UserRoleFilter>("");
+  const [date_from, setDateFrom] = useState("");
+  const [date_to, setDateTo] = useState("");
+
+  const debounced_search = useDebounce(search_input, 450);
+
   // ── Ban modal state ──────────────────────────────────────────────────────
   const [ban_target, setBanTarget] = useState<AdminUser | null>(null);
   const [ban_mode, setBanMode] = useState<"ban" | "unban">("ban");
   const [is_ban_loading, setIsBanLoading] = useState(false);
   const [ban_error, setBanError] = useState<string | null>(null);
 
+  // Reset to page 1 whenever filters change
+  useEffect(() => {
+    setPage(1);
+  }, [debounced_search, sort_field, sort_direction, role_filter, date_from, date_to]);
+
   useEffect(() => {
     let cancelled = false;
+    setIsLoading(true);
+    setError(null);
 
-    listAdminUsers(page, "staff")
+    listAdminUsers(
+      {
+        page,
+        search: debounced_search,
+        sort_field,
+        sort_direction,
+        role: role_filter || undefined,
+        date_from: date_from || undefined,
+        date_to: date_to || undefined,
+      },
+      "staff"
+    )
       .then((data) => {
         if (!cancelled) {
           setUsers(data.data);
@@ -129,7 +201,28 @@ export default function AdminUsersContent() {
     return () => {
       cancelled = true;
     };
-  }, [page]);
+  }, [page, debounced_search, sort_field, sort_direction, role_filter, date_from, date_to]);
+
+  // ── Handlers ─────────────────────────────────────────────────────────────
+
+  function handleColumnSort(field: UserSortField) {
+    if (sort_field === field) {
+      setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  }
+
+  function handleClearAll() {
+    setSearchInput("");
+    setSortField(undefined);
+    setSortDirection("asc");
+    setRoleFilter("");
+    setDateFrom("");
+    setDateTo("");
+    setPage(1);
+  }
 
   const openBanModal = (user: AdminUser) => {
     setBanMode(user.is_active ? "ban" : "unban");
@@ -163,8 +256,10 @@ export default function AdminUsersContent() {
     }
   };
 
+  // ── Render ────────────────────────────────────────────────────────────────
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* ── Header ── */}
       <div className="flex items-start justify-between">
         <div>
@@ -178,31 +273,30 @@ export default function AdminUsersContent() {
           </p>
         </div>
 
-        {/* Legend */}
-        {!is_loading && (
-          <div className="hidden items-center gap-3 sm:flex">
-            {[
-              { label: "Super Admin", cls: "bg-violet-500" },
-              { label: "Admin", cls: "bg-blue-500" },
-              { label: "Staff", cls: "bg-emerald-500" },
-            ].map(({ label, cls }) => (
-              <span key={label} className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                <span className={`h-2 w-2 rounded-full ${cls}`} />
-                {label}
-              </span>
-            ))}
-          </div>
-        )}
+        
       </div>
 
-      {/* ── Error ── */}
+      {/* ── Filters bar ── */}
+      <UserFiltersBar
+        search_value={search_input}
+        on_search_change={setSearchInput}
+        role_filter={role_filter}
+        on_role_change={setRoleFilter}
+        date_from={date_from}
+        date_to={date_to}
+        on_date_from_change={setDateFrom}
+        on_date_to_change={setDateTo}
+        total={total}
+        is_loading={is_loading}
+        on_clear_all={handleClearAll}
+      />
+
+      {/* ── Error states ── */}
       {error && (
         <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">
           {error}
         </div>
       )}
-
-      {/* ── Ban action error ── */}
       {ban_error && (
         <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">
           {ban_error}
@@ -215,14 +309,43 @@ export default function AdminUsersContent() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/80 dark:border-gray-800 dark:bg-gray-800/40">
-                {["User", "Roles", "Organization", "Joined", "Actions"].map((col) => (
-                  <th
-                    key={col}
-                    className={`px-5 py-3 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 ${col === "Actions" ? "text-right" : "text-left"}`}
-                  >
-                    {col}
-                  </th>
-                ))}
+                {TABLE_COLUMNS.map((col) => {
+                  const is_actions = col.key === "actions";
+                  if (col.sortable) {
+                    const is_sorted = sort_field === col.key;
+                    return (
+                      <th
+                        key={col.key}
+                        onClick={() => handleColumnSort(col.key as UserSortField)}
+                        className="group cursor-pointer select-none px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                      >
+                        <span className="inline-flex items-center gap-0.5">
+                          {col.label}
+                          <SortIndicator
+                            column_key={col.key as UserSortField}
+                            sort_field={sort_field}
+                            sort_direction={sort_direction}
+                          />
+                          {is_sorted && (
+                            <span className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-brand-500/10 text-brand-500 dark:bg-brand-400/10 dark:text-brand-400">
+                              <svg className="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 8 8">
+                                <circle cx="4" cy="4" r="3" />
+                              </svg>
+                            </span>
+                          )}
+                        </span>
+                      </th>
+                    );
+                  }
+                  return (
+                    <th
+                      key={col.key}
+                      className={`px-5 py-3 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 ${is_actions ? "text-right" : "text-left"}`}
+                    >
+                      {col.label}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 dark:divide-gray-800/60">
@@ -234,12 +357,14 @@ export default function AdminUsersContent() {
                     <div className="flex flex-col items-center gap-2">
                       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
                         <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                         </svg>
                       </div>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">No app users found</p>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">No users found</p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Users with admin or staff roles will appear here.
+                        {debounced_search || date_from || date_to
+                          ? "Try adjusting your search or date range."
+                          : "Users with admin or staff roles will appear here."}
                       </p>
                     </div>
                   </td>
@@ -250,6 +375,7 @@ export default function AdminUsersContent() {
                     key={user.id}
                     className={`transition-colors hover:bg-gray-50/70 dark:hover:bg-white/2 ${!user.is_active ? "bg-red-50/30 dark:bg-red-500/3" : ""}`}
                   >
+                    {/* User column */}
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
                         <div className="relative">
@@ -273,6 +399,8 @@ export default function AdminUsersContent() {
                         </div>
                       </div>
                     </td>
+
+                    {/* Roles column */}
                     <td className="px-5 py-3.5">
                       <div className="flex flex-wrap gap-1">
                         {user.roles.map((role) => (
@@ -285,9 +413,13 @@ export default function AdminUsersContent() {
                         ))}
                       </div>
                     </td>
+
+                    {/* Organization column */}
                     <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-400">
                       {user.organization?.name ?? <span className="text-gray-400 dark:text-gray-600">—</span>}
                     </td>
+
+                    {/* Joined column */}
                     <td className="px-5 py-3.5 text-sm text-gray-500">
                       {new Date(user.created_at).toLocaleDateString("en-US", {
                         month: "short",
@@ -295,6 +427,8 @@ export default function AdminUsersContent() {
                         year: "numeric",
                       })}
                     </td>
+
+                    {/* Actions column */}
                     <td className="px-5 py-3.5 text-right">
                       <div className="inline-flex items-center gap-2">
                         <Link
@@ -336,7 +470,7 @@ export default function AdminUsersContent() {
           </table>
         </div>
 
-        {/* Pagination */}
+        {/* ── Pagination ── */}
         {!is_loading && last_page > 1 && (
           <div className="flex items-center justify-between border-t border-gray-100 px-5 py-3 dark:border-gray-800">
             <p className="text-xs text-gray-500 dark:text-gray-400">

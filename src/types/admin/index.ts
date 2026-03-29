@@ -53,6 +53,22 @@ export type OrderSortField =
 
 export type SortDirection = "asc" | "desc";
 
+// ── Users ─────────────────────────────────────────────────────────────────────
+
+export type UserSortField = "first_name" | "email" | "organization" | "created_at";
+
+export type UserRoleFilter = "super_admin" | "admin" | "staff" | "";
+
+export interface AdminUserFilters {
+  page?: number;
+  search?: string;
+  sort_field?: UserSortField;
+  sort_direction?: SortDirection;
+  date_from?: string;
+  date_to?: string;
+  role?: UserRoleFilter;
+}
+
 export interface AdminOrderFilters {
   page?: number;
   per_page?: number;
