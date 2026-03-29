@@ -2,7 +2,9 @@ import { apiClient, setToken } from "@/lib/api-client";
 import { getPrimaryRole, setPrimaryRoleCookie } from "@/lib/roles";
 import type {
   AdminInvitation,
+  AdminInvitationFilters,
   AdminInvitationValidation,
+  PaginatedResponse,
   SendAdminInvitationData,
   AcceptAdminInvitationData,
   AcceptInvitationResponse,
@@ -40,12 +42,34 @@ export async function acceptAdminInvitation(
 }
 
 /**
- * List all invitations.
+ * List invitations (paginated) with optional search, status, role, sort and date range.
  * Roles allowed: super_admin, admin, staff.
- * NOT paginated — returns the full array.
+ * Handles both paginated and legacy plain-array responses.
  */
-export async function listAdminInvitations(): Promise<AdminInvitation[]> {
-  return apiClient.get<AdminInvitation[]>("/api/admin/invitations");
+export async function listAdminInvitations(
+  filters: AdminInvitationFilters = {}
+): Promise<PaginatedResponse<AdminInvitation>> {
+  const params = new URLSearchParams({ page: String(filters.page ?? 1) });
+  if (filters.search?.trim()) params.set("search", filters.search.trim());
+  if (filters.status) params.set("status", filters.status);
+  if (filters.role) params.set("role", filters.role);
+  if (filters.sort_field) params.set("sort_field", filters.sort_field);
+  if (filters.sort_direction) params.set("sort_direction", filters.sort_direction);
+  if (filters.date_from) params.set("date_from", filters.date_from);
+  if (filters.date_to) params.set("date_to", filters.date_to);
+  const response = await apiClient.get<PaginatedResponse<AdminInvitation> | AdminInvitation[]>(
+    `/api/admin/invitations?${params.toString()}`
+  );
+  // Normalise: backend may still return a plain array before pagination is implemented
+  if (Array.isArray(response)) {
+    return {
+      data: response,
+      current_page: 1,
+      last_page: 1,
+      total: response.length,
+    };
+  }
+  return response;
 }
 
 /**

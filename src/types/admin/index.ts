@@ -279,6 +279,26 @@ export interface AdminInvoice {
 
 export type InvitationRole = "admin" | "staff";
 
+export type InvitationStatus = "pending" | "expired" | "accepted";
+
+export type InvitationSortField =
+  | "email"
+  | "role"
+  | "status"
+  | "expires_at"
+  | "created_at";
+
+export interface AdminInvitationFilters {
+  page?: number;
+  search?: string;
+  status?: InvitationStatus | "";
+  role?: InvitationRole | "";
+  sort_field?: InvitationSortField;
+  sort_direction?: SortDirection;
+  date_from?: string;
+  date_to?: string;
+}
+
 export interface InvitationInviter {
   id: number;
   first_name: string;
