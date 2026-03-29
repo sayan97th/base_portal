@@ -24,7 +24,7 @@ const STATUS_STYLES: Record<OrderStatus, string> = {
     "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400",
 };
 
-type SortableColumn = "order_title" | "status" | "total_amount" | "created_at";
+type SortableColumn = "order_title" | "status" | "total_amount" | "created_at" | "customer";
 
 function SortIcon({
   field,
@@ -88,6 +88,9 @@ export default function AdminOrdersContent() {
   );
   const [sort_direction, setSortDirection] = useState<SortDirection>("desc");
 
+  const [date_from, setDateFrom] = useState("");
+  const [date_to, setDateTo] = useState("");
+
   // Debounce the search so we don't fire a request on every keystroke
   const debounced_search = useDebounce(search_input, 450);
 
@@ -109,7 +112,7 @@ export default function AdminOrdersContent() {
     []
   );
 
-  // Re-fetch whenever page, debounced search, status, or sort changes
+  // Re-fetch whenever page, debounced search, status, sort, or date range changes
   useEffect(() => {
     fetchOrders({
       page,
@@ -117,8 +120,10 @@ export default function AdminOrdersContent() {
       status: status_filter || undefined,
       sort_field,
       sort_direction,
+      date_from: date_from || undefined,
+      date_to: date_to || undefined,
     });
-  }, [fetchOrders, page, debounced_search, status_filter, sort_field, sort_direction]);
+  }, [fetchOrders, page, debounced_search, status_filter, sort_field, sort_direction, date_from, date_to]);
 
   // Reset to page 1 when filters change (but not page itself)
   function handleSearchChange(value: string) {
@@ -147,12 +152,20 @@ export default function AdminOrdersContent() {
     setPage(1);
   }
 
-  // "Clear all" from the bar resets sort to default
+  function handleDateRangeChange(from: string, to: string) {
+    setDateFrom(from);
+    setDateTo(to);
+    setPage(1);
+  }
+
+  // "Clear all" from the bar resets all filters to defaults
   function handleClearAll() {
     setSearchInput("");
     setStatusFilter("");
     setSortField("created_at");
     setSortDirection("desc");
+    setDateFrom("");
+    setDateTo("");
     setPage(1);
   }
 
@@ -176,6 +189,9 @@ export default function AdminOrdersContent() {
         sort_field={sort_field}
         sort_direction={sort_direction}
         on_sort_change={handleSortChange}
+        date_from={date_from}
+        date_to={date_to}
+        on_date_range_change={handleDateRangeChange}
         total={total}
         is_loading={is_loading}
         on_clear_all={handleClearAll}
@@ -207,9 +223,19 @@ export default function AdminOrdersContent() {
                   </span>
                 </th>
 
-                {/* Customer — not sortable */}
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  Customer
+                {/* Customer — sortable */}
+                <th
+                  className="group cursor-pointer px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 transition hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  onClick={() => handleColumnSort("customer")}
+                >
+                  <span className="inline-flex items-center">
+                    Customer
+                    <SortIcon
+                      field="customer"
+                      active_field={sort_field}
+                      direction={sort_direction}
+                    />
+                  </span>
                 </th>
 
                 {/* Status — sortable */}

@@ -24,6 +24,8 @@ export async function listAdminOrders(
     status,
     sort_field,
     sort_direction,
+    date_from,
+    date_to,
   } = filters;
 
   const params = new URLSearchParams();
@@ -33,6 +35,8 @@ export async function listAdminOrders(
   if (status) params.set("status", status);
   if (sort_field) params.set("sort_field", sort_field);
   if (sort_direction) params.set("sort_direction", sort_direction);
+  if (date_from) params.set("date_from", date_from);
+  if (date_to) params.set("date_to", date_to);
 
   return apiClient.get<PaginatedResponse<AdminOrder>>(
     `/api/admin/orders?${params.toString()}`

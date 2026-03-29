@@ -44,7 +44,12 @@ export interface PaginatedResponse<T> {
 
 export type OrderStatus = "pending" | "processing" | "completed" | "cancelled";
 
-export type OrderSortField = "created_at" | "total_amount" | "status" | "order_title";
+export type OrderSortField =
+  | "created_at"
+  | "total_amount"
+  | "status"
+  | "order_title"
+  | "customer";
 
 export type SortDirection = "asc" | "desc";
 
@@ -55,6 +60,8 @@ export interface AdminOrderFilters {
   status?: OrderStatus | "";
   sort_field?: OrderSortField;
   sort_direction?: SortDirection;
+  date_from?: string;
+  date_to?: string;
 }
 
 export interface OrderUser {
