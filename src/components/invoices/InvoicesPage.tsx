@@ -33,7 +33,7 @@ function TableSkeleton() {
     <>
       {Array.from({ length: PER_PAGE }).map((_, i) => (
         <TableRow key={i}>
-          {Array.from({ length: 5 }).map((__, j) => (
+          {Array.from({ length: 6 }).map((__, j) => (
             <TableCell key={j} className="py-3">
               <div className="h-4 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
             </TableCell>
@@ -147,7 +147,7 @@ const InvoicesPage: React.FC = () => {
         <Table>
           <TableHeader className="border-y border-gray-100 dark:border-gray-800">
             <TableRow>
-              {["Invoice", "Date", "Date Due", "Total", "Status"].map((col) => (
+              {["Invoice", "Date", "Date Due", "Total", "Status", "Actions"].map((col) => (
                 <TableCell
                   key={col}
                   isHeader
@@ -165,7 +165,7 @@ const InvoicesPage: React.FC = () => {
             ) : invoices.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={6}
                   className="py-12 text-center text-sm text-gray-400 dark:text-gray-500"
                 >
                   {total === 0 && !search
@@ -211,6 +211,18 @@ const InvoicesPage: React.FC = () => {
                     >
                       {invoice.status === "paid" ? "Paid" : "Void"}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap py-3">
+                    <Link
+                      href={`/invoices/${invoice.unique_id}`}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-coral-200 bg-coral-50 px-3 py-1.5 text-xs font-medium text-coral-600 transition-colors hover:bg-coral-500 hover:text-white dark:border-coral-500/30 dark:bg-coral-500/10 dark:text-coral-400 dark:hover:bg-coral-500 dark:hover:text-white"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <path d="M6 2.5C3.5 2.5 1.5 6 1.5 6C1.5 6 3.5 9.5 6 9.5C8.5 9.5 10.5 6 10.5 6C10.5 6 8.5 2.5 6 2.5Z" stroke="currentColor" strokeWidth="1.2" />
+                        <circle cx="6" cy="6" r="1.5" stroke="currentColor" strokeWidth="1.2" />
+                      </svg>
+                      View
+                    </Link>
                   </TableCell>
                 </TableRow>
               ))
