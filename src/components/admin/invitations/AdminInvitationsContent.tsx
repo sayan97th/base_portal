@@ -99,7 +99,8 @@ export default function AdminInvitationsContent() {
   // Debounce search — avoids firing a request on every keystroke
   const debounced_search = useDebounce(search_input, 450);
 
-  // Send invitation form
+  // Send invitation modal & form
+  const [is_modal_open, setIsModalOpen] = useState(false);
   const [form, setForm] = useState<SendAdminInvitationData>({ email: "", role: "staff" });
   const [is_sending, setIsSending] = useState(false);
   const [send_error, setSendError] = useState<string | null>(null);
@@ -188,6 +189,19 @@ export default function AdminInvitationsContent() {
 
   // ── Send invitation handlers ───────────────────────────────────────────────
 
+  function handleOpenModal() {
+    setForm({ email: "", role: "staff" });
+    setSendError(null);
+    setSendSuccess(false);
+    setIsModalOpen(true);
+  }
+
+  function handleCloseModal() {
+    setIsModalOpen(false);
+    setSendError(null);
+    setSendSuccess(false);
+  }
+
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setShowConfirmDialog(true);
@@ -213,6 +227,10 @@ export default function AdminInvitationsContent() {
         date_from: date_from || undefined,
         date_to: date_to || undefined,
       });
+      setTimeout(() => {
+        setIsModalOpen(false);
+        setSendSuccess(false);
+      }, 1800);
     } catch (err: unknown) {
       const api_err = err as ApiError;
       setSendError(api_err.message || "Failed to send invitation.");
@@ -245,82 +263,35 @@ export default function AdminInvitationsContent() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-          Team Invitations
-        </h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Invite new staff members to the platform. Only invited users can
-          register as staff or admin.
-        </p>
-      </div>
-
-      {/* Send invitation form — admins only */}
-      {isAdmin && (
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
-          <h2 className="mb-4 text-base font-semibold text-gray-800 dark:text-white">
-            Send Invitation
-          </h2>
-
-          {send_success && (
-            <div className="mb-4 rounded-lg bg-success-50 p-3 text-sm text-success-700 dark:bg-success-500/10 dark:text-success-400">
-              Invitation sent successfully.
-            </div>
-          )}
-          {send_error && (
-            <div className="mb-4 rounded-lg bg-error-50 p-3 text-sm text-error-600 dark:bg-error-500/10 dark:text-error-400">
-              {send_error}
-            </div>
-          )}
-
-          <form onSubmit={handleFormSubmit} className="flex flex-col gap-4 sm:flex-row sm:items-end">
-            <div className="flex-1">
-              <label
-                htmlFor="invite_email"
-                className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
-                Email address
-              </label>
-              <input
-                id="invite_email"
-                type="email"
-                required
-                value={form.email}
-                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                placeholder="colleague@company.com"
-                className="h-11 w-full rounded-lg border border-gray-300 bg-white px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500"
-              />
-            </div>
-            <div className="w-full sm:w-48">
-              <label
-                htmlFor="invite_role"
-                className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
-                Role
-              </label>
-              <select
-                id="invite_role"
-                value={form.role}
-                onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as InvitationRole }))}
-                className="h-11 w-full rounded-lg border border-gray-300 bg-white px-4 text-sm text-gray-900 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-              >
-                {available_roles.map((r) => (
-                  <option key={r.value} value={r.value}>
-                    {r.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button
-              type="submit"
-              disabled={is_sending}
-              className="h-11 rounded-lg bg-brand-500 px-6 text-sm font-medium text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
-            >
-              {is_sending ? "Sending..." : "Send Invite"}
-            </button>
-          </form>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+            Team Invitations
+          </h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Invite new staff members to the platform. Only invited users can
+            register as staff or admin.
+          </p>
         </div>
-      )}
+
+        {isAdmin && (
+          <button
+            onClick={handleOpenModal}
+            className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+          >
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2.2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Invite Member
+          </button>
+        )}
+      </div>
 
       {/* Filters bar */}
       <InvitationFiltersBar
@@ -582,6 +553,173 @@ export default function AdminInvitationsContent() {
           </div>
         )}
       </div>
+
+      {/* Send Invitation modal */}
+      {is_modal_open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={handleCloseModal}
+          />
+          <div className="relative w-full max-w-lg rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900">
+
+            {/* Modal header */}
+            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-5 dark:border-gray-800">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-50 dark:bg-brand-500/10">
+                  <svg
+                    className="h-5 w-5 text-brand-500"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.8}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25H4.5a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5H4.5a2.25 2.25 0 00-2.25 2.25m19.5 0L12 13.5 2.25 6.75" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                    Invite a Team Member
+                  </h2>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    They will receive an email with a sign-up link.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleCloseModal}
+                className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal body */}
+            <div className="px-6 py-5">
+              {send_success && (
+                <div className="mb-4 flex items-center gap-2 rounded-lg bg-success-50 p-3 text-sm text-success-700 dark:bg-success-500/10 dark:text-success-400">
+                  <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                  </svg>
+                  Invitation sent successfully! Closing…
+                </div>
+              )}
+              {send_error && (
+                <div className="mb-4 flex items-center gap-2 rounded-lg bg-error-50 p-3 text-sm text-error-600 dark:bg-error-500/10 dark:text-error-400">
+                  <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                  </svg>
+                  {send_error}
+                </div>
+              )}
+
+              <form onSubmit={handleFormSubmit} className="space-y-4">
+                <div>
+                  <label
+                    htmlFor="invite_email"
+                    className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    Email address
+                  </label>
+                  <input
+                    id="invite_email"
+                    type="email"
+                    required
+                    autoFocus
+                    value={form.email}
+                    onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                    placeholder="colleague@company.com"
+                    className="h-11 w-full rounded-lg border border-gray-300 bg-white px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="invite_role"
+                    className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    Role
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {available_roles.map((r) => (
+                      <label
+                        key={r.value}
+                        className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3.5 transition-all ${
+                          form.role === r.value
+                            ? "border-brand-400 bg-brand-50 dark:border-brand-500 dark:bg-brand-500/10"
+                            : "border-gray-200 bg-white hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-gray-600"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="invite_role"
+                          value={r.value}
+                          checked={form.role === r.value}
+                          onChange={() => setForm((f) => ({ ...f, role: r.value as InvitationRole }))}
+                          className="sr-only"
+                        />
+                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                          r.value === "admin"
+                            ? "bg-purple-100 dark:bg-purple-500/20"
+                            : "bg-brand-100 dark:bg-brand-500/20"
+                        }`}>
+                          {r.value === "admin" ? (
+                            <svg className="h-4 w-4 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                            </svg>
+                          ) : (
+                            <svg className="h-4 w-4 text-brand-600 dark:text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                            </svg>
+                          )}
+                        </div>
+                        <div>
+                          <p className={`text-sm font-medium ${
+                            form.role === r.value
+                              ? "text-brand-700 dark:text-brand-300"
+                              : "text-gray-800 dark:text-gray-200"
+                          }`}>
+                            {r.label}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {r.value === "admin" ? "Full access" : "Limited access"}
+                          </p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Modal footer */}
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleCloseModal}
+                    className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-transparent dark:text-gray-300 dark:hover:bg-gray-800"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={is_sending || send_success}
+                    className="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-600 disabled:opacity-60"
+                  >
+                    {is_sending && (
+                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                      </svg>
+                    )}
+                    {is_sending ? "Sending…" : "Send Invitation"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Confirmation dialog */}
       {show_confirm_dialog && (
