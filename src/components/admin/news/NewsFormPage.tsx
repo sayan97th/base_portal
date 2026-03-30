@@ -7,8 +7,13 @@ import flatpickr from "flatpickr";
 import "flatpickr/dist/flatpickr.css";
 import type { NewsPost, PostType, PostStatus, CreateNewsPostPayload } from "@/types/admin/news";
 import type { Coupon } from "@/types/admin/coupons";
-import { createAdminNewsPost, updateAdminNewsPost, getAdminNewsPost } from "@/services/admin/news.service";
+import { createAdminNewsPost, updateAdminNewsPost, getAdminNewsPost, uploadAdminNewsImage } from "@/services/admin/news.service";
 import { listAdminCoupons } from "@/services/admin/coupons.service";
+
+// ── Image upload constants ────────────────────────────────────────────────────
+
+const IMAGE_MAX_SIZE = 5 * 1024 * 1024; // 5 MB
+const IMAGE_ALLOWED_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -221,6 +226,165 @@ function TextArea({ has_error, className = "", ...props }: TextAreaProps) {
           : "border-gray-200 bg-white focus:border-brand-400 focus:ring-brand-200 dark:border-gray-600 dark:bg-gray-700 dark:focus:border-brand-500 dark:focus:ring-brand-500/30"
       } ${className}`}
     />
+  );
+}
+
+// ── Image Upload Field ────────────────────────────────────────────────────────
+
+interface ImageUploadFieldProps {
+  label: string;
+  value: string;
+  onChange: (url: string) => void;
+  hint?: string;
+  id: string;
+}
+
+function ImageUploadField({ label, value, onChange, hint, id }: ImageUploadFieldProps) {
+  const [preview, setPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [upload_error, setUploadError] = useState<string | null>(null);
+  const file_input_ref = useRef<HTMLInputElement>(null);
+
+  const displayed_src = preview || value || null;
+
+  const validateFile = (file: File): string | null => {
+    if (!IMAGE_ALLOWED_TYPES.includes(file.type))
+      return "Invalid file type. Use PNG, JPG, GIF, or WebP.";
+    if (file.size > IMAGE_MAX_SIZE)
+      return "File exceeds 5 MB. Please choose a smaller image.";
+    return null;
+  };
+
+  const handleFileSelect = async (file: File) => {
+    const err = validateFile(file);
+    if (err) {
+      setUploadError(err);
+      return;
+    }
+    setUploadError(null);
+
+    // Show local preview immediately
+    const reader = new FileReader();
+    reader.onload = (e) => setPreview(e.target?.result as string);
+    reader.readAsDataURL(file);
+
+    setUploading(true);
+    try {
+      const response = await uploadAdminNewsImage(file);
+      onChange(response.url);
+      setPreview(null); // use the persisted URL going forward
+    } catch {
+      setUploadError("Upload failed. Please try again.");
+      setPreview(null);
+    } finally {
+      setUploading(false);
+      if (file_input_ref.current) file_input_ref.current.value = "";
+    }
+  };
+
+  const handleRemove = () => {
+    setPreview(null);
+    setUploadError(null);
+    onChange("");
+    if (file_input_ref.current) file_input_ref.current.value = "";
+  };
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+        {label}
+      </label>
+
+      <input
+        ref={file_input_ref}
+        id={id}
+        type="file"
+        accept="image/png,image/jpeg,image/gif,image/webp"
+        className="hidden"
+        disabled={uploading}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handleFileSelect(f);
+        }}
+      />
+
+      {displayed_src ? (
+        /* ── Preview state ── */
+        <div className="relative overflow-hidden rounded-xl border border-gray-200 dark:border-gray-600">
+          <img
+            src={displayed_src}
+            alt=""
+            className="h-44 w-full object-cover"
+          />
+          {/* Uploading overlay */}
+          {uploading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+              <div className="flex flex-col items-center gap-2 text-white">
+                <svg className="h-7 w-7 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                <span className="text-xs font-medium">Uploading…</span>
+              </div>
+            </div>
+          )}
+          {/* Actions bar */}
+          {!uploading && (
+            <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between bg-black/50 px-3 py-2 backdrop-blur-sm">
+              <button
+                type="button"
+                onClick={() => file_input_ref.current?.click()}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-white/20 px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-white/30"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                </svg>
+                Change
+              </button>
+              <button
+                type="button"
+                onClick={handleRemove}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-red-500/70 px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-red-500/90"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                </svg>
+                Remove
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* ── Drop zone state ── */
+        <button
+          type="button"
+          onClick={() => file_input_ref.current?.click()}
+          disabled={uploading}
+          className="flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 px-6 py-10 text-center transition hover:border-brand-400 hover:bg-brand-50/30 disabled:cursor-not-allowed dark:border-gray-600 dark:bg-gray-700/30 dark:hover:border-brand-500 dark:hover:bg-brand-500/5"
+        >
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-gray-200 dark:bg-gray-700 dark:ring-gray-600">
+            <svg className="h-6 w-6 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              Click to upload
+            </p>
+            <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
+              PNG, JPG, GIF or WebP · max 5 MB
+            </p>
+          </div>
+        </button>
+      )}
+
+      {upload_error && (
+        <p className="text-xs font-medium text-red-500">{upload_error}</p>
+      )}
+      {hint && !upload_error && (
+        <p className="text-xs text-gray-400 dark:text-gray-500">{hint}</p>
+      )}
+    </div>
   );
 }
 
@@ -696,24 +860,21 @@ export default function NewsFormPage({ mode, post_id }: NewsFormPageProps) {
                 }
               >
                 <div className="grid gap-5">
-                  <Field label="Banner Image URL" error={errors.image_url} hint="Full URL to the banner/hero image">
-                    <Input
-                      type="url"
-                      value={form.image_url}
-                      onChange={(e) => updateField("image_url", e.target.value)}
-                      placeholder="https://example.com/images/banner.jpg"
-                      has_error={!!errors.image_url}
-                    />
-                  </Field>
+                  <ImageUploadField
+                    id="image_upload_banner"
+                    label="Banner Image"
+                    value={form.image_url}
+                    onChange={(url) => updateField("image_url", url)}
+                    hint="Main image shown at the top of the post card (recommended: 1200×630 px)"
+                  />
 
-                  <Field label="Thumbnail URL" hint="Small preview image (optional)">
-                    <Input
-                      type="url"
-                      value={form.thumbnail_url}
-                      onChange={(e) => updateField("thumbnail_url", e.target.value)}
-                      placeholder="https://example.com/images/thumb.jpg"
-                    />
-                  </Field>
+                  <ImageUploadField
+                    id="image_upload_thumbnail"
+                    label="Thumbnail"
+                    value={form.thumbnail_url}
+                    onChange={(url) => updateField("thumbnail_url", url)}
+                    hint="Small preview shown in lists and cards (optional)"
+                  />
 
                   <div className="grid gap-5 sm:grid-cols-2">
                     <Field label="CTA Button Text" hint='e.g. "Learn More", "Claim Offer"'>

@@ -49,3 +49,14 @@ export async function toggleAdminNewsPostStatus(
 export async function deleteAdminNewsPost(id: string): Promise<void> {
   return apiClient.delete<void>(`/api/admin/news/${id}`);
 }
+
+export interface NewsImageUploadResponse {
+  url: string;
+  path: string;
+}
+
+export async function uploadAdminNewsImage(file: File): Promise<NewsImageUploadResponse> {
+  const form_data = new FormData();
+  form_data.append("image", file);
+  return apiClient.postFormData<NewsImageUploadResponse>("/api/admin/news/upload", form_data);
+}
