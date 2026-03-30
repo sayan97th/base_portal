@@ -44,6 +44,12 @@ const EmptyReportIcon = () => (
   </svg>
 );
 
+const ClockIcon = () => (
+  <svg className="h-16 w-16" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
+
 // ── Skeleton loader ─────────────────────────────────────────────────────────────
 
 const Skeleton = ({ className }: { className?: string }) => (
@@ -130,23 +136,35 @@ export default function ClientOrderReportContent({ order_id }: ClientOrderReport
   const [order_status, setOrderStatus] = useState<OrderStatus | null>(null);
   const [is_loading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [report_not_found, setReportNotFound] = useState(false);
 
   useEffect(() => {
     async function load() {
       setIsLoading(true);
       setError(null);
-      try {
-        const [report_data, order_data] = await Promise.all([
-          fetchClientOrderReport(order_id),
-          linkBuildingService.fetchLinkBuildingOrderDetail(order_id),
-        ]);
-        setReport(report_data);
-        setOrderStatus(order_data.status);
-      } catch {
-        setError("We couldn't load the report for this order. Please try again.");
-      } finally {
-        setIsLoading(false);
+      setReportNotFound(false);
+
+      const [report_result, order_result] = await Promise.allSettled([
+        fetchClientOrderReport(order_id),
+        linkBuildingService.fetchLinkBuildingOrderDetail(order_id),
+      ]);
+
+      if (order_result.status === "fulfilled") {
+        setOrderStatus(order_result.value.status);
       }
+
+      if (report_result.status === "fulfilled") {
+        setReport(report_result.value);
+      } else {
+        const err = report_result.reason as { status_code?: number };
+        if (err.status_code === 404) {
+          setReportNotFound(true);
+        } else {
+          setError("We couldn't load the report for this order. Please try again.");
+        }
+      }
+
+      setIsLoading(false);
     }
     load();
   }, [order_id]);
@@ -180,6 +198,44 @@ export default function ClientOrderReportContent({ order_id }: ClientOrderReport
               >
                 Try again
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Report not yet available */}
+      {!is_loading && report_not_found && (
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+          <div className="h-1 w-full bg-gradient-to-r from-brand-400 via-brand-500 to-brand-600" />
+          <div className="flex flex-col items-center gap-5 px-6 py-16 text-center">
+            <div className="text-gray-200 dark:text-gray-700">
+              <ClockIcon />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-center gap-2">
+                <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
+                  Your Report Is Being Prepared
+                </h2>
+                {order_status && (() => {
+                  const cfg = ORDER_STATUS_CONFIG[order_status];
+                  return (
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${cfg.bg} ${cfg.text}`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
+                      {cfg.label}
+                    </span>
+                  );
+                })()}
+              </div>
+              <p className="mx-auto max-w-md text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+                We&apos;ve received your order and our team is actively working on your link placements.
+                Your report will appear here once the first deliverables are ready — check back soon to track your campaign&apos;s progress.
+              </p>
+            </div>
+            <div className="mt-2 flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50/60 px-4 py-2 text-xs font-medium text-blue-600 dark:border-blue-500/20 dark:bg-blue-500/5 dark:text-blue-400">
+              <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+              </svg>
+              No action required on your end — we&apos;ll handle everything from here.
             </div>
           </div>
         </div>
