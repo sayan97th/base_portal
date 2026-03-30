@@ -1,8 +1,17 @@
 import { apiClient } from "@/lib/api-client";
 import type { InvoiceDetail, InvoiceSummary } from "@/components/invoices/invoiceData";
 
-interface InvoiceListResponse {
+export interface InvoiceListFilters {
+  page?: number;
+  per_page?: number;
+}
+
+interface PaginatedInvoiceListResponse {
   data: InvoiceSummary[];
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
 }
 
 interface InvoiceDetailResponse {
@@ -21,9 +30,12 @@ interface CreateInvoiceResponse {
 }
 
 export const invoicesService = {
-  async getInvoiceList(): Promise<InvoiceSummary[]> {
-    const response = await apiClient.get<InvoiceListResponse>("/api/invoices");
-    return response.data;
+  async getInvoiceList(filters: InvoiceListFilters = {}): Promise<PaginatedInvoiceListResponse> {
+    const { page = 1, per_page = 10 } = filters;
+    const params = new URLSearchParams();
+    params.set("page", String(page));
+    params.set("per_page", String(per_page));
+    return apiClient.get<PaginatedInvoiceListResponse>(`/api/invoices?${params.toString()}`);
   },
 
   async getInvoiceDetail(unique_id: string): Promise<InvoiceDetail> {

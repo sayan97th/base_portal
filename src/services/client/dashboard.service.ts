@@ -159,7 +159,7 @@ const fetchPaginatedTableRows = async (
 
 export const dashboardService = {
   async fetchOrders(): Promise<LinkBuildingOrderSummary[]> {
-    return linkBuildingService.fetchMyOrders();
+    return linkBuildingService.fetchAllOrders();
   },
   fetchPaginatedTableRows,
   computeStats,

@@ -6,6 +6,7 @@ import type {
   DrTier,
   LinkBuildingOrderDetail,
   LinkBuildingOrderSummary,
+  OrderListFilters,
   OrderPlacementFilters,
   OrderPlacementRow,
 } from "@/types/client/link-building";
@@ -17,6 +18,8 @@ interface DrTiersResponse {
 interface OrdersListResponse {
   data: LinkBuildingOrderSummary[];
 }
+
+interface PaginatedOrdersListResponse extends ClientPaginatedResponse<LinkBuildingOrderSummary> {}
 
 interface OrderDetailResponse {
   data: LinkBuildingOrderDetail;
@@ -39,11 +42,16 @@ export const linkBuildingService = {
     return response.data;
   },
 
-  async fetchMyOrders(): Promise<LinkBuildingOrderSummary[]> {
-    const response = await apiClient.get<OrdersListResponse>(
-      "/api/link-building/orders"
+  async fetchMyOrders(
+    filters: OrderListFilters = {}
+  ): Promise<PaginatedOrdersListResponse> {
+    const { page = 1, per_page = 10 } = filters;
+    const params = new URLSearchParams();
+    params.set("page", String(page));
+    params.set("per_page", String(per_page));
+    return apiClient.get<PaginatedOrdersListResponse>(
+      `/api/link-building/orders?${params.toString()}`
     );
-    return response.data;
   },
 
   async createLinkBuildingOrder(

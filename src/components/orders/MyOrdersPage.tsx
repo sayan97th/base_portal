@@ -10,8 +10,11 @@ import {
   TableRow,
   TableCell,
 } from "@/components/ui/table";
+import Pagination from "@/components/tables/Pagination";
 import { linkBuildingService } from "@/services/client/link-building.service";
 import type { LinkBuildingOrderSummary, OrderStatus } from "@/types/client/link-building";
+
+const PER_PAGE = 10;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -22,7 +25,6 @@ function formatDate(iso: string): string {
     day: "numeric",
   });
 }
-
 
 function formatRelativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -126,19 +128,24 @@ const MyOrdersPage: React.FC = () => {
   const [orders, setOrders] = useState<LinkBuildingOrderSummary[]>([]);
   const [is_loading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [last_page, setLastPage] = useState(1);
+  const [total, setTotal] = useState(0);
 
   const loadOrders = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await linkBuildingService.fetchMyOrders();
-      setOrders(data);
+      const response = await linkBuildingService.fetchMyOrders({ page, per_page: PER_PAGE });
+      setOrders(response.data);
+      setLastPage(response.last_page);
+      setTotal(response.total);
     } catch {
       setError("We couldn't load your orders. Please try again.");
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [page]);
 
   useEffect(() => {
     loadOrders();
@@ -156,15 +163,22 @@ const MyOrdersPage: React.FC = () => {
             View and track all your link building orders.
           </p>
         </div>
-        <Link
-          href="/link-building"
-          className="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-600"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-          </svg>
-          New Order
-        </Link>
+        <div className="flex items-center gap-4">
+          {!is_loading && total > 0 && (
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {total} order{total !== 1 ? "s" : ""}
+            </p>
+          )}
+          <Link
+            href="/link-building"
+            className="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-600"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            New Order
+          </Link>
+        </div>
       </div>
 
       {/* ── Error ──────────────────────────────────────────────────────────── */}
@@ -183,7 +197,6 @@ const MyOrdersPage: React.FC = () => {
       {/* ── Orders table ──────────────────────────────────────────────────── */}
       {!error && (
         <div>
-
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
             <div className="overflow-x-auto">
               <Table>
@@ -346,6 +359,16 @@ const MyOrdersPage: React.FC = () => {
               </Table>
             </div>
           </div>
+
+          {!is_loading && last_page > 1 && (
+            <div className="mt-4 flex justify-end">
+              <Pagination
+                currentPage={page}
+                totalPages={last_page}
+                onPageChange={setPage}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -127,6 +127,11 @@ export interface ClientPaginatedResponse<T> {
   total: number;
 }
 
+export interface OrderListFilters {
+  page?: number;
+  per_page?: number;
+}
+
 export interface OrderPlacementFilters {
   page?: number;
   per_page?: number;

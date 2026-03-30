@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Badge from "../ui/badge/Badge";
 import {
@@ -10,36 +10,51 @@ import {
   TableRow,
   TableCell,
 } from "../ui/table";
+import Pagination from "@/components/tables/Pagination";
 import { invoicesService } from "@/services/client/invoices.service";
 import type { InvoiceSummary } from "./invoiceData";
+
+const PER_PAGE = 10;
 
 const InvoicesPage: React.FC = () => {
   const [invoices, setInvoices] = useState<InvoiceSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [last_page, setLastPage] = useState(1);
+  const [total, setTotal] = useState(0);
+
+  const loadInvoices = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await invoicesService.getInvoiceList({ page, per_page: PER_PAGE });
+      setInvoices(response.data);
+      setLastPage(response.last_page);
+      setTotal(response.total);
+    } catch {
+      setError("Failed to load invoices. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, [page]);
 
   useEffect(() => {
-    const loadInvoices = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await invoicesService.getInvoiceList();
-        setInvoices(data);
-      } catch {
-        setError("Failed to load invoices. Please try again.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadInvoices();
-  }, []);
+  }, [loadInvoices]);
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-        Invoices
-      </h1>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+          Invoices
+        </h1>
+        {!loading && total > 0 && (
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {total} invoice{total !== 1 ? "s" : ""}
+          </p>
+        )}
+      </div>
 
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
         {loading ? (
@@ -141,6 +156,16 @@ const InvoicesPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {!loading && !error && last_page > 1 && (
+        <div className="flex justify-end">
+          <Pagination
+            currentPage={page}
+            totalPages={last_page}
+            onPageChange={setPage}
+          />
+        </div>
+      )}
     </div>
   );
 };
