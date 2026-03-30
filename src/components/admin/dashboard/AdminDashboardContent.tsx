@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import NewsFeedWidget from "@/components/admin/news/NewsFeedWidget";
 import { useAuth } from "@/context/AuthContext";
 import {
   GroupIcon,
@@ -553,6 +554,9 @@ export default function AdminDashboardContent() {
               ))}
             </div>
           </div>
+
+          {/* News & Promos Feed */}
+          <NewsFeedWidget />
 
           {/* Quick Actions */}
           <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
