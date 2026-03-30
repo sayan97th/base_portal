@@ -117,6 +117,40 @@ export interface CreateOrderResponse {
   created_at: string;
 }
 
+// ── Paginated Responses ────────────────────────────────────────────────────────
+
+export interface ClientPaginatedResponse<T> {
+  data: T[];
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+}
+
+export interface OrderPlacementFilters {
+  page?: number;
+  per_page?: number;
+  search?: string;
+  status?: OrderStatus;
+}
+
+/**
+ * Flat row returned by GET /api/link-building/order-placements.
+ * One row = one placement (keyword + landing page) with its order context.
+ * The backend builds this by joining orders → items (with dr_tier) → placements.
+ */
+export interface OrderPlacementRow {
+  order_id: string;
+  start_date: string;
+  dr_type: string;
+  keyword: string | null;
+  landing_page: string | null;
+  status: OrderStatus;
+  live_link: string;
+  completed_date: string;
+  dr: number | null;
+}
+
 // ── Order Tracking ─────────────────────────────────────────────────────────────
 
 export interface OrderUpdateEntry {

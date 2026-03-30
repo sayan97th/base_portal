@@ -1,10 +1,13 @@
 import { apiClient } from "@/lib/api-client";
 import type {
+  ClientPaginatedResponse,
   CreateOrderPayload,
   CreateOrderResponse,
   DrTier,
   LinkBuildingOrderDetail,
   LinkBuildingOrderSummary,
+  OrderPlacementFilters,
+  OrderPlacementRow,
 } from "@/types/client/link-building";
 
 interface DrTiersResponse {
@@ -60,5 +63,29 @@ export const linkBuildingService = {
       `/api/link-building/orders/${order_id}`
     );
     return response.data;
+  },
+
+  /**
+   * Fetches paginated, flat placement rows for the dashboard table.
+   * Hits GET /api/link-building/order-placements — a Laravel endpoint that
+   * joins orders → items (with dr_tier) → placements and returns a standard
+   * paginator response.
+   *
+   * Query params forwarded to the backend:
+   *   page, per_page, search (order_id / keyword / status), status
+   */
+  async fetchMyOrderPlacements(
+    filters: OrderPlacementFilters = {}
+  ): Promise<ClientPaginatedResponse<OrderPlacementRow>> {
+    const { page = 1, per_page = 10, search, status } = filters;
+    const params = new URLSearchParams();
+    params.set("page", String(page));
+    params.set("per_page", String(per_page));
+    if (search?.trim()) params.set("search", search.trim());
+    if (status) params.set("status", status);
+
+    return apiClient.get<ClientPaginatedResponse<OrderPlacementRow>>(
+      `/api/link-building/order-placements?${params.toString()}`
+    );
   },
 };

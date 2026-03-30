@@ -1,7 +1,8 @@
 import { linkBuildingService } from "./link-building.service";
 import type {
+  ClientPaginatedResponse,
   LinkBuildingOrderSummary,
-  LinkBuildingOrderDetail,
+  OrderPlacementFilters,
   OrderStatus,
 } from "@/types/client/link-building";
 
@@ -112,6 +113,7 @@ export const mapOrderStatus = (api_status: OrderStatus): DisplayStatus =>
 /**
  * A flat row representing a single placement (keyword + landing page)
  * within a link-building order item.  One row = one link being built.
+ * status is already mapped to a human-readable display value.
  */
 export interface DashboardTableRow {
   /** Short display ID derived from the order UUID */
@@ -135,66 +137,22 @@ export interface DashboardTableRow {
 }
 
 /**
- * Builds flat DashboardTableRow[] from a fully-loaded order detail.
- * Each placement inside each item becomes its own table row.
- * If an item has no placements yet, one placeholder row is created.
+ * Fetches paginated placement rows from the server.
+ * Calls GET /api/link-building/order-placements — a Laravel endpoint that
+ * joins orders → items (with dr_tier) → placements.
+ * Maps the raw OrderStatus to a DisplayStatus before returning.
  */
-const expandOrderToRows = (detail: LinkBuildingOrderDetail): DashboardTableRow[] => {
-  const rows: DashboardTableRow[] = [];
-  const display_status = mapOrderStatus(detail.status);
-  const completed_date =
-    detail.status === "completed" ? detail.updated_at : "";
-
-  for (const item of detail.items) {
-    const dr_type = item.dr_tier?.dr_label ?? "—";
-
-    if (item.placements.length === 0) {
-      // Item exists but no keyword placements entered yet
-      rows.push({
-        order_id: detail.id,
-        start_date: detail.created_at,
-        dr_type,
-        keyword: null,
-        landing_page: null,
-        status: display_status,
-        live_link: "",
-        completed_date,
-        dr: null,
-      });
-    } else {
-      for (const placement of item.placements) {
-        rows.push({
-          order_id: detail.id,
-          start_date: detail.created_at,
-          dr_type,
-          keyword: placement.keyword,
-          landing_page: placement.landing_page,
-          status: display_status,
-          live_link: "",
-          completed_date,
-          dr: null,
-        });
-      }
-    }
-  }
-
-  return rows;
-};
-
-/**
- * Fetches all orders then loads their full details in parallel to build
- * the flattened table rows (DR type, keyword, landing page per placement).
- */
-const fetchDashboardTableRows = async (): Promise<DashboardTableRow[]> => {
-  const summaries = await linkBuildingService.fetchMyOrders();
-
-  if (summaries.length === 0) return [];
-
-  const details = await Promise.all(
-    summaries.map((o) => linkBuildingService.fetchLinkBuildingOrderDetail(o.id))
-  );
-
-  return details.flatMap(expandOrderToRows);
+const fetchPaginatedTableRows = async (
+  filters: OrderPlacementFilters = {}
+): Promise<ClientPaginatedResponse<DashboardTableRow>> => {
+  const result = await linkBuildingService.fetchMyOrderPlacements(filters);
+  return {
+    ...result,
+    data: result.data.map((row) => ({
+      ...row,
+      status: mapOrderStatus(row.status),
+    })),
+  };
 };
 
 // ── Service Object ────────────────────────────────────────────────────────────
@@ -203,7 +161,7 @@ export const dashboardService = {
   async fetchOrders(): Promise<LinkBuildingOrderSummary[]> {
     return linkBuildingService.fetchMyOrders();
   },
-  fetchDashboardTableRows,
+  fetchPaginatedTableRows,
   computeStats,
   getMonthlyBreakdown,
   mapOrderStatus,

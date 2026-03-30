@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useMemo, useEffect } from "react";
+import React from "react";
 import Link from "next/link";
 import {
   Table,
@@ -9,14 +9,24 @@ import {
   TableRow,
 } from "../ui/table";
 import Badge from "../ui/badge/Badge";
-import type { DashboardTableRow, DisplayStatus } from "@/services/client/dashboard.service";
+import type {
+  DashboardTableRow,
+  DisplayStatus,
+} from "@/services/client/dashboard.service";
 
 interface Props {
   rows: DashboardTableRow[];
   is_loading: boolean;
+  // Server-side pagination metadata
+  current_page: number;
+  last_page: number;
+  total: number;
+  per_page: number;
+  // Controlled inputs — owned by the parent
+  search_term: string;
+  onSearchChange: (value: string) => void;
+  onPageChange: (page: number) => void;
 }
-
-const ITEMS_PER_PAGE = 10;
 
 const status_badge_color: Record<
   DisplayStatus,
@@ -43,10 +53,10 @@ function shortId(id: string): string {
   return id.length > 8 ? id.slice(0, 8).toUpperCase() : id.toUpperCase();
 }
 
-function TableSkeleton() {
+function TableSkeleton({ rows_count }: { rows_count: number }) {
   return (
     <>
-      {[...Array(ITEMS_PER_PAGE)].map((_, i) => (
+      {[...Array(rows_count)].map((_, i) => (
         <TableRow key={i}>
           {[...Array(10)].map((__, j) => (
             <TableCell key={j} className="py-3">
@@ -59,37 +69,33 @@ function TableSkeleton() {
   );
 }
 
-export default function OrderStatusTable({ rows, is_loading }: Props) {
-  const [search_term, setSearchTerm] = useState("");
-  const [attribute_filter, setAttributeFilter] = useState("Links");
-  const [current_page, setCurrentPage] = useState(1);
+/** Generates the page number buttons to show around the current page. */
+function buildPageButtons(current: number, last: number): (number | "...")[] {
+  if (last <= 7) return Array.from({ length: last }, (_, i) => i + 1);
+  const pages: (number | "...")[] = [1];
+  if (current > 3) pages.push("...");
+  for (let p = Math.max(2, current - 1); p <= Math.min(last - 1, current + 1); p++) {
+    pages.push(p);
+  }
+  if (current < last - 2) pages.push("...");
+  pages.push(last);
+  return pages;
+}
 
-  // Reset to page 1 whenever search or filter changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search_term, attribute_filter]);
-
-  const filtered_rows = useMemo(() => {
-    const lower = search_term.toLowerCase();
-    return rows.filter(
-      (row) =>
-        search_term === "" ||
-        row.order_id.toLowerCase().includes(lower) ||
-        (row.keyword ?? "").toLowerCase().includes(lower) ||
-        row.status.toLowerCase().includes(lower) ||
-        row.dr_type.toLowerCase().includes(lower)
-    );
-  }, [rows, search_term]);
-
-  const total_pages = Math.max(1, Math.ceil(filtered_rows.length / ITEMS_PER_PAGE));
-
-  const paginated_rows = useMemo(() => {
-    const start = (current_page - 1) * ITEMS_PER_PAGE;
-    return filtered_rows.slice(start, start + ITEMS_PER_PAGE);
-  }, [filtered_rows, current_page]);
-
-  const range_start = filtered_rows.length === 0 ? 0 : (current_page - 1) * ITEMS_PER_PAGE + 1;
-  const range_end = Math.min(current_page * ITEMS_PER_PAGE, filtered_rows.length);
+export default function OrderStatusTable({
+  rows,
+  is_loading,
+  current_page,
+  last_page,
+  total,
+  per_page,
+  search_term,
+  onSearchChange,
+  onPageChange,
+}: Props) {
+  const range_start = total === 0 ? 0 : (current_page - 1) * per_page + 1;
+  const range_end = Math.min(current_page * per_page, total);
+  const page_buttons = buildPageButtons(current_page, last_page);
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white px-4 pb-4 pt-4 dark:border-gray-800 dark:bg-white/3 sm:px-6 sm:pt-6">
@@ -101,7 +107,7 @@ export default function OrderStatusTable({ rows, is_loading }: Props) {
           </h3>
           {!is_loading && (
             <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-              {filtered_rows.length}
+              {total}
             </span>
           )}
         </div>
@@ -128,7 +134,7 @@ export default function OrderStatusTable({ rows, is_loading }: Props) {
               type="text"
               placeholder="Date, Keyword, DR"
               value={search_term}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => onSearchChange(e.target.value)}
               className="h-10 rounded-lg border border-gray-200 bg-transparent py-2 pl-9 pr-3 text-sm text-gray-700 placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:placeholder:text-gray-500"
             />
           </div>
@@ -137,8 +143,6 @@ export default function OrderStatusTable({ rows, is_loading }: Props) {
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-400">Attribute</span>
             <select
-              value={attribute_filter}
-              onChange={(e) => setAttributeFilter(e.target.value)}
               className="h-10 rounded-lg border border-gray-200 bg-transparent px-3 text-sm text-gray-700 focus:border-brand-300 focus:outline-hidden dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
             >
               <option value="Links">Links</option>
@@ -199,20 +203,20 @@ export default function OrderStatusTable({ rows, is_loading }: Props) {
 
           <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
             {is_loading ? (
-              <TableSkeleton />
-            ) : filtered_rows.length === 0 ? (
+              <TableSkeleton rows_count={per_page} />
+            ) : rows.length === 0 ? (
               <TableRow>
                 <TableCell
                   colSpan={10}
                   className="py-12 text-center text-sm text-gray-400 dark:text-gray-500"
                 >
-                  {rows.length === 0
+                  {total === 0 && !search_term
                     ? "No orders yet. Place your first order to get started."
                     : "No orders match your search."}
                 </TableCell>
               </TableRow>
             ) : (
-              paginated_rows.map((row, index) => (
+              rows.map((row, index) => (
                 <TableRow key={`${row.order_id}-${index}`}>
                   {/* Order ID */}
                   <TableCell className="whitespace-nowrap py-3 font-mono text-xs font-medium text-gray-700 dark:text-gray-300">
@@ -230,7 +234,7 @@ export default function OrderStatusTable({ rows, is_loading }: Props) {
                   </TableCell>
 
                   {/* DR Type */}
-                  <TableCell className="whitespace-nowrap py-3 text-gray-700 text-theme-sm dark:text-gray-300">
+                  <TableCell className="whitespace-nowrap py-3">
                     <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-700 dark:bg-gray-800 dark:text-gray-300">
                       {row.dr_type}
                     </span>
@@ -325,28 +329,88 @@ export default function OrderStatusTable({ rows, is_loading }: Props) {
       </div>
 
       {/* Pagination */}
-      {!is_loading && total_pages > 1 && (
-        <div className="flex items-center justify-between border-t border-gray-200 px-1 pt-4 dark:border-gray-800">
+      {!is_loading && last_page >= 1 && total > 0 && (
+        <div className="flex flex-col gap-3 border-t border-gray-200 px-1 pt-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
+          {/* Range info */}
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            {range_start}–{range_end} of {filtered_rows.length} orders &nbsp;·&nbsp; Page{" "}
-            <span className="font-medium">{current_page}</span> of{" "}
-            <span className="font-medium">{total_pages}</span>
+            Showing{" "}
+            <span className="font-medium text-gray-700 dark:text-gray-300">
+              {range_start}–{range_end}
+            </span>{" "}
+            of{" "}
+            <span className="font-medium text-gray-700 dark:text-gray-300">
+              {total}
+            </span>{" "}
+            results &nbsp;·&nbsp; Page{" "}
+            <span className="font-medium text-gray-700 dark:text-gray-300">
+              {current_page}
+            </span>{" "}
+            of{" "}
+            <span className="font-medium text-gray-700 dark:text-gray-300">
+              {last_page}
+            </span>
           </p>
 
-          <div className="flex gap-2">
+          {/* Page buttons */}
+          <div className="flex items-center gap-1">
+            {/* Previous */}
             <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              onClick={() => onPageChange(current_page - 1)}
               disabled={current_page === 1}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+              className="flex h-8 items-center gap-1 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
             >
-              Previous
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path
+                  d="M7.5 2.5L4.5 6L7.5 9.5"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Prev
             </button>
+
+            {/* Page numbers */}
+            {page_buttons.map((btn, i) =>
+              btn === "..." ? (
+                <span
+                  key={`ellipsis-${i}`}
+                  className="flex h-8 w-8 items-center justify-center text-xs text-gray-400"
+                >
+                  …
+                </span>
+              ) : (
+                <button
+                  key={btn}
+                  onClick={() => onPageChange(btn as number)}
+                  className={`flex h-8 w-8 items-center justify-center rounded-lg border text-xs font-medium transition-colors ${
+                    btn === current_page
+                      ? "border-coral-500 bg-coral-500 text-white"
+                      : "border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+                  }`}
+                >
+                  {btn}
+                </button>
+              )
+            )}
+
+            {/* Next */}
             <button
-              onClick={() => setCurrentPage((p) => Math.min(total_pages, p + 1))}
-              disabled={current_page === total_pages}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+              onClick={() => onPageChange(current_page + 1)}
+              disabled={current_page === last_page}
+              className="flex h-8 items-center gap-1 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
             >
               Next
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path
+                  d="M4.5 2.5L7.5 6L4.5 9.5"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
             </button>
           </div>
         </div>

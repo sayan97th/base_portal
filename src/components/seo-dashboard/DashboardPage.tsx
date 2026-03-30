@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { dashboardService } from "@/services/client/dashboard.service";
 import type { LinkBuildingOrderSummary } from "@/types/client/link-building";
 import type { DashboardTableRow } from "@/services/client/dashboard.service";
+import { useDebounce } from "@/hooks/useDebounce";
 import ClientProfile from "./ClientProfile";
 import OrderHistory from "./OrderHistory";
 import NewsCard from "./NewsCard";
@@ -12,42 +13,78 @@ import OrderStatusTable from "./OrderStatusTable";
 import DashboardStatsCards from "./DashboardStatsCards";
 import SmeContentWidget from "./SmeContentWidget";
 
+const TABLE_PER_PAGE = 10;
+
 export default function DashboardPage() {
+  // ── Summary data (stats + order history cards) ─────────────────────────────
   const [orders, setOrders] = useState<LinkBuildingOrderSummary[]>([]);
-  const [table_rows, setTableRows] = useState<DashboardTableRow[]>([]);
   const [is_loading_summary, setIsLoadingSummary] = useState(true);
-  const [is_loading_table, setIsLoadingTable] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // No synchronous setState calls here — only async callbacks update state,
-  // which satisfies the react-hooks/set-state-in-effect lint rule.
-  const loadData = useCallback(async () => {
-    await Promise.all([
-      dashboardService
-        .fetchOrders()
-        .then(setOrders)
-        .catch(() =>
-          setError("Unable to load order data. Please refresh the page.")
-        )
-        .finally(() => setIsLoadingSummary(false)),
+  // ── Table data (server-side paginated placements) ──────────────────────────
+  const [table_rows, setTableRows] = useState<DashboardTableRow[]>([]);
+  const [is_loading_table, setIsLoadingTable] = useState(true);
+  const [table_search, setTableSearch] = useState("");
+  const [table_page, setTablePage] = useState(1);
+  const [table_last_page, setTableLastPage] = useState(1);
+  const [table_total, setTableTotal] = useState(0);
 
-      dashboardService
-        .fetchDashboardTableRows()
-        .then(setTableRows)
-        .catch(() => {/* table shows empty state gracefully */})
-        .finally(() => setIsLoadingTable(false)),
-    ]);
+  // Debounce search — avoids hitting the API on every keystroke
+  const debounced_search = useDebounce(table_search, 400);
+
+  // ── Load summary orders (used by stats + order history) ────────────────────
+  const loadSummary = useCallback(async () => {
+    setIsLoadingSummary(true);
+    try {
+      const data = await dashboardService.fetchOrders();
+      setOrders(data);
+    } catch {
+      setError("Unable to load order data. Please refresh the page.");
+    } finally {
+      setIsLoadingSummary(false);
+    }
   }, []);
 
+  // ── Load paginated table rows ───────────────────────────────────────────────
+  const loadTableData = useCallback(async () => {
+    setIsLoadingTable(true);
+    try {
+      const result = await dashboardService.fetchPaginatedTableRows({
+        page: table_page,
+        per_page: TABLE_PER_PAGE,
+        search: debounced_search || undefined,
+      });
+      setTableRows(result.data);
+      setTableLastPage(result.last_page);
+      setTableTotal(result.total);
+    } catch {
+      // Table shows empty state gracefully
+      setTableRows([]);
+    } finally {
+      setIsLoadingTable(false);
+    }
+  }, [table_page, debounced_search]);
+
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    loadSummary();
+  }, [loadSummary]);
+
+  useEffect(() => {
+    loadTableData();
+  }, [loadTableData]);
+
+  // ── Handlers ───────────────────────────────────────────────────────────────
 
   const handleRetry = () => {
     setError(null);
-    setIsLoadingSummary(true);
-    setIsLoadingTable(true);
-    loadData();
+    loadSummary();
+    loadTableData();
+  };
+
+  /** Search change: update the input and immediately reset to page 1. */
+  const handleSearchChange = (value: string) => {
+    setTableSearch(value);
+    setTablePage(1);
   };
 
   return (
@@ -102,8 +139,18 @@ export default function DashboardPage() {
       {/* SME Content Services Widget */}
       <SmeContentWidget />
 
-      {/* Full-Width Order Status Table */}
-      <OrderStatusTable rows={table_rows} is_loading={is_loading_table} />
+      {/* Full-Width Order Status Table (server-side paginated) */}
+      <OrderStatusTable
+        rows={table_rows}
+        is_loading={is_loading_table}
+        current_page={table_page}
+        last_page={table_last_page}
+        total={table_total}
+        per_page={TABLE_PER_PAGE}
+        search_term={table_search}
+        onSearchChange={handleSearchChange}
+        onPageChange={setTablePage}
+      />
     </div>
   );
 }
