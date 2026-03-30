@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
   Table,
@@ -9,56 +9,46 @@ import {
   TableRow,
 } from "../ui/table";
 import Badge from "../ui/badge/Badge";
-import type { LinkBuildingOrderSummary, OrderStatus } from "@/types/client/link-building";
+import type { DashboardTableRow, DisplayStatus } from "@/services/client/dashboard.service";
 
 interface Props {
-  orders: LinkBuildingOrderSummary[];
+  rows: DashboardTableRow[];
   is_loading: boolean;
 }
 
-type DisplayStatus =
-  | "Live"
-  | "Writing article"
-  | "New request"
-  | "Cancelled"
-  | "Processing";
-
-const api_to_display: Record<OrderStatus, DisplayStatus> = {
-  pending: "New request",
-  processing: "Writing article",
-  completed: "Live",
-  cancelled: "Cancelled",
-};
+const ITEMS_PER_PAGE = 10;
 
 const status_badge_color: Record<
   DisplayStatus,
   "success" | "error" | "warning" | "info" | "primary"
 > = {
   Live: "success",
+  "Pending with publisher": "error",
   "Writing article": "warning",
-  "New request": "info",
+  "Choosing domain": "info",
+  "New request": "warning",
   Cancelled: "error",
-  Processing: "warning",
 };
 
 function formatDate(iso: string): string {
+  if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-US", {
-    month: "short",
+    month: "long",
     day: "numeric",
     year: "numeric",
   });
 }
 
 function shortId(id: string): string {
-  return id.length > 8 ? `#${id.slice(0, 8).toUpperCase()}` : `#${id.toUpperCase()}`;
+  return id.length > 8 ? id.slice(0, 8).toUpperCase() : id.toUpperCase();
 }
 
 function TableSkeleton() {
   return (
     <>
-      {[...Array(5)].map((_, i) => (
+      {[...Array(ITEMS_PER_PAGE)].map((_, i) => (
         <TableRow key={i}>
-          {[...Array(7)].map((__, j) => (
+          {[...Array(10)].map((__, j) => (
             <TableCell key={j} className="py-3">
               <div className="h-4 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
             </TableCell>
@@ -69,31 +59,37 @@ function TableSkeleton() {
   );
 }
 
-export default function OrderStatusTable({ orders, is_loading }: Props) {
+export default function OrderStatusTable({ rows, is_loading }: Props) {
   const [search_term, setSearchTerm] = useState("");
-  const [status_filter, setStatusFilter] = useState<string>("All");
+  const [attribute_filter, setAttributeFilter] = useState("Links");
+  const [current_page, setCurrentPage] = useState(1);
 
-  const filtered_orders = useMemo(() => {
-    return orders.filter((order) => {
-      const display_status = api_to_display[order.status];
-      const search_lower = search_term.toLowerCase();
+  // Reset to page 1 whenever search or filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search_term, attribute_filter]);
 
-      const matches_search =
+  const filtered_rows = useMemo(() => {
+    const lower = search_term.toLowerCase();
+    return rows.filter(
+      (row) =>
         search_term === "" ||
-        order.id.toLowerCase().includes(search_lower) ||
-        (order.order_title ?? "").toLowerCase().includes(search_lower) ||
-        display_status.toLowerCase().includes(search_lower);
+        row.order_id.toLowerCase().includes(lower) ||
+        (row.keyword ?? "").toLowerCase().includes(lower) ||
+        row.status.toLowerCase().includes(lower) ||
+        row.dr_type.toLowerCase().includes(lower)
+    );
+  }, [rows, search_term]);
 
-      const matches_status =
-        status_filter === "All" ||
-        display_status === status_filter ||
-        order.status === status_filter.toLowerCase();
+  const total_pages = Math.max(1, Math.ceil(filtered_rows.length / ITEMS_PER_PAGE));
 
-      return matches_search && matches_status;
-    });
-  }, [orders, search_term, status_filter]);
+  const paginated_rows = useMemo(() => {
+    const start = (current_page - 1) * ITEMS_PER_PAGE;
+    return filtered_rows.slice(start, start + ITEMS_PER_PAGE);
+  }, [filtered_rows, current_page]);
 
-  const status_options = ["All", "New request", "Writing article", "Live", "Cancelled"];
+  const range_start = filtered_rows.length === 0 ? 0 : (current_page - 1) * ITEMS_PER_PAGE + 1;
+  const range_end = Math.min(current_page * ITEMS_PER_PAGE, filtered_rows.length);
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white px-4 pb-4 pt-4 dark:border-gray-800 dark:bg-white/3 sm:px-6 sm:pt-6">
@@ -105,7 +101,7 @@ export default function OrderStatusTable({ orders, is_loading }: Props) {
           </h3>
           {!is_loading && (
             <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-              {filtered_orders.length}
+              {filtered_rows.length}
             </span>
           )}
         </div>
@@ -130,30 +126,43 @@ export default function OrderStatusTable({ orders, is_loading }: Props) {
             </span>
             <input
               type="text"
-              placeholder="Search orders..."
+              placeholder="Date, Keyword, DR"
               value={search_term}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="h-10 rounded-lg border border-gray-200 bg-transparent py-2 pl-9 pr-3 text-sm text-gray-700 placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:placeholder:text-gray-500"
             />
           </div>
 
-          {/* Status Filter */}
+          {/* Attribute Select */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-400">Status</span>
+            <span className="text-xs text-gray-400">Attribute</span>
             <select
-              value={status_filter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              value={attribute_filter}
+              onChange={(e) => setAttributeFilter(e.target.value)}
               className="h-10 rounded-lg border border-gray-200 bg-transparent px-3 text-sm text-gray-700 focus:border-brand-300 focus:outline-hidden dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
             >
-              {status_options.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
+              <option value="Links">Links</option>
+              <option value="Content">Content</option>
+              <option value="PR">PR</option>
             </select>
           </div>
 
-          {/* Download */}
+          {/* Filter Icon */}
+          <button className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path
+                d="M1.5 3.75H16.5M4.5 9H13.5M7 14.25H11"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+
+          {/* Share & Download */}
+          <button className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
+            SHARE
+          </button>
           <button className="rounded-lg bg-coral-500 px-4 py-2 text-sm font-medium text-white hover:bg-coral-600">
             DOWNLOAD
           </button>
@@ -167,13 +176,15 @@ export default function OrderStatusTable({ orders, is_loading }: Props) {
             <TableRow>
               {[
                 "Order ID",
-                "Date",
-                "Title",
+                "Start Date",
+                "DR Type",
+                "Keyword",
+                "Landing Page",
                 "Status",
-                "Items",
-                "Amount",
-                "Last Update",
-                "",
+                "Live Link",
+                "Completed Date",
+                "DR",
+                "Actions",
               ].map((col) => (
                 <TableCell
                   key={col}
@@ -189,94 +200,155 @@ export default function OrderStatusTable({ orders, is_loading }: Props) {
           <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
             {is_loading ? (
               <TableSkeleton />
-            ) : filtered_orders.length === 0 ? (
+            ) : filtered_rows.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={8}
+                  colSpan={10}
                   className="py-12 text-center text-sm text-gray-400 dark:text-gray-500"
                 >
-                  {orders.length === 0
+                  {rows.length === 0
                     ? "No orders yet. Place your first order to get started."
                     : "No orders match your search."}
                 </TableCell>
               </TableRow>
             ) : (
-              filtered_orders.map((order) => {
-                const display_status = api_to_display[order.status];
-                const badge_color = status_badge_color[display_status];
+              paginated_rows.map((row, index) => (
+                <TableRow key={`${row.order_id}-${index}`}>
+                  {/* Order ID */}
+                  <TableCell className="whitespace-nowrap py-3 font-mono text-xs font-medium text-gray-700 dark:text-gray-300">
+                    <Link
+                      href={`/link-building/orders/${row.order_id}`}
+                      className="hover:text-coral-500 hover:underline"
+                    >
+                      {shortId(row.order_id)}
+                    </Link>
+                  </TableCell>
 
-                return (
-                  <TableRow key={order.id}>
-                    {/* Order ID */}
-                    <TableCell className="whitespace-nowrap py-3 font-mono text-xs text-gray-700 dark:text-gray-300">
-                      {shortId(order.id)}
-                    </TableCell>
+                  {/* Start Date */}
+                  <TableCell className="whitespace-nowrap py-3 text-gray-500 text-theme-sm dark:text-gray-400">
+                    {formatDate(row.start_date)}
+                  </TableCell>
 
-                    {/* Date */}
-                    <TableCell className="whitespace-nowrap py-3 text-gray-500 text-theme-sm dark:text-gray-400">
-                      {formatDate(order.created_at)}
-                    </TableCell>
+                  {/* DR Type */}
+                  <TableCell className="whitespace-nowrap py-3 text-gray-700 text-theme-sm dark:text-gray-300">
+                    <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                      {row.dr_type}
+                    </span>
+                  </TableCell>
 
-                    {/* Title */}
-                    <TableCell className="py-3 text-theme-sm">
-                      <span className="max-w-[180px] truncate block text-gray-700 dark:text-gray-300">
-                        {order.order_title ?? "Untitled Order"}
-                      </span>
-                    </TableCell>
+                  {/* Keyword */}
+                  <TableCell className="whitespace-nowrap py-3 text-gray-500 text-theme-sm dark:text-gray-400">
+                    {row.keyword ?? (
+                      <span className="text-gray-300 dark:text-gray-600">—</span>
+                    )}
+                  </TableCell>
 
-                    {/* Status Badge */}
-                    <TableCell className="whitespace-nowrap py-3">
-                      <Badge size="sm" color={badge_color}>
-                        {display_status}
-                      </Badge>
-                    </TableCell>
-
-                    {/* Items count */}
-                    <TableCell className="whitespace-nowrap py-3 text-center text-gray-500 text-theme-sm dark:text-gray-400">
-                      {order.items_count}
-                    </TableCell>
-
-                    {/* Amount */}
-                    <TableCell className="whitespace-nowrap py-3 font-medium text-gray-700 text-theme-sm dark:text-gray-300">
-                      ${order.total_amount.toLocaleString()}
-                    </TableCell>
-
-                    {/* Last Update */}
-                    <TableCell className="whitespace-nowrap py-3 text-gray-500 text-theme-sm dark:text-gray-400">
-                      {order.last_update_at
-                        ? formatDate(order.last_update_at)
-                        : "—"}
-                    </TableCell>
-
-                    {/* View Details */}
-                    <TableCell className="whitespace-nowrap py-3">
-                      <Link
-                        href={`/orders/${order.id}`}
-                        className="text-xs font-medium text-coral-500 hover:text-coral-600 hover:underline"
+                  {/* Landing Page */}
+                  <TableCell className="py-3 text-theme-sm">
+                    {row.landing_page ? (
+                      <a
+                        href={row.landing_page}
+                        className="block max-w-[200px] truncate text-blue-light-500 hover:underline"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={row.landing_page}
                       >
-                        View
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
+                        {row.landing_page}
+                      </a>
+                    ) : (
+                      <span className="text-gray-300 dark:text-gray-600">—</span>
+                    )}
+                  </TableCell>
+
+                  {/* Status */}
+                  <TableCell className="whitespace-nowrap py-3">
+                    <Badge size="sm" color={status_badge_color[row.status]}>
+                      {row.status}
+                    </Badge>
+                  </TableCell>
+
+                  {/* Live Link */}
+                  <TableCell className="py-3 text-theme-sm">
+                    {row.live_link ? (
+                      <a
+                        href={row.live_link}
+                        className="block max-w-[200px] truncate text-blue-light-500 hover:underline"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={row.live_link}
+                      >
+                        {row.live_link}
+                      </a>
+                    ) : (
+                      <span className="text-gray-300 dark:text-gray-600">—</span>
+                    )}
+                  </TableCell>
+
+                  {/* Completed Date */}
+                  <TableCell className="whitespace-nowrap py-3 text-gray-500 text-theme-sm dark:text-gray-400">
+                    {row.completed_date ? formatDate(row.completed_date) : "—"}
+                  </TableCell>
+
+                  {/* DR score */}
+                  <TableCell className="whitespace-nowrap py-3 text-gray-500 text-theme-sm dark:text-gray-400">
+                    {row.dr ?? "—"}
+                  </TableCell>
+
+                  {/* Actions */}
+                  <TableCell className="whitespace-nowrap py-3">
+                    <Link
+                      href={`/link-building/orders/${row.order_id}`}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-coral-200 bg-coral-50 px-3 py-1.5 text-xs font-medium text-coral-600 transition-colors hover:bg-coral-500 hover:text-white dark:border-coral-500/30 dark:bg-coral-500/10 dark:text-coral-400 dark:hover:bg-coral-500 dark:hover:text-white"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <path
+                          d="M6 2.5C3.5 2.5 1.5 6 1.5 6C1.5 6 3.5 9.5 6 9.5C8.5 9.5 10.5 6 10.5 6C10.5 6 8.5 2.5 6 2.5Z"
+                          stroke="currentColor"
+                          strokeWidth="1.2"
+                        />
+                        <circle
+                          cx="6"
+                          cy="6"
+                          r="1.5"
+                          stroke="currentColor"
+                          strokeWidth="1.2"
+                        />
+                      </svg>
+                      View
+                    </Link>
+                  </TableCell>
+                </TableRow>
+              ))
             )}
           </TableBody>
         </Table>
       </div>
 
-      {/* Footer */}
-      {!is_loading && orders.length > 0 && (
-        <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-4 dark:border-gray-800">
-          <p className="text-xs text-gray-400">
-            Showing {filtered_orders.length} of {orders.length} orders
+      {/* Pagination */}
+      {!is_loading && total_pages > 1 && (
+        <div className="flex items-center justify-between border-t border-gray-200 px-1 pt-4 dark:border-gray-800">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {range_start}–{range_end} of {filtered_rows.length} orders &nbsp;·&nbsp; Page{" "}
+            <span className="font-medium">{current_page}</span> of{" "}
+            <span className="font-medium">{total_pages}</span>
           </p>
-          <Link
-            href="/orders"
-            className="text-sm font-medium text-coral-500 hover:text-coral-600"
-          >
-            View all orders →
-          </Link>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={current_page === 1}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(total_pages, p + 1))}
+              disabled={current_page === total_pages}
+              className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
     </div>
