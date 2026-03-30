@@ -45,10 +45,11 @@ export const linkBuildingService = {
   async fetchMyOrders(
     filters: OrderListFilters = {}
   ): Promise<PaginatedOrdersListResponse> {
-    const { page = 1, per_page = 10 } = filters;
+    const { page = 1, per_page = 10, search } = filters;
     const params = new URLSearchParams();
     params.set("page", String(page));
     params.set("per_page", String(per_page));
+    if (search?.trim()) params.set("search", search.trim());
     return apiClient.get<PaginatedOrdersListResponse>(
       `/api/link-building/orders?${params.toString()}`
     );

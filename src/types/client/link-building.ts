@@ -130,6 +130,7 @@ export interface ClientPaginatedResponse<T> {
 export interface OrderListFilters {
   page?: number;
   per_page?: number;
+  search?: string;
 }
 
 export interface OrderPlacementFilters {
