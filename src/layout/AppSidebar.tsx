@@ -50,7 +50,7 @@ const sidebar_sections: SidebarSection[] = [
   {
     items: [
       { name: "Dashboard", icon: <GridIcon />, path: "/", highlight: true },
-      { name: "Deliverables", icon: <DocsIcon />, path: "#" },
+      { name: "Deliverables", icon: <DocsIcon />, path: "/deliverables" },
       { name: "Resources", icon: <FolderIcon />, path: "#" },
     ],
   },
