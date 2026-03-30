@@ -179,18 +179,7 @@ function DeliverableCard({ item }: DeliverableCardProps) {
                 <span>total</span>
               </div>
               <div className="h-3 w-px bg-gray-200 dark:bg-gray-700" />
-              <div className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-success-500" />
-                <span className="text-xs font-medium text-success-700 dark:text-success-400">
-                  {item.live_count} live
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-warning-500" />
-                <span className="text-xs font-medium text-warning-700 dark:text-warning-400">
-                  {item.pending_count} pending
-                </span>
-              </div>
+             
             </div>
 
             {/* Status badge */}
