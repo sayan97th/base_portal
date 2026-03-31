@@ -2,7 +2,6 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import type { NewsPost, PostType } from "@/types/admin/news";
 import {
   newsPublicService,
@@ -138,12 +137,10 @@ function PostCard({ post }: PostCardProps) {
       <div className="relative h-44 overflow-hidden">
         {post.image_url ? (
           <>
-            <Image
+            <img
               src={post.image_url}
               alt={post.title}
-              fill
-              className="object-cover transition-transform duration-300 group-hover:scale-105"
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
           </>

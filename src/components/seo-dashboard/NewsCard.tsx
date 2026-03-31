@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import type { NewsPost, PostType } from "@/types/admin/news";
 import { newsPublicService } from "@/services/client/news.service";
@@ -135,12 +134,10 @@ function FeaturedPanel({
     if (post.image_url) {
       return (
         <>
-          <Image
+          <img
             src={post.image_url}
             alt={post.title}
-            fill
-            className="object-cover"
-            sizes="(max-width: 640px) 100vw, 50vw"
+            className="absolute inset-0 h-full w-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
           <div className="absolute bottom-14 left-0 right-0 p-4">

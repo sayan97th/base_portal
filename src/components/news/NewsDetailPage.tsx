@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import type { NewsPost, PostType } from "@/types/admin/news";
 import { newsPublicService } from "@/services/client/news.service";
 
@@ -154,13 +153,10 @@ function Hero({ post }: HeroProps) {
   if (post.image_url) {
     return (
       <div className="relative h-64 overflow-hidden rounded-2xl sm:h-80 lg:h-[420px]">
-        <Image
+        <img
           src={post.image_url}
           alt={post.title}
-          fill
-          className="object-cover"
-          sizes="(max-width: 1024px) 100vw, 900px"
-          priority
+          className="absolute inset-0 h-full w-full object-cover"
         />
         {/* Deep gradient overlay so text is always readable */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10" />
