@@ -201,21 +201,6 @@ function DeliverableCard({ item }: DeliverableCardProps) {
           </div>
         </div>
 
-        {/* Progress bar */}
-        {item.total_links > 0 && (
-          <div className="mt-4">
-            <div className="mb-1.5 flex items-center justify-between text-xs text-gray-400 dark:text-gray-500">
-              <span>Delivery progress</span>
-              <span className="font-medium text-gray-600 dark:text-gray-300">{delivery_pct}%</span>
-            </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
-              <div
-                className="h-full rounded-full bg-brand-500 transition-all duration-500"
-                style={{ width: `${delivery_pct}%` }}
-              />
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

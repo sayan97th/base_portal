@@ -43,7 +43,7 @@ export default function ResourcesCard() {
 
   useEffect(() => {
     resourcesService
-      .fetchLatestResources(3)
+      .fetchLatestResources(5)
       .then(setResources)
       .catch(() => setResources([]))
       .finally(() => setIsLoading(false));
