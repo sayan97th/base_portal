@@ -128,7 +128,7 @@ interface DatePickerProps {
 
 function DatePickerField({ id, value, onChange, placeholder, min_date, has_error }: DatePickerProps) {
   const input_ref = useRef<HTMLInputElement>(null);
-  const fp_ref = useRef<ReturnType<typeof flatpickr> | null>(null);
+  const fp_ref = useRef<flatpickr.Instance | null>(null);
 
   useEffect(() => {
     if (!input_ref.current) return;
@@ -146,7 +146,7 @@ function DatePickerField({ id, value, onChange, placeholder, min_date, has_error
           onChange("");
         }
       },
-    });
+    }) as flatpickr.Instance;
     return () => fp_ref.current?.destroy();
   }, []);
 
