@@ -202,17 +202,24 @@ function getCategoryLabel(category: ResourceCategory): string {
 
 export default function ResourceDetail({ resource_id }: { resource_id: number }) {
   const [resource, setResource] = useState<Resource | null>(null);
-  const [is_loading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loaded_id, setLoadedId] = useState<number | null>(null);
+
+  const is_loading = loaded_id !== resource_id;
 
   useEffect(() => {
-    setIsLoading(true);
-    setError(null);
     resourcesService
       .fetchResource(resource_id)
-      .then(setResource)
-      .catch(() => setError("Unable to load this resource. It may have been removed or you may not have access."))
-      .finally(() => setIsLoading(false));
+      .then((data) => {
+        setResource(data);
+        setError(null);
+        setLoadedId(resource_id);
+      })
+      .catch(() => {
+        setResource(null);
+        setError("Unable to load this resource. It may have been removed or you may not have access.");
+        setLoadedId(resource_id);
+      });
   }, [resource_id]);
 
   return (

@@ -6,10 +6,11 @@ export const metadata: Metadata = {
   description: "View and download files for this resource.",
 };
 
-export default function ResourceDetailPage({
+export default async function ResourceDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  return <ResourceDetail resource_id={Number(params.id)} />;
+  const { id } = await params;
+  return <ResourceDetail resource_id={Number(id)} />;
 }
