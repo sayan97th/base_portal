@@ -3,44 +3,33 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { GroupIcon, DollarLineIcon, ListIcon, TaskIcon } from "@/icons/index";
 import {
-  GroupIcon,
-  DollarLineIcon,
-  ListIcon,
-  TaskIcon,
-} from "@/icons/index";
-import { listAdminOrders } from "@/services/admin/order.service";
-import { listAdminClients } from "@/services/admin/user.service";
-import { listAdminInvoices } from "@/services/admin/invoice.service";
+  getDashboardSummary,
+  getTeamCapacity,
+  getTeamHealth,
+} from "@/services/admin/backlink-order.service";
+import type {
+  DashboardSummary,
+  TeamMemberCapacity,
+  TeamMemberHealth,
+} from "@/types/admin/backlink-order";
 import BacklinkOrdersTable from "./BacklinkOrdersTable";
 
-// ── Types ──────────────────────────────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
-interface DashboardStats {
-  total_orders: number;
-  pending_orders: number;
-  total_clients: number;
-  total_paid_invoices: number;
+function capacityColor(pct: number): string {
+  if (pct >= 90) return "bg-orange-500";
+  if (pct >= 70) return "bg-yellow-500";
+  if (pct >= 50) return "bg-green-500";
+  return "bg-blue-400";
 }
 
-interface TeamMember {
-  name: string;
-  capacity_pct: number;
-  capacity_color: string;
-  links_on_track: number;
-  total_links: number;
-  links_delayed: number;
+function healthColor(pct: number): string {
+  if (pct === 100) return "text-green-600 dark:text-green-400";
+  if (pct >= 80) return "text-orange-500";
+  return "text-red-500";
 }
-
-// ── Team mock data ─────────────────────────────────────────────────────────────
-// TODO: Replace with real API data when the team capacity endpoint is available
-
-const TEAM_MEMBERS: TeamMember[] = [
-  { name: "Kaitlin", capacity_pct: 95, capacity_color: "bg-orange-500", links_on_track: 20, total_links: 22, links_delayed: 2 },
-  { name: "Amanda", capacity_pct: 65, capacity_color: "bg-green-500", links_on_track: 15, total_links: 22, links_delayed: 7 },
-  { name: "Lauren", capacity_pct: 100, capacity_color: "bg-yellow-500", links_on_track: 14, total_links: 14, links_delayed: 0 },
-  { name: "Krista", capacity_pct: 55, capacity_color: "bg-green-500", links_on_track: 8, total_links: 12, links_delayed: 4 },
-];
 
 // ── Stat card skeleton ─────────────────────────────────────────────────────────
 
@@ -52,6 +41,27 @@ function StatCardSkeleton() {
         <div className="h-6 w-14 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
         <div className="h-3.5 w-24 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
         <div className="h-3 w-32 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+      </div>
+    </div>
+  );
+}
+
+// ── Team widget skeleton ───────────────────────────────────────────────────────
+
+function TeamWidgetSkeleton() {
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
+      <div className="mb-5 h-4 w-32 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+      <div className="space-y-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="space-y-1.5">
+            <div className="flex justify-between">
+              <div className="h-3 w-20 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+              <div className="h-3 w-10 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+            </div>
+            <div className="h-2.5 w-full animate-pulse rounded-full bg-gray-100 dark:bg-gray-800" />
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -90,27 +100,27 @@ function StatCard({ label, value, description, icon, href, badge_color }: StatCa
 
 // ── Team Capacity widget ───────────────────────────────────────────────────────
 
-function TeamCapacityWidget() {
+function TeamCapacityWidget({ members }: { members: TeamMemberCapacity[] }) {
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
       <h2 className="mb-5 text-base font-semibold text-gray-900 dark:text-white">
         Team Capacity
       </h2>
       <div className="space-y-4">
-        {TEAM_MEMBERS.map((member) => (
-          <div key={member.name}>
+        {members.map((member) => (
+          <div key={member.user_id}>
             <div className="mb-1.5 flex items-center justify-between text-xs">
               <span className="font-medium text-gray-700 dark:text-gray-300">
                 {member.name}
               </span>
               <span className="tabular-nums text-gray-500 dark:text-gray-400">
-                {member.capacity_pct}%
+                {member.total_assigned} / {member.max_capacity}
               </span>
             </div>
             <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
               <div
-                className={`h-full rounded-full transition-all duration-700 ${member.capacity_color}`}
-                style={{ width: `${member.capacity_pct}%` }}
+                className={`h-full rounded-full transition-all duration-700 ${capacityColor(member.capacity_pct)}`}
+                style={{ width: `${Math.min(member.capacity_pct, 100)}%` }}
               />
             </div>
           </div>
@@ -122,7 +132,7 @@ function TeamCapacityWidget() {
 
 // ── Team Health widget ─────────────────────────────────────────────────────────
 
-function TeamHealthWidget() {
+function TeamHealthWidget({ members }: { members: TeamMemberHealth[] }) {
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
       <h2 className="mb-5 text-base font-semibold text-gray-900 dark:text-white">
@@ -131,43 +141,32 @@ function TeamHealthWidget() {
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-            {TEAM_MEMBERS.map((member) => {
-              const health_pct =
-                member.total_links > 0
-                  ? Math.round((member.links_on_track / member.total_links) * 100)
-                  : 0;
-              const health_color =
-                health_pct === 100
-                  ? "text-green-600 dark:text-green-400"
-                  : health_pct >= 80
-                    ? "text-orange-500"
-                    : "text-red-500";
-              const delayed_color =
-                member.links_delayed === 0
-                  ? "text-green-500 dark:text-green-400"
-                  : "text-orange-500";
-
-              return (
-                <tr key={member.name}>
-                  <td className="py-2.5 pr-4 font-medium text-gray-700 dark:text-gray-300">
-                    {member.name}
-                  </td>
-                  <td className="py-2.5 pr-4">
-                    <span className={`tabular-nums font-semibold ${health_color}`}>
-                      {health_pct}%
-                    </span>
-                  </td>
-                  <td className="py-2.5 pr-4 tabular-nums text-gray-500 dark:text-gray-400">
-                    {member.links_on_track}/{member.total_links} links on track
-                  </td>
-                  <td className="py-2.5 text-right">
-                    <span className={`tabular-nums font-medium ${delayed_color}`}>
-                      {member.links_delayed} links delayed
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
+            {members.map((member) => (
+              <tr key={member.user_id}>
+                <td className="py-2.5 pr-4 font-medium text-gray-700 dark:text-gray-300">
+                  {member.name}
+                </td>
+                <td className="py-2.5 pr-4">
+                  <span className={`tabular-nums font-semibold ${healthColor(member.health_pct)}`}>
+                    {member.health_pct}%
+                  </span>
+                </td>
+                <td className="py-2.5 pr-4 tabular-nums text-gray-500 dark:text-gray-400">
+                  {member.links_on_track}/{member.total_links} links on track
+                </td>
+                <td className="py-2.5 text-right">
+                  <span
+                    className={`tabular-nums font-medium ${
+                      member.links_delayed === 0
+                        ? "text-green-500 dark:text-green-400"
+                        : "text-orange-500"
+                    }`}
+                  >
+                    {member.links_delayed} links delayed
+                  </span>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -180,7 +179,9 @@ function TeamHealthWidget() {
 export default function AdminDashboardContent() {
   const { user } = useAuth();
 
-  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [stats, setStats] = useState<DashboardSummary | null>(null);
+  const [capacity, setCapacity] = useState<TeamMemberCapacity[]>([]);
+  const [health, setHealth] = useState<TeamMemberHealth[]>([]);
   const [is_loading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -188,19 +189,14 @@ export default function AdminDashboardContent() {
     setIsLoading(true);
     setError(null);
     try {
-      const [all_orders_res, pending_res, clients_res, invoices_res] = await Promise.all([
-        listAdminOrders({ per_page: 1 }),
-        listAdminOrders({ per_page: 1, status: "pending" }),
-        listAdminClients({}),
-        listAdminInvoices({ per_page: 1, status: "paid" }),
+      const [summary_res, capacity_res, health_res] = await Promise.all([
+        getDashboardSummary(),
+        getTeamCapacity(),
+        getTeamHealth(),
       ]);
-
-      setStats({
-        total_orders: all_orders_res.total,
-        pending_orders: pending_res.total,
-        total_clients: clients_res.total,
-        total_paid_invoices: invoices_res.total,
-      });
+      setStats(summary_res);
+      setCapacity(capacity_res.data);
+      setHealth(health_res.data);
     } catch {
       setError("Failed to load dashboard data. Please try again.");
     } finally {
@@ -240,8 +236,14 @@ export default function AdminDashboardContent() {
 
       {/* Error banner */}
       {error && (
-        <div className="rounded-xl border border-error-200 bg-error-50 p-4 text-sm text-error-700 dark:border-error-500/20 dark:bg-error-500/10 dark:text-error-400">
-          {error}
+        <div className="flex items-center justify-between rounded-xl border border-error-200 bg-error-50 p-4 text-sm text-error-700 dark:border-error-500/20 dark:bg-error-500/10 dark:text-error-400">
+          <span>{error}</span>
+          <button
+            onClick={fetchDashboardData}
+            className="ml-4 rounded-lg border border-error-300 px-3 py-1 text-xs font-medium transition-colors hover:bg-error-100 dark:border-error-500/30 dark:hover:bg-error-500/10"
+          >
+            Retry
+          </button>
         </div>
       )}
 
@@ -294,8 +296,17 @@ export default function AdminDashboardContent() {
 
       {/* Team panels */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <TeamCapacityWidget />
-        <TeamHealthWidget />
+        {is_loading ? (
+          <>
+            <TeamWidgetSkeleton />
+            <TeamWidgetSkeleton />
+          </>
+        ) : (
+          <>
+            <TeamCapacityWidget members={capacity} />
+            <TeamHealthWidget members={health} />
+          </>
+        )}
       </div>
 
       {/* Backlink Orders — full-width editable tracking table */}

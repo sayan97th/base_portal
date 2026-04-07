@@ -1,8 +1,17 @@
 "use client";
 
 import React, { useState, useCallback, useEffect, useRef } from "react";
+import type { BacklinkOrderRow } from "@/types/admin/backlink-order";
+import {
+  listBacklinkOrders,
+  createBacklinkOrder,
+  updateBacklinkOrder,
+  deleteBacklinkOrder,
+  buildPayload,
+  buildExportUrl,
+} from "@/services/admin/backlink-order.service";
 
-// ── Types ──────────────────────────────────────────────────────────────────────
+// ── Column types ───────────────────────────────────────────────────────────────
 
 type ColumnGroup =
   | "order"
@@ -15,40 +24,6 @@ type ColumnGroup =
   | "live"
   | "metrics"
   | "pricing";
-
-export interface BacklinkOrderRow {
-  id: string;
-  order_id: string;
-  team_specific_link_id: string;
-  link_type: string;
-  client: string;
-  keyword: string;
-  landing_page: string;
-  exact_match: string;
-  notes: string;
-  request_date: string;
-  estimated_delivery_date: string;
-  estimated_turnaround_days: string;
-  days_left: string;
-  projected_health: string;
-  link_builder: string;
-  pen_name: string;
-  partnership: string;
-  article_title: string;
-  article: string;
-  status: string;
-  live_link: string;
-  live_link_date: string;
-  dr_lbs: string;
-  posting_fee_lbs: string;
-  current_traffic: string;
-  dr_formula: string;
-  current_poc: string;
-  current_price: string;
-  lb_tl_approval: string;
-  approval_date: string;
-  final_price: string;
-}
 
 interface ColumnDef {
   key: keyof BacklinkOrderRow;
@@ -120,17 +95,17 @@ const GROUP_HEADER_STYLES: Record<ColumnGroup, string> = {
   pricing: "bg-gray-200 text-gray-800 border-gray-300 dark:bg-gray-600 dark:text-gray-100 dark:border-gray-500",
 };
 
-// ── Sample data ────────────────────────────────────────────────────────────────
+// ── Empty row factory ──────────────────────────────────────────────────────────
 
-let _id_counter = 0;
-function generateId(): string {
-  _id_counter += 1;
-  return `row_${_id_counter}_${Math.random().toString(36).slice(2, 7)}`;
+let _local_counter = 0;
+function createTempId(): string {
+  _local_counter += 1;
+  return `temp_${_local_counter}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
 function createEmptyRow(): BacklinkOrderRow {
   return {
-    id: generateId(),
+    id: createTempId(),
     order_id: "",
     team_specific_link_id: "",
     link_type: "",
@@ -164,258 +139,15 @@ function createEmptyRow(): BacklinkOrderRow {
   };
 }
 
-const INITIAL_ROWS: BacklinkOrderRow[] = [
-  {
-    id: generateId(), order_id: "BL-19319", team_specific_link_id: "", link_type: "DA 30+ External",
-    client: "PolicySweet", keyword: "Business Owners Policy",
-    landing_page: "https://www.policysweet.com/business-owners-policy",
-    exact_match: "Yes", notes: "", request_date: "12/2/2024", estimated_delivery_date: "1/1/2025",
-    estimated_turnaround_days: "30", days_left: "-114", projected_health: "-280%",
-    link_builder: "2. Anderson, Kaitlin", pen_name: "Rebecca", partnership: "walkermagazine.com",
-    article_title: "", article: "https://docs.google.com/d", status: "Live",
-    live_link: "https://walkermagazine.com/the-benefits", live_link_date: "12/12/2024",
-    dr_lbs: "37", posting_fee_lbs: "$25", current_traffic: "171", dr_formula: "37",
-    current_poc: "SITE REMOVED", current_price: "SITE REMOVED", lb_tl_approval: "Amanda",
-    approval_date: "12/13/2024", final_price: "$250.0",
-  },
-  {
-    id: generateId(), order_id: "BL-19320", team_specific_link_id: "", link_type: "DA 30+ External",
-    client: "PolicySweet", keyword: "Business Owners Policy",
-    landing_page: "https://www.policysweet.com/business-owners-policy",
-    exact_match: "Yes", notes: "", request_date: "12/2/2024", estimated_delivery_date: "1/1/2025",
-    estimated_turnaround_days: "30", days_left: "-114", projected_health: "-280%",
-    link_builder: "2. Anderson, Kaitlin", pen_name: "ms link builder", partnership: "celebsliving.com",
-    article_title: "", article: "https://docs.google.com/d", status: "Live",
-    live_link: "https://celebsliving.com/how-business-ow", live_link_date: "12/11/2024",
-    dr_lbs: "36", posting_fee_lbs: "$18", current_traffic: "131", dr_formula: "36",
-    current_poc: "SITE REMOVED", current_price: "SITE REMOVED", lb_tl_approval: "Amanda",
-    approval_date: "12/12/2024", final_price: "$250.0",
-  },
-  {
-    id: generateId(), order_id: "BL-19321", team_specific_link_id: "", link_type: "DA 30+ External",
-    client: "PolicySweet", keyword: "Business Owners Policy",
-    landing_page: "https://www.policysweet.com/business-owners-policy",
-    exact_match: "Yes", notes: "", request_date: "12/2/2024", estimated_delivery_date: "1/1/2025",
-    estimated_turnaround_days: "30", days_left: "-114", projected_health: "-280%",
-    link_builder: "2. Anderson, Kaitlin", pen_name: "ms link builder", partnership: "vefeast.com",
-    article_title: "", article: "https://docs.google.com/d", status: "Live",
-    live_link: "https://vefeast.com/how-business-owner", live_link_date: "12/17/2024",
-    dr_lbs: "42", posting_fee_lbs: "$17", current_traffic: "467", dr_formula: "42",
-    current_poc: "SITE REMOVED", current_price: "SITE REMOVED", lb_tl_approval: "Amanda",
-    approval_date: "12/17/2024", final_price: "$250.0",
-  },
-  {
-    id: generateId(), order_id: "BL-19322", team_specific_link_id: "", link_type: "DA 30+ External",
-    client: "PolicySweet", keyword: "Business Owners Policy",
-    landing_page: "https://www.policysweet.com/business-owners-policy",
-    exact_match: "No", notes: "", request_date: "12/2/2024", estimated_delivery_date: "1/1/2025",
-    estimated_turnaround_days: "30", days_left: "-114", projected_health: "-280%",
-    link_builder: "2. Anderson, Kaitlin", pen_name: "ms link builder", partnership: "wordstreetjournal.com",
-    article_title: "", article: "https://docs.google.com/d", status: "Live",
-    live_link: "https://vatonlinecalculator.co.uk/the-impo", live_link_date: "12/11/2024",
-    dr_lbs: "40", posting_fee_lbs: "$22", current_traffic: "6729", dr_formula: "40",
-    current_poc: "Muhammad", current_price: "$20", lb_tl_approval: "Amanda",
-    approval_date: "12/11/2024", final_price: "$250.0",
-  },
-  {
-    id: generateId(), order_id: "BL-19323", team_specific_link_id: "", link_type: "DA 30+ External",
-    client: "PolicySweet", keyword: "Business Owners Policy",
-    landing_page: "https://www.policysweet.com/business-owners-policy",
-    exact_match: "No", notes: "", request_date: "12/2/2024", estimated_delivery_date: "1/1/2025",
-    estimated_turnaround_days: "30", days_left: "-114", projected_health: "-280%",
-    link_builder: "2. Hevener, Amanda", pen_name: "Areeba", partnership: "forbeszine.com",
-    article_title: "The Importance of Business Insurance", article: "https://docs.google.com/d",
-    status: "Live", live_link: "https://forbeszine.com/the-importance-of", live_link_date: "12/12/2024",
-    dr_lbs: "38", posting_fee_lbs: "$25", current_traffic: "0", dr_formula: "38",
-    current_poc: "SITE REMOVED", current_price: "SITE REMOVED", lb_tl_approval: "Amanda",
-    approval_date: "12/13/2024", final_price: "$250.0",
-  },
-  {
-    id: generateId(), order_id: "BL-19324", team_specific_link_id: "", link_type: "DA 30+ External",
-    client: "PolicySweet", keyword: "Business Owners Policy",
-    landing_page: "https://www.policysweet.com/business-owners-policy",
-    exact_match: "No", notes: "", request_date: "12/2/2024", estimated_delivery_date: "1/1/2025",
-    estimated_turnaround_days: "30", days_left: "-114", projected_health: "-280%",
-    link_builder: "2. Hevener, Amanda", pen_name: "Areeba", partnership: "tribuneindian.com",
-    article_title: "Understanding the Different Types of Business Insurance",
-    article: "https://docs.google.com/d", status: "Live",
-    live_link: "https://www.tribuneindian.com/understan", live_link_date: "12/12/2024",
-    dr_lbs: "37", posting_fee_lbs: "$25", current_traffic: "1", dr_formula: "37",
-    current_poc: "SITE REMOVED", current_price: "SITE REMOVED", lb_tl_approval: "Amanda",
-    approval_date: "12/13/2024", final_price: "$250.0",
-  },
-  {
-    id: generateId(), order_id: "BL-19325", team_specific_link_id: "", link_type: "DA 30+ External",
-    client: "PolicySweet", keyword: "Business Owners Policy",
-    landing_page: "https://www.policysweet.com/business-owners-policy",
-    exact_match: "No", notes: "", request_date: "12/2/2024", estimated_delivery_date: "1/1/2025",
-    estimated_turnaround_days: "30", days_left: "-114", projected_health: "-280%",
-    link_builder: "2. Hevener, Amanda", pen_name: "Arijit", partnership: "captionsunleashed.com",
-    article_title: "How to Choose Business Insurance", article: "https://docs.google.com/d",
-    status: "Live", live_link: "https://captionsunleashed.com/how-to-ch", live_link_date: "12/3/2024",
-    dr_lbs: "40", posting_fee_lbs: "$20", current_traffic: "1056", dr_formula: "40",
-    current_poc: "SITE REMOVED", current_price: "SITE REMOVED", lb_tl_approval: "Amanda",
-    approval_date: "12/4/2024", final_price: "$250.0",
-  },
-  {
-    id: generateId(), order_id: "BL-19326", team_specific_link_id: "AMA-157", link_type: "DA 30+ External",
-    client: "Amagi", keyword: "Amagi podcast",
-    landing_page: "https://www.amagi.com/podcasts",
-    exact_match: "No", notes: "", request_date: "12/2/2024", estimated_delivery_date: "1/1/2025",
-    estimated_turnaround_days: "30", days_left: "-114", projected_health: "-280%",
-    link_builder: "2. Anderson, Kaitlin", pen_name: "Rebecca", partnership: "coopermagazine.co.uk",
-    article_title: "", article: "https://docs.google.com/d", status: "Live",
-    live_link: "https://coopermagazine.co.uk/brands-anc", live_link_date: "12/12/2024",
-    dr_lbs: "38", posting_fee_lbs: "$25", current_traffic: "2088", dr_formula: "38",
-    current_poc: "SITE REMOVED", current_price: "SITE REMOVED", lb_tl_approval: "Amanda",
-    approval_date: "12/13/2024", final_price: "$250.0",
-  },
-  {
-    id: generateId(), order_id: "BL-19327", team_specific_link_id: "AMA-163", link_type: "DA 40+ External",
-    client: "Amagi", keyword: "how to launch a fast channel",
-    landing_page: "https://www.amagi.com/blog/how-to-launch-fast-channel",
-    exact_match: "Yes", notes: "", request_date: "12/2/2024", estimated_delivery_date: "1/1/2025",
-    estimated_turnaround_days: "30", days_left: "-114", projected_health: "-280%",
-    link_builder: "2. Anderson, Kaitlin", pen_name: "hammad", partnership: "starmusiqweb.com",
-    article_title: "", article: "https://docs.google.com/d", status: "Live",
-    live_link: "https://starmusiqweb.com/a-guide-for-lau", live_link_date: "12/12/2024",
-    dr_lbs: "60", posting_fee_lbs: "$20", current_traffic: "3207", dr_formula: "60",
-    current_poc: "SITE REMOVED", current_price: "SITE REMOVED", lb_tl_approval: "Amanda",
-    approval_date: "12/13/2024", final_price: "$300.0",
-  },
-  {
-    id: generateId(), order_id: "BL-19328", team_specific_link_id: "AMA-168", link_type: "DA 50+ External",
-    client: "Amagi", keyword: "how to launch a fast channel",
-    landing_page: "https://www.amagi.com/blog/how-to-launch-fast-channel",
-    exact_match: "Yes", notes: "", request_date: "12/2/2024", estimated_delivery_date: "1/1/2025",
-    estimated_turnaround_days: "30", days_left: "-114", projected_health: "-280%",
-    link_builder: "2. Anderson, Kaitlin", pen_name: "Christina", partnership: "anationofmoms.com",
-    article_title: "", article: "https://docs.google.com/d", status: "Live",
-    live_link: "https://anationofmoms.com/2024/12/free-", live_link_date: "12/17/2024",
-    dr_lbs: "67", posting_fee_lbs: "$65", current_traffic: "1975", dr_formula: "67",
-    current_poc: "Arslan", current_price: "$25", lb_tl_approval: "Amanda",
-    approval_date: "12/17/2024", final_price: "$375.0",
-  },
-  {
-    id: generateId(), order_id: "BL-19329", team_specific_link_id: "", link_type: "DA 30+ Internal",
-    client: "97th Floor", keyword: "cybersecurity marketing agency",
-    landing_page: "https://97thfloor.com/industries/cybersecurity/",
-    exact_match: "Yes", notes: "", request_date: "12/2/2024", estimated_delivery_date: "1/1/2025",
-    estimated_turnaround_days: "30", days_left: "-114", projected_health: "-280%",
-    link_builder: "1. Barney, Lauren", pen_name: "David Wirt", partnership: "letmagazine.com",
-    article_title: "Strategies For Protecting Sensitive Information",
-    article: "https://docs.google.com/d", status: "Live",
-    live_link: "https://www.letmagazine.com/strategies-", live_link_date: "12/18/2024",
-    dr_lbs: "42", posting_fee_lbs: "$25", current_traffic: "33", dr_formula: "42",
-    current_poc: "SITE REMOVED", current_price: "SITE REMOVED", lb_tl_approval: "Krista",
-    approval_date: "1/4/2025", final_price: "$55.0",
-  },
-  {
-    id: generateId(), order_id: "BL-19330", team_specific_link_id: "", link_type: "DA 40+ Internal",
-    client: "97th Floor", keyword: "cybersecurity marketing agency",
-    landing_page: "https://97thfloor.com/industries/cybersecurity/",
-    exact_match: "Yes", notes: "", request_date: "12/2/2024", estimated_delivery_date: "1/1/2025",
-    estimated_turnaround_days: "30", days_left: "-114", projected_health: "-280%",
-    link_builder: "1. Barney, Lauren", pen_name: "Bobby Jesse", partnership: "explorethings.org",
-    article_title: "Simple Tips for Effective Outsourcing", article: "https://docs.google.com/d",
-    status: "Live", live_link: "https://explorethings.org/tips-for-effective", live_link_date: "12/20/2024",
-    dr_lbs: "45", posting_fee_lbs: "$50", current_traffic: "0", dr_formula: "45",
-    current_poc: "SITE REMOVED", current_price: "SITE REMOVED", lb_tl_approval: "Krista",
-    approval_date: "1/2/2025", final_price: "$80.0",
-  },
-  {
-    id: generateId(), order_id: "BL-19331", team_specific_link_id: "", link_type: "DA 30+ Internal",
-    client: "97th Floor", keyword: "digital marketing services",
-    landing_page: "https://97thfloor.com/services/",
-    exact_match: "No", notes: "", request_date: "12/2/2024", estimated_delivery_date: "1/1/2025",
-    estimated_turnaround_days: "30", days_left: "-114", projected_health: "-280%",
-    link_builder: "1. Barney, Lauren", pen_name: "Hammad", partnership: "usawire.com",
-    article_title: "Building a Digital Foundation for Your Business",
-    article: "https://docs.google.com/d", status: "Live",
-    live_link: "https://usawire.com/building-a-digital-fo", live_link_date: "12/17/2024",
-    dr_lbs: "55", posting_fee_lbs: "$12", current_traffic: "5203", dr_formula: "55",
-    current_poc: "Muhammad", current_price: "$15", lb_tl_approval: "Krista",
-    approval_date: "1/2/2025", final_price: "$55.0",
-  },
-  {
-    id: generateId(), order_id: "BL-19332", team_specific_link_id: "", link_type: "DA 30+ Internal",
-    client: "97th Floor", keyword: "digital marketing services",
-    landing_page: "https://97thfloor.com/services/",
-    exact_match: "Yes", notes: "", request_date: "12/2/2024", estimated_delivery_date: "1/1/2025",
-    estimated_turnaround_days: "30", days_left: "-114", projected_health: "-280%",
-    link_builder: "1. Barney, Lauren", pen_name: "Hammad", partnership: "wistomagazine.co.uk",
-    article_title: "Becoming a Household Name in Business",
-    article: "https://docs.google.com/d", status: "Live",
-    live_link: "https://wistomagazine.co.uk/becoming-a", live_link_date: "12/10/2024",
-    dr_lbs: "37", posting_fee_lbs: "$12", current_traffic: "0", dr_formula: "37",
-    current_poc: "SITE REMOVED", current_price: "SITE REMOVED", lb_tl_approval: "Krista",
-    approval_date: "12/16/2024", final_price: "$55.0",
-  },
-  {
-    id: generateId(), order_id: "BL-19333", team_specific_link_id: "", link_type: "DA 30+ Internal",
-    client: "97th Floor", keyword: "saas digital marketing agency",
-    landing_page: "https://97thfloor.com/industries/saas/",
-    exact_match: "Yes", notes: "", request_date: "12/2/2024", estimated_delivery_date: "1/1/2025",
-    estimated_turnaround_days: "30", days_left: "-114", projected_health: "-280%",
-    link_builder: "1. Barney, Lauren", pen_name: "Hammad", partnership: "picnob.uk",
-    article_title: "The Role of Software in Modern Business",
-    article: "https://docs.google.com/d", status: "Live",
-    live_link: "https://picnob.uk/2024/12/10/the-role-of-", live_link_date: "12/10/2024",
-    dr_lbs: "36", posting_fee_lbs: "$15", current_traffic: "0", dr_formula: "36",
-    current_poc: "SITE REMOVED", current_price: "SITE REMOVED", lb_tl_approval: "Krista",
-    approval_date: "12/16/2024", final_price: "$55.0",
-  },
-  {
-    id: generateId(), order_id: "BL-19334", team_specific_link_id: "", link_type: "DA 30+ Internal",
-    client: "97th Floor", keyword: "saas digital marketing agency",
-    landing_page: "https://97thfloor.com/industries/saas/",
-    exact_match: "No", notes: "", request_date: "12/2/2024", estimated_delivery_date: "1/1/2025",
-    estimated_turnaround_days: "30", days_left: "-114", projected_health: "-280%",
-    link_builder: "1. Barney, Lauren", pen_name: "Hammad", partnership: "kidzmommy.com",
-    article_title: "Marketing Trends and Developments",
-    article: "https://docs.google.com/d", status: "Live",
-    live_link: "https://kidzmommy.com/marketing-trends-", live_link_date: "12/9/2024",
-    dr_lbs: "42", posting_fee_lbs: "$20", current_traffic: "688", dr_formula: "42",
-    current_poc: "SITE REMOVED", current_price: "SITE REMOVED", lb_tl_approval: "Krista",
-    approval_date: "12/16/2024", final_price: "$55.0",
-  },
-  {
-    id: generateId(), order_id: "BL-19335", team_specific_link_id: "", link_type: "DA 30+ Internal",
-    client: "97th Floor", keyword: "saas digital marketing agency",
-    landing_page: "https://97thfloor.com/industries/saas/",
-    exact_match: "No", notes: "", request_date: "12/2/2024", estimated_delivery_date: "1/1/2025",
-    estimated_turnaround_days: "30", days_left: "-114", projected_health: "-280%",
-    link_builder: "1. Barney, Lauren", pen_name: "Hammad", partnership: "scrollblogs.co.uk",
-    article_title: "What You Should Know About Working Remotely",
-    article: "https://docs.google.com/d", status: "Live",
-    live_link: "https://scrollblogs.co.uk/what-you-should", live_link_date: "12/11/2024",
-    dr_lbs: "38", posting_fee_lbs: "$15", current_traffic: "0", dr_formula: "38",
-    current_poc: "SITE REMOVED", current_price: "SITE REMOVED", lb_tl_approval: "Krista",
-    approval_date: "12/16/2024", final_price: "$55.0",
-  },
-  {
-    id: generateId(), order_id: "BL-19336", team_specific_link_id: "", link_type: "DA 40+ Internal",
-    client: "97th Floor", keyword: "saas digital marketing agency",
-    landing_page: "https://97thfloor.com/industries/saas/",
-    exact_match: "Yes", notes: "", request_date: "12/2/2024", estimated_delivery_date: "1/1/2025",
-    estimated_turnaround_days: "30", days_left: "-114", projected_health: "-280%",
-    link_builder: "1. Barney, Lauren", pen_name: "Arslan Khan", partnership: "educba.com",
-    article_title: "Reaching Younger Consumers with Your Marketing",
-    article: "https://docs.google.com/d", status: "Live",
-    live_link: "https://www.educba.com/reaching-young-", live_link_date: "12/27/2024",
-    dr_lbs: "58", posting_fee_lbs: "$50", current_traffic: "131486", dr_formula: "58",
-    current_poc: "Muhammad", current_price: "$40", lb_tl_approval: "Krista",
-    approval_date: "1/2/2025", final_price: "$80.0",
-  },
-];
-
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function isDateOverdue(date_str: string): boolean {
   if (!date_str) return false;
   const parts = date_str.split("/");
   if (parts.length !== 3) return false;
-  const date = new Date(`${parts[2]}-${parts[0].padStart(2, "0")}-${parts[1].padStart(2, "0")}`);
+  const date = new Date(
+    `${parts[2]}-${parts[0].padStart(2, "0")}-${parts[1].padStart(2, "0")}`
+  );
   return !isNaN(date.getTime()) && date < new Date();
 }
 
@@ -509,7 +241,7 @@ function EditableCell({
     );
   }
 
-  // ── Display mode ───────────────────────────────────────────────────────────
+  // ── Display mode ─────────────────────────────────────────────────────────────
 
   let display: React.ReactNode;
 
@@ -541,11 +273,11 @@ function EditableCell({
     };
     display = (
       <span
-        className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs font-medium ${status_map[value] ?? "bg-gray-100 text-gray-600"}`}
+        className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs font-medium ${
+          status_map[value] ?? "bg-gray-100 text-gray-600"
+        }`}
       >
-        {value === "Live" && (
-          <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-        )}
+        {value === "Live" && <span className="h-1.5 w-1.5 rounded-full bg-green-500" />}
         {value}
       </span>
     );
@@ -560,7 +292,11 @@ function EditableCell({
   } else if (col.key === "projected_health" && value) {
     const is_negative = value.startsWith("-");
     display = (
-      <span className={`font-medium ${is_negative ? "text-red-500" : "text-green-600 dark:text-green-400"}`}>
+      <span
+        className={`font-medium ${
+          is_negative ? "text-red-500" : "text-green-600 dark:text-green-400"
+        }`}
+      >
         {value}
       </span>
     );
@@ -585,14 +321,95 @@ function EditableCell({
   );
 }
 
+// ── Table skeleton ─────────────────────────────────────────────────────────────
+
+function TableSkeleton() {
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-full border-collapse text-xs">
+        <thead>
+          <tr>
+            {COLUMNS.slice(0, 10).map((col) => (
+              <th
+                key={col.key}
+                className={`border border-gray-700/30 px-2 py-2 text-left font-semibold ${GROUP_HEADER_STYLES[col.group]}`}
+                style={{ minWidth: col.min_width }}
+              >
+                {col.label}
+              </th>
+            ))}
+            <th className="border border-gray-700/30 bg-gray-800 px-2 py-2" />
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <tr key={i} className="border-b border-gray-100 dark:border-gray-800">
+              {COLUMNS.slice(0, 10).map((col) => (
+                <td key={col.key} className="px-2 py-2">
+                  <div className="h-3.5 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+                </td>
+              ))}
+              <td className="px-2 py-2">
+                <div className="h-3.5 w-6 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function BacklinkOrdersTable() {
-  const [rows, setRows] = useState<BacklinkOrderRow[]>(INITIAL_ROWS);
+  const [rows, setRows] = useState<BacklinkOrderRow[]>([]);
+  const [is_loading, setIsLoading] = useState(true);
+  const [save_error, setSaveError] = useState<string | null>(null);
   const [editing_cell, setEditingCell] = useState<{ row_id: string; col_key: string } | null>(null);
+  const [saving_row_ids, setSavingRowIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [show_filter_panel, setShowFilterPanel] = useState(false);
   const [hidden_columns, setHiddenColumns] = useState<Set<string>>(new Set());
+  const [current_page, setCurrentPage] = useState(1);
+  const [last_page, setLastPage] = useState(1);
+  const [total, setTotal] = useState(0);
+
+  // Refs for stable callbacks (avoid stale closures)
+  const rows_ref = useRef<BacklinkOrderRow[]>([]);
+  rows_ref.current = rows;
+
+  const editing_cell_ref = useRef<{ row_id: string; col_key: string } | null>(null);
+  editing_cell_ref.current = editing_cell;
+
+  // Tracks rows created locally that haven't been persisted yet
+  const new_row_ids_ref = useRef<Set<string>>(new Set());
+
+  // ── Fetch ───────────────────────────────────────────────────────────────────
+
+  const fetchRows = useCallback(async (page: number) => {
+    setIsLoading(true);
+    setSaveError(null);
+    try {
+      const res = await listBacklinkOrders({ page, per_page: 50 });
+      setRows(res.data);
+      setCurrentPage(res.current_page);
+      setLastPage(res.last_page);
+      setTotal(res.total);
+    } catch {
+      setSaveError("Failed to load backlink orders. Please refresh.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchRows(1);
+  }, [fetchRows]);
+
+  // ── Derived state ───────────────────────────────────────────────────────────
+
+  const visible_columns = COLUMNS.filter((col) => !hidden_columns.has(col.key));
 
   const filtered_rows = rows.filter((row) => {
     if (!search.trim()) return true;
@@ -607,15 +424,77 @@ export default function BacklinkOrdersTable() {
     );
   });
 
-  const visible_columns = COLUMNS.filter((col) => !hidden_columns.has(col.key));
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+
+  const markSaving = (row_id: string) =>
+    setSavingRowIds((prev) => new Set(prev).add(row_id));
+
+  const unmarkSaving = (row_id: string) =>
+    setSavingRowIds((prev) => {
+      const next = new Set(prev);
+      next.delete(row_id);
+      return next;
+    });
+
+  const replaceRow = (old_id: string, new_row: BacklinkOrderRow) =>
+    setRows((prev) =>
+      prev.map((r) => (r.id === old_id ? new_row : r))
+    );
+
+  // ── Persist helpers ─────────────────────────────────────────────────────────
+
+  const persistNewRow = useCallback(async (row: BacklinkOrderRow) => {
+    markSaving(row.id);
+    setSaveError(null);
+    try {
+      const res = await createBacklinkOrder(buildPayload(row));
+      // Replace temp row with server row (server assigns the real UUID)
+      new_row_ids_ref.current.delete(row.id);
+      replaceRow(row.id, res.data);
+    } catch {
+      setSaveError(`Failed to create row "${row.order_id}". Check required fields and try again.`);
+    } finally {
+      unmarkSaving(row.id);
+    }
+  }, []);
+
+  const persistRowUpdate = useCallback(async (row: BacklinkOrderRow) => {
+    markSaving(row.id);
+    setSaveError(null);
+    try {
+      const res = await updateBacklinkOrder(row.id, buildPayload(row));
+      // Sync computed fields (days_left, projected_health) from server response
+      replaceRow(row.id, res.data);
+    } catch {
+      setSaveError(`Failed to save row "${row.order_id}". Changes may not have been saved.`);
+    } finally {
+      unmarkSaving(row.id);
+    }
+  }, []);
+
+  // ── Editing ─────────────────────────────────────────────────────────────────
 
   const startEditing = useCallback((row_id: string, col_key: string) => {
     setEditingCell({ row_id, col_key });
   }, []);
 
   const stopEditing = useCallback(() => {
+    const cell = editing_cell_ref.current;
+    if (!cell) return;
     setEditingCell(null);
-  }, []);
+
+    const row = rows_ref.current.find((r) => r.id === cell.row_id);
+    if (!row) return;
+
+    if (new_row_ids_ref.current.has(row.id)) {
+      // Only persist a new row once order_id is filled
+      if (row.order_id.trim()) {
+        persistNewRow(row);
+      }
+    } else {
+      persistRowUpdate(row);
+    }
+  }, [persistNewRow, persistRowUpdate]);
 
   const updateCell = useCallback(
     (row_id: string, col_key: keyof BacklinkOrderRow, value: string) => {
@@ -636,13 +515,14 @@ export default function BacklinkOrdersTable() {
         if (next_col) {
           setEditingCell({ row_id, col_key: next_col.key });
         } else if (filtered_rows[row_idx + 1]) {
-          setEditingCell({ row_id: filtered_rows[row_idx + 1].id, col_key: visible_columns[0].key });
+          setEditingCell({
+            row_id: filtered_rows[row_idx + 1].id,
+            col_key: visible_columns[0].key,
+          });
         }
       } else if (direction === "prev") {
         const prev_col = visible_columns[col_idx - 1];
-        if (prev_col) {
-          setEditingCell({ row_id, col_key: prev_col.key });
-        }
+        if (prev_col) setEditingCell({ row_id, col_key: prev_col.key });
       } else if (direction === "down") {
         if (filtered_rows[row_idx + 1]) {
           setEditingCell({ row_id: filtered_rows[row_idx + 1].id, col_key });
@@ -652,16 +532,41 @@ export default function BacklinkOrdersTable() {
     [visible_columns, filtered_rows]
   );
 
+  // ── Add / Delete ────────────────────────────────────────────────────────────
+
   const addRow = useCallback(() => {
     const new_row = createEmptyRow();
+    new_row_ids_ref.current.add(new_row.id);
     setRows((prev) => [...prev, new_row]);
     setTimeout(() => setEditingCell({ row_id: new_row.id, col_key: "order_id" }), 50);
   }, []);
 
-  const deleteRow = useCallback((row_id: string) => {
-    setRows((prev) => prev.filter((r) => r.id !== row_id));
-    if (editing_cell?.row_id === row_id) stopEditing();
-  }, [editing_cell, stopEditing]);
+  const deleteRow = useCallback(
+    async (row_id: string) => {
+      if (editing_cell_ref.current?.row_id === row_id) setEditingCell(null);
+
+      // If it's a local-only row, just remove it
+      if (new_row_ids_ref.current.has(row_id)) {
+        new_row_ids_ref.current.delete(row_id);
+        setRows((prev) => prev.filter((r) => r.id !== row_id));
+        return;
+      }
+
+      markSaving(row_id);
+      setSaveError(null);
+      try {
+        await deleteBacklinkOrder(row_id);
+        setRows((prev) => prev.filter((r) => r.id !== row_id));
+      } catch {
+        setSaveError("Failed to delete row. Please try again.");
+      } finally {
+        unmarkSaving(row_id);
+      }
+    },
+    []
+  );
+
+  // ── Column visibility ───────────────────────────────────────────────────────
 
   const toggleColumn = useCallback((col_key: string) => {
     setHiddenColumns((prev) => {
@@ -675,33 +580,27 @@ export default function BacklinkOrdersTable() {
     });
   }, []);
 
-  const exportCsv = useCallback(() => {
-    const headers = visible_columns.map((c) => `"${c.label}"`).join(",");
-    const data_rows = rows.map((row) =>
-      visible_columns
-        .map((col) => `"${((row[col.key] as string) ?? "").replace(/"/g, '""')}"`)
-        .join(",")
-    );
-    const csv = [headers, ...data_rows].join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "backlink_orders.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [rows, visible_columns]);
+  // ── Export ──────────────────────────────────────────────────────────────────
+
+  const handleExport = useCallback(() => {
+    const url = buildExportUrl({ search: search || undefined });
+    window.open(url, "_blank");
+  }, [search]);
+
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-      {/* Table toolbar */}
+      {/* Toolbar */}
       <div className="flex flex-col gap-3 border-b border-gray-100 px-4 py-3 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-base font-semibold text-gray-900 dark:text-white">
             Backlink Orders
           </h2>
           <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-            {filtered_rows.length} of {rows.length} rows &middot; {visible_columns.length} columns &middot; Click any cell to edit
+            {is_loading
+              ? "Loading…"
+              : `${filtered_rows.length} of ${total} rows · ${visible_columns.length} columns · Click any cell to edit`}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -743,9 +642,9 @@ export default function BacklinkOrdersTable() {
               </span>
             )}
           </button>
-          {/* Export CSV */}
+          {/* Export */}
           <button
-            onClick={exportCsv}
+            onClick={handleExport}
             className="flex h-8 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
           >
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -765,6 +664,21 @@ export default function BacklinkOrdersTable() {
           </button>
         </div>
       </div>
+
+      {/* Error banner */}
+      {save_error && (
+        <div className="flex items-center justify-between border-b border-red-100 bg-red-50 px-4 py-2 dark:border-red-900/30 dark:bg-red-900/20">
+          <p className="text-xs text-red-600 dark:text-red-400">{save_error}</p>
+          <button
+            onClick={() => setSaveError(null)}
+            className="ml-4 rounded p-0.5 text-red-400 hover:text-red-600"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
 
       {/* Column visibility panel */}
       {show_filter_panel && (
@@ -810,108 +724,163 @@ export default function BacklinkOrdersTable() {
         </div>
       )}
 
-      {/* Scrollable table */}
-      <div className="overflow-x-auto">
-        <table className="min-w-full border-collapse text-xs">
-          <thead>
-            <tr>
-              {visible_columns.map((col) => (
-                <th
-                  key={col.key}
-                  className={`border border-gray-700/30 px-2 py-2 text-left font-semibold tracking-wide ${GROUP_HEADER_STYLES[col.group]}`}
-                  style={{ minWidth: col.min_width }}
-                >
-                  <span className="flex items-center gap-1 whitespace-nowrap">
-                    {col.locked && (
-                      <svg
-                        className="h-3 w-3 shrink-0 opacity-80"
-                        fill="currentColor"
-                        viewBox="0 0 24 24"
-                        aria-label="Locked column"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M12 1.5a5.25 5.25 0 00-5.25 5.25v3a3 3 0 00-3 3v6.75a3 3 0 003 3h10.5a3 3 0 003-3v-6.75a3 3 0 00-3-3v-3c0-2.9-2.35-5.25-5.25-5.25zm3.75 8.25v-3a3.75 3.75 0 10-7.5 0v3h7.5z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    )}
-                    {col.label}
-                  </span>
-                </th>
-              ))}
-              <th className="border border-gray-700/30 bg-gray-800 px-2 py-2 text-center text-xs font-semibold text-white">
-                <span className="sr-only">Row actions</span>
-                <svg className="mx-auto h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                </svg>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered_rows.length === 0 ? (
+      {/* Table body */}
+      {is_loading ? (
+        <TableSkeleton />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full border-collapse text-xs">
+            <thead>
               <tr>
-                <td
-                  colSpan={visible_columns.length + 1}
-                  className="px-6 py-14 text-center text-sm text-gray-400 dark:text-gray-500"
-                >
-                  {search
-                    ? `No rows match "${search}". Try a different search term.`
-                    : 'No rows yet. Click "Add Row" to get started.'}
-                </td>
+                {visible_columns.map((col) => (
+                  <th
+                    key={col.key}
+                    className={`border border-gray-700/30 px-2 py-2 text-left font-semibold tracking-wide ${GROUP_HEADER_STYLES[col.group]}`}
+                    style={{ minWidth: col.min_width }}
+                  >
+                    <span className="flex items-center gap-1 whitespace-nowrap">
+                      {col.locked && (
+                        <svg
+                          className="h-3 w-3 shrink-0 opacity-80"
+                          fill="currentColor"
+                          viewBox="0 0 24 24"
+                          aria-label="Locked column"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M12 1.5a5.25 5.25 0 00-5.25 5.25v3a3 3 0 00-3 3v6.75a3 3 0 003 3h10.5a3 3 0 003-3v-6.75a3 3 0 00-3-3v-3c0-2.9-2.35-5.25-5.25-5.25zm3.75 8.25v-3a3.75 3.75 0 10-7.5 0v3h7.5z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      )}
+                      {col.label}
+                    </span>
+                  </th>
+                ))}
+                <th className="border border-gray-700/30 bg-gray-800 px-2 py-2 text-center text-xs font-semibold text-white">
+                  <span className="sr-only">Row actions</span>
+                  <svg className="mx-auto h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                  </svg>
+                </th>
               </tr>
-            ) : (
-              filtered_rows.map((row, row_idx) => (
-                <tr
-                  key={row.id}
-                  className={`group border-b border-gray-100 transition-colors dark:border-gray-800 ${
-                    row_idx % 2 === 0
-                      ? "bg-white dark:bg-gray-900"
-                      : "bg-gray-50/60 dark:bg-gray-800/30"
-                  } hover:bg-blue-50/40 dark:hover:bg-blue-900/10`}
-                >
-                  {visible_columns.map((col) => {
-                    const is_editing =
-                      editing_cell?.row_id === row.id && editing_cell?.col_key === col.key;
-                    return (
-                      <EditableCell
-                        key={col.key}
-                        col={col}
-                        value={(row[col.key] as string) ?? ""}
-                        is_editing={is_editing}
-                        onStartEdit={() => startEditing(row.id, col.key)}
-                        onUpdate={(val) => updateCell(row.id, col.key, val)}
-                        onStopEdit={stopEditing}
-                        onKeyNav={(dir) => navigateCell(row.id, col.key, dir)}
-                      />
-                    );
-                  })}
-                  {/* Actions cell */}
-                  <td className="border-l border-gray-100 px-2 py-1.5 text-center dark:border-gray-800">
-                    <button
-                      onClick={() => deleteRow(row.id)}
-                      className="rounded p-1 text-gray-300 opacity-0 transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 dark:text-gray-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
-                      title="Delete row"
-                    >
-                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
+            </thead>
+            <tbody>
+              {filtered_rows.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={visible_columns.length + 1}
+                    className="px-6 py-14 text-center text-sm text-gray-400 dark:text-gray-500"
+                  >
+                    {search
+                      ? `No rows match "${search}".`
+                      : 'No backlink orders found. Click "Add Row" to create one.'}
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              ) : (
+                filtered_rows.map((row, row_idx) => {
+                  const is_saving = saving_row_ids.has(row.id);
+                  const is_new = new_row_ids_ref.current.has(row.id);
+                  return (
+                    <tr
+                      key={row.id}
+                      className={`group border-b border-gray-100 transition-colors dark:border-gray-800 ${
+                        row_idx % 2 === 0
+                          ? "bg-white dark:bg-gray-900"
+                          : "bg-gray-50/60 dark:bg-gray-800/30"
+                      } ${is_saving ? "opacity-60" : ""} hover:bg-blue-50/40 dark:hover:bg-blue-900/10`}
+                    >
+                      {visible_columns.map((col) => {
+                        const is_editing =
+                          editing_cell?.row_id === row.id &&
+                          editing_cell?.col_key === col.key;
+                        return (
+                          <EditableCell
+                            key={col.key}
+                            col={col}
+                            value={(row[col.key] as string) ?? ""}
+                            is_editing={is_editing}
+                            onStartEdit={() => startEditing(row.id, col.key)}
+                            onUpdate={(val) => updateCell(row.id, col.key, val)}
+                            onStopEdit={stopEditing}
+                            onKeyNav={(dir) => navigateCell(row.id, col.key, dir)}
+                          />
+                        );
+                      })}
+                      {/* Actions cell */}
+                      <td className="border-l border-gray-100 px-2 py-1.5 text-center dark:border-gray-800">
+                        {is_saving ? (
+                          <svg
+                            className="mx-auto h-3.5 w-3.5 animate-spin text-brand-400"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                          </svg>
+                        ) : (
+                          <div className="flex items-center justify-center gap-1">
+                            {is_new && !row.order_id && (
+                              <span
+                                className="rounded bg-yellow-100 px-1 py-0.5 text-xs text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400"
+                                title="Fill in Order ID to save this row"
+                              >
+                                unsaved
+                              </span>
+                            )}
+                            <button
+                              onClick={() => deleteRow(row.id)}
+                              className="rounded p-1 text-gray-300 opacity-0 transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 dark:text-gray-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                              title="Delete row"
+                            >
+                              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-      {/* Footer */}
+      {/* Footer — pagination + summary */}
       <div className="flex items-center justify-between border-t border-gray-100 px-4 py-2 dark:border-gray-800">
         <p className="text-xs text-gray-400 dark:text-gray-600">
-          {rows.length} total rows &middot; {visible_columns.length} of {COLUMNS.length} columns visible
+          {total} total rows &middot; {visible_columns.length} of {COLUMNS.length} columns visible
         </p>
+        {last_page > 1 && (
+          <div className="flex items-center gap-2">
+            <button
+              disabled={current_page <= 1 || is_loading}
+              onClick={() => fetchRows(current_page - 1)}
+              className="flex h-6 w-6 items-center justify-center rounded border border-gray-200 text-gray-500 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+            >
+              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+              </svg>
+            </button>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              Page {current_page} of {last_page}
+            </span>
+            <button
+              disabled={current_page >= last_page || is_loading}
+              onClick={() => fetchRows(current_page + 1)}
+              className="flex h-6 w-6 items-center justify-center rounded border border-gray-200 text-gray-500 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+            >
+              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+              </svg>
+            </button>
+          </div>
+        )}
         <p className="text-xs text-gray-300 dark:text-gray-700">
-          Tab to navigate &middot; Enter to confirm &middot; Esc to cancel
+          Tab · Enter · Esc to navigate
         </p>
       </div>
     </div>
