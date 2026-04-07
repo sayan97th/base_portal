@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Elements } from "@stripe/react-stripe-js";
 import LinkBuildingHeader from "./LinkBuildingHeader";
 import DrTierGrid from "./DrTierGrid";
+import ContentRefreshUpsell from "./ContentRefreshUpsell";
 import LinkBuildingOrderSummary, {
   OrderSummaryItem,
 } from "./LinkBuildingOrderSummary";
@@ -474,6 +475,10 @@ const LinkBuildingPage: React.FC = () => {
                   onOrderNotesChange={setOrderNotes}
                 />
               </>
+            )}
+
+            {selected_items.length > 0 && (
+              <ContentRefreshUpsell />
             )}
           </div>
 
