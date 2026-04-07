@@ -347,24 +347,7 @@ export default function AdminServicesContent() {
                   </svg>
                 )}
                 {tab.label}
-                {tab.available && tab.id === "link_building" && (
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                    active_tab === tab.id
-                      ? "bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-400"
-                      : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
-                  }`}>
-                    {total_count}
-                  </span>
-                )}
-                {tab.available && tab.id === "link_building_addons" && (
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                    active_tab === tab.id
-                      ? "bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-400"
-                      : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
-                  }`}>
-                    {cr_tiers.length}
-                  </span>
-                )}
+                
                 {!tab.available && (
                   <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-400 dark:bg-gray-800 dark:text-gray-600">
                     Soon
