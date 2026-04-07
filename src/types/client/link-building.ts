@@ -10,6 +10,15 @@ export interface DrTier {
   max_quantity?: number;
 }
 
+export interface ContentRefreshTier {
+  id: string;
+  label: string;
+  word_count_range: string;
+  turnaround_days: number;
+  price: number;
+  sort_order: number;
+}
+
 export interface OrderPlacement {
   row_index: number;
   keyword: string | null;

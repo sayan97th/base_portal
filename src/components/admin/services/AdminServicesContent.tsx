@@ -2,6 +2,11 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import type { AdminDrTier, CreateDrTierPayload, UpdateDrTierPayload } from "@/types/admin/services";
+import type {
+  AdminContentRefreshTier,
+  CreateContentRefreshTierPayload,
+  UpdateContentRefreshTierPayload,
+} from "@/types/admin/content-refresh-tiers";
 import {
   listAdminDrTiers,
   createAdminDrTier,
@@ -9,10 +14,17 @@ import {
   toggleAdminDrTierStatus,
   hideAdminDrTier,
   unhideAdminDrTier,
+  listAdminContentRefreshTiers,
+  createAdminContentRefreshTier,
+  updateAdminContentRefreshTier,
+  toggleAdminContentRefreshTierStatus,
+  deleteAdminContentRefreshTier,
 } from "@/services/admin/services.service";
 import DrTierCard from "./DrTierCard";
 import DrTierFormModal from "./DrTierFormModal";
 import DrTierDetailModal from "./DrTierDetailModal";
+import ContentRefreshTierCard from "./ContentRefreshTierCard";
+import ContentRefreshTierFormModal from "./ContentRefreshTierFormModal";
 
 type StatusFilter = "all" | "active" | "disabled";
 
@@ -25,6 +37,7 @@ type ServiceTab = {
 
 const SERVICE_TABS: ServiceTab[] = [
   { id: "link_building", label: "Link Building", category: "link_building", available: true },
+  { id: "link_building_addons", label: "Link Building Add-ons", category: "link_building_addons", available: true },
   { id: "content", label: "Content", category: "content", available: false },
   { id: "seo", label: "SEO", category: "seo", available: false },
 ];
@@ -73,6 +86,8 @@ function ComingSoonTab({ label }: { label: string }) {
 
 export default function AdminServicesContent() {
   const [active_tab, setActiveTab] = useState("link_building");
+
+  // ── DR Tiers state ─────────────────────────────────────────────────────────
   const [tiers, setTiers] = useState<AdminDrTier[]>([]);
   const [is_loading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -86,7 +101,14 @@ export default function AdminServicesContent() {
   const [editing_tier, setEditingTier] = useState<AdminDrTier | null>(null);
   const [detail_tier_id, setDetailTierId] = useState<string | null>(null);
 
-  // ── Fetch ──────────────────────────────────────────────────────────────────
+  // ── Content Refresh Tiers state ────────────────────────────────────────────
+  const [cr_tiers, setCrTiers] = useState<AdminContentRefreshTier[]>([]);
+  const [cr_is_loading, setCrIsLoading] = useState(false);
+  const [cr_error, setCrError] = useState<string | null>(null);
+  const [cr_form_modal_open, setCrFormModalOpen] = useState(false);
+  const [cr_editing_tier, setCrEditingTier] = useState<AdminContentRefreshTier | null>(null);
+
+  // ── Fetch DR Tiers ─────────────────────────────────────────────────────────
 
   const fetchTiers = useCallback(async () => {
     setIsLoading(true);
@@ -104,6 +126,27 @@ export default function AdminServicesContent() {
   useEffect(() => {
     fetchTiers();
   }, [fetchTiers]);
+
+  // ── Fetch Content Refresh Tiers ────────────────────────────────────────────
+
+  const fetchCrTiers = useCallback(async () => {
+    setCrIsLoading(true);
+    setCrError(null);
+    try {
+      const data = await listAdminContentRefreshTiers();
+      setCrTiers(data);
+    } catch {
+      setCrError("Failed to load content refresh tiers. Please try again.");
+    } finally {
+      setCrIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (active_tab === "link_building_addons") {
+      fetchCrTiers();
+    }
+  }, [active_tab, fetchCrTiers]);
 
   // ── Stats ──────────────────────────────────────────────────────────────────
 
@@ -170,6 +213,40 @@ export default function AdminServicesContent() {
     setFormModalOpen(true);
   };
 
+  // ── Content Refresh Handlers ───────────────────────────────────────────────
+
+  const handleCreateCrTier = async (payload: CreateContentRefreshTierPayload) => {
+    await createAdminContentRefreshTier(payload);
+    fetchCrTiers();
+  };
+
+  const handleUpdateCrTier = async (payload: CreateContentRefreshTierPayload) => {
+    if (!cr_editing_tier) return;
+    await updateAdminContentRefreshTier(cr_editing_tier.id, payload as UpdateContentRefreshTierPayload);
+    fetchCrTiers();
+  };
+
+  const handleToggleCrTierStatus = async (tier_id: string, is_active: boolean) => {
+    await toggleAdminContentRefreshTierStatus(tier_id, is_active);
+    fetchCrTiers();
+  };
+
+  const handleDeleteCrTier = async (tier_id: string) => {
+    if (!confirm("Are you sure you want to delete this tier? This action cannot be undone.")) return;
+    await deleteAdminContentRefreshTier(tier_id);
+    fetchCrTiers();
+  };
+
+  const openCrAdd = () => {
+    setCrEditingTier(null);
+    setCrFormModalOpen(true);
+  };
+
+  const openCrEdit = (tier: AdminContentRefreshTier) => {
+    setCrEditingTier(tier);
+    setCrFormModalOpen(true);
+  };
+
   // ── Skeleton ───────────────────────────────────────────────────────────────
 
   if (is_loading) {
@@ -214,6 +291,17 @@ export default function AdminServicesContent() {
               Add DR Tier
             </button>
           )}
+          {active_tab === "link_building_addons" && (
+            <button
+              onClick={openCrAdd}
+              className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-brand-600"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              Add Tier
+            </button>
+          )}
         </div>
 
         {error && (
@@ -243,6 +331,11 @@ export default function AdminServicesContent() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                   </svg>
                 )}
+                {tab.id === "link_building_addons" && (
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                  </svg>
+                )}
                 {tab.id === "content" && (
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -263,6 +356,15 @@ export default function AdminServicesContent() {
                     {total_count}
                   </span>
                 )}
+                {tab.available && tab.id === "link_building_addons" && (
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                    active_tab === tab.id
+                      ? "bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-400"
+                      : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+                  }`}>
+                    {cr_tiers.length}
+                  </span>
+                )}
                 {!tab.available && (
                   <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-400 dark:bg-gray-800 dark:text-gray-600">
                     Soon
@@ -278,7 +380,66 @@ export default function AdminServicesContent() {
 
           {/* Tab body */}
           <div className="p-5">
-            {active_tab !== "link_building" ? (
+            {active_tab === "link_building_addons" ? (
+              /* ── Content Refresh Tiers tab ─────────────────────────────── */
+              <div className="space-y-5">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Manage the Content Refresh add-on tiers shown on the Link Building page when clients select links.
+                </p>
+
+                {cr_error && (
+                  <div className="rounded-xl bg-error-50 px-4 py-3 text-sm text-error-600 dark:bg-error-500/10 dark:text-error-400">
+                    {cr_error}
+                  </div>
+                )}
+
+                {cr_is_loading ? (
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="h-52 animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-800" />
+                    ))}
+                  </div>
+                ) : cr_tiers.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 py-14 dark:border-gray-700">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
+                      <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                      </svg>
+                    </div>
+                    <h3 className="mt-3 text-sm font-semibold text-gray-900 dark:text-white">
+                      No content refresh tiers yet
+                    </h3>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                      Add your first tier to show it on the Link Building page.
+                    </p>
+                    <button
+                      onClick={openCrAdd}
+                      className="mt-4 inline-flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                      </svg>
+                      Add First Tier
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                    {cr_tiers
+                      .slice()
+                      .sort((a, b) => a.sort_order - b.sort_order)
+                      .map((tier) => (
+                        <ContentRefreshTierCard
+                          key={tier.id}
+                          tier={tier}
+                          onEdit={() => openCrEdit(tier)}
+                          onToggleStatus={(is_active) => handleToggleCrTierStatus(tier.id, is_active)}
+                          onDelete={() => handleDeleteCrTier(tier.id)}
+                        />
+                      ))}
+                  </div>
+                )}
+              </div>
+            ) : active_tab !== "link_building" ? (
               <ComingSoonTab
                 label={SERVICE_TABS.find((t) => t.id === active_tab)?.label ?? ""}
               />
@@ -376,12 +537,20 @@ export default function AdminServicesContent() {
         </div>
       </div>
 
-      {/* Add / Edit tier modal */}
+      {/* Add / Edit DR tier modal */}
       <DrTierFormModal
         is_open={form_modal_open}
         tier={editing_tier}
         onClose={() => { setFormModalOpen(false); setEditingTier(null); }}
         onSubmit={editing_tier ? handleUpdateTier : handleCreateTier}
+      />
+
+      {/* Add / Edit Content Refresh tier modal */}
+      <ContentRefreshTierFormModal
+        is_open={cr_form_modal_open}
+        tier={cr_editing_tier}
+        onClose={() => { setCrFormModalOpen(false); setCrEditingTier(null); }}
+        onSubmit={cr_editing_tier ? handleUpdateCrTier : handleCreateCrTier}
       />
 
       {/* Detail modal */}

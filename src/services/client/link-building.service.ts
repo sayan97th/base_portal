@@ -1,6 +1,7 @@
 import { apiClient } from "@/lib/api-client";
 import type {
   ClientPaginatedResponse,
+  ContentRefreshTier,
   CreateOrderPayload,
   CreateOrderResponse,
   DrTier,
@@ -13,6 +14,10 @@ import type {
 
 interface DrTiersResponse {
   data: DrTier[];
+}
+
+interface ContentRefreshTiersResponse {
+  data: ContentRefreshTier[];
 }
 
 interface OrdersListResponse {
@@ -32,6 +37,11 @@ interface CreateOrderApiResponse {
 export const linkBuildingService = {
   async fetchDrTiers(): Promise<DrTier[]> {
     const response = await apiClient.get<DrTiersResponse>("/api/dr-tiers");
+    return response.data;
+  },
+
+  async fetchContentRefreshTiers(): Promise<ContentRefreshTier[]> {
+    const response = await apiClient.get<ContentRefreshTiersResponse>("/api/content-refresh-tiers");
     return response.data;
   },
 

@@ -8,6 +8,11 @@ import type {
   CreateDrTierPayload,
   UpdateDrTierPayload,
 } from "@/types/admin/services";
+import type {
+  AdminContentRefreshTier,
+  CreateContentRefreshTierPayload,
+  UpdateContentRefreshTierPayload,
+} from "@/types/admin/content-refresh-tiers";
 
 export async function listAdminServices(): Promise<AdminService[]> {
   return apiClient.get<AdminService[]>("/api/admin/services");
@@ -91,4 +96,34 @@ export async function unhideAdminDrTier(id: string): Promise<AdminDrTier> {
 
 export async function deleteAdminDrTier(id: string): Promise<void> {
   return apiClient.delete<void>(`/api/admin/dr-tiers/${id}`);
+}
+
+// ── Content Refresh Tiers ──────────────────────────────────────────────────────
+
+export async function listAdminContentRefreshTiers(): Promise<AdminContentRefreshTier[]> {
+  return apiClient.get<AdminContentRefreshTier[]>("/api/admin/content-refresh-tiers");
+}
+
+export async function createAdminContentRefreshTier(
+  payload: CreateContentRefreshTierPayload
+): Promise<AdminContentRefreshTier> {
+  return apiClient.post<AdminContentRefreshTier>("/api/admin/content-refresh-tiers", payload);
+}
+
+export async function updateAdminContentRefreshTier(
+  id: string,
+  payload: UpdateContentRefreshTierPayload
+): Promise<AdminContentRefreshTier> {
+  return apiClient.patch<AdminContentRefreshTier>(`/api/admin/content-refresh-tiers/${id}`, payload);
+}
+
+export async function toggleAdminContentRefreshTierStatus(
+  id: string,
+  is_active: boolean
+): Promise<AdminContentRefreshTier> {
+  return apiClient.patch<AdminContentRefreshTier>(`/api/admin/content-refresh-tiers/${id}`, { is_active });
+}
+
+export async function deleteAdminContentRefreshTier(id: string): Promise<void> {
+  return apiClient.delete<void>(`/api/admin/content-refresh-tiers/${id}`);
 }

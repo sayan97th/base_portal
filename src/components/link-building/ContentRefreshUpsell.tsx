@@ -1,19 +1,34 @@
-import React from "react";
+"use client";
+
+import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-
-interface ContentRefreshTier {
-  label: string;
-  turnaround: string;
-  price: number;
-}
-
-const content_refresh_tiers: ContentRefreshTier[] = [
-  { label: "Current Content Word Count\n0-799", turnaround: "5 Days", price: 220 },
-  { label: "Current Content Word Count\n800-1,599", turnaround: "7 Days", price: 275 },
-  { label: "Current Content Word Count\n1,600+", turnaround: "9 Days", price: 440 },
-];
+import type { ContentRefreshTier } from "@/types/client/link-building";
+import { linkBuildingService } from "@/services/client/link-building.service";
 
 const ContentRefreshUpsell: React.FC = () => {
+  const [tiers, setTiers] = useState<ContentRefreshTier[]>([]);
+  const [is_loading, setIsLoading] = useState(true);
+
+  const fetchTiers = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const data = await linkBuildingService.fetchContentRefreshTiers();
+      setTiers(data.sort((a, b) => a.sort_order - b.sort_order));
+    } catch {
+      // Silently fail — the upsell section simply stays hidden
+      setTiers([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTiers();
+  }, [fetchTiers]);
+
+  // Don't render anything while loading or if there are no active tiers
+  if (is_loading || tiers.length === 0) return null;
+
   return (
     <div className="mt-8">
       {/* Popular Pairing label */}
@@ -47,16 +62,16 @@ const ContentRefreshUpsell: React.FC = () => {
 
       {/* Tier cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {content_refresh_tiers.map((tier) => (
+        {tiers.map((tier) => (
           <div
-            key={tier.label}
+            key={tier.id}
             className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3"
           >
-            <p className="mb-1 whitespace-pre-line text-sm font-semibold text-gray-800 dark:text-white/90">
+            <p className="mb-1 text-sm font-semibold text-gray-800 dark:text-white/90">
               {tier.label}
             </p>
             <p className="mb-4 text-xs text-gray-400 dark:text-gray-500">
-              Turnaround time: {tier.turnaround}
+              Turnaround time: {tier.turnaround_days} {tier.turnaround_days === 1 ? "Day" : "Days"}
             </p>
             <div className="h-px w-full bg-gray-100 dark:bg-gray-800" />
             <p className="mt-4 text-base font-bold text-gray-800 dark:text-white/90">
