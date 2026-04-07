@@ -879,9 +879,7 @@ export default function BacklinkOrdersTable() {
             </button>
           </div>
         )}
-        <p className="text-xs text-gray-300 dark:text-gray-700">
-          Tab · Enter · Esc to navigate
-        </p>
+        
       </div>
     </div>
   );
