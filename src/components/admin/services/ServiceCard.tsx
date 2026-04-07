@@ -242,9 +242,7 @@ export default function ServiceCard({
           <div className="rounded-xl bg-gray-50 px-3.5 py-3 dark:bg-gray-800/60">
             <p className="text-xs font-medium text-gray-400 dark:text-gray-500">Revenue</p>
             <p className="mt-0.5 text-xl font-bold text-gray-900 dark:text-white">
-              ${service.revenue_total >= 1000
-                ? `${(service.revenue_total / 1000).toFixed(1)}k`
-                : service.revenue_total.toFixed(0)}
+              ${(() => { const r = Number(service.revenue_total ?? 0); return r >= 1000 ? `${(r / 1000).toFixed(1)}k` : r.toFixed(0); })()}
             </p>
           </div>
         </div>
