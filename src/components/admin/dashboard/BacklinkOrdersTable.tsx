@@ -45,10 +45,19 @@ const LINK_TYPE_OPTIONS = [
   "DA 40+ Internal",
 ];
 
-const STATUS_OPTIONS = ["Live", "Pending", "In Progress", "Cancelled"];
+const STATUS_OPTIONS = [
+  "New Request",
+  "Reviewing",
+  "Ordered",
+  "Pending",
+  "Live",
+  "Quality Control",
+  "Cancelled",
+];
 
 const COLUMNS: ColumnDef[] = [
   { key: "order_id", label: "Order ID", group: "order", min_width: 110, type: "text" },
+  { key: "status", label: "Status", group: "status_col", min_width: 130, type: "select", options: STATUS_OPTIONS },
   { key: "team_specific_link_id", label: "Team Specific Link ID", group: "team_link", min_width: 160, type: "text" },
   { key: "link_type", label: "Link Type", group: "core", min_width: 155, type: "select", options: LINK_TYPE_OPTIONS },
   { key: "client", label: "Client", group: "core", min_width: 120, type: "text" },
@@ -66,7 +75,6 @@ const COLUMNS: ColumnDef[] = [
   { key: "partnership", label: "Partnership", group: "writer", min_width: 180, type: "url" },
   { key: "article_title", label: "Article Title", group: "writer", min_width: 220, type: "text" },
   { key: "article", label: "Article", group: "writer", min_width: 120, type: "url" },
-  { key: "status", label: "Status", group: "status_col", min_width: 110, type: "select", options: STATUS_OPTIONS },
   { key: "live_link", label: "Live Link", group: "live", min_width: 220, type: "url" },
   { key: "live_link_date", label: "Live Link Date", group: "live", min_width: 120, type: "date" },
   { key: "dr_lbs", label: "DR - LBs", group: "metrics", min_width: 80, type: "number" },
@@ -124,7 +132,7 @@ function createEmptyRow(): BacklinkOrderRow {
     partnership: "",
     article_title: "",
     article: "",
-    status: "Pending",
+    status: "New Request",
     live_link: "",
     live_link_date: "",
     dr_lbs: "",
@@ -266,9 +274,12 @@ function EditableCell({
     display = <span className="font-semibold text-red-500">{value}</span>;
   } else if (col.key === "status" && value) {
     const status_map: Record<string, string> = {
-      Live: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+      "New Request": "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+      Reviewing: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400",
+      Ordered: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
       Pending: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-      "In Progress": "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+      Live: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+      "Quality Control": "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
       Cancelled: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
     };
     display = (
@@ -369,6 +380,10 @@ export default function BacklinkOrdersTable() {
   const [editing_cell, setEditingCell] = useState<{ row_id: string; col_key: string } | null>(null);
   const [saving_row_ids, setSavingRowIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
+  const [status_filter, setStatusFilter] = useState<string>("");
+  const [client_filter, setClientFilter] = useState<string>("");
+  const [link_type_filter, setLinkTypeFilter] = useState<string>("");
+  const [link_builder_filter, setLinkBuilderFilter] = useState<string>("");
   const [show_filter_panel, setShowFilterPanel] = useState(false);
   const [hidden_columns, setHiddenColumns] = useState<Set<string>>(new Set());
   const [current_page, setCurrentPage] = useState(1);
@@ -412,6 +427,10 @@ export default function BacklinkOrdersTable() {
   const visible_columns = COLUMNS.filter((col) => !hidden_columns.has(col.key));
 
   const filtered_rows = rows.filter((row) => {
+    if (status_filter && row.status !== status_filter) return false;
+    if (link_type_filter && row.link_type !== link_type_filter) return false;
+    if (client_filter && !row.client.toLowerCase().includes(client_filter.toLowerCase())) return false;
+    if (link_builder_filter && !row.link_builder.toLowerCase().includes(link_builder_filter.toLowerCase())) return false;
     if (!search.trim()) return true;
     const lower = search.toLowerCase();
     return (
@@ -623,6 +642,44 @@ export default function BacklinkOrdersTable() {
               className="h-8 rounded-lg border border-gray-200 bg-gray-50 pl-8 pr-3 text-xs outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
             />
           </div>
+          {/* Status filter */}
+          <select
+            value={status_filter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="h-8 rounded-lg border border-gray-200 bg-gray-50 px-2 text-xs outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+          >
+            <option value="">All Statuses</option>
+            {STATUS_OPTIONS.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+          {/* Link Type filter */}
+          <select
+            value={link_type_filter}
+            onChange={(e) => setLinkTypeFilter(e.target.value)}
+            className="h-8 rounded-lg border border-gray-200 bg-gray-50 px-2 text-xs outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+          >
+            <option value="">All Link Types</option>
+            {LINK_TYPE_OPTIONS.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+          {/* Client filter */}
+          <input
+            type="text"
+            placeholder="Client..."
+            value={client_filter}
+            onChange={(e) => setClientFilter(e.target.value)}
+            className="h-8 rounded-lg border border-gray-200 bg-gray-50 px-3 text-xs outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+          />
+          {/* Link Builder filter */}
+          <input
+            type="text"
+            placeholder="Link Builder..."
+            value={link_builder_filter}
+            onChange={(e) => setLinkBuilderFilter(e.target.value)}
+            className="h-8 rounded-lg border border-gray-200 bg-gray-50 px-3 text-xs outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+          />
           {/* Column filter toggle */}
           <button
             onClick={() => setShowFilterPanel((v) => !v)}
@@ -772,8 +829,8 @@ export default function BacklinkOrdersTable() {
                     colSpan={visible_columns.length + 1}
                     className="px-6 py-14 text-center text-sm text-gray-400 dark:text-gray-500"
                   >
-                    {search
-                      ? `No rows match "${search}".`
+                    {search || status_filter || link_type_filter || client_filter || link_builder_filter
+                      ? "No rows match the active filters."
                       : 'No backlink orders found. Click "Add Row" to create one.'}
                   </td>
                 </tr>
