@@ -1,81 +1,18 @@
 "use client";
-import React, { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
-const tabs = ["OVERVIEW", "PRODUCTS", "RESOURCES", "TOOLS"];
-
-const tab_content: Record<string, React.ReactNode> = {
-  OVERVIEW: null,
-  PRODUCTS: (
-    <div className="flex flex-wrap gap-2 px-5 py-4 sm:px-6">
-      {["Link Building", "SME Authored", "Enhanced Content", "Internal Collaboration"].map(
-        (product) => (
-          <span
-            key={product}
-            className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-600 dark:border-gray-700 dark:bg-white/5 dark:text-gray-300"
-          >
-            {product}
-          </span>
-        )
-      )}
-    </div>
-  ),
-  RESOURCES: (
-    <div className="flex flex-wrap gap-3 px-5 py-4 sm:px-6">
-      {[
-        { label: "Knowledge Base", href: "#" },
-        { label: "SEO Guides", href: "#" },
-        { label: "Case Studies", href: "#" },
-      ].map((item) => (
-        <a
-          key={item.label}
-          href={item.href}
-          className="flex items-center gap-1.5 text-sm text-coral-500 hover:text-coral-600 hover:underline"
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path
-              d="M2 7h10M7 2l5 5-5 5"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          {item.label}
-        </a>
-      ))}
-    </div>
-  ),
-  TOOLS: (
-    <div className="flex flex-wrap gap-3 px-5 py-4 sm:px-6">
-      {[
-        { label: "Order Report", href: "#" },
-        { label: "Keyword Tracker", href: "#" },
-      ].map((item) => (
-        <a
-          key={item.label}
-          href={item.href}
-          className="flex items-center gap-1.5 text-sm text-coral-500 hover:text-coral-600 hover:underline"
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path
-              d="M2 7h10M7 2l5 5-5 5"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          {item.label}
-        </a>
-      ))}
-    </div>
-  ),
-};
+// Navigation tabs for the client profile header.
+// OVERVIEW → dashboard (/), PRODUCTS → products overview (/link-building).
+// RESOURCES and TOOLS are not yet built out and are intentionally excluded.
+const nav_tabs = [
+  { label: "OVERVIEW", href: "/" },
+  { label: "PRODUCTS", href: "/link-building" },
+];
 
 export default function ClientProfile() {
-  const [active_tab, setActiveTab] = useState("OVERVIEW");
+  const pathname = usePathname();
   const { user } = useAuth();
 
   const org_name =
@@ -87,6 +24,10 @@ export default function ClientProfile() {
     .slice(0, 2)
     .map((w: string) => w.charAt(0).toUpperCase())
     .join("");
+
+  // OVERVIEW is active on the root dashboard; PRODUCTS is active on its page.
+  const getIsActive = (href: string) =>
+    href === "/" ? pathname === "/" : pathname.startsWith(href);
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
@@ -118,7 +59,7 @@ export default function ClientProfile() {
           </div>
         </div>
 
-        {/* Quick Action */}
+        {/* Place Order → products overview page */}
         <Link
           href="/link-building"
           className="hidden items-center gap-2 rounded-lg bg-coral-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-coral-600 sm:flex"
@@ -135,25 +76,25 @@ export default function ClientProfile() {
         </Link>
       </div>
 
-      {/* Tabs */}
+      {/* Navigation Tabs */}
       <div className="mt-4 flex border-b border-gray-200 px-5 dark:border-gray-800 sm:px-6">
-        {tabs.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-3 text-sm font-medium transition-colors ${
-              active_tab === tab
-                ? "border-b-2 border-coral-500 text-coral-500"
-                : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
+        {nav_tabs.map((tab) => {
+          const is_active = getIsActive(tab.href);
+          return (
+            <Link
+              key={tab.label}
+              href={tab.href}
+              className={`px-4 py-3 text-sm font-medium transition-colors ${
+                is_active
+                  ? "border-b-2 border-coral-500 text-coral-500"
+                  : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+              }`}
+            >
+              {tab.label}
+            </Link>
+          );
+        })}
       </div>
-
-      {/* Tab Content (all tabs except OVERVIEW show a small panel) */}
-      {active_tab !== "OVERVIEW" && tab_content[active_tab]}
     </div>
   );
 }

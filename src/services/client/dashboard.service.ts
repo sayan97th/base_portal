@@ -37,6 +37,8 @@ export interface MonthlyOrderData {
   completion_rate: number;
   is_complete: boolean;
   has_no_orders: boolean;
+  /** True only for the current calendar month (i === 0 in the breakdown loop). */
+  is_current_month: boolean;
 }
 
 export const getMonthlyBreakdown = (
@@ -82,6 +84,7 @@ export const getMonthlyBreakdown = (
       completion_rate,
       is_complete: order_count > 0 && completion_rate === 100,
       has_no_orders: order_count === 0,
+      is_current_month: i === 0,
     });
   }
 

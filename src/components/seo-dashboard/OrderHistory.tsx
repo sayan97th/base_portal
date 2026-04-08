@@ -103,13 +103,17 @@ export default function OrderHistory({ orders, is_loading }: Props) {
 
               {/* Completion or Start Order CTA */}
               <div className="col-span-4 flex items-center gap-2">
-                {row.has_no_orders ? (
+                {row.has_no_orders && row.is_current_month ? (
                   <Link
                     href="/link-building"
                     className="w-full rounded-lg bg-coral-500 px-4 py-2 text-center text-xs font-semibold uppercase text-white hover:bg-coral-600"
                   >
                     Start Order
                   </Link>
+                ) : row.has_no_orders ? (
+                  <span className="w-full text-center text-sm text-gray-400 dark:text-gray-600">
+                    —
+                  </span>
                 ) : (
                   <>
                     <ProgressBar
