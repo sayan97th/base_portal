@@ -4,11 +4,11 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
 // Navigation tabs for the client profile header.
-// OVERVIEW → dashboard (/), PRODUCTS → products overview (/link-building).
-// RESOURCES and TOOLS are not yet built out and are intentionally excluded.
 const nav_tabs = [
   { label: "OVERVIEW", href: "/" },
   { label: "PRODUCTS", href: "/link-building" },
+  { label: "RESOURCES", href: "/resources" },
+  { label: "TOOLS", href: "/tools" },
 ];
 
 export default function ClientProfile() {
