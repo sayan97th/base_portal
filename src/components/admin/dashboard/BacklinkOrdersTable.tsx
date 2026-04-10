@@ -846,31 +846,115 @@ export default function BacklinkOrdersTable() {
           <table className="min-w-full border-collapse text-xs">
             <thead>
               <tr>
-                {visible_columns.map((col) => (
-                  <th
-                    key={col.key}
-                    className={`border border-gray-700/30 px-2 py-2 text-left font-semibold tracking-wide ${GROUP_HEADER_STYLES[col.group]}`}
-                    style={{ minWidth: col.min_width }}
-                  >
-                    <span className="flex items-center gap-1 whitespace-nowrap">
-                      {col.locked && (
-                        <svg
-                          className="h-3 w-3 shrink-0 opacity-80"
-                          fill="currentColor"
-                          viewBox="0 0 24 24"
-                          aria-label="Locked column"
+                {visible_columns.map((col) => {
+                  const sort_rule = sort_rules.find((r) => r.key === col.key);
+                  const sort_priority = sort_rules.findIndex((r) => r.key === col.key);
+                  const col_filter = column_filters[col.key];
+                  const filter_is_active = col_filter ? isFilterActive(col_filter) : false;
+
+                  return (
+                    <th
+                      key={col.key}
+                      className={`border border-gray-700/30 px-2 py-1.5 text-left font-semibold tracking-wide ${GROUP_HEADER_STYLES[col.group]}`}
+                      style={{ minWidth: col.min_width }}
+                    >
+                      <div className="flex items-center gap-1">
+                        {/* Sort button — takes up most of the header width */}
+                        <button
+                          onClick={(e) =>
+                            toggleSort(col.key, e.shiftKey)
+                          }
+                          title={
+                            sort_rules.length > 0
+                              ? "Click to sort · Shift+Click to add secondary sort"
+                              : "Click to sort · Shift+Click for multi-column sort"
+                          }
+                          className="flex flex-1 items-center gap-1 whitespace-nowrap text-left hover:opacity-75"
                         >
-                          <path
-                            fillRule="evenodd"
-                            d="M12 1.5a5.25 5.25 0 00-5.25 5.25v3a3 3 0 00-3 3v6.75a3 3 0 003 3h10.5a3 3 0 003-3v-6.75a3 3 0 00-3-3v-3c0-2.9-2.35-5.25-5.25-5.25zm3.75 8.25v-3a3.75 3.75 0 10-7.5 0v3h7.5z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      )}
-                      {col.label}
-                    </span>
-                  </th>
-                ))}
+                          {col.locked && (
+                            <svg
+                              className="h-3 w-3 shrink-0 opacity-80"
+                              fill="currentColor"
+                              viewBox="0 0 24 24"
+                              aria-label="Locked column"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M12 1.5a5.25 5.25 0 00-5.25 5.25v3a3 3 0 00-3 3v6.75a3 3 0 003 3h10.5a3 3 0 003-3v-6.75a3 3 0 00-3-3v-3c0-2.9-2.35-5.25-5.25-5.25zm3.75 8.25v-3a3.75 3.75 0 10-7.5 0v3h7.5z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                          )}
+                          <span>{col.label}</span>
+                          {/* Sort direction arrow */}
+                          {sort_rule ? (
+                            <span className="ml-0.5 flex items-center gap-0.5">
+                              <svg
+                                className="h-3 w-3 shrink-0"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2.5}
+                              >
+                                {sort_rule.direction === "asc" ? (
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+                                ) : (
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                                )}
+                              </svg>
+                              {/* Priority badge for multi-sort */}
+                              {sort_rules.length > 1 && (
+                                <span className="rounded bg-white/25 px-1 text-[10px] font-bold leading-tight">
+                                  {sort_priority + 1}
+                                </span>
+                              )}
+                            </span>
+                          ) : (
+                            <svg
+                              className="h-3 w-3 shrink-0 opacity-0 group-hover:opacity-40"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
+                            </svg>
+                          )}
+                        </button>
+
+                        {/* Per-column filter button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (open_filter_col === col.key) {
+                              setOpenFilterCol(null);
+                              setFilterAnchorEl(null);
+                            } else {
+                              setOpenFilterCol(col.key);
+                              setFilterAnchorEl(e.currentTarget);
+                            }
+                          }}
+                          title="Filter this column"
+                          className={`shrink-0 rounded p-0.5 transition-opacity ${
+                            filter_is_active
+                              ? "opacity-100 text-yellow-200"
+                              : "opacity-30 hover:opacity-80"
+                          }`}
+                        >
+                          <svg
+                            className="h-3 w-3"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                          </svg>
+                        </button>
+                      </div>
+                    </th>
+                  );
+                })}
                 <th className="border border-gray-700/30 bg-gray-800 px-2 py-2 text-center text-xs font-semibold text-white">
                   <span className="sr-only">Row actions</span>
                   <svg className="mx-auto h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -961,6 +1045,23 @@ export default function BacklinkOrdersTable() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* Per-column filter dropdown (portal — avoids overflow clipping) */}
+      {open_filter_col && (
+        <ColumnFilterDropdown
+          col_key={open_filter_col}
+          col_label={COLUMNS.find((c) => c.key === open_filter_col)?.label ?? open_filter_col}
+          col_type={COLUMNS.find((c) => c.key === open_filter_col)?.type ?? "text"}
+          col_options={COLUMNS.find((c) => c.key === open_filter_col)?.options}
+          current_filter={column_filters[open_filter_col]}
+          anchor_el={filter_anchor_el}
+          onSetFilter={(filter) => setFilter(open_filter_col, filter)}
+          onClose={() => {
+            setOpenFilterCol(null);
+            setFilterAnchorEl(null);
+          }}
+        />
       )}
 
       {/* Footer — pagination + summary */}
