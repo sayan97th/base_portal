@@ -238,6 +238,15 @@ function generateAdminInvoicePdf(invoice: AdminInvoice): void {
     doc.text("Subtotal", sum_label_x, y);
     doc.text(formatCurrency(invoice.subtotal_amount), right_x, y, { align: "right" });
     y += 7;
+    if (invoice.discount_amount != null && invoice.discount_amount > 0) {
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(109, 40, 217); // violet-700
+      doc.text("Bulk Discount (10% off)", sum_label_x, y);
+      doc.setFont("helvetica", "bold");
+      doc.text(`-${formatCurrency(invoice.discount_amount)}`, right_x, y, { align: "right" });
+      doc.setTextColor(...COLORS.secondary);
+      y += 7;
+    }
     if (invoice.coupon_discounts && invoice.coupon_discounts.length > 0) {
       invoice.coupon_discounts.forEach((coupon) => {
         doc.setFont("helvetica", "normal");
@@ -484,6 +493,19 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
                   <span className="text-gray-500 dark:text-gray-400">Subtotal</span>
                   <span className="text-gray-700 dark:text-gray-300">{formatAmount(invoice.subtotal_amount)}</span>
                 </div>
+                {invoice.discount_amount != null && invoice.discount_amount > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="flex items-center gap-1.5 font-medium text-violet-600 dark:text-violet-400">
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
+                      </svg>
+                      Bulk Discount (10% off)
+                    </span>
+                    <span className="font-semibold tabular-nums text-violet-600 dark:text-violet-400">
+                      -{formatAmount(invoice.discount_amount)}
+                    </span>
+                  </div>
+                )}
                 {invoice.coupon_discounts && invoice.coupon_discounts.length > 0 && (
                   <div className="space-y-1 border-t border-dashed border-gray-200 pt-2 dark:border-gray-700">
                     <p className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
@@ -496,7 +518,7 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
                     {invoice.coupon_discounts.map((coupon: InvoiceCouponDiscount) => (
                       <div key={coupon.code} className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-1.5">
-                          <span className="inline-flex items-center rounded border border-success-300 bg-success-50 px-1.5 py-0.5 font-mono text-xs font-semibold tracking-wider text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400">
+                          <span className="inline-flex items-center rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 font-mono text-xs font-semibold tracking-wider text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400">
                             {coupon.code}
                           </span>
                           <span className="text-xs text-gray-500 dark:text-gray-400">
@@ -505,7 +527,7 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
                               : "Fixed discount"}
                           </span>
                         </div>
-                        <span className="text-sm font-medium text-success-600 dark:text-success-400">
+                        <span className="text-sm font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
                           -{formatAmount(coupon.discount_amount)}
                         </span>
                       </div>
@@ -515,7 +537,7 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
                 {invoice.credit_amount > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500 dark:text-gray-400">Credits Applied</span>
-                    <span className="text-success-600 dark:text-success-400">
+                    <span className="text-emerald-600 dark:text-emerald-400">
                       -{formatAmount(invoice.credit_amount)}
                     </span>
                   </div>
@@ -579,6 +601,19 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
               <InfoRow label="Payment Method" value={invoice.payment_method} />
               <InfoRow label="Currency" value={invoice.currency_type.toUpperCase()} />
               <InfoRow label="Subtotal" value={formatAmount(invoice.subtotal_amount)} />
+              {invoice.discount_amount != null && invoice.discount_amount > 0 && (
+                <InfoRow
+                  label={
+                    <span className="flex items-center gap-1.5 font-medium text-violet-600 dark:text-violet-400">
+                      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
+                      </svg>
+                      Bulk Discount (10%)
+                    </span>
+                  }
+                  value={<span className="font-semibold tabular-nums text-violet-600 dark:text-violet-400">-{formatAmount(invoice.discount_amount)}</span>}
+                />
+              )}
               {invoice.coupon_discounts && invoice.coupon_discounts.length > 0 && (
                 <>
                   {invoice.coupon_discounts.map((coupon: InvoiceCouponDiscount) => (
@@ -586,7 +621,7 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
                       key={coupon.code}
                       label={
                         <span className="flex items-center gap-1.5">
-                          <span className="inline-flex items-center rounded border border-success-300 bg-success-50 px-1.5 py-0.5 font-mono text-xs font-semibold tracking-wider text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400">
+                          <span className="inline-flex items-center rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 font-mono text-xs font-semibold tracking-wider text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400">
                             {coupon.code}
                           </span>
                           <span className="text-xs">
@@ -594,7 +629,7 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
                           </span>
                         </span>
                       }
-                      value={<span className="text-success-600 dark:text-success-400">-{formatAmount(coupon.discount_amount)}</span>}
+                      value={<span className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">-{formatAmount(coupon.discount_amount)}</span>}
                     />
                   ))}
                 </>
@@ -602,7 +637,7 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
               {invoice.credit_amount > 0 && (
                 <InfoRow
                   label="Credits Applied"
-                  value={<span className="text-success-600 dark:text-success-400">-{formatAmount(invoice.credit_amount)}</span>}
+                  value={<span className="text-emerald-600 dark:text-emerald-400">-{formatAmount(invoice.credit_amount)}</span>}
                 />
               )}
               <InfoRow

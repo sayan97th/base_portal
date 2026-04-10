@@ -86,7 +86,14 @@ interface OrderItemsTableProps {
 
 const OrderItemsTable = ({ items, coupons, total_amount }: OrderItemsTableProps) => {
   const items_subtotal = items.reduce((sum, i) => sum + i.subtotal, 0);
+  const coupon_total = coupons?.reduce((sum, c) => sum + c.discount_amount, 0) ?? 0;
+  const bulk_discount_amount = Math.max(
+    0,
+    Math.round((items_subtotal - (total_amount ?? items_subtotal) - coupon_total) * 100) / 100
+  );
+  const has_bulk_discount = bulk_discount_amount > 0;
   const has_coupons = coupons && coupons.length > 0;
+  const has_any_discount = has_bulk_discount || !!has_coupons;
 
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
@@ -141,7 +148,7 @@ const OrderItemsTable = ({ items, coupons, total_amount }: OrderItemsTableProps)
             ))}
           </tbody>
           <tfoot>
-            {has_coupons ? (
+            {has_any_discount ? (
               <>
                 <tr className="border-t border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50">
                   <td colSpan={4} className="px-5 py-3 text-right text-sm text-gray-500 dark:text-gray-400">
@@ -151,15 +158,32 @@ const OrderItemsTable = ({ items, coupons, total_amount }: OrderItemsTableProps)
                     {formatCurrency(items_subtotal)}
                   </td>
                 </tr>
-                {coupons.map((coupon) => (
-                  <tr key={coupon.coupon_id} className="bg-success-50/40 dark:bg-success-500/5">
+                {has_bulk_discount && (
+                  <tr className="bg-violet-50/40 dark:bg-violet-500/5">
                     <td colSpan={4} className="px-5 py-2.5 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <svg className="h-3.5 w-3.5 text-success-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                        <svg className="h-3.5 w-3.5 text-violet-500 dark:text-violet-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
+                        </svg>
+                        <span className="text-xs font-medium text-violet-700 dark:text-violet-300">
+                          Bulk Discount (10% off)
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-2.5 text-right text-sm font-semibold tabular-nums text-violet-600 dark:text-violet-400">
+                      -{formatCurrency(bulk_discount_amount)}
+                    </td>
+                  </tr>
+                )}
+                {has_coupons && coupons.map((coupon) => (
+                  <tr key={coupon.coupon_id} className="bg-emerald-50/40 dark:bg-emerald-500/5">
+                    <td colSpan={4} className="px-5 py-2.5 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <svg className="h-3.5 w-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
                           <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" />
                         </svg>
-                        <span className="inline-flex items-center rounded border border-success-300 bg-success-50 px-1.5 py-0.5 font-mono text-xs font-semibold tracking-wider text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400">
+                        <span className="inline-flex items-center rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 font-mono text-xs font-semibold tracking-wider text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400">
                           {coupon.code}
                         </span>
                         <span className="text-xs text-gray-500 dark:text-gray-400">
@@ -169,7 +193,7 @@ const OrderItemsTable = ({ items, coupons, total_amount }: OrderItemsTableProps)
                         </span>
                       </div>
                     </td>
-                    <td className="px-5 py-2.5 text-right text-sm font-medium text-success-600 dark:text-success-400">
+                    <td className="px-5 py-2.5 text-right text-sm font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
                       -{formatCurrency(coupon.discount_amount)}
                     </td>
                   </tr>
@@ -226,6 +250,19 @@ const InvoiceCard = ({ invoice }: InvoiceCardProps) => {
         <InfoRow label="Payment Method" value={invoice.payment_method} />
         <InfoRow label="Currency" value={invoice.currency_type.toUpperCase()} />
         <InfoRow label="Subtotal" value={formatCurrency(invoice.subtotal_amount)} />
+        {invoice.discount_amount != null && invoice.discount_amount > 0 && (
+          <InfoRow
+            label={
+              <span className="flex items-center gap-1.5 font-medium text-violet-600 dark:text-violet-400">
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
+                </svg>
+                Bulk Discount (10%)
+              </span>
+            }
+            value={<span className="font-semibold tabular-nums text-violet-600 dark:text-violet-400">-{formatCurrency(invoice.discount_amount)}</span>}
+          />
+        )}
         {invoice.coupon_discounts && invoice.coupon_discounts.length > 0 && (
           <>
             {invoice.coupon_discounts.map((coupon: InvoiceCouponDiscount) => (
@@ -233,7 +270,7 @@ const InvoiceCard = ({ invoice }: InvoiceCardProps) => {
                 key={coupon.code}
                 label={
                   <span className="flex items-center gap-1.5">
-                    <span className="inline-flex items-center rounded border border-success-300 bg-success-50 px-1.5 py-0.5 font-mono text-xs font-semibold tracking-wider text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400">
+                    <span className="inline-flex items-center rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 font-mono text-xs font-semibold tracking-wider text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400">
                       {coupon.code}
                     </span>
                     <span className="text-xs">
@@ -241,7 +278,7 @@ const InvoiceCard = ({ invoice }: InvoiceCardProps) => {
                     </span>
                   </span>
                 }
-                value={<span className="text-success-600 dark:text-success-400">-{formatCurrency(coupon.discount_amount)}</span>}
+                value={<span className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">-{formatCurrency(coupon.discount_amount)}</span>}
               />
             ))}
           </>
@@ -249,7 +286,7 @@ const InvoiceCard = ({ invoice }: InvoiceCardProps) => {
         {invoice.credit_amount > 0 && (
           <InfoRow
             label="Credits Applied"
-            value={<span className="text-success-600 dark:text-success-400">-{formatCurrency(invoice.credit_amount)}</span>}
+            value={<span className="text-emerald-600 dark:text-emerald-400">-{formatCurrency(invoice.credit_amount)}</span>}
           />
         )}
         <InfoRow
@@ -461,51 +498,85 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
                   <InfoRow label="Items" value={`${order.items.length} item${order.items.length !== 1 ? "s" : ""}`} />
                   <InfoRow label="Placed" value={formatDate(order.created_at)} />
                   <InfoRow label="Last Updated" value={formatDate(order.updated_at)} />
-                  {order.coupons && order.coupons.length > 0 ? (
-                    <>
-                      <InfoRow
-                        label="Subtotal"
-                        value={formatCurrency(order.subtotal_before_discount ?? order.total_amount)}
-                      />
-                      <div className="border-t border-dashed border-gray-100 py-2 dark:border-gray-800">
-                        <p className="mb-1.5 flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" />
-                          </svg>
-                          Coupons Applied
-                        </p>
-                        {order.coupons.map((coupon: OrderCouponDetail) => (
-                          <div key={coupon.coupon_id} className="flex items-center justify-between gap-2 py-0.5">
-                            <dt className="flex items-center gap-1.5">
-                              <span className="inline-flex items-center rounded border border-success-300 bg-success-50 px-1.5 py-0.5 font-mono text-xs font-semibold tracking-wider text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400">
-                                {coupon.code}
+                  {(() => {
+                    const order_items_subtotal = order.items.reduce((s, i) => s + i.subtotal, 0);
+                    const order_coupon_total = order.coupons?.reduce((s, c) => s + c.discount_amount, 0) ?? 0;
+                    const order_bulk_discount = Math.max(
+                      0,
+                      Math.round(((order.subtotal_before_discount ?? order_items_subtotal) - order.total_amount - order_coupon_total) * 100) / 100
+                    );
+                    const order_total_savings = order_bulk_discount + order_coupon_total;
+                    const show_breakdown = order_bulk_discount > 0 || (order.coupons && order.coupons.length > 0);
+
+                    return show_breakdown ? (
+                      <>
+                        <InfoRow
+                          label="Subtotal"
+                          value={formatCurrency(order.subtotal_before_discount ?? order_items_subtotal)}
+                        />
+                        {order_bulk_discount > 0 && (
+                          <InfoRow
+                            label={
+                              <span className="flex items-center gap-1.5 font-medium text-violet-600 dark:text-violet-400">
+                                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
+                                </svg>
+                                Bulk Discount (10%)
                               </span>
-                              <span className="text-xs text-gray-500 dark:text-gray-400">
-                                {coupon.discount_type === "percentage"
-                                  ? `${coupon.discount_value}% off`
-                                  : "Fixed discount"}
-                              </span>
-                            </dt>
-                            <dd className="text-sm font-medium text-success-600 dark:text-success-400">
-                              -{formatCurrency(coupon.discount_amount)}
+                            }
+                            value={<span className="font-semibold tabular-nums text-violet-600 dark:text-violet-400">-{formatCurrency(order_bulk_discount)}</span>}
+                          />
+                        )}
+                        {order.coupons && order.coupons.length > 0 && (
+                          <div className="border-t border-dashed border-gray-100 py-2 dark:border-gray-800">
+                            <p className="mb-1.5 flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" />
+                              </svg>
+                              Coupons Applied
+                            </p>
+                            {order.coupons.map((coupon: OrderCouponDetail) => (
+                              <div key={coupon.coupon_id} className="flex items-center justify-between gap-2 py-0.5">
+                                <dt className="flex items-center gap-1.5">
+                                  <span className="inline-flex items-center rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 font-mono text-xs font-semibold tracking-wider text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400">
+                                    {coupon.code}
+                                  </span>
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                                    {coupon.discount_type === "percentage"
+                                      ? `${coupon.discount_value}% off`
+                                      : "Fixed discount"}
+                                  </span>
+                                </dt>
+                                <dd className="text-sm font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                                  -{formatCurrency(coupon.discount_amount)}
+                                </dd>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between border-t border-gray-100 py-2.5 dark:border-gray-800">
+                          <dt className="text-sm text-gray-500 dark:text-gray-400">Total</dt>
+                          <dd className="text-base font-bold text-gray-900 dark:text-white">
+                            {formatCurrency(order.total_amount)}
+                          </dd>
+                        </div>
+                        {order_total_savings > 0 && (
+                          <div className="flex items-center justify-between rounded-lg bg-emerald-50 px-3 py-2 dark:bg-emerald-500/10">
+                            <dt className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Total savings</dt>
+                            <dd className="text-sm font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
+                              -{formatCurrency(order_total_savings)}
                             </dd>
                           </div>
-                        ))}
-                      </div>
-                      <div className="flex items-center justify-between border-t border-gray-100 py-2.5 dark:border-gray-800">
-                        <dt className="text-sm text-gray-500 dark:text-gray-400">Total</dt>
-                        <dd className="text-base font-bold text-gray-900 dark:text-white">
-                          {formatCurrency(order.total_amount)}
-                        </dd>
-                      </div>
-                    </>
-                  ) : (
-                    <InfoRow
-                      label="Total"
-                      value={<span className="text-base font-bold text-gray-900 dark:text-white">{formatCurrency(order.total_amount)}</span>}
-                    />
-                  )}
+                        )}
+                      </>
+                    ) : (
+                      <InfoRow
+                        label="Total"
+                        value={<span className="text-base font-bold text-gray-900 dark:text-white">{formatCurrency(order.total_amount)}</span>}
+                      />
+                    );
+                  })()}
                 </dl>
               </div>
 
