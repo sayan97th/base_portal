@@ -599,6 +599,25 @@ export default function BacklinkOrdersTable() {
     });
   }, []);
 
+  // ── Clear filters ───────────────────────────────────────────────────────────
+
+  const has_active_filters =
+    search.trim() !== "" ||
+    status_filter !== "" ||
+    client_filter !== "" ||
+    link_type_filter !== "" ||
+    link_builder_filter !== "" ||
+    hidden_columns.size > 0;
+
+  const clearAllFilters = useCallback(() => {
+    setSearch("");
+    setStatusFilter("");
+    setClientFilter("");
+    setLinkTypeFilter("");
+    setLinkBuilderFilter("");
+    setHiddenColumns(new Set());
+  }, []);
+
   // ── Export ──────────────────────────────────────────────────────────────────
 
   const handleExport = useCallback(() => {
@@ -680,6 +699,18 @@ export default function BacklinkOrdersTable() {
             onChange={(e) => setLinkBuilderFilter(e.target.value)}
             className="h-8 rounded-lg border border-gray-200 bg-gray-50 px-3 text-xs outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
           />
+          {/* Clear all filters */}
+          {has_active_filters && (
+            <button
+              onClick={clearAllFilters}
+              className="flex h-8 items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Clear All
+            </button>
+          )}
           {/* Column filter toggle */}
           <button
             onClick={() => setShowFilterPanel((v) => !v)}
