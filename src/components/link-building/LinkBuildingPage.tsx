@@ -30,6 +30,7 @@ type Step = "selection" | "keywords" | "checkout";
 
 const BULK_DISCOUNT_THRESHOLD = 10;
 const BULK_DISCOUNT_RATE = 0.1;
+const MINIMUM_CART_FOR_COUPON = 1000;
 
 const empty_keyword_row = (): KeywordRow => ({
   keyword: "",
@@ -221,6 +222,18 @@ const LinkBuildingPage: React.FC = () => {
       setCouponsState((prev) => ({
         ...prev,
         error: "This promo code has already been applied.",
+      }));
+      return;
+    }
+
+    // Enforce minimum cart amount for promo codes
+    if (amount_after_bulk < MINIMUM_CART_FOR_COUPON) {
+      setCouponsState((prev) => ({
+        ...prev,
+        error: `A minimum cart total of $${MINIMUM_CART_FOR_COUPON.toLocaleString("en-US", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })} is required to apply a promo code.`,
       }));
       return;
     }
@@ -485,7 +498,9 @@ const LinkBuildingPage: React.FC = () => {
           <div className="col-span-12 lg:col-span-4">
             <LinkBuildingOrderSummary
               selected_items={selected_items}
-              total={subtotal}
+              total={amount_after_bulk}
+              bulk_discount_amount={bulk_discount_amount}
+              total_links={total_links}
               action_label={current_step === "selection" ? "Continue" : "Review"}
               onAction={current_step === "selection" ? handleContinue : handleReview}
               is_action_disabled={selected_items.length === 0}
@@ -521,6 +536,8 @@ const LinkBuildingPage: React.FC = () => {
                 selected_items={selected_items}
                 total={amount_after_bulk}
                 bulk_discount_amount={bulk_discount_amount}
+                total_links={total_links}
+                min_cart_for_coupon={MINIMUM_CART_FOR_COUPON}
                 action_label="Review"
                 onAction={() => {}}
                 is_action_disabled
