@@ -229,6 +229,21 @@ function drawSummarySection(
   doc.text("Subtotal", label_x, y_position);
   doc.text(invoice.subtotal, right_x, y_position, { align: "right" });
 
+  // Bulk discount (10% off for 10+ services)
+  if (invoice.discount) {
+    y_position += 6;
+
+    doc.setFontSize(FONT_SIZES.body);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(109, 40, 217); // violet-700
+    doc.text("Bulk Discount (10% off)", label_x, y_position);
+    doc.setFont("helvetica", "bold");
+    doc.text(`-${invoice.discount}`, right_x, y_position, { align: "right" });
+
+    // Reset color
+    doc.setTextColor(...COLORS.secondary);
+  }
+
   // Coupon discounts
   if (invoice.coupon_discounts && invoice.coupon_discounts.length > 0) {
     y_position += 6;

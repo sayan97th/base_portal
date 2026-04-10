@@ -308,6 +308,31 @@ const InvoiceDetailPage: React.FC<InvoiceDetailPageProps> = ({ invoice_id }) => 
               </dd>
             </div>
 
+            {invoice.discount && (
+              <div className="flex justify-between">
+                <dt className="flex items-center gap-1.5 font-medium text-violet-600 dark:text-violet-400">
+                  <svg
+                    className="h-3.5 w-3.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"
+                    />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" />
+                  </svg>
+                  Bulk Discount (10% off)
+                </dt>
+                <dd className="font-semibold tabular-nums text-violet-600 dark:text-violet-400">
+                  -{invoice.discount}
+                </dd>
+              </div>
+            )}
+
             {invoice.coupon_discounts && invoice.coupon_discounts.length > 0 && (
               <>
                 <div className="border-t border-dashed border-gray-200 pt-2 dark:border-gray-700">

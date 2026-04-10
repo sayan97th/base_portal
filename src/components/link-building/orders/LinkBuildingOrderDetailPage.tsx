@@ -361,6 +361,20 @@ const LinkBuildingOrderDetailPage: React.FC<
 
   const total_links = order?.items.reduce((sum, i) => sum + i.quantity, 0) ?? 0;
 
+  // Derive bulk discount from: subtotal_before_discount − total_amount − Σ coupon_discounts
+  const coupon_discount_total =
+    order?.coupons?.reduce((s, c) => s + c.discount_amount, 0) ?? 0;
+  const raw_subtotal =
+    order?.subtotal_before_discount ??
+    order?.items.reduce((s, i) => s + i.subtotal, 0) ??
+    0;
+  const bulk_discount_amount = Math.max(
+    0,
+    Math.round((raw_subtotal - (order?.total_amount ?? 0) - coupon_discount_total) * 100) / 100
+  );
+  const has_bulk_discount = total_links >= 10 && bulk_discount_amount > 0;
+  const total_savings = bulk_discount_amount + coupon_discount_total;
+
   const status_config = order ? getStatusConfig(order.status) : null;
 
   const is_new_order = order?.status === "pending";
@@ -535,13 +549,13 @@ const LinkBuildingOrderDetailPage: React.FC<
                     </dd>
                   </div>
 
-                  {total_links >= 10 && (
+                  {has_bulk_discount && (
                     <div className="flex justify-between gap-2">
-                      <dt className="text-sm text-success-600 dark:text-success-400">
-                        Bulk discount (10%)
+                      <dt className="text-sm font-medium text-violet-600 dark:text-violet-400">
+                        Bulk Discount (10% off)
                       </dt>
-                      <dd className="text-sm font-medium text-success-600 dark:text-success-400">
-                        Applied
+                      <dd className="text-sm font-semibold tabular-nums text-violet-600 dark:text-violet-400">
+                        -{formatCurrency(bulk_discount_amount)}
                       </dd>
                     </div>
                   )}
@@ -557,22 +571,22 @@ const LinkBuildingOrderDetailPage: React.FC<
                           {order.coupons.map((coupon: OrderCouponDetail) => (
                             <div
                               key={coupon.coupon_id}
-                              className="flex items-start justify-between gap-2 rounded-lg border border-success-200 bg-success-50 px-3 py-2 dark:border-success-500/20 dark:bg-success-500/10"
+                              className="flex items-start justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-500/20 dark:bg-emerald-500/10"
                             >
                               <div className="min-w-0">
                                 <div className="flex items-center gap-1.5">
-                                  <span className="inline-flex items-center rounded border border-success-300 bg-white px-1.5 py-0.5 font-mono text-xs font-semibold tracking-wider text-success-700 dark:border-success-500/30 dark:bg-success-500/5 dark:text-success-400">
+                                  <span className="inline-flex items-center rounded border border-emerald-300 bg-white px-1.5 py-0.5 font-mono text-xs font-semibold tracking-wider text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/5 dark:text-emerald-400">
                                     {coupon.code}
                                   </span>
                                 </div>
-                                <p className="mt-0.5 truncate text-xs text-success-600 dark:text-success-500">
+                                <p className="mt-0.5 truncate text-xs text-emerald-600 dark:text-emerald-500">
                                   {coupon.name}
                                   {coupon.discount_type === "percentage"
                                     ? ` — ${coupon.discount_value}% off`
                                     : ""}
                                 </p>
                               </div>
-                              <span className="shrink-0 text-sm font-semibold text-success-700 dark:text-success-400">
+                              <span className="shrink-0 text-sm font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
                                 -{formatCurrency(coupon.discount_amount)}
                               </span>
                             </div>
@@ -591,13 +605,13 @@ const LinkBuildingOrderDetailPage: React.FC<
                     </dd>
                   </div>
 
-                  {order.coupons && order.coupons.length > 0 && (
-                    <div className="flex justify-between gap-2 rounded-lg bg-success-50 px-3 py-2 dark:bg-success-500/10">
-                      <dt className="text-sm font-medium text-success-700 dark:text-success-400">
+                  {total_savings > 0 && (
+                    <div className="flex justify-between gap-2 rounded-lg bg-emerald-50 px-3 py-2 dark:bg-emerald-500/10">
+                      <dt className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
                         Total savings
                       </dt>
-                      <dd className="text-sm font-semibold text-success-700 dark:text-success-400">
-                        -{formatCurrency(order.coupons.reduce((s, c) => s + c.discount_amount, 0))}
+                      <dd className="text-sm font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
+                        -{formatCurrency(total_savings)}
                       </dd>
                     </div>
                   )}
