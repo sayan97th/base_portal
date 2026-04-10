@@ -2,6 +2,9 @@
 
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import type { BacklinkOrderRow } from "@/types/admin/backlink-order";
+import { useTableSort } from "@/hooks/useTableSort";
+import { useColumnFilters, isFilterActive } from "@/hooks/useColumnFilters";
+import ColumnFilterDropdown from "./ColumnFilterDropdown";
 import {
   listBacklinkOrders,
   createBacklinkOrder,
@@ -390,6 +393,21 @@ export default function BacklinkOrdersTable() {
   const [last_page, setLastPage] = useState(1);
   const [total, setTotal] = useState(0);
 
+  // ── Sort & column-filter state ───────────────────────────────────────────────
+
+  const { sort_rules, toggleSort, clearSort, applySorting } = useTableSort();
+  const {
+    column_filters,
+    setFilter,
+    clearAllFilters: clearColumnFilters,
+    active_filter_count,
+    applyFilters: applyColumnFilters,
+  } = useColumnFilters();
+
+  // Which column's filter dropdown is currently open
+  const [open_filter_col, setOpenFilterCol] = useState<keyof BacklinkOrderRow | null>(null);
+  const [filter_anchor_el, setFilterAnchorEl] = useState<HTMLElement | null>(null);
+
   // Refs for stable callbacks (avoid stale closures)
   const rows_ref = useRef<BacklinkOrderRow[]>([]);
   rows_ref.current = rows;
@@ -426,7 +444,8 @@ export default function BacklinkOrdersTable() {
 
   const visible_columns = COLUMNS.filter((col) => !hidden_columns.has(col.key));
 
-  const filtered_rows = rows.filter((row) => {
+  // 1. Toolbar filters (search + quick dropdowns)
+  const toolbar_filtered = rows.filter((row) => {
     if (status_filter && row.status !== status_filter) return false;
     if (link_type_filter && row.link_type !== link_type_filter) return false;
     if (client_filter && !row.client.toLowerCase().includes(client_filter.toLowerCase())) return false;
@@ -442,6 +461,9 @@ export default function BacklinkOrdersTable() {
       row.partnership.toLowerCase().includes(lower)
     );
   });
+
+  // 2. Per-column filters → 3. Multi-column sort
+  const filtered_rows = applySorting(applyColumnFilters(toolbar_filtered));
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -607,7 +629,9 @@ export default function BacklinkOrdersTable() {
     client_filter !== "" ||
     link_type_filter !== "" ||
     link_builder_filter !== "" ||
-    hidden_columns.size > 0;
+    hidden_columns.size > 0 ||
+    active_filter_count > 0 ||
+    sort_rules.length > 0;
 
   const clearAllFilters = useCallback(() => {
     setSearch("");
@@ -616,7 +640,9 @@ export default function BacklinkOrdersTable() {
     setLinkTypeFilter("");
     setLinkBuilderFilter("");
     setHiddenColumns(new Set());
-  }, []);
+    clearColumnFilters();
+    clearSort();
+  }, [clearColumnFilters, clearSort]);
 
   // ── Export ──────────────────────────────────────────────────────────────────
 
