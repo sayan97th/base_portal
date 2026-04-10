@@ -99,11 +99,36 @@ export async function deleteBacklinkOrder(
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 /**
+ * Ensures a URL string has a protocol prefix so the backend validator accepts it.
+ * Empty strings are left as-is (field is optional).
+ */
+function normalizeUrl(value: string): string {
+  if (!value || value.trim() === "") return value;
+  if (/^https?:\/\//i.test(value)) return value;
+  return `https://${value}`;
+}
+
+const URL_FIELDS: (keyof BacklinkOrderPayload)[] = [
+  "landing_page",
+  "partnership",
+  "article",
+  "live_link",
+];
+
+/**
  * Strips server-only / computed fields from a row before sending it as a payload.
+ * URL fields are normalized to include a protocol prefix if missing.
  */
 export function buildPayload(row: BacklinkOrderRow): BacklinkOrderPayload {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { id: _id, days_left: _dl, projected_health: _ph, created_at: _ca, updated_at: _ua, ...payload } = row;
+
+  for (const field of URL_FIELDS) {
+    if (typeof payload[field] === "string") {
+      (payload as Record<string, string>)[field] = normalizeUrl(payload[field] as string);
+    }
+  }
+
   return payload;
 }
 
