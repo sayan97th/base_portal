@@ -1,26 +1,29 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import type { BacklinkOrderRow } from "@/types/admin/backlink-order";
+import type { SortRulePayload } from "@/types/admin/backlink-order";
+
+/**
+ * Re-export so consumers can import the sort rule type from a single place
+ * without coupling to the full backlink-order types.
+ */
+export type { SortRulePayload as SortRule };
 
 export type SortDirection = "asc" | "desc";
 
-export interface SortRule {
-  key: keyof BacklinkOrderRow;
-  direction: SortDirection;
-}
-
 /**
  * Manages multi-column sort state for a data table.
+ * Sort rules are in the same shape as `SortRulePayload`, so they can be
+ * passed directly into `BacklinkOrderSearchBody.sort_rules` without mapping.
  *
- * - Single click on a column: set as the sole sort rule (asc → desc → cleared).
- * - Shift+click on a column: add/cycle/remove it from the multi-sort chain.
+ * - Single click: set as the sole sort rule (asc → desc → cleared).
+ * - Shift+click: add / cycle / remove from the multi-sort chain.
  */
 export function useTableSort() {
-  const [sort_rules, setSortRules] = useState<SortRule[]>([]);
+  const [sort_rules, setSortRules] = useState<SortRulePayload[]>([]);
 
   const toggleSort = useCallback(
-    (key: keyof BacklinkOrderRow, add_to_existing: boolean) => {
+    (key: string, add_to_existing: boolean) => {
       setSortRules((prev) => {
         const existing_idx = prev.findIndex((r) => r.key === key);
 
@@ -38,7 +41,7 @@ export function useTableSort() {
           return prev.filter((_, i) => i !== existing_idx);
         }
 
-        // Plain click: replace with single sort rule (asc → desc → cleared)
+        // Plain click: replace with a single sort rule (asc → desc → cleared)
         if (prev.length === 1 && existing_idx === 0) {
           if (prev[0].direction === "asc") return [{ key, direction: "desc" }];
           return []; // clear
@@ -51,36 +54,5 @@ export function useTableSort() {
 
   const clearSort = useCallback(() => setSortRules([]), []);
 
-  /** Returns a sorted copy of `data` according to the active sort rules. */
-  const applySorting = useCallback(
-    (data: BacklinkOrderRow[]): BacklinkOrderRow[] => {
-      if (sort_rules.length === 0) return data;
-
-      return [...data].sort((a, b) => {
-        for (const rule of sort_rules) {
-          const a_val = (a[rule.key] as string) ?? "";
-          const b_val = (b[rule.key] as string) ?? "";
-
-          const a_num = parseFloat(a_val);
-          const b_num = parseFloat(b_val);
-
-          let cmp: number;
-          if (!isNaN(a_num) && !isNaN(b_num)) {
-            cmp = a_num - b_num;
-          } else {
-            cmp = a_val.localeCompare(b_val, undefined, {
-              numeric: true,
-              sensitivity: "base",
-            });
-          }
-
-          if (cmp !== 0) return rule.direction === "asc" ? cmp : -cmp;
-        }
-        return 0;
-      });
-    },
-    [sort_rules]
-  );
-
-  return { sort_rules, toggleSort, clearSort, applySorting };
+  return { sort_rules, toggleSort, clearSort };
 }
