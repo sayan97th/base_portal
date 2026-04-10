@@ -30,7 +30,7 @@ export function useTableSort() {
         if (add_to_existing) {
           // Shift+click: append / cycle / remove from multi-sort chain
           if (existing_idx === -1) {
-            return [...prev, { key, direction: "asc" }];
+            return [...prev, { key, direction: "asc", nulls_last: true }];
           }
           if (prev[existing_idx].direction === "asc") {
             return prev.map((r, i) =>
@@ -43,10 +43,10 @@ export function useTableSort() {
 
         // Plain click: replace with a single sort rule (asc → desc → cleared)
         if (prev.length === 1 && existing_idx === 0) {
-          if (prev[0].direction === "asc") return [{ key, direction: "desc" }];
+          if (prev[0].direction === "asc") return [{ key, direction: "desc", nulls_last: true }];
           return []; // clear
         }
-        return [{ key, direction: "asc" }];
+        return [{ key, direction: "asc", nulls_last: true }];
       });
     },
     []

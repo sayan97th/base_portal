@@ -70,6 +70,12 @@ export interface BacklinkOrderDeleteResponse {
 export interface SortRulePayload {
   key: string;
   direction: "asc" | "desc";
+  /**
+   * When true the backend must place NULL / empty-string rows at the bottom
+   * regardless of sort direction. Defaults to true so that columns with
+   * sparse data (partnership, article, live_link, etc.) sort predictably.
+   */
+  nulls_last?: boolean;
 }
 
 export interface TextColumnFilterPayload {

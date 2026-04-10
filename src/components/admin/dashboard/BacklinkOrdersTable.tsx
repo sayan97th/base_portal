@@ -38,6 +38,18 @@ interface ColumnDef {
   type: "text" | "select" | "date" | "url" | "number";
   options?: string[];
   locked?: boolean;
+  /**
+   * When the backend DB column name differs from the frontend key, set this
+   * to the exact column name the Laravel API expects in sort_rules[].key.
+   * Defaults to `key` when omitted.
+   */
+  sort_key?: string;
+  /**
+   * Set to false for computed / virtual columns that the backend cannot sort
+   * in a SQL ORDER BY clause (e.g. days_left, projected_health).
+   * Defaults to true when omitted.
+   */
+  sortable?: boolean;
 }
 
 // ── Column definitions ─────────────────────────────────────────────────────────
@@ -73,8 +85,8 @@ const COLUMNS: ColumnDef[] = [
   { key: "request_date", label: "Request Date", group: "dates", min_width: 120, type: "date", locked: true },
   { key: "estimated_delivery_date", label: "Estimated Delivery Date", group: "dates", min_width: 175, type: "date", locked: true },
   { key: "estimated_turnaround_days", label: "Est. Turnaround (Days)", group: "dates", min_width: 155, type: "number", locked: true },
-  { key: "days_left", label: "Days Left", group: "health", min_width: 90, type: "number" },
-  { key: "projected_health", label: "Projected Health", group: "health", min_width: 130, type: "text" },
+  { key: "days_left", label: "Days Left", group: "health", min_width: 90, type: "number", sortable: false },
+  { key: "projected_health", label: "Projected Health", group: "health", min_width: 130, type: "text", sortable: false },
   { key: "link_builder", label: "Link Builder", group: "writer", min_width: 170, type: "text" },
   { key: "pen_name", label: "Pen Name", group: "writer", min_width: 120, type: "text" },
   { key: "partnership", label: "Partnership", group: "writer", min_width: 180, type: "url" },
@@ -870,8 +882,13 @@ export default function BacklinkOrdersTable() {
             <thead>
               <tr>
                 {visible_columns.map((col) => {
-                  const sort_rule = sort_rules.find((r) => r.key === col.key);
-                  const sort_priority = sort_rules.findIndex((r) => r.key === col.key);
+                  // Use sort_key when the backend DB column name differs from the frontend key.
+                  // Falls back to col.key so existing behaviour is unchanged for all other columns.
+                  const effective_sort_key = col.sort_key ?? (col.key as string);
+                  const is_sortable = col.sortable !== false;
+
+                  const sort_rule = sort_rules.find((r) => r.key === effective_sort_key);
+                  const sort_priority = sort_rules.findIndex((r) => r.key === effective_sort_key);
                   const col_filter = column_filters[col.key];
                   const filter_is_active = col_filter ? isFilterActive(col_filter) : false;
 
@@ -884,15 +901,21 @@ export default function BacklinkOrdersTable() {
                       <div className="flex items-center gap-1">
                         {/* Sort button — takes up most of the header width */}
                         <button
-                          onClick={(e) =>
-                            toggleSort(col.key, e.shiftKey)
-                          }
+                          onClick={(e) => {
+                            if (!is_sortable) return;
+                            toggleSort(effective_sort_key, e.shiftKey);
+                          }}
+                          disabled={!is_sortable}
                           title={
-                            sort_rules.length > 0
+                            !is_sortable
+                              ? "This column cannot be sorted"
+                              : sort_rules.length > 0
                               ? "Click to sort · Shift+Click to add secondary sort"
                               : "Click to sort · Shift+Click for multi-column sort"
                           }
-                          className="flex flex-1 items-center gap-1 whitespace-nowrap text-left hover:opacity-75"
+                          className={`flex flex-1 items-center gap-1 whitespace-nowrap text-left ${
+                            is_sortable ? "hover:opacity-75" : "cursor-default opacity-50"
+                          }`}
                         >
                           {col.locked && (
                             <svg
