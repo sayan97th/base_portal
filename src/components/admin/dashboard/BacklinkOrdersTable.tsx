@@ -11,8 +11,10 @@ import {
   updateBacklinkOrder,
   deleteBacklinkOrder,
   buildPayload,
-  buildExportUrl,
+  exportBacklinkOrders,
 } from "@/services/admin/backlink-order.service";
+import type { BacklinkOrderSearchBody, ColumnFilterPayload } from "@/types/admin/backlink-order";
+import { useDebounce } from "@/hooks/useDebounce";
 
 // ── Column types ───────────────────────────────────────────────────────────────
 
@@ -395,13 +397,12 @@ export default function BacklinkOrdersTable() {
 
   // ── Sort & column-filter state ───────────────────────────────────────────────
 
-  const { sort_rules, toggleSort, clearSort, applySorting } = useTableSort();
+  const { sort_rules, toggleSort, clearSort } = useTableSort();
   const {
     column_filters,
     setFilter,
     clearAllFilters: clearColumnFilters,
     active_filter_count,
-    applyFilters: applyColumnFilters,
   } = useColumnFilters();
 
   // Which column's filter dropdown is currently open
@@ -418,13 +419,23 @@ export default function BacklinkOrdersTable() {
   // Tracks rows created locally that haven't been persisted yet
   const new_row_ids_ref = useRef<Set<string>>(new Set());
 
+  // ── Debounced text inputs (avoid a request on every keystroke) ─────────────
+
+  const debounced_search = useDebounce(search, 400);
+  const debounced_client_filter = useDebounce(client_filter, 400);
+  const debounced_link_builder_filter = useDebounce(link_builder_filter, 400);
+
+  // Stores the last body sent so pagination buttons can reuse it without
+  // needing the filter values in their own closure.
+  const current_body_ref = useRef<BacklinkOrderSearchBody>({});
+
   // ── Fetch ───────────────────────────────────────────────────────────────────
 
-  const fetchRows = useCallback(async (page: number) => {
+  const fetchRows = useCallback(async (page: number, body: BacklinkOrderSearchBody) => {
     setIsLoading(true);
     setSaveError(null);
     try {
-      const res = await listBacklinkOrders({ page, per_page: 50 });
+      const res = await listBacklinkOrders({ ...body, page, per_page: 50 });
       setRows(res.data);
       setCurrentPage(res.current_page);
       setLastPage(res.last_page);
@@ -436,34 +447,43 @@ export default function BacklinkOrdersTable() {
     }
   }, []);
 
+  // Re-fetch from server whenever any filter or sort state changes.
+  // Text inputs are debounced so we don't fire on every keystroke.
   useEffect(() => {
-    fetchRows(1);
-  }, [fetchRows]);
+    const active_col_filters: ColumnFilterPayload[] = Object.entries(column_filters)
+      .filter(([, f]) => f && isFilterActive(f))
+      .map(([key, f]) => ({ key, ...f } as ColumnFilterPayload));
+
+    const body: BacklinkOrderSearchBody = {
+      search: debounced_search.trim() || undefined,
+      status: status_filter || undefined,
+      link_type: link_type_filter || undefined,
+      client: debounced_client_filter.trim() || undefined,
+      link_builder: debounced_link_builder_filter.trim() || undefined,
+      sort_rules: sort_rules.length > 0 ? sort_rules : undefined,
+      column_filters: active_col_filters.length > 0 ? active_col_filters : undefined,
+    };
+
+    current_body_ref.current = body;
+    fetchRows(1, body);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    debounced_search,
+    status_filter,
+    link_type_filter,
+    debounced_client_filter,
+    debounced_link_builder_filter,
+    sort_rules,
+    column_filters,
+  ]);
 
   // ── Derived state ───────────────────────────────────────────────────────────
 
   const visible_columns = COLUMNS.filter((col) => !hidden_columns.has(col.key));
 
-  // 1. Toolbar filters (search + quick dropdowns)
-  const toolbar_filtered = rows.filter((row) => {
-    if (status_filter && row.status !== status_filter) return false;
-    if (link_type_filter && row.link_type !== link_type_filter) return false;
-    if (client_filter && !row.client.toLowerCase().includes(client_filter.toLowerCase())) return false;
-    if (link_builder_filter && !row.link_builder.toLowerCase().includes(link_builder_filter.toLowerCase())) return false;
-    if (!search.trim()) return true;
-    const lower = search.toLowerCase();
-    return (
-      row.order_id.toLowerCase().includes(lower) ||
-      row.client.toLowerCase().includes(lower) ||
-      row.keyword.toLowerCase().includes(lower) ||
-      row.link_builder.toLowerCase().includes(lower) ||
-      row.status.toLowerCase().includes(lower) ||
-      row.partnership.toLowerCase().includes(lower)
-    );
-  });
-
-  // 2. Per-column filters → 3. Multi-column sort
-  const filtered_rows = applySorting(applyColumnFilters(toolbar_filtered));
+  // Filtering and sorting are handled server-side via the POST body.
+  // The rows returned from the API are already filtered and sorted.
+  const filtered_rows = rows;
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -646,10 +666,13 @@ export default function BacklinkOrdersTable() {
 
   // ── Export ──────────────────────────────────────────────────────────────────
 
-  const handleExport = useCallback(() => {
-    const url = buildExportUrl({ search: search || undefined });
-    window.open(url, "_blank");
-  }, [search]);
+  const handleExport = useCallback(async () => {
+    try {
+      await exportBacklinkOrders(current_body_ref.current);
+    } catch {
+      setSaveError("Export failed. Please try again.");
+    }
+  }, []);
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
@@ -1073,7 +1096,7 @@ export default function BacklinkOrdersTable() {
           <div className="flex items-center gap-2">
             <button
               disabled={current_page <= 1 || is_loading}
-              onClick={() => fetchRows(current_page - 1)}
+              onClick={() => fetchRows(current_page - 1, current_body_ref.current)}
               className="flex h-6 w-6 items-center justify-center rounded border border-gray-200 text-gray-500 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
             >
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -1085,7 +1108,7 @@ export default function BacklinkOrdersTable() {
             </span>
             <button
               disabled={current_page >= last_page || is_loading}
-              onClick={() => fetchRows(current_page + 1)}
+              onClick={() => fetchRows(current_page + 1, current_body_ref.current)}
               className="flex h-6 w-6 items-center justify-center rounded border border-gray-200 text-gray-500 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
             >
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>

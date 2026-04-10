@@ -1,11 +1,11 @@
-import { apiClient } from "@/lib/api-client";
+import { apiClient, getToken } from "@/lib/api-client";
 import type {
   BacklinkOrderRow,
   BacklinkOrderPayload,
   BacklinkOrdersResponse,
   BacklinkOrderMutationResponse,
   BacklinkOrderDeleteResponse,
-  BacklinkOrderFilters,
+  BacklinkOrderSearchBody,
   DashboardSummary,
   TeamCapacityResponse,
   TeamHealthResponse,
@@ -41,26 +41,17 @@ export async function getTeamHealth(): Promise<TeamHealthResponse> {
 // ── Backlink Orders ────────────────────────────────────────────────────────────
 
 /**
- * GET /api/admin/backlink-orders
- * Returns a paginated, searchable, sortable list of backlink order rows.
+ * POST /api/admin/backlink-orders/search
+ * Returns a paginated, filtered, and multi-column sorted list of backlink order rows.
+ * All filter and sort state is sent as a JSON body so complex column filters
+ * (number ranges, date ranges, multi-select) are cleanly supported.
  */
 export async function listBacklinkOrders(
-  filters: BacklinkOrderFilters = {}
+  body: BacklinkOrderSearchBody = {}
 ): Promise<BacklinkOrdersResponse> {
-  const params = new URLSearchParams();
-
-  if (filters.page)             params.set("page",           String(filters.page));
-  if (filters.per_page)         params.set("per_page",       String(filters.per_page));
-  if (filters.search?.trim())   params.set("search",         filters.search.trim());
-  if (filters.status)           params.set("status",         filters.status);
-  if (filters.client)           params.set("client",         filters.client);
-  if (filters.link_builder)     params.set("link_builder",   filters.link_builder);
-  if (filters.sort_field)       params.set("sort_field",     filters.sort_field);
-  if (filters.sort_direction)   params.set("sort_direction", filters.sort_direction);
-
-  const query = params.toString();
-  return apiClient.get<BacklinkOrdersResponse>(
-    `/api/admin/backlink-orders${query ? `?${query}` : ""}`
+  return apiClient.post<BacklinkOrdersResponse>(
+    "/api/admin/backlink-orders/search",
+    body
   );
 }
 
@@ -117,24 +108,38 @@ export function buildPayload(row: BacklinkOrderRow): BacklinkOrderPayload {
 }
 
 /**
- * Builds a server-side CSV export URL (includes auth token as query param
- * so the browser download works without extra headers).
- * The token is read from localStorage the same way api-client does it.
+ * POST /api/admin/backlink-orders/export
+ * Sends the full filter + sort body and triggers a CSV file download in the browser.
+ * Uses fetch directly so the response blob can be turned into a download link.
  */
-export function buildExportUrl(filters: BacklinkOrderFilters = {}): string {
-  const params = new URLSearchParams();
+export async function exportBacklinkOrders(
+  body: BacklinkOrderSearchBody = {}
+): Promise<void> {
+  const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+  const token = getToken();
 
-  if (filters.search?.trim())   params.set("search",       filters.search.trim());
-  if (filters.status)           params.set("status",       filters.status);
-  if (filters.client)           params.set("client",       filters.client);
-  if (filters.link_builder)     params.set("link_builder", filters.link_builder);
+  const response = await fetch(`${base}/api/admin/backlink-orders/export`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "text/csv",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
 
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("access_token");
-    if (token) params.set("token", token);
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: "Export failed" }));
+    throw error;
   }
 
-  const query = params.toString();
-  const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-  return `${base}/api/admin/backlink-orders/export${query ? `?${query}` : ""}`;
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `backlink-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
 }

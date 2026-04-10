@@ -65,17 +65,63 @@ export interface BacklinkOrderDeleteResponse {
   message: string;
 }
 
-// ── Filter / query params ──────────────────────────────────────────────────────
+// ── Search / filter / sort payload (sent as POST body) ────────────────────────
 
-export interface BacklinkOrderFilters {
+export interface SortRulePayload {
+  key: string;
+  direction: "asc" | "desc";
+}
+
+export interface TextColumnFilterPayload {
+  key: string;
+  type: "text";
+  value: string;
+}
+
+export interface SelectColumnFilterPayload {
+  key: string;
+  type: "select";
+  values: string[];
+}
+
+export interface NumberColumnFilterPayload {
+  key: string;
+  type: "number";
+  min: string;
+  max: string;
+}
+
+export interface DateColumnFilterPayload {
+  key: string;
+  type: "date";
+  from: string;
+  to: string;
+}
+
+export type ColumnFilterPayload =
+  | TextColumnFilterPayload
+  | SelectColumnFilterPayload
+  | NumberColumnFilterPayload
+  | DateColumnFilterPayload;
+
+/**
+ * Full POST body for the backlink orders search endpoint.
+ * Replaces the old BacklinkOrderFilters (query-string only).
+ */
+export interface BacklinkOrderSearchBody {
   page?: number;
   per_page?: number;
+  /** Global keyword search across order_id, client, keyword, link_builder, status, partnership. */
   search?: string;
+  /** Quick toolbar filters — convenience aliases handled by the backend. */
   status?: string;
+  link_type?: string;
   client?: string;
   link_builder?: string;
-  sort_field?: string;
-  sort_direction?: "asc" | "desc";
+  /** Ordered list of sort rules (primary first). */
+  sort_rules?: SortRulePayload[];
+  /** Per-column filters applied after the toolbar quick filters. */
+  column_filters?: ColumnFilterPayload[];
 }
 
 // ── Dashboard summary ──────────────────────────────────────────────────────────
