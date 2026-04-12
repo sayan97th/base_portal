@@ -1,5 +1,7 @@
 import { apiClient } from "@/lib/api-client";
 import type {
+  CartPayload,
+  CartResponse,
   ClientPaginatedResponse,
   ContentRefreshTier,
   CreateOrderPayload,
@@ -82,6 +84,34 @@ export const linkBuildingService = {
       `/api/link-building/orders/${order_id}`
     );
     return response.data;
+  },
+
+  // ── Cart ───────────────────────────────────────────────────────────────────
+
+  /**
+   * GET /api/link-building/cart
+   * Returns the authenticated user's saved cart, or null if none exists.
+   */
+  async fetchCart(): Promise<CartPayload | null> {
+    const response = await apiClient.get<CartResponse>("/api/link-building/cart");
+    return response.data;
+  },
+
+  /**
+   * PUT /api/link-building/cart
+   * Creates or fully replaces the user's saved cart on the server.
+   */
+  async saveCart(payload: CartPayload): Promise<void> {
+    await apiClient.put("/api/link-building/cart", payload);
+  },
+
+  /**
+   * DELETE /api/link-building/cart
+   * Removes the user's saved cart from the server (called after order completion
+   * or when the user explicitly clears the cart).
+   */
+  async deleteCart(): Promise<void> {
+    await apiClient.delete("/api/link-building/cart");
   },
 
   /**

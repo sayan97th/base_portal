@@ -180,6 +180,42 @@ export interface OrderUpdatesListResponse {
   data: OrderUpdateEntry[];
 }
 
+// ── Cart ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Coupon shape stored inside the cart snapshot.
+ * Mirrors AppliedCouponItem (UI) — defined here to keep API types in the
+ * types layer and avoid importing from component files.
+ */
+export interface CartSavedCoupon {
+  coupon_id: string;
+  code: string;
+  coupon_name: string;
+  discount_amount: number;
+  discount_type: string;
+  discount_value: number;
+}
+
+export interface CartKeywordRow {
+  keyword: string;
+  landing_page: string;
+  exact_match: boolean;
+}
+
+/** Shape of the cart payload sent to and received from the Laravel API. */
+export interface CartPayload {
+  selected_quantities: Record<string, number>;
+  keyword_data: Record<string, CartKeywordRow[]>;
+  order_title: string;
+  order_notes: string;
+  applied_coupons: CartSavedCoupon[];
+  coupon_input_code: string;
+}
+
+export interface CartResponse {
+  data: CartPayload | null;
+}
+
 // ── Coupons ────────────────────────────────────────────────────────────────────
 
 export type CouponDiscountType = "percentage" | "fixed_amount";

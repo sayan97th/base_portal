@@ -80,9 +80,7 @@ const LinkBuildingPage: React.FC = () => {
     setAppliedCoupons,
     coupon_input_code,
     setCouponInputCode,
-    is_cart_restored,
     clearCart,
-    dismissRestoredNotice,
   } = useCartPersistence();
 
   // Reconstructed coupon state object consumed by LinkBuildingOrderSummary
@@ -431,45 +429,6 @@ const LinkBuildingPage: React.FC = () => {
           My Orders
         </Link>
       </div>
-      {/* ── Restored cart notice ── */}
-      {is_cart_restored && current_step === "selection" && (
-        <div className="mb-6 flex items-center gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 dark:border-brand-500/25 dark:bg-brand-500/10">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-100 dark:bg-brand-500/20">
-            <svg
-              className="h-3.5 w-3.5 text-brand-600 dark:text-brand-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z"
-              />
-            </svg>
-          </div>
-          <p className="flex-1 text-sm font-medium text-brand-700 dark:text-brand-300">
-            Your previous cart has been restored.
-          </p>
-          <button
-            onClick={clearCart}
-            className="text-xs font-semibold text-brand-600 underline-offset-2 transition-colors hover:text-brand-800 hover:underline dark:text-brand-400 dark:hover:text-brand-200"
-          >
-            Clear cart
-          </button>
-          <button
-            onClick={dismissRestoredNotice}
-            className="ml-1 flex h-5 w-5 items-center justify-center rounded-full text-brand-400 transition-colors hover:bg-brand-100 hover:text-brand-600 dark:hover:bg-brand-500/20 dark:hover:text-brand-200"
-            aria-label="Dismiss"
-          >
-            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-      )}
-
       {/* ── Selection & Keywords steps ── */}
       {current_step !== "checkout" && (
         <div className="grid grid-cols-12 gap-6">
