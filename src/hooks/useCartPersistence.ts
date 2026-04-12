@@ -55,6 +55,25 @@ function removeLocalSnapshot(): void {
   }
 }
 
+/**
+ * Guarantees every tier present in `selected_quantities` has at least an
+ * empty array in `keyword_data`. This prevents sending a plain `{}` to the
+ * Laravel API, which would fail the `required` validation because PHP treats
+ * an empty JSON object as an empty array.
+ */
+function normalizeKeywordData(
+  keyword_data: KeywordData,
+  selected_quantities: Record<string, number>
+): KeywordData {
+  const normalized = { ...keyword_data };
+  Object.keys(selected_quantities).forEach((tier_id) => {
+    if (!normalized[tier_id]) {
+      normalized[tier_id] = [];
+    }
+  });
+  return normalized;
+}
+
 // ── Hook public interface ─────────────────────────────────────────────────────
 
 export interface UseCartPersistenceReturn {
@@ -143,7 +162,7 @@ export function useCartPersistence(): UseCartPersistenceReturn {
           // so it becomes available from other devices going forward
           const local_payload: CartPayload = {
             selected_quantities: local.selected_quantities,
-            keyword_data: local.keyword_data ?? {},
+            keyword_data: normalizeKeywordData(local.keyword_data ?? {}, local.selected_quantities),
             order_title: local.order_title ?? "",
             order_notes: local.order_notes ?? "",
             applied_coupons: local.applied_coupons ?? [],
@@ -172,7 +191,7 @@ export function useCartPersistence(): UseCartPersistenceReturn {
 
     const current_payload: CartPayload = {
       selected_quantities,
-      keyword_data,
+      keyword_data: normalizeKeywordData(keyword_data, selected_quantities),
       order_title,
       order_notes,
       applied_coupons,
