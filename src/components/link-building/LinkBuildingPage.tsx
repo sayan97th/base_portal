@@ -23,6 +23,7 @@ import { linkBuildingService } from "@/services/client/link-building.service";
 import { validateCoupon } from "@/services/client/coupons.service";
 import { useNotifications } from "@/context/NotificationsContext";
 import { useBillingAddress } from "@/hooks/useBillingAddress";
+import { useCartPersistence } from "@/hooks/useCartPersistence";
 import { getStripe } from "@/lib/stripe";
 import type { DrTier } from "@/types/client/link-building";
 
@@ -52,12 +53,6 @@ const LinkBuildingPage: React.FC = () => {
   const [submit_error, setSubmitError] = useState<string | null>(null);
 
   const [current_step, setCurrentStep] = useState<Step>("selection");
-  const [selected_quantities, setSelectedQuantities] = useState<
-    Record<string, number>
-  >({});
-  const [keyword_data, setKeywordData] = useState<KeywordData>({});
-  const [order_title, setOrderTitle] = useState("");
-  const [order_notes, setOrderNotes] = useState("");
   const [billing_address, setBillingAddress] = useState<BillingAddress>({
     address: "",
     city: "",
@@ -66,24 +61,37 @@ const LinkBuildingPage: React.FC = () => {
     postal_code: "",
     company: "",
   });
-  const [coupons_state, setCouponsState] = useState<{
-    input_code: string;
-    applied_coupons: Array<{
-      coupon_id: string;
-      code: string;
-      coupon_name: string;
-      discount_amount: number;
-      discount_type: string;
-      discount_value: number;
-    }>;
-    error: string | null;
-    is_applying: boolean;
-  }>({
-    input_code: "",
-    applied_coupons: [],
-    error: null,
-    is_applying: false,
-  });
+
+  // Coupon transient state (not persisted — reset on every session)
+  const [coupon_error, setCouponError] = useState<string | null>(null);
+  const [coupon_is_applying, setCouponIsApplying] = useState(false);
+
+  // Persisted cart state — survives navigation and page reloads for 7 days
+  const {
+    selected_quantities,
+    setSelectedQuantities,
+    keyword_data,
+    setKeywordData,
+    order_title,
+    setOrderTitle,
+    order_notes,
+    setOrderNotes,
+    applied_coupons,
+    setAppliedCoupons,
+    coupon_input_code,
+    setCouponInputCode,
+    is_cart_restored,
+    clearCart,
+    dismissRestoredNotice,
+  } = useCartPersistence();
+
+  // Reconstructed coupon state object consumed by LinkBuildingOrderSummary
+  const coupons_state = {
+    input_code: coupon_input_code,
+    applied_coupons,
+    error: coupon_error,
+    is_applying: coupon_is_applying,
+  };
 
   const { saved_billing_address, has_saved_address } = useBillingAddress();
 
@@ -207,38 +215,36 @@ const LinkBuildingPage: React.FC = () => {
   };
 
   const handleCouponCodeChange = (code: string) => {
-    setCouponsState((prev) => ({ ...prev, input_code: code, error: null }));
+    setCouponInputCode(code);
+    setCouponError(null);
   };
 
   const handleApplyCoupon = async () => {
-    const trimmed_code = coupons_state.input_code.trim();
+    const trimmed_code = coupon_input_code.trim();
     if (!trimmed_code) return;
 
     // Reject duplicate codes (case-insensitive)
-    const already_applied = coupons_state.applied_coupons.some(
+    const already_applied = applied_coupons.some(
       (c) => c.code.toUpperCase() === trimmed_code.toUpperCase()
     );
     if (already_applied) {
-      setCouponsState((prev) => ({
-        ...prev,
-        error: "This promo code has already been applied.",
-      }));
+      setCouponError("This promo code has already been applied.");
       return;
     }
 
     // Enforce minimum cart amount for promo codes
     if (amount_after_bulk < MINIMUM_CART_FOR_COUPON) {
-      setCouponsState((prev) => ({
-        ...prev,
-        error: `A minimum cart total of $${MINIMUM_CART_FOR_COUPON.toLocaleString("en-US", {
+      setCouponError(
+        `A minimum cart total of $${MINIMUM_CART_FOR_COUPON.toLocaleString("en-US", {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
-        })} is required to apply a promo code.`,
-      }));
+        })} is required to apply a promo code.`
+      );
       return;
     }
 
-    setCouponsState((prev) => ({ ...prev, is_applying: true, error: null }));
+    setCouponIsApplying(true);
+    setCouponError(null);
     try {
       const dr_tier_ids = Object.keys(selected_quantities).filter(
         (id) => selected_quantities[id] > 0
@@ -254,7 +260,7 @@ const LinkBuildingPage: React.FC = () => {
         });
 
       // Validate against remaining amount after bulk discount and previously applied coupon discounts
-      const applied_discount = coupons_state.applied_coupons.reduce(
+      const applied_discount = applied_coupons.reduce(
         (sum, c) => sum + c.discount_amount,
         0
       );
@@ -265,45 +271,33 @@ const LinkBuildingPage: React.FC = () => {
         dr_tier_amounts,
       });
       if (response.valid) {
-        setCouponsState((prev) => ({
+        setCouponInputCode("");
+        setCouponError(null);
+        setCouponIsApplying(false);
+        setAppliedCoupons((prev) => [
           ...prev,
-          input_code: "",
-          error: null,
-          is_applying: false,
-          applied_coupons: [
-            ...prev.applied_coupons,
-            {
-              coupon_id: response.coupon_id,
-              code: response.code,
-              coupon_name: response.name,
-              discount_amount: response.discount_amount,
-              discount_type: response.discount_type,
-              discount_value: response.discount_value,
-            },
-          ],
-        }));
+          {
+            coupon_id: response.coupon_id,
+            code: response.code,
+            coupon_name: response.name,
+            discount_amount: response.discount_amount,
+            discount_type: response.discount_type,
+            discount_value: response.discount_value,
+          },
+        ]);
       } else {
-        setCouponsState((prev) => ({
-          ...prev,
-          error: response.message || "Invalid promo code.",
-          is_applying: false,
-        }));
+        setCouponError(response.message || "Invalid promo code.");
+        setCouponIsApplying(false);
       }
     } catch {
-      setCouponsState((prev) => ({
-        ...prev,
-        error: "Could not validate promo code. Please try again.",
-        is_applying: false,
-      }));
+      setCouponError("Could not validate promo code. Please try again.");
+      setCouponIsApplying(false);
     }
   };
 
   const handleRemoveCoupon = (code: string) => {
-    setCouponsState((prev) => ({
-      ...prev,
-      applied_coupons: prev.applied_coupons.filter((c) => c.code !== code),
-      error: null,
-    }));
+    setAppliedCoupons((prev) => prev.filter((c) => c.code !== code));
+    setCouponError(null);
   };
 
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
@@ -367,7 +361,7 @@ const LinkBuildingPage: React.FC = () => {
         order_title: order_title || null,
         order_notes: order_notes || null,
         total_amount: total,
-        coupon_ids: coupons_state.applied_coupons.map((c) => c.coupon_id),
+        coupon_ids: applied_coupons.map((c) => c.coupon_id),
         items,
         billing: is_using_saved_method
           ? { company: null, address: "", city: "", state: "", country: "", postal_code: "" }
@@ -394,6 +388,9 @@ const LinkBuildingPage: React.FC = () => {
         preview_text: `Order #${result.order_id} · ${total_links} link${total_links !== 1 ? "s" : ""} · $${formatted_amount}`,
         link: `/link-building/orders/${result.order_id}`,
       });
+
+      // Wipe the persisted cart so the user starts fresh on the next visit
+      clearCart();
 
       router.push(`/link-building/orders/${result.order_id}`);
     } catch (err: unknown) {
@@ -434,6 +431,45 @@ const LinkBuildingPage: React.FC = () => {
           My Orders
         </Link>
       </div>
+      {/* ── Restored cart notice ── */}
+      {is_cart_restored && current_step === "selection" && (
+        <div className="mb-6 flex items-center gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 dark:border-brand-500/25 dark:bg-brand-500/10">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-100 dark:bg-brand-500/20">
+            <svg
+              className="h-3.5 w-3.5 text-brand-600 dark:text-brand-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z"
+              />
+            </svg>
+          </div>
+          <p className="flex-1 text-sm font-medium text-brand-700 dark:text-brand-300">
+            Your previous cart has been restored.
+          </p>
+          <button
+            onClick={clearCart}
+            className="text-xs font-semibold text-brand-600 underline-offset-2 transition-colors hover:text-brand-800 hover:underline dark:text-brand-400 dark:hover:text-brand-200"
+          >
+            Clear cart
+          </button>
+          <button
+            onClick={dismissRestoredNotice}
+            className="ml-1 flex h-5 w-5 items-center justify-center rounded-full text-brand-400 transition-colors hover:bg-brand-100 hover:text-brand-600 dark:hover:bg-brand-500/20 dark:hover:text-brand-200"
+            aria-label="Dismiss"
+          >
+            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+
       {/* ── Selection & Keywords steps ── */}
       {current_step !== "checkout" && (
         <div className="grid grid-cols-12 gap-6">
