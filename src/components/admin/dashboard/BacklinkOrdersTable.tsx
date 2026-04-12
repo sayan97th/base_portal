@@ -38,6 +38,8 @@ interface ColumnDef {
   type: "text" | "select" | "date" | "url" | "number";
   options?: string[];
   locked?: boolean;
+  /** Marks this column as required — draft rows show a visual indicator when this field is empty. */
+  required?: boolean;
   /**
    * When the backend DB column name differs from the frontend key, set this
    * to the exact column name the Laravel API expects in sort_rules[].key.
@@ -76,10 +78,10 @@ const COLUMNS: ColumnDef[] = [
   { key: "order_id", label: "Order ID", group: "order", min_width: 110, type: "text" },
   { key: "status", label: "Status", group: "status_col", min_width: 130, type: "select", options: STATUS_OPTIONS },
   { key: "team_specific_link_id", label: "Team Specific Link ID", group: "team_link", min_width: 160, type: "text" },
-  { key: "link_type", label: "Link Type", group: "core", min_width: 155, type: "select", options: LINK_TYPE_OPTIONS },
-  { key: "client", label: "Client", group: "core", min_width: 120, type: "text" },
-  { key: "keyword", label: "Keyword", group: "core", min_width: 200, type: "text" },
-  { key: "landing_page", label: "Landing Page", group: "core", min_width: 240, type: "url" },
+  { key: "link_type", label: "Link Type", group: "core", min_width: 155, type: "select", options: LINK_TYPE_OPTIONS, required: true },
+  { key: "client", label: "Client", group: "core", min_width: 120, type: "text", required: true },
+  { key: "keyword", label: "Keyword", group: "core", min_width: 200, type: "text", required: true },
+  { key: "landing_page", label: "Landing Page", group: "core", min_width: 240, type: "url", required: true },
   { key: "exact_match", label: "Exact Match?", group: "core", min_width: 100, type: "select", options: ["Yes", "No"] },
   { key: "notes", label: "Notes", group: "core", min_width: 160, type: "text" },
   { key: "request_date", label: "Request Date", group: "dates", min_width: 120, type: "date", locked: true },
@@ -128,10 +130,68 @@ function createTempId(): string {
   return `temp_${_local_counter}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
+// ── Order ID auto-generation ───────────────────────────────────────────────────
+
+function generateOrderId(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  const rand = Math.random().toString(36).toUpperCase().slice(2, 7);
+  return `BO-${y}${m}${d}-${rand}`;
+}
+
+// ── Required fields ────────────────────────────────────────────────────────────
+
+const REQUIRED_FIELDS: (keyof BacklinkOrderRow)[] = [
+  "link_type",
+  "client",
+  "keyword",
+  "landing_page",
+];
+
+function getRowMissingRequired(row: BacklinkOrderRow): string[] {
+  return REQUIRED_FIELDS
+    .filter((key) => !row[key] || String(row[key]).trim() === "")
+    .map((key) => COLUMNS.find((c) => c.key === key)?.label ?? String(key));
+}
+
+// ── Draft persistence (localStorage) ──────────────────────────────────────────
+
+const DRAFT_STORAGE_KEY = "bo_row_drafts_v1";
+
+type DraftRowData = Omit<BacklinkOrderRow, "id">;
+
+function loadDrafts(): BacklinkOrderRow[] {
+  try {
+    if (typeof window === "undefined") return [];
+    const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
+    if (!raw) return [];
+    const entries = JSON.parse(raw) as DraftRowData[];
+    return entries.map((entry) => ({ ...entry, id: createTempId() }));
+  } catch {
+    return [];
+  }
+}
+
+function saveDraftsToStorage(draft_rows: BacklinkOrderRow[]): void {
+  try {
+    if (typeof window === "undefined") return;
+    if (draft_rows.length === 0) {
+      localStorage.removeItem(DRAFT_STORAGE_KEY);
+      return;
+    }
+    const entries: DraftRowData[] = draft_rows.map(({ id: _id, ...rest }) => rest);
+    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(entries));
+  } catch {
+    // Storage quota exceeded or unavailable
+  }
+}
+
 function createEmptyRow(): BacklinkOrderRow {
   return {
     id: createTempId(),
-    order_id: "",
+    order_id: generateOrderId(),
     team_specific_link_id: "",
     link_type: "",
     client: "",
@@ -187,6 +247,8 @@ interface EditableCellProps {
   col: ColumnDef;
   value: string;
   is_editing: boolean;
+  /** True when this cell belongs to a locally-created row not yet persisted to the server. */
+  is_draft?: boolean;
   onStartEdit: () => void;
   onUpdate: (value: string) => void;
   onStopEdit: () => void;
@@ -197,6 +259,7 @@ function EditableCell({
   col,
   value,
   is_editing,
+  is_draft = false,
   onStartEdit,
   onUpdate,
   onStopEdit,
@@ -336,14 +399,27 @@ function EditableCell({
     );
   }
 
+  const is_required_error = is_draft && (col.required ?? false) && !value;
+
   return (
     <td
-      className="cursor-pointer whitespace-nowrap px-2 py-1.5 text-xs text-gray-700 transition-colors hover:bg-blue-50 dark:text-gray-300 dark:hover:bg-blue-900/20"
+      className={`cursor-pointer whitespace-nowrap px-2 py-1.5 text-xs text-gray-700 transition-colors dark:text-gray-300 ${
+        is_required_error
+          ? "bg-red-50/80 ring-1 ring-inset ring-red-300 hover:bg-red-100/60 dark:bg-red-900/20 dark:ring-red-700"
+          : "hover:bg-blue-50 dark:hover:bg-blue-900/20"
+      }`}
       onClick={onStartEdit}
-      title="Click to edit"
+      title={is_required_error ? `Required: ${col.label} must be filled to save this row` : "Click to edit"}
     >
       <div className="overflow-hidden" style={{ maxWidth: col.min_width }}>
-        {display}
+        {is_required_error ? (
+          <span className="flex items-center gap-1 text-red-400 dark:text-red-500">
+            <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-red-400 dark:bg-red-500" />
+            <span className="italic">Required</span>
+          </span>
+        ) : (
+          display
+        )}
       </div>
     </td>
   );
@@ -431,6 +507,9 @@ export default function BacklinkOrdersTable() {
   // Tracks rows created locally that haven't been persisted yet
   const new_row_ids_ref = useRef<Set<string>>(new Set());
 
+  // Ensures localStorage drafts are restored only once, on the first successful fetch
+  const drafts_restored_ref = useRef(false);
+
   // ── Debounced text inputs (avoid a request on every keystroke) ─────────────
 
   const debounced_search = useDebounce(search, 400);
@@ -448,10 +527,23 @@ export default function BacklinkOrdersTable() {
     setSaveError(null);
     try {
       const res = await listBacklinkOrders({ ...body, page, per_page: 50 });
-      setRows(res.data);
       setCurrentPage(res.current_page);
       setLastPage(res.last_page);
       setTotal(res.total);
+
+      if (!drafts_restored_ref.current) {
+        // Restore localStorage drafts on the very first successful fetch.
+        // Deduplicate against server rows by order_id to avoid showing rows
+        // that were already saved in a previous session.
+        drafts_restored_ref.current = true;
+        const saved_drafts = loadDrafts();
+        const server_order_ids = new Set(res.data.map((r) => r.order_id));
+        const restored = saved_drafts.filter((d) => !server_order_ids.has(d.order_id));
+        restored.forEach((d) => new_row_ids_ref.current.add(d.id));
+        setRows([...restored, ...res.data]);
+      } else {
+        setRows(res.data);
+      }
     } catch {
       setSaveError("Failed to load backlink orders. Please refresh.");
     } finally {
@@ -521,11 +613,21 @@ export default function BacklinkOrdersTable() {
     setSaveError(null);
     try {
       const res = await createBacklinkOrder(buildPayload(row));
-      // Replace temp row with server row (server assigns the real UUID)
+      // Replace temp row with the server row (server assigns the real UUID)
       new_row_ids_ref.current.delete(row.id);
       replaceRow(row.id, res.data);
+      // Remove this draft from localStorage now that it is safely persisted
+      const remaining = rows_ref.current.filter(
+        (r) => new_row_ids_ref.current.has(r.id) && r.id !== row.id
+      );
+      saveDraftsToStorage(remaining);
     } catch {
-      setSaveError(`Failed to create row "${row.order_id}". Check required fields and try again.`);
+      // Preserve the draft in localStorage so the user's work is never lost
+      const all_drafts = rows_ref.current.filter((r) => new_row_ids_ref.current.has(r.id));
+      saveDraftsToStorage(all_drafts);
+      setSaveError(
+        `Could not save "${row.order_id}" to the server — fill all required fields (Link Type, Client, Keyword, Landing Page) then click any cell to retry.`
+      );
     } finally {
       unmarkSaving(row.id);
     }
@@ -560,10 +662,8 @@ export default function BacklinkOrdersTable() {
     if (!row) return;
 
     if (new_row_ids_ref.current.has(row.id)) {
-      // Only persist a new row once order_id is filled
-      if (row.order_id.trim()) {
-        persistNewRow(row);
-      }
+      // Always attempt to persist — order_id is auto-generated so it is always present
+      persistNewRow(row);
     } else {
       persistRowUpdate(row);
     }
@@ -571,9 +671,17 @@ export default function BacklinkOrdersTable() {
 
   const updateCell = useCallback(
     (row_id: string, col_key: keyof BacklinkOrderRow, value: string) => {
-      setRows((prev) =>
-        prev.map((row) => (row.id === row_id ? { ...row, [col_key]: value } : row))
-      );
+      setRows((prev) => {
+        const updated = prev.map((row) =>
+          row.id === row_id ? { ...row, [col_key]: value } : row
+        );
+        // Keep localStorage in sync whenever a draft cell changes
+        if (new_row_ids_ref.current.has(row_id)) {
+          const drafts = updated.filter((r) => new_row_ids_ref.current.has(r.id));
+          saveDraftsToStorage(drafts);
+        }
+        return updated;
+      });
     },
     []
   );
@@ -610,18 +718,30 @@ export default function BacklinkOrdersTable() {
   const addRow = useCallback(() => {
     const new_row = createEmptyRow();
     new_row_ids_ref.current.add(new_row.id);
-    setRows((prev) => [...prev, new_row]);
-    setTimeout(() => setEditingCell({ row_id: new_row.id, col_key: "order_id" }), 50);
+    setRows((prev) => {
+      const updated = [...prev, new_row];
+      // Immediately persist the draft to localStorage so data survives a reload
+      const drafts = updated.filter((r) => new_row_ids_ref.current.has(r.id));
+      saveDraftsToStorage(drafts);
+      return updated;
+    });
+    // Focus the first required field so the user knows where to start typing
+    setTimeout(() => setEditingCell({ row_id: new_row.id, col_key: "client" }), 50);
   }, []);
 
   const deleteRow = useCallback(
     async (row_id: string) => {
       if (editing_cell_ref.current?.row_id === row_id) setEditingCell(null);
 
-      // If it's a local-only row, just remove it
+      // If it's a local-only row, remove it and clean up localStorage
       if (new_row_ids_ref.current.has(row_id)) {
         new_row_ids_ref.current.delete(row_id);
-        setRows((prev) => prev.filter((r) => r.id !== row_id));
+        setRows((prev) => {
+          const updated = prev.filter((r) => r.id !== row_id);
+          const drafts = updated.filter((r) => new_row_ids_ref.current.has(r.id));
+          saveDraftsToStorage(drafts);
+          return updated;
+        });
         return;
       }
 
@@ -829,6 +949,31 @@ export default function BacklinkOrdersTable() {
         </div>
       )}
 
+      {/* Draft rows warning banner */}
+      {rows.some((r) => new_row_ids_ref.current.has(r.id)) && (
+        <div className="flex items-start gap-3 border-b border-amber-200 bg-amber-50 px-4 py-2.5 dark:border-amber-900/40 dark:bg-amber-900/20">
+          <svg
+            className="mt-0.5 h-4 w-4 shrink-0 text-amber-500"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+          <div>
+            <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+              You have unsaved draft rows
+            </p>
+            <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">
+              Draft rows are highlighted in amber and marked with a red indicator on each empty required field.
+              Fill in <strong>Link Type</strong>, <strong>Client</strong>, <strong>Keyword</strong>, and <strong>Landing Page</strong> in each draft row, then click outside the cell to save it to the server.
+              Your data is preserved locally and will not be lost on page reload.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Column visibility panel */}
       {show_filter_panel && (
         <div className="border-b border-gray-100 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-gray-800/50">
@@ -1029,7 +1174,9 @@ export default function BacklinkOrdersTable() {
                     <tr
                       key={row.id}
                       className={`group border-b border-gray-100 transition-colors dark:border-gray-800 ${
-                        row_idx % 2 === 0
+                        is_new
+                          ? "border-l-2 border-l-amber-400 bg-amber-50/30 dark:border-l-amber-500 dark:bg-amber-900/10"
+                          : row_idx % 2 === 0
                           ? "bg-white dark:bg-gray-900"
                           : "bg-gray-50/60 dark:bg-gray-800/30"
                       } ${is_saving ? "opacity-60" : ""} hover:bg-blue-50/40 dark:hover:bg-blue-900/10`}
@@ -1044,6 +1191,7 @@ export default function BacklinkOrdersTable() {
                             col={col}
                             value={(row[col.key] as string) ?? ""}
                             is_editing={is_editing}
+                            is_draft={is_new}
                             onStartEdit={() => startEditing(row.id, col.key)}
                             onUpdate={(val) => updateCell(row.id, col.key, val)}
                             onStopEdit={stopEditing}
@@ -1064,14 +1212,24 @@ export default function BacklinkOrdersTable() {
                           </svg>
                         ) : (
                           <div className="flex items-center justify-center gap-1">
-                            {is_new && !row.order_id && (
-                              <span
-                                className="rounded bg-yellow-100 px-1 py-0.5 text-xs text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400"
-                                title="Fill in Order ID to save this row"
-                              >
-                                unsaved
-                              </span>
-                            )}
+                            {is_new && (() => {
+                              const missing = getRowMissingRequired(row);
+                              return missing.length > 0 ? (
+                                <span
+                                  className="cursor-default rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                                  title={`Draft — fill required fields to save:\n• ${missing.join("\n• ")}`}
+                                >
+                                  Draft · {missing.length} required
+                                </span>
+                              ) : (
+                                <span
+                                  className="cursor-default rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                                  title="All required fields filled — will save on next edit"
+                                >
+                                  Ready to save
+                                </span>
+                              );
+                            })()}
                             <button
                               onClick={() => deleteRow(row.id)}
                               className="rounded p-1 text-gray-300 opacity-0 transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 dark:text-gray-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"

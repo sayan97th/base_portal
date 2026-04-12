@@ -11,6 +11,59 @@ import type {
   TeamHealthResponse,
 } from "@/types/admin/backlink-order";
 
+// ── Validation ─────────────────────────────────────────────────────────────────
+
+/**
+ * Fields that must be non-empty for a backlink order row to be accepted by
+ * the server. Used both for pre-flight client validation and for UI indicators.
+ */
+export const REQUIRED_ORDER_FIELDS: (keyof BacklinkOrderPayload)[] = [
+  "link_type",
+  "client",
+  "keyword",
+  "landing_page",
+];
+
+/**
+ * Returns the names of required fields that are missing from a payload.
+ * An empty array means the payload is ready to be sent to the server.
+ */
+export function getMissingRequiredFields(
+  payload: Partial<BacklinkOrderPayload>
+): (keyof BacklinkOrderPayload)[] {
+  return REQUIRED_ORDER_FIELDS.filter(
+    (key) => !payload[key] || String(payload[key]).trim() === ""
+  );
+}
+
+// ── Laravel error parsing ──────────────────────────────────────────────────────
+
+interface LaravelErrorBody {
+  message: string;
+  errors?: Record<string, string[]>;
+}
+
+/**
+ * Extracts a human-readable error message from a Laravel API error response.
+ * Laravel returns field-level validation errors under `errors` as an object of
+ * field → string[] pairs. This flattens them into a single readable string.
+ */
+export function parseApiErrorMessage(err: unknown): string {
+  if (err && typeof err === "object") {
+    const body = err as Partial<LaravelErrorBody>;
+    if (body.errors) {
+      const field_messages = Object.entries(body.errors)
+        .map(([field, msgs]) => `${field}: ${msgs.join(", ")}`)
+        .join("; ");
+      return field_messages;
+    }
+    if (typeof body.message === "string" && body.message) {
+      return body.message;
+    }
+  }
+  return "An unexpected error occurred. Please try again.";
+}
+
 // ── Dashboard aggregate endpoints ──────────────────────────────────────────────
 
 /**
@@ -118,6 +171,9 @@ const URL_FIELDS: (keyof BacklinkOrderPayload)[] = [
 /**
  * Strips server-only / computed fields from a row before sending it as a payload.
  * URL fields are normalized to include a protocol prefix if missing.
+ *
+ * Optionally call `getMissingRequiredFields(buildPayload(row))` before sending
+ * to give the user targeted feedback instead of relying on server validation.
  */
 export function buildPayload(row: BacklinkOrderRow): BacklinkOrderPayload {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
