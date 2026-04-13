@@ -28,7 +28,7 @@
 
 import { useEffect, useRef, useCallback, useState, useMemo } from "react";
 import { getToken } from "@/lib/api-client";
-import { getEcho } from "@/lib/echo";
+import { getEcho, setEchoSessionId } from "@/lib/echo";
 import type { CollaboratorPresence, WsReadyState } from "@/types/admin/presence";
 import type { BacklinkOrderRow } from "@/types/admin/backlink-order";
 
@@ -102,11 +102,20 @@ function enrichCollaborator(c: CollaboratorPresence): CollaboratorPresence {
 const CHANNEL_NAME = "backlink-orders";
 
 /**
- * Unique identifier for this browser tab, stable for the lifetime of the page.
- * Used as the `session_id` in whisper payloads so other collaborators can
- * distinguish two tabs opened by the same user.
+ * Unique identifier for this browser tab, stable across hot-reloads for the
+ * lifetime of the tab (survives module re-evaluation because it lives in
+ * sessionStorage).  Uses crypto.randomUUID() as required by the API spec so
+ * the backend can reliably track per-tab presence.
  */
-const local_session_id = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+const local_session_id = (() => {
+  if (typeof window === "undefined") return crypto.randomUUID();
+  const key = "bo_session_id";
+  const stored = sessionStorage.getItem(key);
+  if (stored) return stored;
+  const id = crypto.randomUUID();
+  sessionStorage.setItem(key, id);
+  return id;
+})();
 
 // ── Public types ───────────────────────────────────────────────────────────────
 
@@ -198,6 +207,10 @@ export function useBacklinkCollaboration(
       return;
     }
 
+    // Register the session ID before creating/reusing the Echo instance so the
+    // authorizer includes it as X-Session-Id on every presence-channel auth request.
+    setEchoSessionId(local_session_id);
+
     const echo = getEcho(token);
 
     // ── Track Pusher connection state ────────────────────────────────────────
@@ -233,18 +246,20 @@ export function useBacklinkCollaboration(
     const channel = echo.join(CHANNEL_NAME) as unknown as EchoPresenceChannel;
     channel_ref.current = channel;
 
-    // Initial snapshot — all users currently in the channel
+    // Initial snapshot — all users currently in the channel.
+    // Filter by session_id (not user_id) so that if the same user has multiple
+    // tabs open, the other tabs still appear as distinct collaborators.
     channel.here((users: CollaboratorPresence[]) => {
       setCollaborators(
         users
-          .filter((u) => u.user_id !== current_user_id)
+          .filter((u) => u.session_id !== local_session_id)
           .map(enrichCollaborator)
       );
     });
 
     // A new user joined the channel
     channel.joining((user: CollaboratorPresence) => {
-      if (user.user_id === current_user_id) return;
+      if (user.session_id === local_session_id) return;
       const new_collaborator = enrichCollaborator(user);
       setCollaborators((prev) => {
         const exists = prev.some(
@@ -271,6 +286,8 @@ export function useBacklinkCollaboration(
           row_id: string;
           col_key: string;
         };
+        // Always ignore our own whispers — we manage local state directly.
+        if (session_id === local_session_id) return;
         setCollaborators((prev) =>
           prev.map((c) =>
             c.session_id === session_id
@@ -285,6 +302,7 @@ export function useBacklinkCollaboration(
       "row-blur",
       (data: unknown) => {
         const { session_id } = data as { session_id: string };
+        if (session_id === local_session_id) return;
         setCollaborators((prev) =>
           prev.map((c) =>
             c.session_id === session_id
@@ -305,6 +323,7 @@ export function useBacklinkCollaboration(
           session_id: string;
           row_id: string;
         };
+        if (session_id === local_session_id) return;
         setCollaborators((prev) =>
           prev.map((c) =>
             c.session_id === session_id

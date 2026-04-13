@@ -93,6 +93,8 @@ const AppHeader: React.FC = () => {
               className="dark:hidden"
               src="/images/logo/base-logo.png"
               alt="Logo"
+              priority
+              style={{ height: "auto" }}
             />
             <Image
               width={154}
@@ -100,6 +102,8 @@ const AppHeader: React.FC = () => {
               className="hidden dark:block"
               src="/images/logo/base-logo.png"
               alt="Logo"
+              priority
+              style={{ height: "auto" }}
             />
           </Link>
 
@@ -158,7 +162,7 @@ const AppHeader: React.FC = () => {
                   ref={inputRef}
                   type="text"
                   placeholder="Type here..."
-                  className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-200 bg-transparent py-2.5 pl-12 pr-4 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:bg-white/[0.03] dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800 xl:w-[300px]"
+                  className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-200 bg-transparent py-2.5 pl-12 pr-4 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-white/3 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800 xl:w-[300px]"
                 />
               </div>
             </form>

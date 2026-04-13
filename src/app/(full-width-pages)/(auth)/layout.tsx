@@ -28,6 +28,8 @@ export default function AuthLayout({
                     height={48}
                     src="/images/logo/base-logo.png"
                     alt="Logo"
+                    priority
+                    style={{ height: "auto" }}
                   />
                 </Link>
               </div>

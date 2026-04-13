@@ -25,6 +25,22 @@ const REVERB_SCHEME = process.env.NEXT_PUBLIC_REVERB_SCHEME ?? "http";
 let echo_instance: Echo<"reverb"> | null = null;
 
 /**
+ * Per-tab session identifier forwarded as X-Session-Id on every channel auth
+ * request.  Set via setEchoSessionId() before the first getEcho() call so the
+ * backend can associate the socket connection with a specific browser tab.
+ */
+let _session_id: string | null = null;
+
+/**
+ * Stores the tab-scoped session UUID so that the Echo authorizer can forward it
+ * as X-Session-Id on every presence-channel auth request.
+ * Must be called before the first getEcho() call (i.e. before any channel join).
+ */
+export function setEchoSessionId(id: string): void {
+  _session_id = id;
+}
+
+/**
  * Returns the cached Echo instance, or creates a new one authenticated with
  * the provided JWT Bearer token. Call this once per authenticated session.
  */
@@ -59,6 +75,7 @@ export function getEcho(token: string): Echo<"reverb"> {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/x-www-form-urlencoded",
+            ...(_session_id ? { "X-Session-Id": _session_id } : {}),
           },
           body,
         })
