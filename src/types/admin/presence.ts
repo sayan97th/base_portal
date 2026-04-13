@@ -56,6 +56,18 @@ export interface WhisperRowBlur {
   row_id: string;
 }
 
+/**
+ * Sent when the current user selects a row without editing a specific cell
+ * (e.g. clicking anywhere on the row before a cell is focused).
+ * Sets focused_row_id on the collaborator without a focused_col_key so that
+ * other users see the row as "selected by" this collaborator.
+ * Transmitted as a client event (whisper) on the presence channel.
+ */
+export interface WhisperRowSelect {
+  session_id: string;
+  row_id: string;
+}
+
 // ── Server broadcast event payloads (server → all clients) ────────────────────
 
 /**

@@ -126,15 +126,27 @@ export interface UseBacklinkCollaborationReturn {
   /** All currently connected collaborators (current user excluded) */
   collaborators: CollaboratorPresence[];
   /**
-   * Map of row_id → collaborators currently editing that row.
-   * Only entries where focused_row_id is non-null are included.
+   * Map of row_id → collaborators who have that row active (selected or editing a cell).
+   * Includes all entries where focused_row_id is non-null, regardless of focused_col_key.
+   * Use collaborator.focused_col_key to distinguish "editing a cell" from "just selected".
    */
   row_editors: Map<string, CollaboratorPresence[]>;
   ready_state: WsReadyState;
+  /**
+   * Stable identifier for this browser tab, assigned once per page load.
+   * Use this to skip re-applying your own server-broadcast updates.
+   */
+  local_session_id: string;
   /** Notify other users that this tab started editing a cell */
   sendRowFocus: (row_id: string, col_key: string) => void;
   /** Notify other users that this tab stopped editing a row */
   sendRowBlur: (row_id: string) => void;
+  /**
+   * Notify other users that this tab selected a row without editing a specific cell.
+   * Sets focused_row_id on the collaborator without a focused_col_key so others see
+   * "User X is viewing this row" rather than "User X is editing column Y".
+   */
+  sendRowSelect: (row_id: string) => void;
 }
 
 // ── Internal channel shape (subset used by this hook) ─────────────────────────
@@ -283,6 +295,26 @@ export function useBacklinkCollaboration(
       }
     );
 
+    // row-select: another tab clicked a row without starting cell editing.
+    // We set focused_row_id but leave focused_col_key null so the UI can
+    // distinguish "selected" from "actively editing a cell".
+    channel.listenForWhisper(
+      "row-select",
+      (data: unknown) => {
+        const { session_id, row_id } = data as {
+          session_id: string;
+          row_id: string;
+        };
+        setCollaborators((prev) =>
+          prev.map((c) =>
+            c.session_id === session_id
+              ? { ...c, focused_row_id: row_id, focused_col_key: null }
+              : c
+          )
+        );
+      }
+    );
+
     // ── Server events: row CRUD broadcasts ──────────────────────────────────
 
     channel.listen(
@@ -350,6 +382,13 @@ export function useBacklinkCollaboration(
     });
   }, []);
 
+  const sendRowSelect = useCallback((row_id: string) => {
+    channel_ref.current?.whisper("row-select", {
+      session_id: local_session_id,
+      row_id,
+    });
+  }, []);
+
   // ── Derived: row_id → collaborators editing that row ──────────────────────
 
   const row_editors = useMemo(
@@ -364,5 +403,13 @@ export function useBacklinkCollaboration(
     [collaborators]
   );
 
-  return { collaborators, row_editors, ready_state, sendRowFocus, sendRowBlur };
+  return {
+    collaborators,
+    row_editors,
+    ready_state,
+    local_session_id,
+    sendRowFocus,
+    sendRowBlur,
+    sendRowSelect,
+  };
 }

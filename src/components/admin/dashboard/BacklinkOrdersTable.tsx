@@ -18,7 +18,10 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { useAuth } from "@/context/AuthContext";
 import { useBacklinkCollaboration } from "@/hooks/useBacklinkCollaboration";
 import CollaborationBar from "./CollaborationBar";
-import RowPresenceIndicator, { CellPresenceOverlay } from "./RowPresenceIndicator";
+import RowPresenceIndicator, {
+  CellPresenceOverlay,
+  RowSelectionBanner,
+} from "./RowPresenceIndicator";
 import type { CollaboratorPresence } from "@/types/admin/presence";
 
 // ── Column types ───────────────────────────────────────────────────────────────
@@ -254,6 +257,13 @@ interface EditableCellProps {
   is_editing: boolean;
   /** True when this cell belongs to a locally-created row not yet persisted to the server. */
   is_draft?: boolean;
+  /** True when this is the first visible column in its row — used to anchor the selection banner. */
+  is_first_col?: boolean;
+  /**
+   * The primary collaborator who has this row active (selected or editing).
+   * Only passed for the first visible column so the banner is rendered once per row.
+   */
+  primary_editor?: CollaboratorPresence | null;
   /** Collaborators currently editing this specific cell */
   cell_editors?: CollaboratorPresence[];
   onStartEdit: () => void;
@@ -267,6 +277,8 @@ function EditableCell({
   value,
   is_editing,
   is_draft = false,
+  is_first_col = false,
+  primary_editor = null,
   cell_editors = [],
   onStartEdit,
   onUpdate,
@@ -409,10 +421,14 @@ function EditableCell({
 
   const is_required_error = is_draft && (col.required ?? false) && !value;
   const has_cell_editors = cell_editors.length > 0;
+  // Show the selection banner anchored to the top of the first visible column
+  const show_selection_banner = is_first_col && !!primary_editor;
 
   return (
     <td
       className={`relative cursor-pointer whitespace-nowrap px-2 py-1.5 text-xs text-gray-700 transition-colors dark:text-gray-300 ${
+        show_selection_banner ? "pt-4" : ""
+      } ${
         is_required_error
           ? "bg-red-50/80 ring-1 ring-inset ring-red-300 hover:bg-red-100/60 dark:bg-red-900/20 dark:ring-red-700"
           : "hover:bg-blue-50 dark:hover:bg-blue-900/20"
@@ -425,6 +441,10 @@ function EditableCell({
       onClick={onStartEdit}
       title={is_required_error ? `Required: ${col.label} must be filled to save this row` : "Click to edit"}
     >
+      {/* Selection / editing banner — visible to all other collaborators */}
+      {show_selection_banner && (
+        <RowSelectionBanner editor={primary_editor!} />
+      )}
       {has_cell_editors && <CellPresenceOverlay editors={cell_editors} />}
       <div className="overflow-hidden" style={{ maxWidth: col.min_width }}>
         {is_required_error ? (
@@ -486,6 +506,8 @@ export default function BacklinkOrdersTable() {
   const [is_loading, setIsLoading] = useState(true);
   const [save_error, setSaveError] = useState<string | null>(null);
   const [editing_cell, setEditingCell] = useState<{ row_id: string; col_key: string } | null>(null);
+  /** The row the current user has clicked/selected (may or may not be actively editing a cell) */
+  const [selected_row_id, setSelectedRowId] = useState<string | null>(null);
   const [saving_row_ids, setSavingRowIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [status_filter, setStatusFilter] = useState<string>("");
@@ -542,7 +564,11 @@ export default function BacklinkOrdersTable() {
   // any cell the current user is actively editing.
 
   const handleRemoteRowUpdated = useCallback(
-    (updated_row: BacklinkOrderRow, _by_session_id: string) => {
+    (updated_row: BacklinkOrderRow, by_session_id: string) => {
+      // Skip updates originating from this tab — the REST response already applied
+      // the change optimistically, so applying it again would cause a redundant re-render.
+      if (by_session_id === local_session_id_ref.current) return;
+
       setRows((prev) =>
         prev.map((r) => {
           if (r.id !== updated_row.id) return r;
@@ -563,7 +589,10 @@ export default function BacklinkOrdersTable() {
   );
 
   const handleRemoteRowCreated = useCallback(
-    (new_row: BacklinkOrderRow, _by_session_id: string) => {
+    (new_row: BacklinkOrderRow, by_session_id: string) => {
+      // Skip row-created broadcasts triggered by this tab
+      if (by_session_id === local_session_id_ref.current) return;
+
       setRows((prev) => {
         if (prev.some((r) => r.id === new_row.id)) return prev;
         return [new_row, ...prev];
@@ -574,8 +603,12 @@ export default function BacklinkOrdersTable() {
   );
 
   const handleRemoteRowDeleted = useCallback(
-    (row_id: string, _by_session_id: string) => {
+    (row_id: string, by_session_id: string) => {
+      // Skip row-deleted broadcasts triggered by this tab
+      if (by_session_id === local_session_id_ref.current) return;
+
       if (editing_cell_ref.current?.row_id === row_id) setEditingCell(null);
+      if (selected_row_id_ref.current === row_id) setSelectedRowId(null);
       setRows((prev) => prev.filter((r) => r.id !== row_id));
       setTotal((prev) => Math.max(0, prev - 1));
     },
@@ -584,37 +617,83 @@ export default function BacklinkOrdersTable() {
 
   const { user } = useAuth();
 
-  const { collaborators, row_editors, ready_state, sendRowFocus, sendRowBlur } =
-    useBacklinkCollaboration({
-      current_user_id: user?.id ?? 0,
-      current_user_name: user
-        ? `${user.first_name} ${user.last_name}`.trim()
-        : "Unknown",
-      current_user_avatar: user?.profile_photo_url ?? null,
-      onRowUpdated: handleRemoteRowUpdated,
-      onRowCreated: handleRemoteRowCreated,
-      onRowDeleted: handleRemoteRowDeleted,
-    });
+  const {
+    collaborators,
+    row_editors,
+    ready_state,
+    local_session_id,
+    sendRowFocus,
+    sendRowBlur,
+    sendRowSelect,
+  } = useBacklinkCollaboration({
+    current_user_id: user?.id ?? 0,
+    current_user_name: user
+      ? `${user.first_name} ${user.last_name}`.trim()
+      : "Unknown",
+    current_user_avatar: user?.profile_photo_url ?? null,
+    onRowUpdated: handleRemoteRowUpdated,
+    onRowCreated: handleRemoteRowCreated,
+    onRowDeleted: handleRemoteRowDeleted,
+  });
 
-  // Keep the server informed of which cell the current user is editing.
-  // This drives the presence indicators seen by all other collaborators.
+  // Stable ref for local_session_id so the remote handlers can read it without
+  // being listed as effect dependencies (local_session_id never changes, but the
+  // ref pattern keeps ESLint exhaustive-deps happy).
+  const local_session_id_ref = useRef(local_session_id);
+  local_session_id_ref.current = local_session_id;
+
+  // Stable ref for selected_row_id (used inside handleRemoteRowDeleted without
+  // adding it as a useCallback dependency).
+  const selected_row_id_ref = useRef(selected_row_id);
+  selected_row_id_ref.current = selected_row_id;
+
+  // ── Unified row-activity whisper effect ──────────────────────────────────────
+  // Tracks both cell editing (row-focus whisper) and row selection (row-select
+  // whisper) so all other collaborators always see the current user's position.
+
   const prev_editing_ref = useRef<{ row_id: string; col_key: string } | null>(null);
+  const prev_selected_ref = useRef<string | null>(null);
 
+  // Cell editing → sends row-focus / row-blur for the active cell
   useEffect(() => {
     const prev = prev_editing_ref.current;
 
-    // If the user moved away from a row (or stopped editing entirely), send blur
+    // User moved away from a row or stopped editing entirely → send blur
     if (prev && (!editing_cell || editing_cell.row_id !== prev.row_id)) {
       sendRowBlur(prev.row_id);
     }
 
-    // If the user is now editing a cell, send focus
+    // User is now editing a cell → send focus with col_key
     if (editing_cell) {
       sendRowFocus(editing_cell.row_id, editing_cell.col_key);
     }
 
     prev_editing_ref.current = editing_cell;
   }, [editing_cell, sendRowFocus, sendRowBlur]);
+
+  // Row selection (click without editing) → sends row-select / row-blur
+  useEffect(() => {
+    const prev = prev_selected_ref.current;
+    const curr = selected_row_id;
+
+    if (prev === curr) return;
+
+    // Blur the previous row only if we weren't editing a cell in it
+    // (the cell-editing effect already sends blur in that case)
+    if (prev && editing_cell_ref.current?.row_id !== prev) {
+      sendRowBlur(prev);
+    }
+
+    // Select the new row only if we're not already editing a cell in it
+    // (the cell-editing effect handles that case with a more specific row-focus)
+    if (curr && editing_cell_ref.current?.row_id !== curr) {
+      sendRowSelect(curr);
+    }
+
+    prev_selected_ref.current = curr;
+  // editing_cell is intentionally read from editing_cell_ref (not as a dep)
+  // to avoid spurious row-select whispers whenever the active cell changes.
+  }, [selected_row_id, sendRowSelect, sendRowBlur]);
 
   // ── Fetch ───────────────────────────────────────────────────────────────────
 
@@ -1271,28 +1350,45 @@ export default function BacklinkOrdersTable() {
                   const is_new = new_row_ids_ref.current.has(row.id);
                   const row_collaborators = row_editors.get(row.id) ?? [];
                   const has_collaborators = !is_new && row_collaborators.length > 0;
+                  // Primary collaborator drives the row border + tint color
+                  const primary_editor = has_collaborators ? row_collaborators[0] : null;
+                  // Current user's own selection (local visual only)
+                  const is_locally_selected =
+                    !is_new && selected_row_id === row.id && !has_collaborators;
+
                   return (
                     <tr
                       key={row.id}
+                      onClick={() => {
+                        // Mark the row as locally selected so others see it via row-select whisper
+                        if (!is_new) setSelectedRowId(row.id);
+                      }}
                       className={`group border-b border-gray-100 transition-colors dark:border-gray-800 ${
                         is_new
                           ? "border-l-2 border-l-amber-400 bg-amber-50/30 dark:border-l-amber-500 dark:bg-amber-900/10"
                           : has_collaborators
                           ? "border-l-[3px]"
+                          : is_locally_selected
+                          ? "border-l-2 border-l-brand-400 bg-brand-50/30 dark:border-l-brand-500 dark:bg-brand-900/10"
                           : row_idx % 2 === 0
                           ? "bg-white dark:bg-gray-900"
                           : "bg-gray-50/60 dark:bg-gray-800/30"
                       } ${is_saving ? "opacity-60" : ""} hover:bg-blue-50/40 dark:hover:bg-blue-900/10`}
                       style={
-                        has_collaborators
-                          ? { borderLeftColor: row_collaborators[0].color }
+                        primary_editor
+                          ? {
+                              borderLeftColor: primary_editor.color,
+                              // Subtle tinted row background matching the editor's color
+                              backgroundColor: `${primary_editor.color}14`,
+                            }
                           : undefined
                       }
                     >
-                      {visible_columns.map((col) => {
+                      {visible_columns.map((col, col_idx) => {
                         const is_editing =
                           editing_cell?.row_id === row.id &&
                           editing_cell?.col_key === col.key;
+                        const is_first_col = col_idx === 0;
                         return (
                           <EditableCell
                             key={col.key}
@@ -1300,6 +1396,8 @@ export default function BacklinkOrdersTable() {
                             value={(row[col.key] as string) ?? ""}
                             is_editing={is_editing}
                             is_draft={is_new}
+                            is_first_col={is_first_col}
+                            primary_editor={is_first_col ? primary_editor : null}
                             cell_editors={row_collaborators.filter(
                               (c) => c.focused_col_key === col.key
                             )}
@@ -1311,18 +1409,21 @@ export default function BacklinkOrdersTable() {
                         );
                       })}
                       {/* Actions cell */}
-                      <td className="border-l border-gray-100 px-2 py-1.5 text-center dark:border-gray-800">
+                      <td className="border-l border-gray-100 px-2 py-1.5 dark:border-gray-800">
                         {is_saving ? (
-                          <svg
-                            className="mx-auto h-3.5 w-3.5 animate-spin text-brand-400"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                          >
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                          </svg>
+                          <div className="flex items-center justify-center">
+                            <svg
+                              className="h-3.5 w-3.5 animate-spin text-brand-400"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                            >
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                            </svg>
+                          </div>
                         ) : (
-                          <div className="flex items-center justify-center gap-1">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {/* Collaborator presence badges — show who is editing / has selected this row */}
                             {row_collaborators.length > 0 && (
                               <RowPresenceIndicator editors={row_collaborators} />
                             )}
@@ -1345,7 +1446,10 @@ export default function BacklinkOrdersTable() {
                               );
                             })()}
                             <button
-                              onClick={() => deleteRow(row.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteRow(row.id);
+                              }}
                               className="rounded p-1 text-gray-300 opacity-0 transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 dark:text-gray-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
                               title="Delete row"
                             >
