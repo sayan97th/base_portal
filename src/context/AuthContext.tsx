@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { authService } from "@/services/auth.service";
 import { getToken } from "@/lib/api-client";
+import { resetEcho } from "@/lib/echo";
 import { getPrimaryRole, isStaffRole, setPrimaryRoleCookie } from "@/lib/roles";
 import type { RoleName } from "@/lib/roles";
 import type { User, AuthResponse, LoginCredentials, RegisterData, ApiError } from "@/types/auth";
@@ -177,6 +178,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
+    // Disconnect WebSocket before clearing the token so no stale subscriptions
+    // persist across sessions.
+    resetEcho();
     await authService.logout();
     setUser(null);
     setPermissions([]);
