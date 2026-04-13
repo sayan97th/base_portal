@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from "react"
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Elements } from "@stripe/react-stripe-js";
+import ClientProfile from "@/components/seo-dashboard/ClientProfile";
 import LinkBuildingHeader from "./LinkBuildingHeader";
 import DrTierGrid from "./DrTierGrid";
 import ContentRefreshUpsell from "./ContentRefreshUpsell";
@@ -403,12 +404,13 @@ const LinkBuildingPage: React.FC = () => {
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-      {/* Page header */}
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-          Link Building
-        </h1>
+    <div className="space-y-6">
+      {/* Client profile navigation */}
+      <ClientProfile />
+
+      <div className="mx-auto max-w-7xl">
+      {/* My Orders shortcut */}
+      <div className="mb-6 flex items-center justify-end">
         <Link
           href="/orders"
           className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-500 transition-colors hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
@@ -551,6 +553,7 @@ const LinkBuildingPage: React.FC = () => {
           </div>
         </Elements>
       )}
+      </div>
     </div>
   );
 };

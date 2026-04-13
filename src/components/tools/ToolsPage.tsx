@@ -1,8 +1,14 @@
 "use client";
 
+import ClientProfile from "@/components/seo-dashboard/ClientProfile";
+
 export default function ToolsPage() {
   return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center">
+    <div className="space-y-6">
+      {/* Client profile navigation */}
+      <ClientProfile />
+
+      <div className="flex min-h-[50vh] flex-col items-center justify-center px-4 text-center">
       {/* Icon */}
       <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-coral-50 dark:bg-coral-500/10">
         <svg
@@ -32,6 +38,7 @@ export default function ToolsPage() {
         We&apos;re building a suite of SEO tools to help you get more out of
         your campaigns. Check back soon.
       </p>
+      </div>
     </div>
   );
 }

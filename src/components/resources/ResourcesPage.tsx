@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import ClientProfile from "@/components/seo-dashboard/ClientProfile";
 import { resourcesService } from "@/services/client/resources.service";
 import type { Resource, ResourceCategory } from "@/types/client/resources";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -147,7 +148,7 @@ function getCategoryLabel(category: ResourceCategory): string {
 
 function ResourceCardSkeleton() {
   return (
-    <div className="animate-pulse rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+    <div className="animate-pulse rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3">
       <div className="mb-4 flex items-start gap-3">
         <div className="h-10 w-10 rounded-xl bg-gray-100 dark:bg-gray-800" />
         <div className="flex-1">
@@ -173,7 +174,7 @@ function ResourceCard({ resource }: { resource: Resource }) {
   const file_count = resource.files?.length ?? 0;
 
   return (
-    <div className="group flex flex-col rounded-2xl border border-gray-200 bg-white p-5 transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-white/[0.03] dark:hover:border-gray-700">
+    <div className="group flex flex-col rounded-2xl border border-gray-200 bg-white p-5 transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-white/3 dark:hover:border-gray-700">
       {/* Header */}
       <div className="mb-3 flex items-start gap-3">
         <ResourceCategoryIcon category={resource.category} />
@@ -393,23 +394,20 @@ export default function ResourcesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Resources</h1>
-          <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
-            Documents, reports, and files shared with your account.
-          </p>
-        </div>
-        {total > 0 && (
-          <span className="self-start rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-sm font-medium text-gray-600 dark:border-gray-700 dark:bg-white/5 dark:text-gray-400 sm:self-auto">
+      {/* Client profile navigation */}
+      <ClientProfile />
+
+      {/* Resources count badge */}
+      {total > 0 && (
+        <div className="flex items-center justify-end">
+          <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-sm font-medium text-gray-600 dark:border-gray-700 dark:bg-white/5 dark:text-gray-400">
             {total} {total === 1 ? "resource" : "resources"}
           </span>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Search & Filters */}
-      <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/3">
         {/* Search Input */}
         <div className="relative mb-4">
           <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400">
@@ -423,7 +421,7 @@ export default function ResourcesPage() {
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
             placeholder="Search resources..."
-            className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-4 text-sm text-gray-700 placeholder-gray-400 transition-colors focus:border-brand-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-gray-700 dark:bg-white/5 dark:text-gray-300 dark:placeholder-gray-600 dark:focus:border-brand-500/50 dark:focus:bg-white/[0.03] dark:focus:ring-brand-500/10"
+            className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-4 text-sm text-gray-700 placeholder-gray-400 transition-colors focus:border-brand-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-gray-700 dark:bg-white/5 dark:text-gray-300 dark:placeholder-gray-600 dark:focus:border-brand-500/50 dark:focus:bg-white/3 dark:focus:ring-brand-500/10"
           />
           {search && (
             <button
