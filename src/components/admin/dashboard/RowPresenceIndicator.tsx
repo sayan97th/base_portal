@@ -1,8 +1,6 @@
 "use client";
 
-import React from "react";
 import type { CollaboratorPresence } from "@/types/admin/presence";
-import { CollaboratorAvatar } from "./CollaborationBar";
 
 // ── Single editor badge (avatar + name + state label) ────────────────────────
 
@@ -153,34 +151,126 @@ export function CellPresenceOverlay({ editors }: CellPresenceOverlayProps) {
   );
 }
 
-// ── Row selection banner (first-column overlay) ───────────────────────────────
+// ── Row presence floater (first-column overlay, Google-Sheets style) ──────────
 
-interface RowSelectionBannerProps {
-  /** The primary collaborator who has this row active */
-  editor: CollaboratorPresence;
+interface RowPresenceFloaterProps {
+  /** All collaborators currently active on this row */
+  editors: CollaboratorPresence[];
 }
 
 /**
- * A thin colored label that appears anchored to the top-left of the first
- * visible cell in a row, showing who has that row selected or in edit.
+ * Google-Sheets-style floating user chips that appear above the first cell of
+ * a row whenever one or more collaborators have it selected or are editing it.
+ *
+ * Each chip shows:
+ *  • The user's avatar (photo when available, otherwise colored initials)
+ *  • Their first name
+ *  • A pulsing dot when they are actively editing a cell
+ *  • A small downward caret that "points" at the row below
+ *
+ * Up to 3 users are shown as full chips; additional users are collapsed into a
+ * compact "+N" overflow badge.
  *
  * The parent <td> must have `position: relative`.
  */
-export function RowSelectionBanner({ editor }: RowSelectionBannerProps) {
-  const is_editing = !!editor.focused_col_key;
+export function RowPresenceFloater({ editors }: RowPresenceFloaterProps) {
+  if (editors.length === 0) return null;
+
+  const visible = editors.slice(0, 3);
+  const overflow_count = editors.length - visible.length;
+  const overflow_names = editors
+    .slice(3)
+    .map((e) => e.name)
+    .join(", ");
 
   return (
-    <span
-      className="pointer-events-none absolute -top-2.5 left-0 z-10 flex items-center gap-0.5 rounded-sm px-1 py-px text-[8px] font-bold leading-none text-white shadow"
-      style={{ backgroundColor: editor.color }}
-      title={
-        is_editing
-          ? `${editor.name} is editing this row`
-          : `${editor.name} has this row selected`
-      }
-    >
-      <CollaboratorAvatar collaborator={editor} size="sm" />
-      <span>{editor.name.split(" ")[0]}</span>
-    </span>
+    <div className="pointer-events-none absolute bottom-full left-0 z-20 mb-0.5 flex items-end gap-1">
+      {visible.map((editor) => {
+        const is_editing = !!editor.focused_col_key;
+        const first_name = editor.name.split(" ")[0];
+
+        return (
+          <div
+            key={editor.session_id}
+            className="flex flex-col items-center"
+            title={
+              is_editing
+                ? `${editor.name} is editing "${editor.focused_col_key}"`
+                : `${editor.name} has this row selected`
+            }
+          >
+            {/* ── Chip ─────────────────────────────────────────────────────── */}
+            <div
+              className="flex items-center gap-1 rounded-full py-0.5 pl-0.5 pr-2 shadow-md ring-1 ring-white/30 dark:ring-black/30"
+              style={{ backgroundColor: editor.color }}
+            >
+              {/* Avatar */}
+              <div
+                className="flex h-[18px] w-[18px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/25 text-[8px] font-bold leading-none text-white"
+              >
+                {editor.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={editor.avatar_url}
+                    alt={editor.name}
+                    className="h-full w-full rounded-full object-cover"
+                  />
+                ) : (
+                  editor.initials
+                )}
+              </div>
+
+              {/* First name */}
+              <span className="max-w-[56px] truncate text-[10px] font-semibold leading-none text-white">
+                {first_name}
+              </span>
+
+              {/* Editing pulse dot — shown only when a specific cell is being edited */}
+              {is_editing ? (
+                <span className="relative ml-0.5 flex h-1.5 w-1.5 shrink-0">
+                  <span
+                    className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75"
+                  />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-white" />
+                </span>
+              ) : (
+                /* Eye dot — shown when only the row is selected */
+                <span className="ml-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-white/50" />
+              )}
+            </div>
+
+            {/* ── Downward caret "pointer" ──────────────────────────────────── */}
+            <div
+              className="h-[5px] w-[10px] shrink-0"
+              style={{
+                clipPath: "polygon(0 0, 100% 0, 50% 100%)",
+                backgroundColor: editor.color,
+              }}
+            />
+          </div>
+        );
+      })}
+
+      {/* Overflow badge */}
+      {overflow_count > 0 && (
+        <div
+          className="flex flex-col items-center"
+          title={overflow_names}
+        >
+          <div className="flex items-center gap-1 rounded-full bg-gray-500 py-0.5 pl-1.5 pr-2 shadow-md ring-1 ring-white/20 dark:ring-black/20">
+            <span className="text-[10px] font-semibold leading-none text-white">
+              +{overflow_count}
+            </span>
+          </div>
+          <div
+            className="h-[5px] w-[10px] shrink-0"
+            style={{
+              clipPath: "polygon(0 0, 100% 0, 50% 100%)",
+              backgroundColor: "#6b7280",
+            }}
+          />
+        </div>
+      )}
+    </div>
   );
 }

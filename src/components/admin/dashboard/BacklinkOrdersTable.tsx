@@ -20,7 +20,7 @@ import { useBacklinkCollaboration } from "@/hooks/useBacklinkCollaboration";
 import CollaborationBar from "./CollaborationBar";
 import RowPresenceIndicator, {
   CellPresenceOverlay,
-  RowSelectionBanner,
+  RowPresenceFloater,
 } from "./RowPresenceIndicator";
 import type { CollaboratorPresence } from "@/types/admin/presence";
 
@@ -257,13 +257,13 @@ interface EditableCellProps {
   is_editing: boolean;
   /** True when this cell belongs to a locally-created row not yet persisted to the server. */
   is_draft?: boolean;
-  /** True when this is the first visible column in its row — used to anchor the selection banner. */
+  /** True when this is the first visible column in its row — used to anchor the floater. */
   is_first_col?: boolean;
   /**
-   * The primary collaborator who has this row active (selected or editing).
-   * Only passed for the first visible column so the banner is rendered once per row.
+   * All collaborators currently active on this row (selected or editing a cell).
+   * Only passed for the first visible column so the floater is rendered once per row.
    */
-  primary_editor?: CollaboratorPresence | null;
+  row_editors?: CollaboratorPresence[];
   /** Collaborators currently editing this specific cell */
   cell_editors?: CollaboratorPresence[];
   onStartEdit: () => void;
@@ -278,7 +278,7 @@ function EditableCell({
   is_editing,
   is_draft = false,
   is_first_col = false,
-  primary_editor = null,
+  row_editors = [],
   cell_editors = [],
   onStartEdit,
   onUpdate,
@@ -421,14 +421,12 @@ function EditableCell({
 
   const is_required_error = is_draft && (col.required ?? false) && !value;
   const has_cell_editors = cell_editors.length > 0;
-  // Show the selection banner anchored to the top of the first visible column
-  const show_selection_banner = is_first_col && !!primary_editor;
+  // Show the Google-Sheets-style floating user chips above the first visible column
+  const show_row_floater = is_first_col && row_editors.length > 0;
 
   return (
     <td
       className={`relative cursor-pointer whitespace-nowrap px-2 py-1.5 text-xs text-gray-700 transition-colors dark:text-gray-300 ${
-        show_selection_banner ? "pt-4" : ""
-      } ${
         is_required_error
           ? "bg-red-50/80 ring-1 ring-inset ring-red-300 hover:bg-red-100/60 dark:bg-red-900/20 dark:ring-red-700"
           : "hover:bg-blue-50 dark:hover:bg-blue-900/20"
@@ -441,9 +439,9 @@ function EditableCell({
       onClick={onStartEdit}
       title={is_required_error ? `Required: ${col.label} must be filled to save this row` : "Click to edit"}
     >
-      {/* Selection / editing banner — visible to all other collaborators */}
-      {show_selection_banner && (
-        <RowSelectionBanner editor={primary_editor!} />
+      {/* Google-Sheets-style floating user chips — visible to all collaborators */}
+      {show_row_floater && (
+        <RowPresenceFloater editors={row_editors} />
       )}
       {has_cell_editors && <CellPresenceOverlay editors={cell_editors} />}
       <div className="overflow-hidden" style={{ maxWidth: col.min_width }}>
