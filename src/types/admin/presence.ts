@@ -3,9 +3,12 @@ import type { BacklinkOrderRow } from "./backlink-order";
 // ── Collaborator presence ──────────────────────────────────────────────────────
 
 /**
- * A user currently connected to the backlink orders table collaboration channel.
- * The server assigns a unique session_id per WebSocket connection so that the
- * same user opening two browser tabs is tracked as two separate collaborators.
+ * A user currently connected to the backlink orders presence channel.
+ * The server assigns a unique session_id per connection so that the same
+ * user opening two browser tabs is tracked as two separate collaborators.
+ *
+ * Laravel channel auth (`routes/channels.php`) must return at least:
+ *   ['session_id', 'user_id', 'name', 'initials', 'color', 'avatar_url']
  */
 export interface CollaboratorPresence {
   /** Unique per-connection identifier assigned by the server */
@@ -23,134 +26,65 @@ export interface CollaboratorPresence {
   focused_col_key: string | null;
 }
 
-// ── WebSocket connection states ────────────────────────────────────────────────
+// ── WebSocket / Echo connection states ────────────────────────────────────────
 
-export type WsReadyState = "connecting" | "connected" | "reconnecting" | "disconnected";
+export type WsReadyState =
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+  | "disconnected";
 
-// ── Client → Server message types ─────────────────────────────────────────────
-
-/**
- * Sent once right after the socket opens.
- * The server uses this to register the user, assign a color, and broadcast
- * their arrival to all other connected clients.
- */
-export interface WsJoinMessage {
-  type: "join";
-  user_id: number;
-  name: string;
-  avatar_url: string | null;
-}
+// ── Whisper payloads (client → other clients via Echo presence channel) ────────
 
 /**
  * Sent when the current user starts editing a cell.
- * The server broadcasts a `row_focused` event to all other connected clients.
+ * Transmitted as a client event (whisper) on the presence channel.
  */
-export interface WsRowFocusMessage {
-  type: "row_focus";
+export interface WhisperRowFocus {
+  /** Tab-level session identifier so multi-tab users are tracked separately */
+  session_id: string;
   row_id: string;
   col_key: string;
 }
 
 /**
  * Sent when the current user stops editing a row (blur, Tab, Enter, Escape).
- * The server broadcasts a `row_blurred` event to all other connected clients.
+ * Transmitted as a client event (whisper) on the presence channel.
  */
-export interface WsRowBlurMessage {
-  type: "row_blur";
+export interface WhisperRowBlur {
+  session_id: string;
   row_id: string;
 }
 
-/** Heartbeat to keep the connection alive */
-export interface WsPingMessage {
-  type: "ping";
-}
-
-export type WsClientMessage =
-  | WsJoinMessage
-  | WsRowFocusMessage
-  | WsRowBlurMessage
-  | WsPingMessage;
-
-// ── Server → Client message types ─────────────────────────────────────────────
+// ── Server broadcast event payloads (server → all clients) ────────────────────
 
 /**
- * Full snapshot of all currently connected collaborators, sent to a new
- * connection right after they send the `join` message.
+ * Broadcast by the server after a BacklinkOrder row is updated via the REST API.
+ * Laravel event class: BacklinkOrderUpdated
+ * Channel: presence-backlink-orders
  */
-export interface WsPresenceStateMessage {
-  type: "presence_state";
-  users: CollaboratorPresence[];
-}
-
-/** Broadcast to all other clients when a new user joins */
-export interface WsUserJoinedMessage {
-  type: "user_joined";
-  user: CollaboratorPresence;
-}
-
-/** Broadcast to all other clients when a user disconnects */
-export interface WsUserLeftMessage {
-  type: "user_left";
-  session_id: string;
-}
-
-/** Broadcast to all other clients when a user focuses a cell */
-export interface WsRowFocusedMessage {
-  type: "row_focused";
-  session_id: string;
-  row_id: string;
-  col_key: string;
-}
-
-/** Broadcast to all other clients when a user stops editing a row */
-export interface WsRowBlurredMessage {
-  type: "row_blurred";
-  session_id: string;
-  row_id: string;
-}
-
-/**
- * Broadcast to all OTHER clients after a row is saved via the REST API.
- * The server should hook into the backlink order update/create/delete endpoints
- * and broadcast these events to all active WebSocket clients on this channel.
- *
- * Laravel implementation note:
- *   After BacklinkOrder::update() succeeds, broadcast a BacklinkOrderUpdated
- *   event on the "backlink-orders" channel with the serialized row.
- */
-export interface WsRowUpdatedMessage {
-  type: "row_updated";
+export interface EchoRowUpdatedPayload {
   row: BacklinkOrderRow;
-  /** session_id of the user who performed the update */
+  /** session_id of the tab that triggered the update */
   updated_by_session_id: string;
 }
 
-/** Broadcast after a new row is created via the REST API */
-export interface WsRowCreatedMessage {
-  type: "row_created";
+/**
+ * Broadcast by the server after a new BacklinkOrder row is created.
+ * Laravel event class: BacklinkOrderCreated
+ * Channel: presence-backlink-orders
+ */
+export interface EchoRowCreatedPayload {
   row: BacklinkOrderRow;
   created_by_session_id: string;
 }
 
-/** Broadcast after a row is deleted via the REST API */
-export interface WsRowDeletedMessage {
-  type: "row_deleted";
+/**
+ * Broadcast by the server after a BacklinkOrder row is deleted.
+ * Laravel event class: BacklinkOrderDeleted
+ * Channel: presence-backlink-orders
+ */
+export interface EchoRowDeletedPayload {
   row_id: string;
   deleted_by_session_id: string;
 }
-
-/** Response to a `ping` heartbeat */
-export interface WsPongMessage {
-  type: "pong";
-}
-
-export type WsServerMessage =
-  | WsPresenceStateMessage
-  | WsUserJoinedMessage
-  | WsUserLeftMessage
-  | WsRowFocusedMessage
-  | WsRowBlurredMessage
-  | WsRowUpdatedMessage
-  | WsRowCreatedMessage
-  | WsRowDeletedMessage
-  | WsPongMessage;

@@ -3,70 +3,63 @@
 /**
  * useBacklinkCollaboration
  * ─────────────────────────────────────────────────────────────────────────────
- * Manages a WebSocket connection to the collaboration server for the
- * Backlink Orders table.  Handles:
+ * Manages real-time collaboration for the Backlink Orders table via
+ * Laravel Echo + Reverb (presence channel).  Handles:
  *
- *  • Presence — who is currently viewing/editing the table
- *  • Cell focus/blur tracking — which row+column each user is editing
- *  • Real-time data sync — row updates/creates/deletes pushed by the server
- *
- * ── Environment variable ──────────────────────────────────────────────────────
- * NEXT_PUBLIC_WS_URL  WebSocket endpoint, e.g. ws://localhost:6001/ws/backlink-orders
- * When this variable is not set the hook gracefully degrades: no WebSocket
- * connection is attempted, all returned state is empty/inert.
+ *  • Presence   — who is currently viewing/editing the table
+ *  • Cell focus/blur tracking — which row+column each user is editing (whispers)
+ *  • Real-time data sync — row updates/creates/deletes broadcast by the server
  *
  * ── Laravel backend requirements ──────────────────────────────────────────────
- * The server must implement a WebSocket endpoint at NEXT_PUBLIC_WS_URL that:
+ * 1. The presence channel `presence-backlink-orders` must be authorised in
+ *    `routes/channels.php` and return at least:
+ *      ['session_id', 'user_id', 'name', 'initials', 'color', 'avatar_url']
  *
- * 1. Accepts a `?token=<bearer>` query parameter for authentication.
- * 2. Assigns each connection a unique `session_id` (UUID or similar).
- * 3. Assigns each user a color from a fixed palette based on user_id.
- * 4. Handles the following inbound messages (JSON):
- *      { type: "join", user_id, name, avatar_url }
- *      { type: "row_focus", row_id, col_key }
- *      { type: "row_blur", row_id }
- *      { type: "ping" }
+ * 2. After each BacklinkOrder REST mutation the Laravel controller should
+ *    broadcast to the channel:
+ *      BacklinkOrderUpdated  → { row: BacklinkOrderRow, updated_by_session_id }
+ *      BacklinkOrderCreated  → { row: BacklinkOrderRow, created_by_session_id }
+ *      BacklinkOrderDeleted  → { row_id: string,        deleted_by_session_id }
  *
- * 5. Broadcasts to ALL connections on the channel:
- *      { type: "presence_state", users: CollaboratorPresence[] }   → only to the joining client
- *      { type: "user_joined", user: CollaboratorPresence }         → to all others
- *      { type: "user_left", session_id }                           → to all others on disconnect
- *      { type: "row_focused", session_id, row_id, col_key }        → to all others
- *      { type: "row_blurred", session_id, row_id }                 → to all others
- *      { type: "pong" }                                            → back to pinging client
- *
- * 6. After each BacklinkOrder REST mutation (update / create / delete), the
- *    Laravel controller should broadcast to the channel:
- *      { type: "row_updated", row: BacklinkOrderRow, updated_by_session_id }
- *      { type: "row_created", row: BacklinkOrderRow, created_by_session_id }
- *      { type: "row_deleted", row_id: string,        deleted_by_session_id }
- *
- *    The `session_id` can be passed as a custom request header from the
- *    frontend (`X-WS-Session-Id`) or stored in the authenticated user's
- *    session after the `join` message.
+ * 3. Client-event (whisper) payloads sent by other tabs/users:
+ *      row-focus  → { session_id, row_id, col_key }
+ *      row-blur   → { session_id, row_id }
  */
 
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useRef, useCallback, useState, useMemo } from "react";
 import { getToken } from "@/lib/api-client";
-import type {
-  CollaboratorPresence,
-  WsClientMessage,
-  WsServerMessage,
-  WsReadyState,
-} from "@/types/admin/presence";
+import { getEcho } from "@/lib/echo";
+import type { CollaboratorPresence, WsReadyState } from "@/types/admin/presence";
 import type { BacklinkOrderRow } from "@/types/admin/backlink-order";
 
-// ── Constants ──────────────────────────────────────────────────────────────────
+// ── Pusher → WsReadyState mapping ─────────────────────────────────────────────
 
-const RECONNECT_BASE_MS = 1_500;
-const RECONNECT_MAX_MS = 30_000;
-const PING_INTERVAL_MS = 25_000;
+type PusherConnectionState =
+  | "initialized"
+  | "connecting"
+  | "connected"
+  | "unavailable"
+  | "failed"
+  | "disconnected";
 
-/**
- * Fallback color palette used when the server does not assign a color.
- * The server should assign colors deterministically so that the same user
- * always gets the same color across sessions and all clients agree.
- */
+function mapConnectionState(pusher_state: string): WsReadyState {
+  switch (pusher_state as PusherConnectionState) {
+    case "connected":
+      return "connected";
+    case "connecting":
+    case "initialized":
+      return "connecting";
+    case "unavailable":
+      return "reconnecting";
+    case "failed":
+    case "disconnected":
+    default:
+      return "disconnected";
+  }
+}
+
+// ── Collaborator helpers ───────────────────────────────────────────────────────
+
 const PRESENCE_COLORS = [
   "#6366f1", // indigo
   "#ec4899", // pink
@@ -80,10 +73,10 @@ const PRESENCE_COLORS = [
   "#84cc16", // lime
 ];
 
-function getFallbackColor(session_id: string): string {
+function getFallbackColor(id: string): string {
   let hash = 0;
-  for (let i = 0; i < session_id.length; i++) {
-    hash = session_id.charCodeAt(i) + ((hash << 5) - hash);
+  for (let i = 0; i < id.length; i++) {
+    hash = id.charCodeAt(i) + ((hash << 5) - hash);
   }
   return PRESENCE_COLORS[Math.abs(hash) % PRESENCE_COLORS.length];
 }
@@ -104,7 +97,18 @@ function enrichCollaborator(c: CollaboratorPresence): CollaboratorPresence {
   };
 }
 
-// ── Hook public API ────────────────────────────────────────────────────────────
+// ── Constants ──────────────────────────────────────────────────────────────────
+
+const CHANNEL_NAME = "backlink-orders";
+
+/**
+ * Unique identifier for this browser tab, stable for the lifetime of the page.
+ * Used as the `session_id` in whisper payloads so other collaborators can
+ * distinguish two tabs opened by the same user.
+ */
+const local_session_id = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+// ── Public types ───────────────────────────────────────────────────────────────
 
 export interface UseBacklinkCollaborationOptions {
   current_user_id: number;
@@ -119,7 +123,7 @@ export interface UseBacklinkCollaborationOptions {
 }
 
 export interface UseBacklinkCollaborationReturn {
-  /** All currently connected collaborators (the current user is excluded) */
+  /** All currently connected collaborators (current user excluded) */
   collaborators: CollaboratorPresence[];
   /**
    * Map of row_id → collaborators currently editing that row.
@@ -127,15 +131,27 @@ export interface UseBacklinkCollaborationReturn {
    */
   row_editors: Map<string, CollaboratorPresence[]>;
   ready_state: WsReadyState;
-  /** Notify the server that this user started editing a cell */
+  /** Notify other users that this tab started editing a cell */
   sendRowFocus: (row_id: string, col_key: string) => void;
-  /** Notify the server that this user stopped editing a row */
+  /** Notify other users that this tab stopped editing a row */
   sendRowBlur: (row_id: string) => void;
 }
 
-// ── Hook implementation ────────────────────────────────────────────────────────
+// ── Internal channel shape (subset used by this hook) ─────────────────────────
 
-const WS_ENDPOINT = process.env.NEXT_PUBLIC_WS_URL ?? null;
+interface EchoPresenceChannel {
+  here(callback: (users: CollaboratorPresence[]) => void): EchoPresenceChannel;
+  joining(callback: (user: CollaboratorPresence) => void): EchoPresenceChannel;
+  leaving(callback: (user: CollaboratorPresence) => void): EchoPresenceChannel;
+  listen(event: string, callback: (data: unknown) => void): EchoPresenceChannel;
+  listenForWhisper(
+    event: string,
+    callback: (data: unknown) => void
+  ): EchoPresenceChannel;
+  whisper(event: string, data: object): EchoPresenceChannel;
+}
+
+// ── Hook implementation ────────────────────────────────────────────────────────
 
 export function useBacklinkCollaboration(
   options: UseBacklinkCollaborationOptions
@@ -150,17 +166,9 @@ export function useBacklinkCollaboration(
   } = options;
 
   const [collaborators, setCollaborators] = useState<CollaboratorPresence[]>([]);
-  const [ready_state, setReadyState] = useState<WsReadyState>(
-    WS_ENDPOINT ? "connecting" : "disconnected"
-  );
+  const [ready_state, setReadyState] = useState<WsReadyState>("connecting");
 
-  // Mutable refs — do not cause re-renders
-  const ws_ref = useRef<WebSocket | null>(null);
-  const reconnect_timer_ref = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const ping_timer_ref = useRef<ReturnType<typeof setInterval> | null>(null);
-  const is_unmounted_ref = useRef(false);
-
-  // Keep latest callbacks in refs to avoid stale closures inside WS handlers
+  // Keep latest callbacks in refs to avoid stale closures inside channel listeners
   const on_row_updated_ref = useRef(onRowUpdated);
   const on_row_created_ref = useRef(onRowCreated);
   const on_row_deleted_ref = useRef(onRowDeleted);
@@ -168,207 +176,192 @@ export function useBacklinkCollaboration(
   on_row_created_ref.current = onRowCreated;
   on_row_deleted_ref.current = onRowDeleted;
 
-  // ── Stable send helper ─────────────────────────────────────────────────────
-
-  const sendMessage = useCallback((msg: WsClientMessage) => {
-    if (ws_ref.current?.readyState === WebSocket.OPEN) {
-      ws_ref.current.send(JSON.stringify(msg));
-    }
-  }, []);
-
-  // ── Connection management ──────────────────────────────────────────────────
+  const channel_ref = useRef<EchoPresenceChannel | null>(null);
 
   useEffect(() => {
-    if (!WS_ENDPOINT) return;
+    const token = getToken();
 
-    is_unmounted_ref.current = false;
-    let attempt = 0;
-
-    function connect() {
-      if (is_unmounted_ref.current) return;
-
-      const token = getToken();
-      const url = token
-        ? `${WS_ENDPOINT}?token=${encodeURIComponent(token)}`
-        : WS_ENDPOINT!;
-
-      setReadyState(attempt > 0 ? "reconnecting" : "connecting");
-
-      const ws = new WebSocket(url);
-      ws_ref.current = ws;
-
-      ws.onopen = () => {
-        if (is_unmounted_ref.current) {
-          ws.close();
-          return;
-        }
-
-        attempt = 0;
-        setReadyState("connected");
-
-        // Announce identity to the server
-        ws.send(
-          JSON.stringify({
-            type: "join",
-            user_id: current_user_id,
-            name: current_user_name,
-            avatar_url: current_user_avatar,
-          } as WsClientMessage)
-        );
-
-        // Heartbeat to keep the connection alive through proxies / load balancers
-        if (ping_timer_ref.current) clearInterval(ping_timer_ref.current);
-        ping_timer_ref.current = setInterval(() => {
-          if (ws_ref.current?.readyState === WebSocket.OPEN) {
-            ws_ref.current.send(JSON.stringify({ type: "ping" } as WsClientMessage));
-          }
-        }, PING_INTERVAL_MS);
-      };
-
-      ws.onmessage = (event) => {
-        let msg: WsServerMessage;
-        try {
-          msg = JSON.parse(event.data as string) as WsServerMessage;
-        } catch {
-          return;
-        }
-
-        switch (msg.type) {
-          case "presence_state": {
-            // Full snapshot on join — exclude ourselves
-            setCollaborators(
-              msg.users
-                .filter((u) => u.user_id !== current_user_id)
-                .map(enrichCollaborator)
-            );
-            break;
-          }
-
-          case "user_joined": {
-            if (msg.user.user_id === current_user_id) break;
-            const new_collaborator = enrichCollaborator(msg.user);
-            setCollaborators((prev) => {
-              // Guard against duplicate join events
-              const exists = prev.some((c) => c.session_id === new_collaborator.session_id);
-              return exists ? prev : [...prev, new_collaborator];
-            });
-            break;
-          }
-
-          case "user_left": {
-            setCollaborators((prev) =>
-              prev.filter((c) => c.session_id !== msg.session_id)
-            );
-            break;
-          }
-
-          case "row_focused": {
-            setCollaborators((prev) =>
-              prev.map((c) =>
-                c.session_id === msg.session_id
-                  ? { ...c, focused_row_id: msg.row_id, focused_col_key: msg.col_key }
-                  : c
-              )
-            );
-            break;
-          }
-
-          case "row_blurred": {
-            setCollaborators((prev) =>
-              prev.map((c) =>
-                c.session_id === msg.session_id
-                  ? { ...c, focused_row_id: null, focused_col_key: null }
-                  : c
-              )
-            );
-            break;
-          }
-
-          case "row_updated": {
-            on_row_updated_ref.current(msg.row, msg.updated_by_session_id);
-            break;
-          }
-
-          case "row_created": {
-            on_row_created_ref.current(msg.row, msg.created_by_session_id);
-            break;
-          }
-
-          case "row_deleted": {
-            on_row_deleted_ref.current(msg.row_id, msg.deleted_by_session_id);
-            break;
-          }
-
-          case "pong":
-            // Heartbeat reply — nothing to do
-            break;
-        }
-      };
-
-      ws.onerror = () => {
-        // onclose fires immediately after onerror; reconnection is handled there
-      };
-
-      ws.onclose = () => {
-        if (ping_timer_ref.current) clearInterval(ping_timer_ref.current);
-        if (is_unmounted_ref.current) return;
-
-        setReadyState("reconnecting");
-        setCollaborators([]);
-
-        // Exponential backoff with a maximum cap
-        const delay = Math.min(
-          RECONNECT_BASE_MS * Math.pow(2, attempt),
-          RECONNECT_MAX_MS
-        );
-        attempt += 1;
-        reconnect_timer_ref.current = setTimeout(connect, delay);
-      };
+    if (!token || !current_user_id) {
+      setReadyState("disconnected");
+      return;
     }
 
-    connect();
+    const echo = getEcho(token);
+
+    // ── Track Pusher connection state ────────────────────────────────────────
+
+    const pusher_connection = (
+      echo.connector as unknown as {
+        pusher: {
+          connection: {
+            state: string;
+            bind: (
+              event: string,
+              handler: (data: { current: string }) => void
+            ) => void;
+            unbind: (
+              event: string,
+              handler: (data: { current: string }) => void
+            ) => void;
+          };
+        };
+      }
+    ).pusher.connection;
+
+    setReadyState(mapConnectionState(pusher_connection.state));
+
+    const handleStateChange = ({ current }: { current: string }) => {
+      setReadyState(mapConnectionState(current));
+    };
+
+    pusher_connection.bind("state_change", handleStateChange);
+
+    // ── Join presence channel ────────────────────────────────────────────────
+
+    const channel = echo.join(CHANNEL_NAME) as unknown as EchoPresenceChannel;
+    channel_ref.current = channel;
+
+    // Initial snapshot — all users currently in the channel
+    channel.here((users: CollaboratorPresence[]) => {
+      setCollaborators(
+        users
+          .filter((u) => u.user_id !== current_user_id)
+          .map(enrichCollaborator)
+      );
+    });
+
+    // A new user joined the channel
+    channel.joining((user: CollaboratorPresence) => {
+      if (user.user_id === current_user_id) return;
+      const new_collaborator = enrichCollaborator(user);
+      setCollaborators((prev) => {
+        const exists = prev.some(
+          (c) => c.session_id === new_collaborator.session_id
+        );
+        return exists ? prev : [...prev, new_collaborator];
+      });
+    });
+
+    // A user left the channel
+    channel.leaving((user: CollaboratorPresence) => {
+      setCollaborators((prev) =>
+        prev.filter((c) => c.session_id !== user.session_id)
+      );
+    });
+
+    // ── Whispers: real-time focus/blur from other tabs ───────────────────────
+
+    channel.listenForWhisper(
+      "row-focus",
+      (data: unknown) => {
+        const { session_id, row_id, col_key } = data as {
+          session_id: string;
+          row_id: string;
+          col_key: string;
+        };
+        setCollaborators((prev) =>
+          prev.map((c) =>
+            c.session_id === session_id
+              ? { ...c, focused_row_id: row_id, focused_col_key: col_key }
+              : c
+          )
+        );
+      }
+    );
+
+    channel.listenForWhisper(
+      "row-blur",
+      (data: unknown) => {
+        const { session_id } = data as { session_id: string };
+        setCollaborators((prev) =>
+          prev.map((c) =>
+            c.session_id === session_id
+              ? { ...c, focused_row_id: null, focused_col_key: null }
+              : c
+          )
+        );
+      }
+    );
+
+    // ── Server events: row CRUD broadcasts ──────────────────────────────────
+
+    channel.listen(
+      ".BacklinkOrderUpdated",
+      (data: unknown) => {
+        const { row, updated_by_session_id } = data as {
+          row: BacklinkOrderRow;
+          updated_by_session_id: string;
+        };
+        on_row_updated_ref.current(row, updated_by_session_id);
+      }
+    );
+
+    channel.listen(
+      ".BacklinkOrderCreated",
+      (data: unknown) => {
+        const { row, created_by_session_id } = data as {
+          row: BacklinkOrderRow;
+          created_by_session_id: string;
+        };
+        on_row_created_ref.current(row, created_by_session_id);
+      }
+    );
+
+    channel.listen(
+      ".BacklinkOrderDeleted",
+      (data: unknown) => {
+        const { row_id, deleted_by_session_id } = data as {
+          row_id: string;
+          deleted_by_session_id: string;
+        };
+        on_row_deleted_ref.current(row_id, deleted_by_session_id);
+      }
+    );
+
+    // ── Cleanup ──────────────────────────────────────────────────────────────
 
     return () => {
-      is_unmounted_ref.current = true;
-      if (reconnect_timer_ref.current) clearTimeout(reconnect_timer_ref.current);
-      if (ping_timer_ref.current) clearInterval(ping_timer_ref.current);
-      ws_ref.current?.close();
-      ws_ref.current = null;
+      pusher_connection.unbind("state_change", handleStateChange);
+      echo.leave(CHANNEL_NAME);
+      channel_ref.current = null;
       setReadyState("disconnected");
       setCollaborators([]);
     };
-  // Intentionally only re-connect when user identity changes.
-  // Callback deps (onRowUpdated etc.) are accessed via stable refs.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    // Intentionally only re-run when user identity changes.
+    // Callback deps (onRowUpdated etc.) are accessed via stable refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current_user_id, current_user_name, current_user_avatar]);
 
   // ── Focus / blur helpers ───────────────────────────────────────────────────
 
-  const sendRowFocus = useCallback(
-    (row_id: string, col_key: string) => {
-      sendMessage({ type: "row_focus", row_id, col_key });
-    },
-    [sendMessage]
-  );
+  const sendRowFocus = useCallback((row_id: string, col_key: string) => {
+    channel_ref.current?.whisper("row-focus", {
+      session_id: local_session_id,
+      row_id,
+      col_key,
+    });
+  }, []);
 
-  const sendRowBlur = useCallback(
-    (row_id: string) => {
-      sendMessage({ type: "row_blur", row_id });
-    },
-    [sendMessage]
-  );
+  const sendRowBlur = useCallback((row_id: string) => {
+    channel_ref.current?.whisper("row-blur", {
+      session_id: local_session_id,
+      row_id,
+    });
+  }, []);
 
-  // ── Derived map: row_id → collaborators editing that row ──────────────────
+  // ── Derived: row_id → collaborators editing that row ──────────────────────
 
-  const row_editors = collaborators.reduce<Map<string, CollaboratorPresence[]>>(
-    (map, c) => {
-      if (c.focused_row_id) {
-        const existing = map.get(c.focused_row_id) ?? [];
-        map.set(c.focused_row_id, [...existing, c]);
-      }
-      return map;
-    },
-    new Map()
+  const row_editors = useMemo(
+    () =>
+      collaborators.reduce<Map<string, CollaboratorPresence[]>>((map, c) => {
+        if (c.focused_row_id) {
+          const existing = map.get(c.focused_row_id) ?? [];
+          map.set(c.focused_row_id, [...existing, c]);
+        }
+        return map;
+      }, new Map()),
+    [collaborators]
   );
 
   return { collaborators, row_editors, ready_state, sendRowFocus, sendRowBlur };
