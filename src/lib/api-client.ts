@@ -74,6 +74,15 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     headers["Authorization"] = `Bearer ${token}`;
   }
 
+  // Forward the tab-scoped session ID so the server can populate
+  // *_by_session_id in broadcast payloads, letting other tabs skip
+  // re-applying mutations they didn't originate.
+  const session_id =
+    typeof window !== "undefined" ? sessionStorage.getItem("bo_session_id") : null;
+  if (session_id) {
+    headers["X-Session-Id"] = session_id;
+  }
+
   const config: RequestInit = {
     ...restOptions,
     headers,

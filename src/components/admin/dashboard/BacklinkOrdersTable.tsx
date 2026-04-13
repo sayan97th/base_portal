@@ -646,52 +646,58 @@ export default function BacklinkOrdersTable() {
   selected_row_id_ref.current = selected_row_id;
 
   // ── Unified row-activity whisper effect ──────────────────────────────────────
-  // Tracks both cell editing (row-focus whisper) and row selection (row-select
-  // whisper) so all other collaborators always see the current user's position.
+  // A single effect watching BOTH editing_cell and selected_row_id avoids the
+  // duplicate row-blur that occurred with two independent effects:
+  //
+  //   Render 1 (input blur fires):  editing_cell → null
+  //     editing effect: blur(prev_row) ✓
+  //   Render 2 (new-cell click fires): editing_cell → {A}, selected → A
+  //     editing effect: focus(A) ✓
+  //     selected effect: blur(prev_row) again ❌  ← the race that caused duplicates
+  //
+  // With one effect the "active row" is derived from both pieces of state at
+  // once, so a single blur is emitted per row transition regardless of which
+  // state variable triggers the render.
 
-  const prev_editing_ref = useRef<{ row_id: string; col_key: string } | null>(null);
-  const prev_selected_ref = useRef<string | null>(null);
+  const prev_activity_ref = useRef<{
+    editing: { row_id: string; col_key: string } | null;
+    selected: string | null;
+  }>({ editing: null, selected: null });
 
-  // Cell editing → sends row-focus / row-blur for the active cell
   useEffect(() => {
-    const prev = prev_editing_ref.current;
+    const prev = prev_activity_ref.current;
 
-    // User moved away from a row or stopped editing entirely → send blur
-    if (prev && (!editing_cell || editing_cell.row_id !== prev.row_id)) {
-      sendRowBlur(prev.row_id);
+    // Editing takes priority: if a cell is focused, that row is "active".
+    // Fall back to the selected row for the click-without-edit case.
+    const prev_row = prev.editing?.row_id ?? prev.selected;
+    const curr_row = editing_cell?.row_id ?? selected_row_id;
+
+    if (prev_row !== curr_row) {
+      // ── Moved to a different row (or left all rows) ──────────────────────
+      // One blur for the old row, always — no matter which state variable
+      // changed first.
+      if (prev_row) sendRowBlur(prev_row);
+
+      if (curr_row) {
+        if (editing_cell) {
+          sendRowFocus(editing_cell.row_id, editing_cell.col_key);
+        } else {
+          sendRowSelect(curr_row);
+        }
+      }
+    } else if (curr_row) {
+      // ── Same row: activity type or column may have changed ───────────────
+      if (editing_cell && editing_cell.col_key !== prev.editing?.col_key) {
+        // Started editing, or tabbed to a different cell in the same row
+        sendRowFocus(editing_cell.row_id, editing_cell.col_key);
+      } else if (!editing_cell && prev.editing) {
+        // Pressed Escape/Enter — stopped editing but still on this row
+        sendRowSelect(curr_row);
+      }
     }
 
-    // User is now editing a cell → send focus with col_key
-    if (editing_cell) {
-      sendRowFocus(editing_cell.row_id, editing_cell.col_key);
-    }
-
-    prev_editing_ref.current = editing_cell;
-  }, [editing_cell, sendRowFocus, sendRowBlur]);
-
-  // Row selection (click without editing) → sends row-select / row-blur
-  useEffect(() => {
-    const prev = prev_selected_ref.current;
-    const curr = selected_row_id;
-
-    if (prev === curr) return;
-
-    // Blur the previous row only if we weren't editing a cell in it
-    // (the cell-editing effect already sends blur in that case)
-    if (prev && editing_cell_ref.current?.row_id !== prev) {
-      sendRowBlur(prev);
-    }
-
-    // Select the new row only if we're not already editing a cell in it
-    // (the cell-editing effect handles that case with a more specific row-focus)
-    if (curr && editing_cell_ref.current?.row_id !== curr) {
-      sendRowSelect(curr);
-    }
-
-    prev_selected_ref.current = curr;
-  // editing_cell is intentionally read from editing_cell_ref (not as a dep)
-  // to avoid spurious row-select whispers whenever the active cell changes.
-  }, [selected_row_id, sendRowSelect, sendRowBlur]);
+    prev_activity_ref.current = { editing: editing_cell, selected: selected_row_id };
+  }, [editing_cell, selected_row_id, sendRowFocus, sendRowBlur, sendRowSelect]);
 
   // ── Fetch ───────────────────────────────────────────────────────────────────
 
