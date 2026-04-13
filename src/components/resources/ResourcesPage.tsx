@@ -397,14 +397,7 @@ export default function ResourcesPage() {
       {/* Client profile navigation */}
       <ClientProfile />
 
-      {/* Resources count badge */}
-      {total > 0 && (
-        <div className="flex items-center justify-end">
-          <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-sm font-medium text-gray-600 dark:border-gray-700 dark:bg-white/5 dark:text-gray-400">
-            {total} {total === 1 ? "resource" : "resources"}
-          </span>
-        </div>
-      )}
+      
 
       {/* Search & Filters */}
       <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/3">
@@ -452,6 +445,15 @@ export default function ResourcesPage() {
           ))}
         </div>
       </div>
+
+      {/* Resources count badge */}
+      {total > 0 && (
+        <div className="flex items-center justify-end">
+          <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-sm font-medium text-gray-600 dark:border-gray-700 dark:bg-white/5 dark:text-gray-400">
+            {total} {total === 1 ? "resource" : "resources"}
+          </span>
+        </div>
+      )}
 
       {/* Error Banner */}
       {error && (
