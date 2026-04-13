@@ -1395,7 +1395,7 @@ export default function BacklinkOrdersTable() {
                             is_editing={is_editing}
                             is_draft={is_new}
                             is_first_col={is_first_col}
-                            primary_editor={is_first_col ? primary_editor : null}
+                            row_editors={is_first_col ? row_collaborators : []}
                             cell_editors={row_collaborators.filter(
                               (c) => c.focused_col_key === col.key
                             )}
