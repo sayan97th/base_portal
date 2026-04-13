@@ -1,73 +1,75 @@
 "use client";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
-// Icons for each navigation tab.
+// ── Tab icons ─────────────────────────────────────────────────────────────────
+
 function DashboardIcon({ active }: { active: boolean }) {
-  const color = active ? "#EC4899" : "currentColor";
+  const color = active ? "#ec3c89" : "currentColor";
   return (
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
-      <rect x="1" y="1" width="5.5" height="5.5" rx="1.5" stroke={color} strokeWidth="1.4" />
-      <rect x="8.5" y="1" width="5.5" height="5.5" rx="1.5" stroke={color} strokeWidth="1.4" />
-      <rect x="1" y="8.5" width="5.5" height="5.5" rx="1.5" stroke={color} strokeWidth="1.4" />
-      <rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1.5" stroke={color} strokeWidth="1.4" />
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.5" stroke={color} strokeWidth="1.4" />
+      <rect x="9"   y="1.5" width="5.5" height="5.5" rx="1.5" stroke={color} strokeWidth="1.4" />
+      <rect x="1.5" y="9"   width="5.5" height="5.5" rx="1.5" stroke={color} strokeWidth="1.4" />
+      <rect x="9"   y="9"   width="5.5" height="5.5" rx="1.5" stroke={color} strokeWidth="1.4" />
     </svg>
   );
 }
 
 function LinkBuildingIcon({ active }: { active: boolean }) {
-  const color = active ? "#EC4899" : "currentColor";
+  const color = active ? "#ec3c89" : "currentColor";
   return (
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
       <path
-        d="M8.5 6.5L6.5 8.5M9.5 4.5a2.828 2.828 0 010 4L8 10a2.828 2.828 0 01-4-4L5.5 4.5"
-        stroke={color}
-        strokeWidth="1.4"
-        strokeLinecap="round"
+        d="M9.5 2.5a3.5 3.5 0 010 4.95L8.5 8.4"
+        stroke={color} strokeWidth="1.4" strokeLinecap="round"
       />
       <path
-        d="M5.5 10.5a2.828 2.828 0 000-4L7 5a2.828 2.828 0 014 4L9.5 10.5"
-        stroke={color}
-        strokeWidth="1.4"
-        strokeLinecap="round"
+        d="M6.5 13.5a3.5 3.5 0 010-4.95L7.5 7.6"
+        stroke={color} strokeWidth="1.4" strokeLinecap="round"
+      />
+      <path
+        d="M10 6L6 10"
+        stroke={color} strokeWidth="1.4" strokeLinecap="round"
       />
     </svg>
   );
 }
 
 function ResourcesIcon({ active }: { active: boolean }) {
-  const color = active ? "#EC4899" : "currentColor";
+  const color = active ? "#ec3c89" : "currentColor";
   return (
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
-      <rect x="2" y="1.5" width="11" height="12" rx="1.5" stroke={color} strokeWidth="1.4" />
-      <path d="M5 5h5M5 7.5h5M5 10h3" stroke={color} strokeWidth="1.3" strokeLinecap="round" />
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <rect x="2.5" y="1.5" width="11" height="13" rx="1.5" stroke={color} strokeWidth="1.4" />
+      <path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3" stroke={color} strokeWidth="1.3" strokeLinecap="round" />
     </svg>
   );
 }
 
 function ToolsIcon({ active }: { active: boolean }) {
-  const color = active ? "#EC4899" : "currentColor";
+  const color = active ? "#ec3c89" : "currentColor";
   return (
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
       <path
-        d="M12.5 2.5L10 5M10 5l1.5 1.5L13.5 4 12.5 2.5ZM10 5L5.5 9.5M5.5 9.5L4 8 1 11l2.5 2.5 3-3L5.5 9.5ZM5.5 9.5L4 11"
-        stroke={color}
-        strokeWidth="1.3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+        d="M13.5 2.5L11 5M11 5l1.5 1.5L15 4l-1.5-1.5ZM11 5L6.5 9.5M6.5 9.5L5 8 2 11l2.5 2.5L7 11l-.5-1.5ZM6.5 9.5L5 11"
+        stroke={color} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"
       />
     </svg>
   );
 }
 
-// Navigation tab definitions.
+// ── Navigation tabs ───────────────────────────────────────────────────────────
+
 const nav_tabs = [
-  { label: "Dashboard", href: "/", icon: DashboardIcon },
-  { label: "Link Building", href: "/link-building", icon: LinkBuildingIcon },
-  { label: "Resources", href: "/resources", icon: ResourcesIcon },
-  { label: "Tools", href: "/tools", icon: ToolsIcon },
+  { label: "Overview",  href: "/",              icon: DashboardIcon    },
+  { label: "Products",  href: "/link-building", icon: LinkBuildingIcon },
+  { label: "Resources", href: "/resources",     icon: ResourcesIcon    },
+  { label: "Tools",     href: "/tools",         icon: ToolsIcon        },
 ];
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function ClientProfile() {
   const pathname = usePathname();
@@ -83,34 +85,43 @@ export default function ClientProfile() {
     .map((w: string) => w.charAt(0).toUpperCase())
     .join("");
 
-  // Dashboard tab is active only on "/"; all others match by prefix.
+  // Dashboard tab is only active on the exact root; all others match by prefix.
   const getIsActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
-      {/* Client info row */}
-      <div className="flex items-center justify-between gap-4 px-5 pt-5 sm:px-6 sm:pt-6">
-        <div className="flex items-center gap-3">
-          {/* Logo / initials avatar */}
+    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
+
+      {/* Top gradient accent stripe */}
+      <div className="h-[3px] bg-linear-to-r from-brand-400 via-brand-500 to-coral-500" />
+
+      {/* ── Client info row ── */}
+      <div className="flex items-center justify-between gap-4 px-5 py-4 sm:px-6">
+
+        {/* Avatar + name / email */}
+        <div className="flex min-w-0 items-center gap-3.5">
           {user?.organization?.icon_light ? (
-            <img
-              src={user.organization.icon_light}
-              alt={org_name}
-              className="h-11 w-11 rounded-xl object-contain ring-1 ring-gray-100 dark:ring-white/10"
-            />
+            <div className="h-11 w-11 shrink-0 overflow-hidden rounded-xl ring-2 ring-brand-100 dark:ring-brand-500/20">
+              <Image
+                src={user.organization.icon_light}
+                alt={org_name}
+                width={44}
+                height={44}
+                className="h-full w-full object-contain"
+              />
+            </div>
           ) : (
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-coral-400 to-coral-600 text-base font-bold text-white shadow-sm">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-brand-400 to-brand-600 text-sm font-bold text-white">
               {initials || "C"}
-            </span>
+            </div>
           )}
 
-          <div>
-            <h2 className="text-[15px] font-semibold leading-tight text-gray-900 dark:text-white/90">
+          <div className="min-w-0">
+            <h2 className="truncate text-sm font-semibold text-gray-900 dark:text-white/90">
               {org_name}
             </h2>
             {user?.email && (
-              <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
+              <p className="mt-0.5 truncate text-xs text-gray-400 dark:text-gray-500">
                 {user.email}
               </p>
             )}
@@ -120,22 +131,20 @@ export default function ClientProfile() {
         {/* Place Order CTA */}
         <Link
           href="/link-building"
-          className="hidden items-center gap-1.5 rounded-lg bg-coral-500 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-coral-600 sm:flex"
+          className="hidden shrink-0 items-center gap-2 rounded-xl bg-brand-500 px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-brand-600 sm:flex"
         >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true">
             <path
-              d="M6 1.5v9M1.5 6h9"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
+              d="M5.5 1v9M1 5.5h9"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round"
             />
           </svg>
           Place Order
         </Link>
       </div>
 
-      {/* Navigation tabs */}
-      <div className="mt-4 flex overflow-x-auto border-b border-gray-100 px-5 dark:border-gray-800 sm:px-6">
+      {/* ── Navigation tabs ── */}
+      <div className="flex overflow-x-auto border-t border-gray-100 px-3 dark:border-gray-800 sm:px-4">
         {nav_tabs.map((tab) => {
           const is_active = getIsActive(tab.href);
           const Icon = tab.icon;
@@ -143,17 +152,21 @@ export default function ClientProfile() {
             <Link
               key={tab.label}
               href={tab.href}
-              className={`relative flex shrink-0 items-center gap-1.5 px-3 py-3 text-[13px] font-medium transition-colors focus-visible:outline-none ${
-                is_active
-                  ? "text-coral-500"
+              className={`
+                relative flex shrink-0 items-center gap-2 rounded-none px-3 py-3.5
+                text-[13px] font-medium transition-colors focus-visible:outline-none
+                ${is_active
+                  ? "text-brand-500 dark:text-brand-400"
                   : "text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-              }`}
+                }
+              `}
             >
               <Icon active={is_active} />
               {tab.label}
-              {/* Active underline indicator */}
+
+              {/* Active underline */}
               {is_active && (
-                <span className="absolute inset-x-0 bottom-0 h-[2px] rounded-t-full bg-coral-500" />
+                <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-t-full bg-brand-500 dark:bg-brand-400" />
               )}
             </Link>
           );
