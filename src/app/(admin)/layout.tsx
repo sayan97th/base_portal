@@ -46,7 +46,7 @@ export default function AdminLayout({
         <AdminSidebar />
         <Backdrop />
         <div
-          className={`flex-1 transition-all duration-300 ease-in-out ${main_content_margin}`}
+          className={`flex-1 min-w-0 overflow-x-hidden transition-all duration-300 ease-in-out ${main_content_margin}`}
         >
           <AppHeader />
           <div className="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">

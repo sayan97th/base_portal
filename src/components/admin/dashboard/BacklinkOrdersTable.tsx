@@ -1204,7 +1204,7 @@ export default function BacklinkOrdersTable() {
       {is_loading ? (
         <TableSkeleton />
       ) : (
-        <div className="overflow-x-auto">
+        <div className="w-full min-w-0 overflow-x-auto">
           <table className="min-w-full border-collapse text-xs">
             <thead>
               <tr>
@@ -1328,8 +1328,10 @@ export default function BacklinkOrdersTable() {
                     </th>
                   );
                 })}
-                <th className="border border-gray-700/30 bg-gray-800 px-2 py-2 text-center text-xs font-semibold text-white">
-                  <span className="sr-only">Row actions</span>
+                <th
+                  aria-label="Row actions"
+                  className="w-px border border-gray-700/30 bg-gray-800 px-2 py-2 text-center text-xs font-semibold text-white"
+                >
                   <svg className="mx-auto h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
                   </svg>
@@ -1413,7 +1415,7 @@ export default function BacklinkOrdersTable() {
                         );
                       })}
                       {/* Actions cell */}
-                      <td className="border-l border-gray-100 px-2 py-1.5 dark:border-gray-800">
+                      <td className="w-px whitespace-nowrap border-l border-gray-100 px-2 py-1.5 dark:border-gray-800">
                         {is_saving ? (
                           <div className="flex items-center justify-center">
                             <svg
@@ -1426,7 +1428,7 @@ export default function BacklinkOrdersTable() {
                             </svg>
                           </div>
                         ) : (
-                          <div className="flex items-center justify-end gap-1.5">
+                          <div className="flex items-center justify-end gap-1">
                             {/* Collaborator presence badges — show who is editing / has selected this row */}
                             {row_collaborators.length > 0 && (
                               <RowPresenceIndicator editors={row_collaborators} />
@@ -1434,18 +1436,27 @@ export default function BacklinkOrdersTable() {
                             {is_new && (() => {
                               const missing = getRowMissingRequired(row);
                               return missing.length > 0 ? (
+                                /* Draft: missing required fields — compact warning icon + count badge */
                                 <span
-                                  className="cursor-default rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                                  className="flex cursor-default items-center gap-0.5"
                                   title={`Draft — fill required fields to save:\n• ${missing.join("\n• ")}`}
                                 >
-                                  Draft · {missing.length} required
+                                  <svg className="h-3.5 w-3.5 shrink-0 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                  </svg>
+                                  <span className="min-w-[1ch] text-[10px] font-semibold leading-none text-amber-600 dark:text-amber-400">
+                                    {missing.length}
+                                  </span>
                                 </span>
                               ) : (
+                                /* Draft: all required fields filled — compact ready icon */
                                 <span
-                                  className="cursor-default rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                                  className="flex cursor-default items-center"
                                   title="All required fields filled — will save on next edit"
                                 >
-                                  Ready to save
+                                  <svg className="h-3.5 w-3.5 shrink-0 text-blue-500 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
                                 </span>
                               );
                             })()}
