@@ -109,6 +109,7 @@ const sidebar_sections: SidebarSection[] = [
       { name: "Invoices", icon: <DollarLineIcon />, path: "/invoices" },
       { name: "Support", icon: <ChatIcon />, path: "/support" },
       { name: "Schedule a Call", icon: <CalenderIcon />, path: "/schedule-a-call" },
+      { name: "Book an Appointment", icon: <CalenderIcon />, path: "/client-calendly" },
     ],
   },
 ];
