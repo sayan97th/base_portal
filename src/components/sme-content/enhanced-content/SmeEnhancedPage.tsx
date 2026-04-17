@@ -12,7 +12,7 @@ import {
   SmeEnhancedTier,
 } from "@/services/client/sme-enhanced.service";
 
-const CALENDLY_URL = "https://calendly.com/ernesto-97thfloor/30min";
+const CALENDLY_URL = "https://calendly.com/abbyallan/sme-content";
 
 type Step = "selection" | "schedule";
 
