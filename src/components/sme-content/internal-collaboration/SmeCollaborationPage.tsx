@@ -155,7 +155,7 @@ const SmeCollaborationPage: React.FC = () => {
         {current_step === "schedule" && (
           <>
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                 Schedule Your Consultation
               </h2>
               <p className="mt-1 text-sm text-gray-500">
