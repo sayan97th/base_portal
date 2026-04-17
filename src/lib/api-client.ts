@@ -2,6 +2,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8
 
 type RequestOptions = Omit<RequestInit, "body"> & {
   body?: unknown;
+  responseType?: "json" | "blob";
 };
 
 function getToken(): string | null {
@@ -61,7 +62,7 @@ async function tryRefreshToken(): Promise<string | null> {
 }
 
 async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
-  const { body, headers: customHeaders, ...restOptions } = options;
+  const { body, responseType, headers: customHeaders, ...restOptions } = options;
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -119,6 +120,10 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
 
   if (response.status === 204 || response.headers.get("content-length") === "0") {
     return undefined as T;
+  }
+
+  if (responseType === "blob") {
+    return response.blob() as Promise<T>;
   }
 
   return response.json();
