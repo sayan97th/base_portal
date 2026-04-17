@@ -31,7 +31,7 @@ const CalendlyWidget: React.FC<CalendlyWidgetProps> = ({
     <div className="w-full overflow-hidden rounded-xl border border-gray-100 shadow-sm">
       <InlineWidget
         url={calendly_url}
-        styles={{ minWidth: "350px", height: "700px" }}
+        styles={{ minWidth: "350px", height: "900px" }}
       />
     </div>
   );
