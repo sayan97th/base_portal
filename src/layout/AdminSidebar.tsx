@@ -145,6 +145,7 @@ const admin_sidebar_sections: SidebarSection[] = [
           { name: "Authored", path: "/admin/sme-content/authored" },
           { name: "Collaboration", path: "/admin/sme-content/collaboration" },
           { name: "Enhanced", path: "/admin/sme-content/enhanced" },
+          { name: "Appointments", path: "/admin/sme-appointments" },
         ],
       },
       {
