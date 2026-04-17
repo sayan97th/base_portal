@@ -640,34 +640,7 @@ export default function AdminSmeAppointmentDetail({ appointment_id }: AdminSmeAp
               </div>
             </div>
 
-            {/* Quick actions */}
-            {available_transitions.length > 0 && (
-              <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-                <div className="border-b border-gray-100 px-5 py-4 dark:border-gray-800">
-                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Quick Actions</h2>
-                </div>
-                <div className="space-y-2 p-5">
-                  {available_transitions.map((next_status) => {
-                    const next_cfg = STATUS_CONFIG[next_status];
-                    const is_danger = next_status === "cancelled";
-                    return (
-                      <button
-                        key={next_status}
-                        onClick={() => { setStatusModalTarget(next_status); setModalAdminNotes(""); }}
-                        className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
-                          is_danger
-                            ? "border border-error-100 bg-error-50 text-error-700 hover:bg-error-100 dark:border-error-700/20 dark:bg-error-500/10 dark:text-error-400 dark:hover:bg-error-500/20"
-                            : "border border-success-100 bg-success-50 text-success-700 hover:bg-success-100 dark:border-success-700/20 dark:bg-success-500/10 dark:text-success-400 dark:hover:bg-success-500/20"
-                        }`}
-                      >
-                        <span className={`h-2 w-2 rounded-full ${next_cfg.dot}`} />
-                        Mark as {next_cfg.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            
           </div>
         </div>
       </div>

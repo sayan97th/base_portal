@@ -10,9 +10,9 @@ import type {
   AppointmentServiceType,
   AppointmentSortField,
   SortDirection,
-  AppointmentStats,
 } from "@/services/admin/sme-appointment.service";
 import { useDebounce } from "@/hooks/useDebounce";
+import FilterDatePicker from "@/components/admin/users/FilterDatePicker";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -107,47 +107,10 @@ function SortIcon({
   );
 }
 
-interface StatCardProps {
-  label: string;
-  value: number;
-  dot_color: string;
-  is_active: boolean;
-  onClick: () => void;
-}
-
-function StatCard({ label, value, dot_color, is_active, onClick }: StatCardProps) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex items-center gap-3 rounded-2xl border p-4 text-left transition-all ${
-        is_active
-          ? "border-brand-200 bg-brand-50 dark:border-brand-500/30 dark:bg-brand-500/10"
-          : "border-gray-200 bg-white hover:border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700"
-      }`}
-    >
-      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dot_color}`} />
-      <div className="flex-1 min-w-0">
-        <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-          {label}
-        </p>
-        <p className="mt-0.5 text-2xl font-bold text-gray-900 dark:text-white">
-          {value}
-        </p>
-      </div>
-      {is_active && (
-        <svg className="h-4 w-4 shrink-0 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      )}
-    </button>
-  );
-}
-
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function AdminSmeAppointmentsContent() {
   const [appointments, setAppointments] = useState<AdminAppointment[]>([]);
-  const [stats, setStats] = useState<AppointmentStats | null>(null);
   const [is_loading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -178,19 +141,6 @@ export default function AdminSmeAppointmentsContent() {
       setIsLoading(false);
     }
   }, []);
-
-  const fetchStats = useCallback(async () => {
-    try {
-      const data = await adminSmeAppointmentService.fetchStats();
-      setStats(data);
-    } catch {
-      // stats are non-critical
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
 
   useEffect(() => {
     fetchAppointments({
@@ -244,14 +194,6 @@ export default function AdminSmeAppointmentsContent() {
   const has_active_filters =
     !!search_input || !!status_filter || !!service_type_filter || !!date_from || !!date_to;
 
-  const stat_cards = [
-    { label: "Total", value: stats?.total ?? 0, dot_color: "bg-gray-400", status_value: "" as const },
-    { label: "Pending", value: stats?.pending ?? 0, dot_color: "bg-warning-500", status_value: "pending" as AppointmentStatus },
-    { label: "Confirmed", value: stats?.confirmed ?? 0, dot_color: "bg-success-500", status_value: "confirmed" as AppointmentStatus },
-    { label: "Completed", value: stats?.completed ?? 0, dot_color: "bg-blue-500", status_value: "completed" as AppointmentStatus },
-    { label: "Cancelled", value: stats?.cancelled ?? 0, dot_color: "bg-error-500", status_value: "cancelled" as AppointmentStatus },
-  ];
-
   return (
     <div className="space-y-6">
       {/* Page header */}
@@ -264,20 +206,6 @@ export default function AdminSmeAppointmentsContent() {
             {total > 0 ? `${total} total appointments` : "Manage all Subject Matter Expert appointments"}
           </p>
         </div>
-      </div>
-
-      {/* Stats strip */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {stat_cards.map((card) => (
-          <StatCard
-            key={card.label}
-            label={card.label}
-            value={card.value}
-            dot_color={card.dot_color}
-            is_active={status_filter === card.status_value}
-            onClick={() => handleStatusFilter(card.status_value)}
-          />
-        ))}
       </div>
 
       {/* Filters bar */}
@@ -321,27 +249,27 @@ export default function AdminSmeAppointmentsContent() {
           <option value="enhanced">Enhanced</option>
         </select>
 
-        {/* Date from */}
-        <input
-          type="date"
+        {/* Date range */}
+        <FilterDatePicker
+          id="date-from"
+          placeholder="From date"
           value={date_from}
-          onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
-          className="h-10 rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-700 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
-          title="From date"
+          max_date={date_to || undefined}
+          on_change={(v) => { setDateFrom(v); setPage(1); }}
         />
         <span className="text-xs text-gray-400">–</span>
-        <input
-          type="date"
+        <FilterDatePicker
+          id="date-to"
+          placeholder="To date"
           value={date_to}
-          onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
-          className="h-10 rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-700 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
-          title="To date"
+          min_date={date_from || undefined}
+          on_change={(v) => { setDateTo(v); setPage(1); }}
         />
 
         {has_active_filters && (
           <button
             onClick={handleClearFilters}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium text-gray-500 transition-colors hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-600 transition-colors hover:border-rose-300 hover:bg-rose-100 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-400 dark:hover:bg-rose-500/20"
           >
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
