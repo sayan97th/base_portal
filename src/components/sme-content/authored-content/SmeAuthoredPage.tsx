@@ -70,7 +70,7 @@ const SmeAuthoredPage: React.FC = () => {
   };
 
   const handleFinish = () => {
-    router.push("/sme-content");
+    router.push("/sme-content/authored-content");
   };
 
   const handleEventScheduled = useCallback(

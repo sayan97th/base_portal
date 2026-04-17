@@ -70,7 +70,7 @@ const SmeEnhancedPage: React.FC = () => {
   };
 
   const handleFinish = () => {
-    router.push("/sme-content");
+    router.push("/sme-content/enhanced-content");
   };
 
   const handleEventScheduled = useCallback(

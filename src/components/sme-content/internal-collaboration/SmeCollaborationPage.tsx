@@ -70,7 +70,7 @@ const SmeCollaborationPage: React.FC = () => {
   };
 
   const handleFinish = () => {
-    router.push("/sme-content");
+    router.push("/sme-content/internal-collaboration");
   };
 
   const handleEventScheduled = useCallback(
