@@ -1,40 +1,51 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import flatpickr from "flatpickr";
+import type { Instance } from "flatpickr/dist/types/instance";
+import "flatpickr/dist/flatpickr.css";
 import { adminSmeAppointmentService } from "@/services/admin/sme-appointment.service";
 import type {
   AdminAppointment,
   AppointmentStatus,
-  UpdateAppointmentStatusPayload,
+  UpdateAppointmentPayload,
 } from "@/services/admin/sme-appointment.service";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<
   AppointmentStatus,
-  { label: string; badge: string; dot: string }
+  { label: string; badge: string; dot: string; pill_active: string; pill_idle: string }
 > = {
   pending: {
     label: "Pending",
     badge: "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400",
     dot: "bg-warning-500",
+    pill_active: "border-warning-400 bg-warning-50 text-warning-700 dark:border-warning-500/50 dark:bg-warning-500/10 dark:text-warning-400",
+    pill_idle: "border-gray-200 bg-white text-gray-600 hover:border-warning-300 hover:bg-warning-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400",
   },
   confirmed: {
     label: "Confirmed",
     badge: "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400",
     dot: "bg-success-500",
+    pill_active: "border-success-400 bg-success-50 text-success-700 dark:border-success-500/50 dark:bg-success-500/10 dark:text-success-400",
+    pill_idle: "border-gray-200 bg-white text-gray-600 hover:border-success-300 hover:bg-success-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400",
   },
   cancelled: {
     label: "Cancelled",
     badge: "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400",
     dot: "bg-error-500",
+    pill_active: "border-error-400 bg-error-50 text-error-700 dark:border-error-500/50 dark:bg-error-500/10 dark:text-error-400",
+    pill_idle: "border-gray-200 bg-white text-gray-600 hover:border-error-300 hover:bg-error-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400",
   },
   completed: {
     label: "Completed",
     badge: "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400",
     dot: "bg-blue-500",
+    pill_active: "border-blue-400 bg-blue-50 text-blue-700 dark:border-blue-500/50 dark:bg-blue-500/10 dark:text-blue-400",
+    pill_idle: "border-gray-200 bg-white text-gray-600 hover:border-blue-300 hover:bg-blue-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400",
   },
 };
 
@@ -100,75 +111,207 @@ function SkeletonLoader() {
   );
 }
 
-// ── Status update modal ────────────────────────────────────────────────────────
+// ── DateTimePicker ─────────────────────────────────────────────────────────────
 
-interface StatusModalProps {
-  current_status: AppointmentStatus;
-  target_status: AppointmentStatus;
+function DateTimePickerInput({
+  value,
+  on_change,
+}: {
+  value: string;
+  on_change: (iso: string) => void;
+}) {
+  const input_ref = useRef<HTMLInputElement>(null);
+  const fp_ref = useRef<Instance | null>(null);
+
+  useEffect(() => {
+    if (!input_ref.current) return;
+    fp_ref.current = flatpickr(input_ref.current, {
+      enableTime: true,
+      dateFormat: "M j, Y h:i K",
+      disableMobile: true,
+      onChange: (dates) => {
+        if (!dates.length) { on_change(""); return; }
+        on_change(dates[0].toISOString());
+      },
+    }) as Instance;
+    return () => { fp_ref.current?.destroy(); fp_ref.current = null; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!fp_ref.current) return;
+    if (!value) { fp_ref.current.clear(); return; }
+    const target = new Date(value);
+    const current = fp_ref.current.selectedDates[0];
+    if (!current || Math.abs(current.getTime() - target.getTime()) > 60000) {
+      fp_ref.current.setDate(target, false);
+    }
+  }, [value]);
+
+  function handleClear(e: React.MouseEvent) {
+    e.stopPropagation();
+    fp_ref.current?.clear();
+    on_change("");
+  }
+
+  return (
+    <div className="relative">
+      <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400">
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      </div>
+      <input
+        ref={input_ref}
+        readOnly
+        placeholder="Select date & time…"
+        className="h-10 w-full cursor-pointer rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-8 text-sm text-gray-700 placeholder-gray-400 outline-none transition focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:placeholder-gray-500 dark:focus:border-brand-400 dark:focus:bg-gray-900"
+      />
+      {value && (
+        <button
+          type="button"
+          onClick={handleClear}
+          className="absolute inset-y-0 right-2 flex items-center text-gray-400 transition hover:text-gray-600 dark:hover:text-gray-300"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── Appointment update modal ───────────────────────────────────────────────────
+
+interface UpdateModalProps {
+  appointment: AdminAppointment;
+  modal_status: AppointmentStatus | "";
+  modal_scheduled_at: string;
+  modal_admin_notes: string;
   is_saving: boolean;
-  admin_notes: string;
-  onNotesChange: (value: string) => void;
+  onStatusChange: (s: AppointmentStatus | "") => void;
+  onScheduledAtChange: (v: string) => void;
+  onNotesChange: (v: string) => void;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
-function StatusUpdateModal({
-  current_status,
-  target_status,
+function AppointmentUpdateModal({
+  appointment,
+  modal_status,
+  modal_scheduled_at,
+  modal_admin_notes,
   is_saving,
-  admin_notes,
+  onStatusChange,
+  onScheduledAtChange,
   onNotesChange,
   onConfirm,
   onCancel,
-}: StatusModalProps) {
-  const target_cfg = STATUS_CONFIG[target_status];
-  const is_cancelling = target_status === "cancelled";
+}: UpdateModalProps) {
+  const current_cfg = STATUS_CONFIG[appointment.status];
+  const available_transitions = STATUS_TRANSITIONS[appointment.status];
 
   return (
     <div className="fixed inset-0 z-99999 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-900">
-        <div className="p-6">
-          <div className={`flex h-12 w-12 items-center justify-center rounded-full ${is_cancelling ? "bg-error-50 dark:bg-error-500/10" : "bg-success-50 dark:bg-success-500/10"}`}>
-            {is_cancelling ? (
-              <svg className="h-6 w-6 text-error-600 dark:text-error-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            ) : (
-              <svg className="h-6 w-6 text-success-600 dark:text-success-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+      <div className="relative w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-900">
+        {/* Header */}
+        <div className="flex items-center gap-3 border-b border-gray-100 px-6 py-5 dark:border-gray-800">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 dark:bg-brand-500/10">
+            <svg className="h-5 w-5 text-brand-600 dark:text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+              Update Appointment
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Appointment #{appointment.id} &middot; currently{" "}
+              <span className={`font-medium ${current_cfg.badge.split(" ")[1]}`}>
+                {current_cfg.label}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-5 px-6 py-5">
+          {/* Status section */}
+          {available_transitions.length > 0 && (
+            <div>
+              <p className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                Change Status
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {/* Current status as default option */}
+                <button
+                  type="button"
+                  onClick={() => onStatusChange("")}
+                  className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-sm font-medium transition-all ${
+                    modal_status === ""
+                      ? current_cfg.pill_active
+                      : current_cfg.pill_idle
+                  }`}
+                >
+                  <span className={`h-2 w-2 rounded-full ${current_cfg.dot}`} />
+                  {current_cfg.label}
+                </button>
+
+                {available_transitions.map((s) => {
+                  const cfg = STATUS_CONFIG[s];
+                  const is_selected = modal_status === s;
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => onStatusChange(s)}
+                      className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-sm font-medium transition-all ${
+                        is_selected ? cfg.pill_active : cfg.pill_idle
+                      }`}
+                    >
+                      <span className={`h-2 w-2 rounded-full ${cfg.dot}`} />
+                      {cfg.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Scheduled At section */}
+          <div>
+            <p className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              Scheduled Date &amp; Time
+            </p>
+            <DateTimePickerInput
+              value={modal_scheduled_at}
+              on_change={onScheduledAtChange}
+            />
+            {!modal_scheduled_at && (
+              <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
+                Leave empty to keep the current value unchanged.
+              </p>
             )}
           </div>
-          <h3 className="mt-4 text-base font-semibold text-gray-900 dark:text-white">
-            Update status to{" "}
-            <span className={`capitalize ${is_cancelling ? "text-error-600 dark:text-error-400" : "text-success-600 dark:text-success-400"}`}>
-              {target_cfg.label}
-            </span>
-          </h3>
-          <p className="mt-1.5 text-sm text-gray-500 dark:text-gray-400">
-            This will change the appointment status from{" "}
-            <span className="font-medium capitalize text-gray-700 dark:text-gray-300">
-              {STATUS_CONFIG[current_status].label}
-            </span>{" "}
-            to{" "}
-            <span className="font-medium capitalize text-gray-700 dark:text-gray-300">
-              {target_cfg.label}
-            </span>.
-          </p>
-          <div className="mt-4">
-            <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
-              Admin notes <span className="font-normal text-gray-400">(optional)</span>
+
+          {/* Admin notes */}
+          <div>
+            <label className="mb-2.5 block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              Admin Notes{" "}
+              <span className="font-normal normal-case text-gray-400">(optional)</span>
             </label>
             <textarea
-              value={admin_notes}
+              value={modal_admin_notes}
               onChange={(e) => onNotesChange(e.target.value)}
               rows={3}
-              placeholder="Add internal notes for this status change..."
-              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 transition-colors focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500 dark:focus:bg-gray-800"
+              placeholder="Add internal notes for this update…"
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 transition-colors focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500 dark:focus:bg-gray-800"
             />
           </div>
         </div>
+
+        {/* Footer */}
         <div className="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4 dark:border-gray-800">
           <button
             onClick={onCancel}
@@ -180,11 +323,7 @@ function StatusUpdateModal({
           <button
             onClick={onConfirm}
             disabled={is_saving}
-            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 ${
-              is_cancelling
-                ? "bg-error-600 hover:bg-error-700"
-                : "bg-success-600 hover:bg-success-700"
-            }`}
+            className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
           >
             {is_saving && (
               <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -192,7 +331,7 @@ function StatusUpdateModal({
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
               </svg>
             )}
-            Confirm
+            Save Changes
           </button>
         </div>
       </div>
@@ -265,10 +404,12 @@ export default function AdminSmeAppointmentDetail({ appointment_id }: AdminSmeAp
   const [is_loading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [status_modal_target, setStatusModalTarget] = useState<AppointmentStatus | null>(null);
+  const [show_update_modal, setShowUpdateModal] = useState(false);
+  const [modal_status, setModalStatus] = useState<AppointmentStatus | "">("");
+  const [modal_scheduled_at, setModalScheduledAt] = useState("");
   const [modal_admin_notes, setModalAdminNotes] = useState("");
-  const [is_saving_status, setIsSavingStatus] = useState(false);
-  const [status_success, setStatusSuccess] = useState<string | null>(null);
+  const [is_saving, setIsSaving] = useState(false);
+  const [update_success, setUpdateSuccess] = useState<string | null>(null);
 
   const [show_delete_modal, setShowDeleteModal] = useState(false);
   const [is_deleting, setIsDeleting] = useState(false);
@@ -290,24 +431,43 @@ export default function AdminSmeAppointmentDetail({ appointment_id }: AdminSmeAp
     fetchAppointment();
   }, [fetchAppointment]);
 
-  async function handleStatusConfirm() {
-    if (!appointment || !status_modal_target) return;
-    setIsSavingStatus(true);
+  function openUpdateModal() {
+    if (!appointment) return;
+    setModalStatus("");
+    setModalScheduledAt(appointment.scheduled_at ?? "");
+    setModalAdminNotes("");
+    setShowUpdateModal(true);
+  }
+
+  function closeUpdateModal() {
+    setShowUpdateModal(false);
+    setModalStatus("");
+    setModalScheduledAt("");
+    setModalAdminNotes("");
+  }
+
+  async function handleUpdateConfirm() {
+    if (!appointment) return;
+    setIsSaving(true);
     try {
-      const payload: UpdateAppointmentStatusPayload = {
-        status: status_modal_target,
-        admin_notes: modal_admin_notes || undefined,
-      };
-      const updated = await adminSmeAppointmentService.updateAppointmentStatus(appointment.id, payload);
+      const payload: UpdateAppointmentPayload = {};
+      if (modal_status) payload.status = modal_status;
+      if (modal_scheduled_at) payload.scheduled_at = modal_scheduled_at;
+      if (modal_admin_notes) payload.admin_notes = modal_admin_notes;
+
+      const updated = await adminSmeAppointmentService.updateAppointment(appointment.id, payload);
       setAppointment(updated);
-      setStatusSuccess(`Status updated to ${STATUS_CONFIG[status_modal_target].label}`);
-      setTimeout(() => setStatusSuccess(null), 4000);
+
+      const parts: string[] = [];
+      if (modal_status) parts.push(`status → ${STATUS_CONFIG[modal_status].label}`);
+      if (modal_scheduled_at) parts.push("scheduled date updated");
+      setUpdateSuccess(parts.length ? parts.join(" · ") : "Appointment updated");
+      setTimeout(() => setUpdateSuccess(null), 4000);
     } catch {
-      setError("Failed to update status. Please try again.");
+      setError("Failed to update appointment. Please try again.");
     } finally {
-      setIsSavingStatus(false);
-      setStatusModalTarget(null);
-      setModalAdminNotes("");
+      setIsSaving(false);
+      closeUpdateModal();
     }
   }
 
@@ -379,24 +539,20 @@ export default function AdminSmeAppointmentDetail({ appointment_id }: AdminSmeAp
 
           {/* Action buttons */}
           <div className="flex flex-wrap items-center gap-2">
-            {available_transitions.map((next_status) => {
-              const next_cfg = STATUS_CONFIG[next_status];
-              const is_danger = next_status === "cancelled";
-              return (
-                <button
-                  key={next_status}
-                  onClick={() => { setStatusModalTarget(next_status); setModalAdminNotes(""); }}
-                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
-                    is_danger
-                      ? "border border-error-200 bg-error-50 text-error-700 hover:bg-error-100 dark:border-error-700/30 dark:bg-error-500/10 dark:text-error-400 dark:hover:bg-error-500/20"
-                      : "border border-success-200 bg-success-50 text-success-700 hover:bg-success-100 dark:border-success-700/30 dark:bg-success-500/10 dark:text-success-400 dark:hover:bg-success-500/20"
-                  }`}
-                >
-                  <span className={`h-2 w-2 rounded-full ${next_cfg.dot}`} />
-                  Mark as {next_cfg.label}
-                </button>
-              );
-            })}
+            <button
+              onClick={openUpdateModal}
+              className="inline-flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-2 text-sm font-medium text-brand-700 transition-colors hover:bg-brand-100 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400 dark:hover:bg-brand-500/20"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+              </svg>
+              Update Appointment
+              {available_transitions.length > 0 && (
+                <span className="rounded-full bg-brand-200 px-1.5 py-0.5 text-xs font-semibold text-brand-700 dark:bg-brand-500/30 dark:text-brand-300">
+                  {available_transitions.length}
+                </span>
+              )}
+            </button>
             <button
               onClick={() => setShowDeleteModal(true)}
               className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium text-gray-500 transition-colors hover:border-error-200 hover:bg-error-50 hover:text-error-600 dark:border-gray-700 dark:text-gray-400 dark:hover:border-error-700/30 dark:hover:bg-error-500/10 dark:hover:text-error-400"
@@ -410,12 +566,12 @@ export default function AdminSmeAppointmentDetail({ appointment_id }: AdminSmeAp
         </div>
 
         {/* Success banner */}
-        {status_success && (
+        {update_success && (
           <div className="flex items-center gap-3 rounded-xl bg-success-50 px-4 py-3 text-sm text-success-700 dark:bg-success-500/10 dark:text-success-400">
             <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            {status_success}
+            {update_success}
           </div>
         )}
 
@@ -606,7 +762,7 @@ export default function AdminSmeAppointmentDetail({ appointment_id }: AdminSmeAp
               )}
             </div>
 
-            {/* Status history / current status */}
+            {/* Current status */}
             <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
               <div className="border-b border-gray-100 px-5 py-4 dark:border-gray-800">
                 <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Current Status</h2>
@@ -628,7 +784,7 @@ export default function AdminSmeAppointmentDetail({ appointment_id }: AdminSmeAp
                     </p>
                     {available_transitions.length > 0 ? (
                       <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                        Can be moved to: {available_transitions.map((s) => STATUS_CONFIG[s].label).join(", ")}
+                        Can move to: {available_transitions.map((s) => STATUS_CONFIG[s].label).join(", ")}
                       </p>
                     ) : (
                       <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
@@ -639,22 +795,23 @@ export default function AdminSmeAppointmentDetail({ appointment_id }: AdminSmeAp
                 </div>
               </div>
             </div>
-
-            
           </div>
         </div>
       </div>
 
-      {/* Status update modal */}
-      {status_modal_target && (
-        <StatusUpdateModal
-          current_status={appointment.status}
-          target_status={status_modal_target}
-          is_saving={is_saving_status}
-          admin_notes={modal_admin_notes}
+      {/* Update modal */}
+      {show_update_modal && (
+        <AppointmentUpdateModal
+          appointment={appointment}
+          modal_status={modal_status}
+          modal_scheduled_at={modal_scheduled_at}
+          modal_admin_notes={modal_admin_notes}
+          is_saving={is_saving}
+          onStatusChange={setModalStatus}
+          onScheduledAtChange={setModalScheduledAt}
           onNotesChange={setModalAdminNotes}
-          onConfirm={handleStatusConfirm}
-          onCancel={() => { setStatusModalTarget(null); setModalAdminNotes(""); }}
+          onConfirm={handleUpdateConfirm}
+          onCancel={closeUpdateModal}
         />
       )}
 

@@ -77,6 +77,7 @@ export interface UpdateAppointmentStatusPayload {
 
 export interface UpdateAppointmentPayload {
   status?: AppointmentStatus;
+  scheduled_at?: string;
   admin_notes?: string;
   notes?: string;
 }
