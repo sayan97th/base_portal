@@ -1,13 +1,15 @@
 import React from "react";
-import { sme_authored_tiers } from "./smeAuthoredData";
+import { SmeAuthoredTier } from "@/services/client/sme-authored.service";
 import SmeAuthoredCard from "./SmeAuthoredCard";
 
 interface SmeAuthoredGridProps {
+  tiers: SmeAuthoredTier[];
   selected_quantities: Record<string, number>;
   onQuantityChange: (tier_id: string, quantity: number) => void;
 }
 
 const SmeAuthoredGrid: React.FC<SmeAuthoredGridProps> = ({
+  tiers,
   selected_quantities,
   onQuantityChange,
 }) => {
@@ -25,7 +27,7 @@ const SmeAuthoredGrid: React.FC<SmeAuthoredGridProps> = ({
         </span>
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {sme_authored_tiers.map((tier) => (
+        {tiers.map((tier) => (
           <SmeAuthoredCard
             key={tier.id}
             tier={tier}

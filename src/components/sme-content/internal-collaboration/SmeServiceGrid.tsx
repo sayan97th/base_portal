@@ -1,13 +1,15 @@
 import React from "react";
-import { sme_service_tiers } from "./smeCollaborationData";
+import { SmeCollaborationTier } from "@/services/client/sme-collaboration.service";
 import SmeServiceCard from "./SmeServiceCard";
 
 interface SmeServiceGridProps {
+  tiers: SmeCollaborationTier[];
   selected_quantities: Record<string, number>;
   onQuantityChange: (tier_id: string, quantity: number) => void;
 }
 
 const SmeServiceGrid: React.FC<SmeServiceGridProps> = ({
+  tiers,
   selected_quantities,
   onQuantityChange,
 }) => {
@@ -25,7 +27,7 @@ const SmeServiceGrid: React.FC<SmeServiceGridProps> = ({
         </span>
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {sme_service_tiers.map((tier) => (
+        {tiers.map((tier) => (
           <SmeServiceCard
             key={tier.id}
             tier={tier}

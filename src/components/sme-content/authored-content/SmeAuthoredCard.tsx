@@ -1,5 +1,5 @@
 import React from "react";
-import { SmeAuthoredTier } from "./smeAuthoredData";
+import { SmeAuthoredTier } from "@/services/client/sme-authored.service";
 
 interface SmeAuthoredCardProps {
   tier: SmeAuthoredTier;

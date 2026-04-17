@@ -1,13 +1,15 @@
 import React from "react";
-import { sme_enhanced_tiers } from "./smeEnhancedData";
+import { SmeEnhancedTier } from "@/services/client/sme-enhanced.service";
 import SmeEnhancedCard from "./SmeEnhancedCard";
 
 interface SmeEnhancedGridProps {
+  tiers: SmeEnhancedTier[];
   selected_quantities: Record<string, number>;
   onQuantityChange: (tier_id: string, quantity: number) => void;
 }
 
 const SmeEnhancedGrid: React.FC<SmeEnhancedGridProps> = ({
+  tiers,
   selected_quantities,
   onQuantityChange,
 }) => {
@@ -26,7 +28,7 @@ const SmeEnhancedGrid: React.FC<SmeEnhancedGridProps> = ({
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {sme_enhanced_tiers.map((tier) => (
+        {tiers.map((tier) => (
           <SmeEnhancedCard
             key={tier.id}
             tier={tier}

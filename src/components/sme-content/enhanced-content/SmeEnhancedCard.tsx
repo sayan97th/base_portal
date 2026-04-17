@@ -1,5 +1,5 @@
 import React from "react";
-import { SmeEnhancedTier } from "./smeEnhancedData";
+import { SmeEnhancedTier } from "@/services/client/sme-enhanced.service";
 
 interface SmeEnhancedCardProps {
   tier: SmeEnhancedTier;

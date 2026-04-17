@@ -1,5 +1,5 @@
 import React from "react";
-import { SmeServiceTier } from "./smeCollaborationData";
+import { SmeCollaborationTier as SmeServiceTier } from "@/services/client/sme-collaboration.service";
 
 interface SmeServiceCardProps {
   tier: SmeServiceTier;

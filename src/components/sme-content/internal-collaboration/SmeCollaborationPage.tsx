@@ -1,14 +1,17 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import SmeCollaborationHeader from "./SmeCollaborationHeader";
 import SmeServiceGrid from "./SmeServiceGrid";
-import { sme_service_tiers } from "./smeCollaborationData";
 import CalendlyWidget, {
   CalendlyEventPayload,
 } from "@/components/shared/CalendlyWidget";
-import { smeContentService } from "@/services/client/sme-content.service";
+import { smeAppointmentService } from "@/services/client/sme-appointment.service";
+import {
+  smeCollaborationService,
+  SmeCollaborationTier,
+} from "@/services/client/sme-collaboration.service";
 
 const CALENDLY_URL = "https://calendly.com/ernesto-97thfloor/30min";
 
@@ -17,6 +20,9 @@ type Step = "selection" | "schedule";
 const SmeCollaborationPage: React.FC = () => {
   const router = useRouter();
   const [current_step, setCurrentStep] = useState<Step>("selection");
+  const [service_tiers, setServiceTiers] = useState<SmeCollaborationTier[]>([]);
+  const [is_loading_tiers, setIsLoadingTiers] = useState(true);
+  const [tiers_error, setTiersError] = useState<string | null>(null);
   const [selected_quantities, setSelectedQuantities] = useState<
     Record<string, number>
   >({});
@@ -24,7 +30,17 @@ const SmeCollaborationPage: React.FC = () => {
   const [is_saving_appointment, setIsSavingAppointment] = useState(false);
   const [appointment_error, setAppointmentError] = useState<string | null>(null);
 
-  const has_selection = sme_service_tiers.some(
+  useEffect(() => {
+    smeCollaborationService
+      .fetchServices()
+      .then(setServiceTiers)
+      .catch(() =>
+        setTiersError("Failed to load services. Please refresh the page.")
+      )
+      .finally(() => setIsLoadingTiers(false));
+  }, []);
+
+  const has_selection = service_tiers.some(
     (tier) => (selected_quantities[tier.id] || 0) > 0
   );
 
@@ -62,7 +78,7 @@ const SmeCollaborationPage: React.FC = () => {
       setIsSavingAppointment(true);
       setAppointmentError(null);
       try {
-        await smeContentService.saveAppointment({
+        await smeAppointmentService.saveAppointment({
           event_uri: payload.event_uri,
           invitee_uri: payload.invitee_uri,
           selected_tiers: selected_quantities,
@@ -86,10 +102,47 @@ const SmeCollaborationPage: React.FC = () => {
         {current_step === "selection" && (
           <>
             <SmeCollaborationHeader />
-            <SmeServiceGrid
-              selected_quantities={selected_quantities}
-              onQuantityChange={handleQuantityChange}
-            />
+
+            {is_loading_tiers && (
+              <div className="flex items-center gap-2 py-4 text-sm text-gray-500">
+                <svg
+                  className="h-4 w-4 animate-spin text-gray-400"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                  />
+                </svg>
+                Loading services…
+              </div>
+            )}
+
+            {tiers_error && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+                <p className="text-sm text-red-700">{tiers_error}</p>
+              </div>
+            )}
+
+            {!is_loading_tiers && !tiers_error && (
+              <SmeServiceGrid
+                tiers={service_tiers}
+                selected_quantities={selected_quantities}
+                onQuantityChange={handleQuantityChange}
+              />
+            )}
+
             <button
               onClick={handleNext}
               disabled={!has_selection}
