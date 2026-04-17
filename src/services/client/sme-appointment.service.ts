@@ -4,6 +4,7 @@ export interface SmeAppointmentPayload {
   event_uri: string;
   invitee_uri: string;
   selected_tiers: Record<string, number>;
+  service_type: "authored" | "collaboration" | "enhanced";
 }
 
 export interface SmeAppointmentResponse {

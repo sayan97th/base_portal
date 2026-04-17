@@ -82,6 +82,7 @@ const SmeCollaborationPage: React.FC = () => {
           event_uri: payload.event_uri,
           invitee_uri: payload.invitee_uri,
           selected_tiers: selected_quantities,
+          service_type: "collaboration",
         });
         setAppointmentScheduled(true);
       } catch {
