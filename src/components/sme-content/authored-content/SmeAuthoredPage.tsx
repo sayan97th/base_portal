@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useCallback, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import SmeAuthoredHeader from "./SmeAuthoredHeader";
 import SmeAuthoredGrid from "./SmeAuthoredGrid";
 import CalendlyWidget, {
@@ -18,7 +17,6 @@ const CALENDLY_URL = "https://calendly.com/ernesto-97thfloor/30min";
 type Step = "selection" | "schedule";
 
 const SmeAuthoredPage: React.FC = () => {
-  const router = useRouter();
   const [current_step, setCurrentStep] = useState<Step>("selection");
   const [service_tiers, setServiceTiers] = useState<SmeAuthoredTier[]>([]);
   const [is_loading_tiers, setIsLoadingTiers] = useState(true);
@@ -70,7 +68,7 @@ const SmeAuthoredPage: React.FC = () => {
   };
 
   const handleFinish = () => {
-    router.push("/sme-content/authored-content");
+    window.location.reload();
   };
 
   const handleEventScheduled = useCallback(

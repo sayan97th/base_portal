@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useCallback, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import SmeEnhancedHeader from "./SmeEnhancedHeader";
 import SmeEnhancedGrid from "./SmeEnhancedGrid";
 import CalendlyWidget, {
@@ -18,7 +17,6 @@ const CALENDLY_URL = "https://calendly.com/ernesto-97thfloor/30min";
 type Step = "selection" | "schedule";
 
 const SmeEnhancedPage: React.FC = () => {
-  const router = useRouter();
   const [current_step, setCurrentStep] = useState<Step>("selection");
   const [service_tiers, setServiceTiers] = useState<SmeEnhancedTier[]>([]);
   const [is_loading_tiers, setIsLoadingTiers] = useState(true);
@@ -70,7 +68,7 @@ const SmeEnhancedPage: React.FC = () => {
   };
 
   const handleFinish = () => {
-    router.push("/sme-content/enhanced-content");
+    window.location.reload();
   };
 
   const handleEventScheduled = useCallback(
