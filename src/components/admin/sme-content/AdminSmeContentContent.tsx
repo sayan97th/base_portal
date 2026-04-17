@@ -249,37 +249,6 @@ export default function AdminSmeContentContent({ default_tab = "authored" }: Adm
           </button>
         </div>
 
-        {/* Overview stats */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {SME_TABS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => handleTabChange(tab.id)}
-              className={`flex items-center gap-4 rounded-2xl border p-4 text-left transition-all ${
-                active_tab === tab.id
-                  ? "border-brand-200 bg-brand-50 dark:border-brand-500/30 dark:bg-brand-500/10"
-                  : "border-gray-200 bg-white hover:border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700"
-              }`}
-            >
-              <span className={`h-3 w-3 rounded-full shrink-0 ${tab.dot_color}`} />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  {tab.label}
-                </p>
-                <p className="mt-0.5 text-xl font-bold text-gray-900 dark:text-white">
-                  {services[tab.id].length}
-                  <span className="ml-1.5 text-xs font-normal text-gray-400">tiers</span>
-                </p>
-              </div>
-              {active_tab === tab.id && (
-                <svg className="h-4 w-4 shrink-0 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              )}
-            </button>
-          ))}
-        </div>
-
         {/* Main panel */}
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
           {/* Tab bar */}
