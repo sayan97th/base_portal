@@ -88,7 +88,7 @@ export default function SeoPackageFormModal({
         slug: package_data.slug,
         price_per_month: package_data.price_per_month,
         best_for: package_data.best_for,
-        tagline: package_data.tagline,
+        tagline: package_data.tagline ?? "",
         is_most_popular: package_data.is_most_popular,
         is_active: package_data.is_active,
         sort_order: package_data.sort_order,
