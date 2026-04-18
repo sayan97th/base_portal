@@ -13,8 +13,6 @@ import {
   FileIcon,
   CopyIcon,
   PencilIcon,
-  BoxIconLine,
-  BoltIcon,
   BoxCubeIcon,
   UserCircleIcon,
   GroupIcon,
@@ -94,9 +92,7 @@ const sidebar_sections: SidebarSection[] = [
   {
     title: "PACKAGES",
     items: [
-      { name: "Growth SEO Plan", icon: <BoxIconLine />, path: "#" },
-      { name: "Performance SEO Plan", icon: <BoltIcon />, path: "#" },
-      { name: "Full Scale SEO Plan", icon: <BoxCubeIcon />, path: "#" },
+      { name: "SEO Packages", icon: <BoxCubeIcon />, path: "/seo-packages" },
     ],
   },
   {
