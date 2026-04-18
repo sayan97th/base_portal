@@ -121,12 +121,12 @@ export default function SeoPackageCard({
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                 </svg>
-                <div className="min-w-0">
+                <div className="min-w-0 wrap-break-word">
                   <span className="font-medium text-gray-700 dark:text-gray-300">
                     {feature.category}
                   </span>
                   {feature.description && (
-                    <span className="ml-1 truncate text-gray-500 dark:text-gray-400">
+                    <span className="ml-1 text-gray-500 dark:text-gray-400">
                       — {feature.description}
                     </span>
                   )}
