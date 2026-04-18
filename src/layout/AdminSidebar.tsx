@@ -121,6 +121,10 @@ const admin_sidebar_sections: SidebarSection[] = [
         ),
         path: "/admin/services",
         permission: "orders.view",
+        sub_items: [
+          { name: "Link Building", path: "/admin/services" },
+          { name: "Premium Mentions", path: "/admin/premium-mentions" },
+        ],
       },
       {
         name: "SME Content",
