@@ -57,7 +57,6 @@ const sidebar_sections: SidebarSection[] = [
     items: [
       { name: "Link Building", icon: <PlugInIcon />, path: "/link-building" },
       { name: "Premium Mentions", icon: <ShootingStarIcon />, path: "/premium-mentions" },
-      { name: "PR Campaigns", icon: <PaperPlaneIcon />, path: "#" },
     ],
   },
   {
