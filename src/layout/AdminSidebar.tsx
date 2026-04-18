@@ -103,7 +103,7 @@ const admin_sidebar_sections: SidebarSection[] = [
         permission: "invoices.view",
       },
       {
-        name: "Services",
+        name: "Link Building",
         icon: (
           <svg
             className="h-5 w-5"
@@ -115,11 +115,11 @@ const admin_sidebar_sections: SidebarSection[] = [
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
-              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+              d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
             />
           </svg>
         ),
-        path: "/admin/services",
+        path: "/admin/link-building",
         permission: "orders.view",
       },
       {

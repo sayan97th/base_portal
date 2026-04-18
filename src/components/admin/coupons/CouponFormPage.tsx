@@ -6,13 +6,13 @@ import Link from "next/link";
 import flatpickr from "flatpickr";
 import "flatpickr/dist/flatpickr.css";
 import type { Coupon, CreateCouponPayload, DiscountType, AppliesTo } from "@/types/admin/coupons";
-import type { AdminDrTier } from "@/types/admin/services";
+import type { AdminDrTier } from "@/types/admin/link-building";
 import {
   createAdminCoupon,
   updateAdminCoupon,
   getAdminCoupon,
 } from "@/services/admin/coupons.service";
-import { listAdminDrTiers } from "@/services/admin/services.service";
+import { listAdminDrTiers } from "@/services/admin/link-building.service";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

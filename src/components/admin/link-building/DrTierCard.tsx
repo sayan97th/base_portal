@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import type { AdminDrTier } from "@/types/admin/services";
+import type { AdminDrTier } from "@/types/admin/link-building";
 
 interface DrTierCardProps {
   tier: AdminDrTier;

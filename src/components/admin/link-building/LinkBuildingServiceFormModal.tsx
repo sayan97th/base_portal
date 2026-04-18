@@ -2,17 +2,17 @@
 
 import React, { useEffect, useState } from "react";
 import type {
-  AdminService,
+  AdminLinkBuildingService,
   ServiceCategory,
   PricingModel,
-  CreateServicePayload,
-} from "@/types/admin/services";
+  CreateLinkBuildingServicePayload,
+} from "@/types/admin/link-building";
 
 interface ServiceFormModalProps {
   is_open: boolean;
-  service: AdminService | null;
+  service: AdminLinkBuildingService | null;
   onClose: () => void;
-  onSubmit: (payload: CreateServicePayload) => Promise<void>;
+  onSubmit: (payload: CreateLinkBuildingServicePayload) => Promise<void>;
 }
 
 const CATEGORY_OPTIONS: { value: ServiceCategory; label: string }[] = [
@@ -30,7 +30,7 @@ const PRICING_MODEL_OPTIONS: { value: PricingModel; label: string; description: 
   { value: "custom", label: "Custom Quote", description: "Price negotiated per client" },
 ];
 
-const EMPTY_FORM: CreateServicePayload = {
+const EMPTY_FORM: CreateLinkBuildingServicePayload = {
   name: "",
   description: "",
   category: "link_building",
@@ -40,13 +40,13 @@ const EMPTY_FORM: CreateServicePayload = {
   is_featured: false,
 };
 
-export default function ServiceFormModal({
+export default function LinkBuildingServiceFormModal({
   is_open,
   service,
   onClose,
   onSubmit,
 }: ServiceFormModalProps) {
-  const [form_data, setFormData] = useState<CreateServicePayload>(EMPTY_FORM);
+  const [form_data, setFormData] = useState<CreateLinkBuildingServicePayload>(EMPTY_FORM);
   const [is_submitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
