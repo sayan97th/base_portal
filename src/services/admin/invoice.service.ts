@@ -11,6 +11,8 @@ import type {
 export interface UpdateInvoicePayload {
   date_due?: string;
   line_items?: CreateInvoiceLineItemPayload[];
+  notes?: string;
+  send_update_notification?: boolean;
 }
 
 export interface UpdateInvoiceBillingPayload {

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   getAdminInvoice,
   getAdminInvoiceHistory,
@@ -12,7 +13,6 @@ import {
 import type { AdminInvoice, InvoiceCouponDiscount, InvoiceHistoryEntry, InvoiceHistoryActorType } from "@/types/admin";
 import {
   EmailInvoiceDialog,
-  EditInvoiceDialog,
   EditBillingDetailsDialog,
   MarkAsPaidDialog,
   DuplicateInvoiceDialog,
@@ -508,6 +508,7 @@ function groupHistoryByDate(entries: InvoiceHistoryEntry[]): Array<{ date_label:
 // ── Actions dropdown ──────────────────────────────────────────────────────────
 
 type ActiveDialog = "email" | "edit" | "edit_billing" | "mark_paid" | "duplicate" | "delete" | "void" | null;
+// "edit" is intercepted in handleDialogSelect and navigates to the full edit page
 
 interface ActionsDropdownProps {
   onSelect: (dialog: ActiveDialog) => void;
@@ -588,6 +589,7 @@ function ActionsDropdown({ onSelect }: ActionsDropdownProps) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDetailContentProps) {
+  const router = useRouter();
   const [invoice, setInvoice] = useState<AdminInvoice | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -597,6 +599,14 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
   const [history_entries, setHistoryEntries] = useState<InvoiceHistoryEntry[]>([]);
   const [history_loading, setHistoryLoading] = useState(false);
   const [history_error, setHistoryError] = useState<string | null>(null);
+
+  function handleDialogSelect(dialog: ActiveDialog) {
+    if (dialog === "edit" && invoice) {
+      router.push(`/admin/invoices/${invoice.unique_id}/edit`);
+      return;
+    }
+    setActiveDialog(dialog);
+  }
 
   useEffect(() => {
     const loadInvoice = async () => {
@@ -702,7 +712,7 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
             </svg>
             Download PDF
           </button>
-          <ActionsDropdown onSelect={setActiveDialog} />
+          <ActionsDropdown onSelect={handleDialogSelect} />
         </div>
       </div>
 
@@ -1172,13 +1182,6 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
         <EmailInvoiceDialog
           invoice={invoice}
           onClose={() => setActiveDialog(null)}
-        />
-      )}
-      {active_dialog === "edit" && (
-        <EditInvoiceDialog
-          invoice={invoice}
-          onClose={() => setActiveDialog(null)}
-          onSuccess={(updated) => { setInvoice(updated); setActiveDialog(null); }}
         />
       )}
       {active_dialog === "edit_billing" && (
