@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import type { AdminDrTier, CreateDrTierPayload, UpdateDrTierPayload } from "@/types/admin/services";
+import type { AdminDrTier, CreateDrTierPayload, UpdateDrTierPayload } from "@/types/admin/link-building";
 import type {
   AdminContentRefreshTier,
   CreateContentRefreshTierPayload,
@@ -19,7 +19,7 @@ import {
   updateAdminContentRefreshTier,
   toggleAdminContentRefreshTierStatus,
   deleteAdminContentRefreshTier,
-} from "@/services/admin/services.service";
+} from "@/services/admin/link-building.service";
 import DrTierCard from "./DrTierCard";
 import DrTierFormModal from "./DrTierFormModal";
 import DrTierDetailModal from "./DrTierDetailModal";
@@ -28,14 +28,14 @@ import ContentRefreshTierFormModal from "./ContentRefreshTierFormModal";
 
 type StatusFilter = "all" | "active" | "disabled";
 
-type ServiceTab = {
+type LinkBuildingTab = {
   id: string;
   label: string;
   category: string;
   available: boolean;
 };
 
-const SERVICE_TABS: ServiceTab[] = [
+const LINK_BUILDING_TABS: LinkBuildingTab[] = [
   { id: "link_building", label: "Link Building", category: "link_building", available: true },
   { id: "link_building_addons", label: "Link Building Add-ons", category: "link_building_addons", available: true },
   { id: "content", label: "Content", category: "content", available: false },
@@ -84,7 +84,7 @@ function ComingSoonTab({ label }: { label: string }) {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export default function AdminServicesContent() {
+export default function AdminLinkBuildingContent() {
   const [active_tab, setActiveTab] = useState("link_building");
 
   // ── DR Tiers state ─────────────────────────────────────────────────────────
@@ -274,10 +274,10 @@ export default function AdminServicesContent() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-              Services
+              Link Building
             </h1>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Manage platform service offerings and pricing.
+              Manage Link Building service offerings and pricing.
             </p>
           </div>
           {active_tab === "link_building" && (
@@ -310,11 +310,11 @@ export default function AdminServicesContent() {
           </div>
         )}
 
-        {/* Service tabs */}
+        {/* Link Building tabs */}
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
           {/* Tab bar */}
           <div className="flex items-center border-b border-gray-100 px-4 dark:border-gray-800">
-            {SERVICE_TABS.map((tab) => (
+            {LINK_BUILDING_TABS.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => tab.available && setActiveTab(tab.id)}
@@ -347,7 +347,7 @@ export default function AdminServicesContent() {
                   </svg>
                 )}
                 {tab.label}
-                
+
                 {!tab.available && (
                   <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-400 dark:bg-gray-800 dark:text-gray-600">
                     Soon
@@ -424,7 +424,7 @@ export default function AdminServicesContent() {
               </div>
             ) : active_tab !== "link_building" ? (
               <ComingSoonTab
-                label={SERVICE_TABS.find((t) => t.id === active_tab)?.label ?? ""}
+                label={LINK_BUILDING_TABS.find((t) => t.id === active_tab)?.label ?? ""}
               />
             ) : (
               <div className="space-y-5">

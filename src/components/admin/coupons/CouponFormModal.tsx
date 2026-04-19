@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import type { Coupon, CreateCouponPayload, DiscountType, AppliesTo } from "@/types/admin/coupons";
-import type { AdminDrTier } from "@/types/admin/services";
+import type { AdminDrTier } from "@/types/admin/link-building";
 
 interface CouponFormModalProps {
   is_open: boolean;

@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import type { AdminDrTierDetail } from "@/types/admin/services";
-import { getAdminDrTierDetail } from "@/services/admin/services.service";
+import type { AdminDrTierDetail } from "@/types/admin/link-building";
+import { getAdminDrTierDetail } from "@/services/admin/link-building.service";
 
 interface DrTierDetailModalProps {
   tier_id: string | null;

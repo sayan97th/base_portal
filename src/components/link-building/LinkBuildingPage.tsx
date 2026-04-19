@@ -4,7 +4,6 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from "react"
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Elements } from "@stripe/react-stripe-js";
-import ClientProfile from "@/components/seo-dashboard/ClientProfile";
 import LinkBuildingHeader from "./LinkBuildingHeader";
 import DrTierGrid from "./DrTierGrid";
 import ContentRefreshUpsell from "./ContentRefreshUpsell";
@@ -405,9 +404,6 @@ const LinkBuildingPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Client profile navigation */}
-      <ClientProfile />
-
       <div className="mx-auto max-w-7xl">
       {/* My Orders shortcut */}
       <div className="mb-6 flex items-center justify-end">

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import type { AdminDrTier, CreateDrTierPayload } from "@/types/admin/services";
+import type { AdminDrTier, CreateDrTierPayload } from "@/types/admin/link-building";
 
 interface DrTierFormModalProps {
   is_open: boolean;

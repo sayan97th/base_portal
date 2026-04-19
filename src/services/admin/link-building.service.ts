@@ -1,50 +1,50 @@
 import { apiClient } from "@/lib/api-client";
 import type {
-  AdminService,
+  AdminLinkBuildingService,
   AdminDrTier,
   AdminDrTierDetail,
-  CreateServicePayload,
-  UpdateServicePayload,
+  CreateLinkBuildingServicePayload,
+  UpdateLinkBuildingServicePayload,
   CreateDrTierPayload,
   UpdateDrTierPayload,
-} from "@/types/admin/services";
+} from "@/types/admin/link-building";
 import type {
   AdminContentRefreshTier,
   CreateContentRefreshTierPayload,
   UpdateContentRefreshTierPayload,
 } from "@/types/admin/content-refresh-tiers";
 
-export async function listAdminServices(): Promise<AdminService[]> {
-  return apiClient.get<AdminService[]>("/api/admin/services");
+export async function listAdminLinkBuildingServices(): Promise<AdminLinkBuildingService[]> {
+  return apiClient.get<AdminLinkBuildingService[]>("/api/admin/services");
 }
 
-export async function getAdminService(id: string): Promise<AdminService> {
-  return apiClient.get<AdminService>(`/api/admin/services/${id}`);
+export async function getAdminLinkBuildingService(id: string): Promise<AdminLinkBuildingService> {
+  return apiClient.get<AdminLinkBuildingService>(`/api/admin/services/${id}`);
 }
 
-export async function createAdminService(
-  payload: CreateServicePayload
-): Promise<AdminService> {
-  return apiClient.post<AdminService>("/api/admin/services", payload);
+export async function createAdminLinkBuildingService(
+  payload: CreateLinkBuildingServicePayload
+): Promise<AdminLinkBuildingService> {
+  return apiClient.post<AdminLinkBuildingService>("/api/admin/services", payload);
 }
 
-export async function updateAdminService(
+export async function updateAdminLinkBuildingService(
   id: string,
-  payload: UpdateServicePayload
-): Promise<AdminService> {
-  return apiClient.patch<AdminService>(`/api/admin/services/${id}`, payload);
+  payload: UpdateLinkBuildingServicePayload
+): Promise<AdminLinkBuildingService> {
+  return apiClient.patch<AdminLinkBuildingService>(`/api/admin/services/${id}`, payload);
 }
 
-export async function toggleAdminServiceStatus(
+export async function toggleAdminLinkBuildingServiceStatus(
   id: string,
   is_active: boolean
-): Promise<AdminService> {
-  return apiClient.patch<AdminService>(`/api/admin/services/${id}`, {
+): Promise<AdminLinkBuildingService> {
+  return apiClient.patch<AdminLinkBuildingService>(`/api/admin/services/${id}`, {
     is_active,
   });
 }
 
-export async function deleteAdminService(id: string): Promise<void> {
+export async function deleteAdminLinkBuildingService(id: string): Promise<void> {
   return apiClient.delete<void>(`/api/admin/services/${id}`);
 }
 

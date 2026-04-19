@@ -1,14 +1,14 @@
 "use client";
 
 import React, { useState } from "react";
-import type { AdminDrTier, CreateDrTierPayload, UpdateDrTierPayload } from "@/types/admin/services";
+import type { AdminDrTier, CreateDrTierPayload, UpdateDrTierPayload } from "@/types/admin/link-building";
 import DrTierFormModal from "./DrTierFormModal";
 import {
   createAdminDrTier,
   updateAdminDrTier,
   toggleAdminDrTierStatus,
   deleteAdminDrTier,
-} from "@/services/admin/services.service";
+} from "@/services/admin/link-building.service";
 
 interface DrTiersPanelProps {
   tiers: AdminDrTier[];

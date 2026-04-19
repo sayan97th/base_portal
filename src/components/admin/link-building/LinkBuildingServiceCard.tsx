@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
-import type { AdminService, ServiceCategory } from "@/types/admin/services";
+import type { AdminLinkBuildingService, ServiceCategory } from "@/types/admin/link-building";
 
 interface ServiceCardProps {
-  service: AdminService;
+  service: AdminLinkBuildingService;
   is_selected: boolean;
   onSelect: () => void;
   onEdit: () => void;
@@ -73,7 +73,7 @@ const PRICING_MODEL_LABELS: Record<string, string> = {
   custom: "Custom quote",
 };
 
-export default function ServiceCard({
+export default function LinkBuildingServiceCard({
   service,
   is_selected,
   onSelect,

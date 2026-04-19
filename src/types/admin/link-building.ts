@@ -35,7 +35,7 @@ export interface AdminDrTierDetail extends AdminDrTier {
   purchases: DrTierPurchase[];
 }
 
-export interface AdminService {
+export interface AdminLinkBuildingService {
   id: string;
   name: string;
   slug: string;
@@ -52,7 +52,7 @@ export interface AdminService {
   updated_at: string;
 }
 
-export interface CreateServicePayload {
+export interface CreateLinkBuildingServicePayload {
   name: string;
   description: string;
   category: ServiceCategory;
@@ -62,7 +62,7 @@ export interface CreateServicePayload {
   is_featured: boolean;
 }
 
-export type UpdateServicePayload = Partial<CreateServicePayload>;
+export type UpdateLinkBuildingServicePayload = Partial<CreateLinkBuildingServicePayload>;
 
 export interface CreateDrTierPayload {
   dr_label: string;
@@ -75,7 +75,7 @@ export interface CreateDrTierPayload {
 
 export type UpdateDrTierPayload = Partial<CreateDrTierPayload>;
 
-export interface ServiceStats {
+export interface LinkBuildingStats {
   total_services: number;
   active_services: number;
   inactive_services: number;
