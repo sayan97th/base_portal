@@ -262,6 +262,7 @@ export interface AdminInvoice {
   currency_type: InvoiceCurrencyType;
   subtotal_amount: number;
   discount_amount?: number;
+  discount_type?: "bulk" | "percentage" | "fixed_amount";
   total_amount: number;
   credit_amount: number;
   date_issued: string | null;

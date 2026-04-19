@@ -27,13 +27,11 @@ interface AdminInvoiceDetailContentProps {
 const formatCurrency = (amount: number): string =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount);
 
-const formatDiscountLabel = (discount_amount: number, subtotal_amount: number): string => {
-  if (subtotal_amount > 0) {
-    const pct = Math.round((discount_amount / subtotal_amount) * 100);
-    return `Discount (${pct}% off)`;
-  }
-  return "Discount";
-};
+const isBulkDiscount = (discount_type?: string): boolean =>
+  discount_type === "bulk";
+
+const getDiscountLabel = (discount_type?: string): string =>
+  isBulkDiscount(discount_type) ? "Bulk Discount (10% off)" : "Discount";
 
 const formatDate = (date_string: string): string =>
   new Date(date_string).toLocaleDateString("en-US", {
@@ -262,9 +260,10 @@ function generateAdminInvoicePdf(invoice: AdminInvoice): void {
     doc.text(formatCurrency(invoice.subtotal_amount), right_x, y, { align: "right" });
     y += 7;
     if (invoice.discount_amount != null && invoice.discount_amount > 0) {
+      const is_bulk = isBulkDiscount(invoice.discount_type);
       doc.setFont("helvetica", "normal");
-      doc.setTextColor(109, 40, 217); // violet-700
-      doc.text(formatDiscountLabel(invoice.discount_amount, invoice.subtotal_amount), sum_label_x, y);
+      doc.setTextColor(...(is_bulk ? ([109, 40, 217] as [number, number, number]) : COLORS.success));
+      doc.text(getDiscountLabel(invoice.discount_type), sum_label_x, y);
       doc.setFont("helvetica", "bold");
       doc.text(`-${formatCurrency(invoice.discount_amount)}`, right_x, y, { align: "right" });
       doc.setTextColor(...COLORS.secondary);
@@ -980,13 +979,13 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
                 </div>
                 {invoice.discount_amount != null && invoice.discount_amount > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span className="flex items-center gap-1.5 font-medium text-violet-600 dark:text-violet-400">
+                    <span className={`flex items-center gap-1.5 font-medium ${isBulkDiscount(invoice.discount_type) ? "text-violet-600 dark:text-violet-400" : "text-emerald-600 dark:text-emerald-400"}`}>
                       <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
                       </svg>
-                      {formatDiscountLabel(invoice.discount_amount, invoice.subtotal_amount)}
+                      {getDiscountLabel(invoice.discount_type)}
                     </span>
-                    <span className="font-semibold tabular-nums text-violet-600 dark:text-violet-400">
+                    <span className={`font-semibold tabular-nums ${isBulkDiscount(invoice.discount_type) ? "text-violet-600 dark:text-violet-400" : "text-emerald-600 dark:text-emerald-400"}`}>
                       -{formatAmount(invoice.discount_amount)}
                     </span>
                   </div>
@@ -1089,14 +1088,14 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
               {invoice.discount_amount != null && invoice.discount_amount > 0 && (
                 <InfoRow
                   label={
-                    <span className="flex items-center gap-1.5 font-medium text-violet-600 dark:text-violet-400">
+                    <span className={`flex items-center gap-1.5 font-medium ${isBulkDiscount(invoice.discount_type) ? "text-violet-600 dark:text-violet-400" : "text-emerald-600 dark:text-emerald-400"}`}>
                       <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
                       </svg>
-                      {formatDiscountLabel(invoice.discount_amount, invoice.subtotal_amount)}
+                      {getDiscountLabel(invoice.discount_type)}
                     </span>
                   }
-                  value={<span className="font-semibold tabular-nums text-violet-600 dark:text-violet-400">-{formatAmount(invoice.discount_amount)}</span>}
+                  value={<span className={`font-semibold tabular-nums ${isBulkDiscount(invoice.discount_type) ? "text-violet-600 dark:text-violet-400" : "text-emerald-600 dark:text-emerald-400"}`}>-{formatAmount(invoice.discount_amount)}</span>}
                 />
               )}
               {invoice.coupon_discounts && invoice.coupon_discounts.length > 0 && (
