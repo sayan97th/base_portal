@@ -27,6 +27,14 @@ interface AdminInvoiceDetailContentProps {
 const formatCurrency = (amount: number): string =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount);
 
+const formatDiscountLabel = (discount_amount: number, subtotal_amount: number): string => {
+  if (subtotal_amount > 0) {
+    const pct = Math.round((discount_amount / subtotal_amount) * 100);
+    return `Discount (${pct}% off)`;
+  }
+  return "Discount";
+};
+
 const formatDate = (date_string: string): string =>
   new Date(date_string).toLocaleDateString("en-US", {
     month: "short",
@@ -256,7 +264,7 @@ function generateAdminInvoicePdf(invoice: AdminInvoice): void {
     if (invoice.discount_amount != null && invoice.discount_amount > 0) {
       doc.setFont("helvetica", "normal");
       doc.setTextColor(109, 40, 217); // violet-700
-      doc.text("Bulk Discount (10% off)", sum_label_x, y);
+      doc.text(formatDiscountLabel(invoice.discount_amount, invoice.subtotal_amount), sum_label_x, y);
       doc.setFont("helvetica", "bold");
       doc.text(`-${formatCurrency(invoice.discount_amount)}`, right_x, y, { align: "right" });
       doc.setTextColor(...COLORS.secondary);
@@ -976,7 +984,7 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
                       <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
                       </svg>
-                      Bulk Discount (10% off)
+                      {formatDiscountLabel(invoice.discount_amount, invoice.subtotal_amount)}
                     </span>
                     <span className="font-semibold tabular-nums text-violet-600 dark:text-violet-400">
                       -{formatAmount(invoice.discount_amount)}
@@ -1085,7 +1093,7 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
                       <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
                       </svg>
-                      Bulk Discount (10%)
+                      {formatDiscountLabel(invoice.discount_amount, invoice.subtotal_amount)}
                     </span>
                   }
                   value={<span className="font-semibold tabular-nums text-violet-600 dark:text-violet-400">-{formatAmount(invoice.discount_amount)}</span>}

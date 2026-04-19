@@ -96,15 +96,37 @@ export interface InvoiceShareLinks {
   public_link: string;
 }
 
+function applyShareDomain(link: string): string {
+  const site_url = (process.env.NEXT_PUBLIC_SITE_URL ?? "").replace(/\/$/, "");
+  if (!site_url) return link;
+  try {
+    const { pathname, search, hash } = new URL(link);
+    return `${site_url}${pathname}${search}${hash}`;
+  } catch {
+    const clean_path = link.startsWith("/") ? link : `/${link}`;
+    return `${site_url}${clean_path}`;
+  }
+}
+
+function normalizeShareLinks(raw: InvoiceShareLinks): InvoiceShareLinks {
+  return {
+    ...raw,
+    private_link: applyShareDomain(raw.private_link),
+    public_link: applyShareDomain(raw.public_link),
+  };
+}
+
 export async function getAdminInvoiceShareLinks(invoice_id: string): Promise<InvoiceShareLinks> {
-  return apiClient.get<InvoiceShareLinks>(`/api/admin/invoices/${invoice_id}/share-links`);
+  const raw = await apiClient.get<InvoiceShareLinks>(`/api/admin/invoices/${invoice_id}/share-links`);
+  return normalizeShareLinks(raw);
 }
 
 export async function toggleAdminInvoiceSharing(
   invoice_id: string,
   enabled: boolean
 ): Promise<InvoiceShareLinks> {
-  return apiClient.patch<InvoiceShareLinks>(`/api/admin/invoices/${invoice_id}/share-links`, {
+  const raw = await apiClient.patch<InvoiceShareLinks>(`/api/admin/invoices/${invoice_id}/share-links`, {
     sharing_enabled: enabled,
   });
+  return normalizeShareLinks(raw);
 }
