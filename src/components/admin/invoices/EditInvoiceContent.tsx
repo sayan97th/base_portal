@@ -25,14 +25,16 @@ interface LocalLineItem {
 }
 
 function fromApiLineItem(item: InvoiceLineItem): LocalLineItem {
+  const raw = item.price * item.quantity;
+  const discount_amount = parseFloat(Math.max(0, raw - item.item_total).toFixed(2));
   return {
     local_id: generateItemId(),
     item_name: item.item_name,
     description: "",
     price: String(item.price),
     quantity: String(item.quantity),
-    discount_type: "percent",
-    discount_value: "0",
+    discount_type: discount_amount > 0 ? "fixed" : "percent",
+    discount_value: discount_amount > 0 ? String(discount_amount) : "0",
   };
 }
 
