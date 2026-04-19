@@ -4,13 +4,24 @@ import type {
   AdminInvoiceFilters,
   PaginatedResponse,
   CreateInvoicePayload,
+  CreateInvoiceLineItemPayload,
   InvoiceHistoryEntry,
 } from "@/types/admin";
 
-/**
- * List all invoices — staff portal view (paginated, filterable, sortable).
- * Roles allowed: super_admin, admin, staff.
- */
+export interface UpdateInvoicePayload {
+  date_due?: string;
+  line_items?: CreateInvoiceLineItemPayload[];
+}
+
+export interface UpdateInvoiceBillingPayload {
+  company_name?: string | null;
+  company_description?: string | null;
+  address_line_1?: string | null;
+  address_line_2?: string | null;
+  state?: string | null;
+  country?: string | null;
+}
+
 export async function listAdminInvoices(
   filters: AdminInvoiceFilters = {}
 ): Promise<PaginatedResponse<AdminInvoice>> {
@@ -31,26 +42,67 @@ export async function listAdminInvoices(
   );
 }
 
-/**
- * Fetch a single invoice by unique_id — admin detail view.
- * Roles allowed: super_admin, admin, staff.
- */
 export async function getAdminInvoice(invoice_id: string): Promise<AdminInvoice> {
   return apiClient.get<AdminInvoice>(`/api/admin/invoices/${invoice_id}`);
 }
 
-/**
- * Create a new invoice — admin only.
- * Roles allowed: super_admin, admin, staff.
- */
 export async function createAdminInvoice(payload: CreateInvoicePayload): Promise<AdminInvoice> {
   return apiClient.post<AdminInvoice>("/api/admin/invoices", payload);
 }
 
-/**
- * Fetch the activity history for a single invoice.
- * Roles allowed: super_admin, admin, staff.
- */
 export async function getAdminInvoiceHistory(invoice_id: string): Promise<InvoiceHistoryEntry[]> {
   return apiClient.get<InvoiceHistoryEntry[]>(`/api/admin/invoices/${invoice_id}/history`);
+}
+
+export async function updateAdminInvoice(
+  invoice_id: string,
+  payload: UpdateInvoicePayload
+): Promise<AdminInvoice> {
+  return apiClient.patch<AdminInvoice>(`/api/admin/invoices/${invoice_id}`, payload);
+}
+
+export async function updateAdminInvoiceBilling(
+  invoice_id: string,
+  payload: UpdateInvoiceBillingPayload
+): Promise<AdminInvoice> {
+  return apiClient.patch<AdminInvoice>(`/api/admin/invoices/${invoice_id}/billing`, payload);
+}
+
+export async function markAdminInvoiceAsPaid(invoice_id: string): Promise<AdminInvoice> {
+  return apiClient.post<AdminInvoice>(`/api/admin/invoices/${invoice_id}/mark-paid`, {});
+}
+
+export async function duplicateAdminInvoice(invoice_id: string): Promise<AdminInvoice> {
+  return apiClient.post<AdminInvoice>(`/api/admin/invoices/${invoice_id}/duplicate`, {});
+}
+
+export async function deleteAdminInvoice(invoice_id: string): Promise<void> {
+  return apiClient.delete<void>(`/api/admin/invoices/${invoice_id}`);
+}
+
+export async function voidAdminInvoice(invoice_id: string): Promise<AdminInvoice> {
+  return apiClient.post<AdminInvoice>(`/api/admin/invoices/${invoice_id}/void`, {});
+}
+
+export async function emailAdminInvoice(invoice_id: string): Promise<void> {
+  return apiClient.post<void>(`/api/admin/invoices/${invoice_id}/send-reminder`, {});
+}
+
+export interface InvoiceShareLinks {
+  sharing_enabled: boolean;
+  private_link: string;
+  public_link: string;
+}
+
+export async function getAdminInvoiceShareLinks(invoice_id: string): Promise<InvoiceShareLinks> {
+  return apiClient.get<InvoiceShareLinks>(`/api/admin/invoices/${invoice_id}/share-links`);
+}
+
+export async function toggleAdminInvoiceSharing(
+  invoice_id: string,
+  enabled: boolean
+): Promise<InvoiceShareLinks> {
+  return apiClient.patch<InvoiceShareLinks>(`/api/admin/invoices/${invoice_id}/share-links`, {
+    sharing_enabled: enabled,
+  });
 }

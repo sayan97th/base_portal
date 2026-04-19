@@ -22,7 +22,8 @@ interface LocalLineItem {
   description: string;
   price: string;
   quantity: string;
-  discount_percent: string;
+  discount_type: "percent" | "fixed";
+  discount_value: string;
 }
 
 function createEmptyLineItem(): LocalLineItem {
@@ -32,16 +33,27 @@ function createEmptyLineItem(): LocalLineItem {
     description: "",
     price: "",
     quantity: "1",
-    discount_percent: "0",
+    discount_type: "percent",
+    discount_value: "0",
   };
+}
+
+function calcItemDiscount(item: LocalLineItem): number {
+  const price = parseFloat(item.price) || 0;
+  const qty = Math.max(1, parseInt(item.quantity) || 1);
+  const raw = price * qty;
+  if (item.discount_type === "percent") {
+    const disc = Math.min(100, Math.max(0, parseFloat(item.discount_value) || 0));
+    return (raw * disc) / 100;
+  }
+  const fixed = Math.max(0, parseFloat(item.discount_value) || 0);
+  return Math.min(fixed, raw);
 }
 
 function calcItemTotal(item: LocalLineItem): number {
   const price = parseFloat(item.price) || 0;
   const qty = Math.max(1, parseInt(item.quantity) || 1);
-  const disc = Math.min(100, Math.max(0, parseFloat(item.discount_percent) || 0));
-  const raw = price * qty;
-  return raw - (raw * disc) / 100;
+  return Math.max(0, price * qty - calcItemDiscount(item));
 }
 
 function calcSubtotal(items: LocalLineItem[]): number {
@@ -49,12 +61,7 @@ function calcSubtotal(items: LocalLineItem[]): number {
 }
 
 function calcTotalDiscount(items: LocalLineItem[]): number {
-  return items.reduce((s, item) => {
-    const price = parseFloat(item.price) || 0;
-    const qty = Math.max(1, parseInt(item.quantity) || 1);
-    const disc = Math.min(100, Math.max(0, parseFloat(item.discount_percent) || 0));
-    return s + (price * qty * disc) / 100;
-  }, 0);
+  return items.reduce((s, item) => s + calcItemDiscount(item), 0);
 }
 
 // ── Client search dropdown ────────────────────────────────────────────────────
@@ -225,7 +232,7 @@ function LineItemRow({
   errors: Record<string, string>;
 }) {
   const item_total = calcItemTotal(item);
-  const has_discount = parseFloat(item.discount_percent) > 0;
+  const has_discount = parseFloat(item.discount_value) > 0;
   const price = parseFloat(item.price) || 0;
   const qty = Math.max(1, parseInt(item.quantity) || 1);
   const raw_total = price * qty;
@@ -316,18 +323,53 @@ function LineItemRow({
 
           <div className="col-span-4 sm:col-span-2">
             <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
-              Discount (%)
+              Discount
             </label>
-            <input
-              type="number"
-              min="0"
-              max="100"
-              step="1"
-              value={item.discount_percent}
-              onChange={(e) => on_change(item.local_id, "discount_percent", e.target.value)}
-              placeholder="0"
-              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:focus:border-brand-500 dark:focus:ring-brand-500/20"
-            />
+            <div className="flex overflow-hidden rounded-lg border border-gray-200 bg-white focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-100 dark:border-gray-600 dark:bg-gray-800 dark:focus-within:border-brand-500 dark:focus-within:ring-brand-500/20">
+              <div className="flex shrink-0 border-r border-gray-200 dark:border-gray-600">
+                <button
+                  type="button"
+                  onClick={() => on_change(item.local_id, "discount_type", "percent")}
+                  className={`px-2 py-2 text-xs font-bold transition-colors ${
+                    item.discount_type === "percent"
+                      ? "bg-brand-500 text-white"
+                      : "text-gray-400 hover:bg-gray-50 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+                  }`}
+                  title="Percentage discount"
+                >
+                  %
+                </button>
+                <button
+                  type="button"
+                  onClick={() => on_change(item.local_id, "discount_type", "fixed")}
+                  className={`px-2 py-2 text-xs font-bold transition-colors ${
+                    item.discount_type === "fixed"
+                      ? "bg-brand-500 text-white"
+                      : "text-gray-400 hover:bg-gray-50 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+                  }`}
+                  title="Fixed amount discount"
+                >
+                  $
+                </button>
+              </div>
+              <input
+                type="number"
+                min="0"
+                max={item.discount_type === "percent" ? "100" : undefined}
+                step={item.discount_type === "percent" ? "1" : "0.01"}
+                value={item.discount_value}
+                onChange={(e) => on_change(item.local_id, "discount_value", e.target.value)}
+                placeholder={item.discount_type === "percent" ? "0" : "0.00"}
+                className="min-w-0 flex-1 bg-transparent px-2 py-2 text-sm text-gray-900 placeholder-gray-400 outline-none dark:text-white dark:placeholder-gray-500"
+              />
+            </div>
+            {has_discount && (
+              <p className="mt-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                -{item.discount_type === "percent"
+                  ? `${item.discount_value}%`
+                  : `$${parseFloat(item.discount_value || "0").toFixed(2)}`} off
+              </p>
+            )}
           </div>
 
           <div className="col-span-4 sm:col-span-2">
@@ -491,7 +533,7 @@ export default function CreateInvoiceContent() {
 
   function updateLineItem(local_id: string, field: keyof LocalLineItem, value: string) {
     setLineItems((prev) =>
-      prev.map((i) => (i.local_id === local_id ? { ...i, [field]: value } : i))
+      prev.map((i) => (i.local_id === local_id ? { ...i, [field]: value } as LocalLineItem : i))
     );
   }
 
@@ -521,13 +563,26 @@ export default function CreateInvoiceContent() {
       const payload: CreateInvoicePayload = {
         user_id: selected_client!.id,
         date_due,
-        line_items: line_items.map((item) => ({
-          item_name: item.item_name.trim(),
-          description: item.description.trim() || undefined,
-          price: parseFloat(item.price) || 0,
-          quantity: Math.max(1, parseInt(item.quantity) || 1),
-          discount_percent: parseFloat(item.discount_percent) || undefined,
-        })),
+        line_items: line_items.map((item) => {
+          const price = parseFloat(item.price) || 0;
+          const qty = Math.max(1, parseInt(item.quantity) || 1);
+          const raw = price * qty;
+          let discount_percent: number | undefined;
+          if (item.discount_type === "percent") {
+            const p = parseFloat(item.discount_value) || 0;
+            if (p > 0) discount_percent = p;
+          } else {
+            const fixed = parseFloat(item.discount_value) || 0;
+            if (fixed > 0 && raw > 0) discount_percent = (fixed / raw) * 100;
+          }
+          return {
+            item_name: item.item_name.trim(),
+            description: item.description.trim() || undefined,
+            price,
+            quantity: qty,
+            discount_percent,
+          };
+        }),
         notes: notes.trim() || undefined,
         send_client_notification,
         send_admin_notification,

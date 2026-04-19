@@ -2,7 +2,13 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { getAdminInvoice, getAdminInvoiceHistory } from "@/services/admin/invoice.service";
+import {
+  getAdminInvoice,
+  getAdminInvoiceHistory,
+  getAdminInvoiceShareLinks,
+  toggleAdminInvoiceSharing,
+  type InvoiceShareLinks,
+} from "@/services/admin/invoice.service";
 import type { AdminInvoice, InvoiceCouponDiscount, InvoiceHistoryEntry, InvoiceHistoryActorType } from "@/types/admin";
 
 interface AdminInvoiceDetailContentProps {
@@ -279,6 +285,199 @@ function generateAdminInvoicePdf(invoice: AdminInvoice): void {
   });
 }
 
+// ── Share Dialog ─────────────────────────────────────────────────────────────
+
+interface ShareDialogProps {
+  invoice_id: string;
+  onClose: () => void;
+}
+
+function ShareDialog({ invoice_id, onClose }: ShareDialogProps) {
+  const [share_links, setShareLinks] = useState<InvoiceShareLinks | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [toggling, setToggling] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [copied_key, setCopiedKey] = useState<"private" | "public" | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const data = await getAdminInvoiceShareLinks(invoice_id);
+        setShareLinks(data);
+      } catch {
+        setError("Failed to load share links.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [invoice_id]);
+
+  const handleToggle = async () => {
+    if (!share_links || toggling) return;
+    setToggling(true);
+    try {
+      const updated = await toggleAdminInvoiceSharing(invoice_id, !share_links.sharing_enabled);
+      setShareLinks(updated);
+    } catch {
+      setError("Failed to update sharing settings.");
+    } finally {
+      setToggling(false);
+    }
+  };
+
+  const handleCopy = async (type: "private" | "public") => {
+    if (!share_links) return;
+    const url = type === "private" ? share_links.private_link : share_links.public_link;
+    await navigator.clipboard.writeText(url);
+    setCopiedKey(type);
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-lg rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-gray-800">
+          <div className="flex items-center gap-2.5">
+            <svg className="h-4 w-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
+            </svg>
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Get link</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6">
+          {loading && (
+            <div className="space-y-5">
+              {[1, 2].map((i) => (
+                <div key={i} className="space-y-2">
+                  <div className="h-4 w-24 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
+                  <div className="flex gap-2">
+                    <div className="h-10 flex-1 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700" />
+                    <div className="h-10 w-28 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700" />
+                  </div>
+                  <div className="h-3 w-48 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {error && !loading && (
+            <p className="text-sm text-error-600 dark:text-error-400">{error}</p>
+          )}
+
+          {!loading && share_links && (
+            <div className="space-y-5">
+              {/* Sharing toggle */}
+              <div className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-white/[0.02]">
+                <div>
+                  <p className="text-sm font-medium text-gray-800 dark:text-white">Shared links</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {share_links.sharing_enabled ? "Links are currently active" : "Links are currently disabled"}
+                  </p>
+                </div>
+                <button
+                  onClick={handleToggle}
+                  disabled={toggling}
+                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${
+                    share_links.sharing_enabled
+                      ? "bg-brand-500 dark:bg-brand-400"
+                      : "bg-gray-300 dark:bg-gray-600"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                      share_links.sharing_enabled ? "translate-x-4" : "translate-x-0.5"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Private link */}
+              <div className="space-y-1.5">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Private link</p>
+                <div className="flex gap-2">
+                  <input
+                    readOnly
+                    value={share_links.private_link}
+                    className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-xs text-gray-600 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400"
+                  />
+                  <button
+                    onClick={() => handleCopy("private")}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                  >
+                    {copied_key === "private" ? (
+                      <>
+                        <svg className="h-3.5 w-3.5 text-success-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+                        </svg>
+                        Copy link
+                      </>
+                    )}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 dark:text-gray-500">Client will need to sign in to view invoice.</p>
+              </div>
+
+              {/* Public link */}
+              <div className="space-y-1.5">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Public link</p>
+                <div className="flex gap-2">
+                  <input
+                    readOnly
+                    value={share_links.public_link}
+                    className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-xs text-gray-600 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400"
+                  />
+                  <button
+                    onClick={() => handleCopy("public")}
+                    disabled={!share_links.sharing_enabled}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                  >
+                    {copied_key === "public" ? (
+                      <>
+                        <svg className="h-3.5 w-3.5 text-success-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+                        </svg>
+                        Copy link
+                      </>
+                    )}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 dark:text-gray-500">Anybody with this link can view and pay the invoice.</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── History timeline helpers ──────────────────────────────────────────────────
 
 const ACTOR_STYLES: Record<InvoiceHistoryActorType, string> = {
@@ -304,6 +503,7 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [active_tab, setActiveTab] = useState<"details" | "history">("details");
+  const [share_dialog_open, setShareDialogOpen] = useState(false);
   const [history_entries, setHistoryEntries] = useState<InvoiceHistoryEntry[]>([]);
   const [history_loading, setHistoryLoading] = useState(false);
   const [history_error, setHistoryError] = useState<string | null>(null);
@@ -393,15 +593,26 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
           </h1>
           <StatusBadge status={invoice.status} />
         </div>
-        <button
-          onClick={() => generateAdminInvoicePdf(invoice)}
-          className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-          </svg>
-          Download PDF
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShareDialogOpen(true)}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
+            </svg>
+            Share
+          </button>
+          <button
+            onClick={() => generateAdminInvoicePdf(invoice)}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+            Download PDF
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -860,6 +1071,10 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
           </div>
         </div>
       </div>
+      )}
+
+      {share_dialog_open && (
+        <ShareDialog invoice_id={invoice_id} onClose={() => setShareDialogOpen(false)} />
       )}
     </div>
   );
