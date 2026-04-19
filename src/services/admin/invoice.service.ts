@@ -1,5 +1,11 @@
 import { apiClient } from "@/lib/api-client";
-import type { AdminInvoice, AdminInvoiceFilters, PaginatedResponse } from "@/types/admin";
+import type {
+  AdminInvoice,
+  AdminInvoiceFilters,
+  PaginatedResponse,
+  CreateInvoicePayload,
+  InvoiceHistoryEntry,
+} from "@/types/admin";
 
 /**
  * List all invoices — staff portal view (paginated, filterable, sortable).
@@ -31,4 +37,20 @@ export async function listAdminInvoices(
  */
 export async function getAdminInvoice(invoice_id: string): Promise<AdminInvoice> {
   return apiClient.get<AdminInvoice>(`/api/admin/invoices/${invoice_id}`);
+}
+
+/**
+ * Create a new invoice — admin only.
+ * Roles allowed: super_admin, admin, staff.
+ */
+export async function createAdminInvoice(payload: CreateInvoicePayload): Promise<AdminInvoice> {
+  return apiClient.post<AdminInvoice>("/api/admin/invoices", payload);
+}
+
+/**
+ * Fetch the activity history for a single invoice.
+ * Roles allowed: super_admin, admin, staff.
+ */
+export async function getAdminInvoiceHistory(invoice_id: string): Promise<InvoiceHistoryEntry[]> {
+  return apiClient.get<InvoiceHistoryEntry[]>(`/api/admin/invoices/${invoice_id}/history`);
 }

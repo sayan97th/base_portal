@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { getAdminInvoice } from "@/services/admin/invoice.service";
-import type { AdminInvoice, InvoiceCouponDiscount } from "@/types/admin";
+import { getAdminInvoice, getAdminInvoiceHistory } from "@/services/admin/invoice.service";
+import type { AdminInvoice, InvoiceCouponDiscount, InvoiceHistoryEntry, InvoiceHistoryActorType } from "@/types/admin";
 
 interface AdminInvoiceDetailContentProps {
   invoice_id: string;
@@ -279,10 +279,34 @@ function generateAdminInvoicePdf(invoice: AdminInvoice): void {
   });
 }
 
+// ── History timeline helpers ──────────────────────────────────────────────────
+
+const ACTOR_STYLES: Record<InvoiceHistoryActorType, string> = {
+  system:  "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400",
+  client:  "bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-400",
+  admin:   "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-400",
+};
+
+function groupHistoryByDate(entries: InvoiceHistoryEntry[]): Array<{ date_label: string; entries: InvoiceHistoryEntry[] }> {
+  const groups: Record<string, InvoiceHistoryEntry[]> = {};
+  entries.forEach((entry) => {
+    const label = new Date(entry.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    if (!groups[label]) groups[label] = [];
+    groups[label].push(entry);
+  });
+  return Object.entries(groups).map(([date_label, entries]) => ({ date_label, entries }));
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
 export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDetailContentProps) {
   const [invoice, setInvoice] = useState<AdminInvoice | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [active_tab, setActiveTab] = useState<"details" | "history">("details");
+  const [history_entries, setHistoryEntries] = useState<InvoiceHistoryEntry[]>([]);
+  const [history_loading, setHistoryLoading] = useState(false);
+  const [history_error, setHistoryError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadInvoice = async () => {
@@ -304,6 +328,23 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
     };
     loadInvoice();
   }, [invoice_id]);
+
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    setHistoryError(null);
+    try {
+      const data = await getAdminInvoiceHistory(invoice_id);
+      setHistoryEntries(data);
+    } catch {
+      setHistoryError("Failed to load history.");
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [invoice_id]);
+
+  useEffect(() => {
+    if (active_tab === "history") loadHistory();
+  }, [active_tab, loadHistory]);
 
   if (loading) return <SkeletonLoader />;
 
@@ -363,6 +404,130 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
         </button>
       </div>
 
+      {/* Tabs */}
+      <div className="border-b border-gray-200 dark:border-gray-800">
+        <nav className="-mb-px flex gap-0" aria-label="Invoice tabs">
+          <button
+            onClick={() => setActiveTab("details")}
+            className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
+              active_tab === "details"
+                ? "border-brand-500 text-brand-600 dark:border-brand-400 dark:text-brand-400"
+                : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-300"
+            }`}
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
+            </svg>
+            Details
+          </button>
+          <button
+            onClick={() => setActiveTab("history")}
+            className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
+              active_tab === "history"
+                ? "border-brand-500 text-brand-600 dark:border-brand-400 dark:text-brand-400"
+                : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-300"
+            }`}
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            History
+          </button>
+        </nav>
+      </div>
+
+      {/* ── History tab ───────────────────────────────────── */}
+      {active_tab === "history" && (
+        <div className="min-h-[300px]">
+          {history_loading && (
+            <div className="space-y-6 py-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-start gap-4">
+                  <div className="h-8 w-8 shrink-0 animate-pulse rounded-full bg-gray-200 dark:bg-gray-700" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-48 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
+                    <div className="h-3 w-24 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {history_error && !history_loading && (
+            <div className="flex items-center gap-3 rounded-xl border border-error-200 bg-error-50 p-4 text-sm text-error-600 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
+              <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+              </svg>
+              {history_error}
+              <button
+                onClick={loadHistory}
+                className="ml-auto text-xs font-medium underline underline-offset-2"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {!history_loading && !history_error && history_entries.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
+                <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">No history yet</p>
+              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Activity for this invoice will appear here</p>
+            </div>
+          )}
+
+          {!history_loading && !history_error && history_entries.length > 0 && (
+            <div className="space-y-8">
+              {groupHistoryByDate(history_entries).map(({ date_label, entries }) => (
+                <div key={date_label}>
+                  <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                    {date_label}
+                  </p>
+                  <div className="relative space-y-0">
+                    {/* Vertical connector line */}
+                    <div className="absolute left-4 top-4 bottom-4 w-px bg-gray-200 dark:bg-gray-700" />
+                    {entries.map((entry) => (
+                      <div key={entry.id} className="relative flex items-start gap-4 py-3">
+                        <div
+                          className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${ACTOR_STYLES[entry.actor_type]}`}
+                        >
+                          {entry.actor_initials}
+                        </div>
+                        <div className="min-w-0 flex-1 pt-1">
+                          <p className="text-sm text-gray-800 dark:text-gray-200">
+                            <span className="font-medium">{entry.actor_name}</span>
+                            {" "}
+                            <span className="text-gray-600 dark:text-gray-400">{entry.event}</span>
+                          </p>
+                          {entry.description && (
+                            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                              {entry.description}
+                            </p>
+                          )}
+                          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                            {new Date(entry.created_at).toLocaleTimeString("en-US", {
+                              hour: "numeric",
+                              minute: "2-digit",
+                              hour12: true,
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Details tab ───────────────────────────────────── */}
+      {active_tab === "details" && (
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* ── Main column ───────────────────────────────── */}
         <div className="space-y-6 lg:col-span-8">
@@ -695,6 +860,7 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

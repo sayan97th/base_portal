@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { listAdminInvoices } from "@/services/admin/invoice.service";
 import type {
   AdminInvoice,
@@ -63,6 +64,7 @@ function SortIcon({
 }
 
 export default function AdminInvoicesContent() {
+  const router = useRouter();
   const [invoices, setInvoices] = useState<AdminInvoice[]>([]);
   const [is_loading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -153,13 +155,24 @@ export default function AdminInvoicesContent() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-          Invoices
-        </h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          {total > 0 ? `${total} total invoices` : "Manage all platform invoices"}
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+            Invoices
+          </h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            {total > 0 ? `${total} total invoices` : "Manage all platform invoices"}
+          </p>
+        </div>
+        <button
+          onClick={() => router.push("/admin/invoices/create")}
+          className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-brand-700 active:scale-[0.98] dark:bg-brand-500 dark:hover:bg-brand-600"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+          Generate Invoice
+        </button>
       </div>
 
       {/* Filters */}

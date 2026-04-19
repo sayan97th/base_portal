@@ -275,6 +275,38 @@ export interface AdminInvoice {
   coupon_discounts?: InvoiceCouponDiscount[];
 }
 
+// ── Invoice Creation & History ────────────────────────────────────────────────
+
+export interface CreateInvoiceLineItemPayload {
+  item_name: string;
+  description?: string;
+  price: number;
+  quantity: number;
+  discount_percent?: number;
+}
+
+export interface CreateInvoicePayload {
+  user_id: number;
+  date_due: string;
+  line_items: CreateInvoiceLineItemPayload[];
+  notes?: string;
+  send_client_notification: boolean;
+  send_admin_notification: boolean;
+  currency_type?: InvoiceCurrencyType;
+}
+
+export type InvoiceHistoryActorType = "system" | "client" | "admin";
+
+export interface InvoiceHistoryEntry {
+  id: number;
+  event: string;
+  description: string | null;
+  actor_name: string;
+  actor_initials: string;
+  actor_type: InvoiceHistoryActorType;
+  created_at: string;
+}
+
 // ── Invitations ───────────────────────────────────────────────────────────────
 
 export type InvitationRole = "admin" | "staff";
