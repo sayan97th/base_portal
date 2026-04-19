@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import flatpickr from "flatpickr";
 import { listAdminClients } from "@/services/admin/user.service";
 import { createAdminInvoice } from "@/services/admin/invoice.service";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -403,6 +404,61 @@ function StyledCheckbox({
   );
 }
 
+// ── Date picker field ─────────────────────────────────────────────────────────
+
+function DatePickerField({
+  value,
+  on_change,
+  error,
+}: {
+  value: string;
+  on_change: (date: string) => void;
+  error?: string;
+}) {
+  const input_ref = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!input_ref.current) return;
+    const fp = flatpickr(input_ref.current, {
+      mode: "single",
+      dateFormat: "Y-m-d",
+      defaultDate: value || undefined,
+      onChange: (selected_dates) => {
+        if (selected_dates[0]) {
+          const d = selected_dates[0];
+          const formatted = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+          on_change(formatted);
+        }
+      },
+    });
+
+    return () => {
+      if (!Array.isArray(fp)) fp.destroy();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="relative">
+      <input
+        ref={input_ref}
+        readOnly
+        placeholder="Select due date..."
+        className={`w-full cursor-pointer rounded-xl border bg-white px-3 py-2.5 pr-10 text-sm text-gray-900 outline-none transition focus:ring-2 dark:bg-gray-800 dark:text-white ${
+          error
+            ? "border-error-400 focus:border-error-400 focus:ring-error-100 dark:border-error-500 dark:focus:ring-error-500/20"
+            : "border-gray-200 focus:border-brand-400 focus:ring-brand-100 dark:border-gray-700 dark:focus:border-brand-500 dark:focus:ring-brand-500/20"
+        }`}
+      />
+      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+        </svg>
+      </span>
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function CreateInvoiceContent() {
@@ -414,7 +470,7 @@ export default function CreateInvoiceContent() {
     d.setDate(d.getDate() + 30);
     return d.toISOString().split("T")[0];
   });
-  const [line_items, setLineItems] = useState<LocalLineItem[]>([createEmptyLineItem(), createEmptyLineItem()]);
+  const [line_items, setLineItems] = useState<LocalLineItem[]>([createEmptyLineItem()]);
   const [notes, setNotes] = useState("");
   const [send_client_notification, setSendClientNotification] = useState(true);
   const [send_admin_notification, setSendAdminNotification] = useState(false);
@@ -522,7 +578,7 @@ export default function CreateInvoiceContent() {
         <div className="space-y-6 lg:col-span-8">
 
           {/* Client section */}
-          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+          <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
             <div className="flex items-center gap-2.5 border-b border-gray-100 px-6 py-4 dark:border-gray-800">
               <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-50 dark:bg-brand-500/10">
                 <svg className="h-4 w-4 text-brand-600 dark:text-brand-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -662,15 +718,10 @@ export default function CreateInvoiceContent() {
                 <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
                   Date Due <span className="text-error-400">*</span>
                 </label>
-                <input
-                  type="date"
+                <DatePickerField
                   value={date_due}
-                  onChange={(e) => setDateDue(e.target.value)}
-                  className={`w-full rounded-xl border bg-white px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:ring-2 dark:bg-gray-800 dark:text-white ${
-                    validation_errors.date_due
-                      ? "border-error-400 focus:border-error-400 focus:ring-error-100 dark:border-error-500 dark:focus:ring-error-500/20"
-                      : "border-gray-200 focus:border-brand-400 focus:ring-brand-100 dark:border-gray-700 dark:focus:border-brand-500 dark:focus:ring-brand-500/20"
-                  }`}
+                  on_change={setDateDue}
+                  error={validation_errors.date_due}
                 />
                 {validation_errors.date_due && (
                   <p className="mt-1 text-xs text-error-500">{validation_errors.date_due}</p>
