@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   getAdminInvoice,
@@ -10,6 +10,15 @@ import {
   type InvoiceShareLinks,
 } from "@/services/admin/invoice.service";
 import type { AdminInvoice, InvoiceCouponDiscount, InvoiceHistoryEntry, InvoiceHistoryActorType } from "@/types/admin";
+import {
+  EmailInvoiceDialog,
+  EditInvoiceDialog,
+  EditBillingDetailsDialog,
+  MarkAsPaidDialog,
+  DuplicateInvoiceDialog,
+  DeleteInvoiceDialog,
+  VoidInvoiceDialog,
+} from "./InvoiceActionDialogs";
 
 interface AdminInvoiceDetailContentProps {
   invoice_id: string;
@@ -496,6 +505,86 @@ function groupHistoryByDate(entries: InvoiceHistoryEntry[]): Array<{ date_label:
   return Object.entries(groups).map(([date_label, entries]) => ({ date_label, entries }));
 }
 
+// ── Actions dropdown ──────────────────────────────────────────────────────────
+
+type ActiveDialog = "email" | "edit" | "edit_billing" | "mark_paid" | "duplicate" | "delete" | "void" | null;
+
+interface ActionsDropdownProps {
+  onSelect: (dialog: ActiveDialog) => void;
+}
+
+function ActionsDropdown({ onSelect }: ActionsDropdownProps) {
+  const [open, setOpen] = useState(false);
+  const container_ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleOutside(e: MouseEvent) {
+      if (container_ref.current && !container_ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, []);
+
+  const handleSelect = (dialog: ActiveDialog) => {
+    setOpen(false);
+    onSelect(dialog);
+  };
+
+  const menu_items: { label: string; dialog: ActiveDialog; danger?: boolean; separator_before?: boolean }[] = [
+    { label: "Email invoice", dialog: "email" },
+    { label: "Edit", dialog: "edit" },
+    { label: "Edit Billing Details", dialog: "edit_billing" },
+    { label: "Mark as paid", dialog: "mark_paid", separator_before: true },
+    { label: "Duplicate", dialog: "duplicate" },
+    { label: "Void", dialog: "void", separator_before: true },
+    { label: "Delete", dialog: "delete", danger: true },
+  ];
+
+  return (
+    <div className="relative" ref={container_ref}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+      >
+        Actions
+        <svg
+          className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          strokeWidth={2}
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full z-40 mt-1.5 w-52 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
+          {menu_items.map((item) => (
+            <React.Fragment key={item.dialog}>
+              {item.separator_before && (
+                <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
+              )}
+              <button
+                onClick={() => handleSelect(item.dialog)}
+                className={`flex w-full items-center px-4 py-2.5 text-sm transition-colors ${
+                  item.danger
+                    ? "text-error-600 hover:bg-error-50 dark:text-error-400 dark:hover:bg-error-500/10"
+                    : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                }`}
+              >
+                {item.label}
+              </button>
+            </React.Fragment>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDetailContentProps) {
@@ -504,6 +593,7 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
   const [error, setError] = useState<string | null>(null);
   const [active_tab, setActiveTab] = useState<"details" | "history">("details");
   const [share_dialog_open, setShareDialogOpen] = useState(false);
+  const [active_dialog, setActiveDialog] = useState<ActiveDialog>(null);
   const [history_entries, setHistoryEntries] = useState<InvoiceHistoryEntry[]>([]);
   const [history_loading, setHistoryLoading] = useState(false);
   const [history_error, setHistoryError] = useState<string | null>(null);
@@ -612,6 +702,7 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
             </svg>
             Download PDF
           </button>
+          <ActionsDropdown onSelect={setActiveDialog} />
         </div>
       </div>
 
@@ -1075,6 +1166,56 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
 
       {share_dialog_open && (
         <ShareDialog invoice_id={invoice_id} onClose={() => setShareDialogOpen(false)} />
+      )}
+
+      {active_dialog === "email" && (
+        <EmailInvoiceDialog
+          invoice={invoice}
+          onClose={() => setActiveDialog(null)}
+        />
+      )}
+      {active_dialog === "edit" && (
+        <EditInvoiceDialog
+          invoice={invoice}
+          onClose={() => setActiveDialog(null)}
+          onSuccess={(updated) => { setInvoice(updated); setActiveDialog(null); }}
+        />
+      )}
+      {active_dialog === "edit_billing" && (
+        <EditBillingDetailsDialog
+          invoice={invoice}
+          onClose={() => setActiveDialog(null)}
+          onSuccess={(updated) => { setInvoice(updated); setActiveDialog(null); }}
+        />
+      )}
+      {active_dialog === "mark_paid" && (
+        <MarkAsPaidDialog
+          invoice={invoice}
+          onClose={() => setActiveDialog(null)}
+          onSuccess={(updated) => { setInvoice(updated); setActiveDialog(null); }}
+        />
+      )}
+      {active_dialog === "duplicate" && (
+        <DuplicateInvoiceDialog
+          invoice={invoice}
+          onClose={() => setActiveDialog(null)}
+          onSuccess={() => setActiveDialog(null)}
+        />
+      )}
+      {active_dialog === "delete" && (
+        <DeleteInvoiceDialog
+          invoice={invoice}
+          onClose={() => setActiveDialog(null)}
+          onSuccess={() => setActiveDialog(null)}
+        />
+      )}
+      {active_dialog === "void" && (
+        <VoidInvoiceDialog
+          invoice={invoice}
+          onClose={() => setActiveDialog(null)}
+          onVoidSuccess={(updated) => { setInvoice(updated); setActiveDialog(null); }}
+          onDeleteSuccess={() => setActiveDialog(null)}
+        />
       )}
     </div>
   );
