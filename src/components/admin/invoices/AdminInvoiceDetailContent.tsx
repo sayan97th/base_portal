@@ -609,7 +609,7 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
 
   function handleDialogSelect(dialog: ActiveDialog) {
     if (dialog === "edit" && invoice) {
-      router.push(`/admin/invoices/${invoice.unique_id}/edit`);
+      router.push(`/admin/invoices/${invoice.id}/edit`);
       return;
     }
     setActiveDialog(dialog);

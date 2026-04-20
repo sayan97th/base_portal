@@ -312,7 +312,7 @@ export default function AdminInvoicesContent() {
                       className="cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-white/2"
                     >
                       <td className="px-6 py-4">
-                        <Link href={`/admin/invoices/${invoice.unique_id}`} className="block">
+                        <Link href={`/admin/invoices/${invoice.id}`} className="block">
                           <p className="font-medium text-gray-900 dark:text-white">
                             {invoice.invoice_number}
                           </p>
@@ -322,30 +322,30 @@ export default function AdminInvoicesContent() {
                         </Link>
                       </td>
                       <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
-                        <Link href={`/admin/invoices/${invoice.unique_id}`} className="block">
+                        <Link href={`/admin/invoices/${invoice.id}`} className="block">
                           <p>{invoice.user.first_name} {invoice.user.last_name}</p>
                           <p className="text-xs text-gray-400">{invoice.user.email}</p>
                         </Link>
                       </td>
                       <td className="px-6 py-4">
-                        <Link href={`/admin/invoices/${invoice.unique_id}`} className="block">
+                        <Link href={`/admin/invoices/${invoice.id}`} className="block">
                           <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[invoice.status]}`}>
                             {invoice.status}
                           </span>
                         </Link>
                       </td>
                       <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
-                        <Link href={`/admin/invoices/${invoice.unique_id}`} className="block">
+                        <Link href={`/admin/invoices/${invoice.id}`} className="block">
                           {invoice.payment_method}
                         </Link>
                       </td>
                       <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
-                        <Link href={`/admin/invoices/${invoice.unique_id}`} className="block">
+                        <Link href={`/admin/invoices/${invoice.id}`} className="block">
                           ${invoice.total_amount.toFixed(2)}
                         </Link>
                       </td>
                       <td className="px-6 py-4 text-gray-500 dark:text-gray-400">
-                        <Link href={`/admin/invoices/${invoice.unique_id}`} className="block">
+                        <Link href={`/admin/invoices/${invoice.id}`} className="block">
                           {invoice.date_issued
                             ? new Date(invoice.date_issued).toLocaleDateString()
                             : <span className="text-gray-400">—</span>}
@@ -353,7 +353,7 @@ export default function AdminInvoicesContent() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <Link
-                          href={`/admin/invoices/${invoice.unique_id}`}
+                          href={`/admin/invoices/${invoice.id}`}
                           className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:border-brand-700 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
                         >
                           View Details

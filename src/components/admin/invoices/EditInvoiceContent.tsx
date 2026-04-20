@@ -529,7 +529,7 @@ export default function EditInvoiceContent({ invoice_id }: { invoice_id: string 
         notes: notes.trim() || undefined,
         send_update_notification,
       });
-      router.push(`/admin/invoices/${invoice.unique_id}`);
+      router.push(`/admin/invoices/${invoice.id}`);
     } catch (err: unknown) {
       const api_error = err as { message?: string };
       setSubmitError(api_error?.message || "Failed to update invoice. Please try again.");
@@ -569,7 +569,7 @@ export default function EditInvoiceContent({ invoice_id }: { invoice_id: string 
       {/* Page header */}
       <div>
         <Link
-          href={`/admin/invoices/${invoice.unique_id}`}
+          href={`/admin/invoices/${invoice.id}`}
           className="inline-flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
