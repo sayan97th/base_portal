@@ -34,6 +34,7 @@ export interface InvoiceDetail {
   status: InvoiceStatus;
   subtotal: string;
   discount?: string;
+  discount_type?: string;
   total: string;
   credit: string;
   billed_to: InvoiceBilledTo | null;

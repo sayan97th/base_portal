@@ -2,6 +2,12 @@
 
 import React, { useState, useEffect } from "react";
 import Badge from "../ui/badge/Badge";
+
+const isBulkDiscount = (discount_type?: string): boolean =>
+  discount_type === "bulk";
+
+const getDiscountLabel = (discount_type?: string): string =>
+  isBulkDiscount(discount_type) ? "Bulk Discount (10% off)" : "Discount";
 import {
   Table,
   TableHeader,
@@ -289,85 +295,63 @@ const PublicInvoiceView: React.FC<PublicInvoiceViewProps> = ({
           <div className="mt-4 flex justify-end">
             <dl className="w-full max-w-xs space-y-2 text-theme-sm">
               <div className="flex justify-between">
-                <dt className="font-medium text-gray-500 dark:text-gray-400">
-                  Subtotal
-                </dt>
-                <dd className="text-gray-700 dark:text-gray-300">
-                  {invoice.subtotal}
-                </dd>
+                <dt className="text-gray-500 dark:text-gray-400">Subtotal</dt>
+                <dd className="text-gray-700 dark:text-gray-300">{invoice.subtotal}</dd>
               </div>
 
               {invoice.discount && (
                 <div className="flex justify-between">
-                  <dt className="flex items-center gap-1.5 font-medium text-violet-600 dark:text-violet-400">
-                    <svg
-                      className="h-3.5 w-3.5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"
-                      />
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" />
+                  <dt className={`flex items-center gap-1.5 font-medium ${isBulkDiscount(invoice.discount_type) ? "text-violet-600 dark:text-violet-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
                     </svg>
-                    Bulk Discount (10% off)
+                    {getDiscountLabel(invoice.discount_type)}
                   </dt>
-                  <dd className="font-semibold tabular-nums text-violet-600 dark:text-violet-400">
+                  <dd className={`font-semibold tabular-nums ${isBulkDiscount(invoice.discount_type) ? "text-violet-600 dark:text-violet-400" : "text-emerald-600 dark:text-emerald-400"}`}>
                     -{invoice.discount}
                   </dd>
                 </div>
               )}
 
               {invoice.coupon_discounts && invoice.coupon_discounts.length > 0 && (
-                <>
-                  <div className="border-t border-dashed border-gray-200 pt-2 dark:border-gray-700">
-                    <p className="mb-1.5 flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" />
-                      </svg>
-                      Coupons applied
-                    </p>
-                    {invoice.coupon_discounts.map((coupon) => (
-                      <div key={coupon.code} className="flex items-center justify-between gap-2 py-0.5">
-                        <dt className="flex items-center gap-1.5">
-                          <span className="inline-flex items-center rounded border border-success-300 bg-success-50 px-1.5 py-0.5 font-mono text-xs font-semibold tracking-wider text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400">
-                            {coupon.code}
-                          </span>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
-                            {coupon.discount_type === "percentage"
-                              ? `${coupon.discount_value}% off`
-                              : "Fixed discount"}
-                          </span>
-                        </dt>
-                        <dd className="font-medium text-success-600 dark:text-success-400">
-                          -{coupon.discount_amount}
-                        </dd>
+                <div className="space-y-1 border-t border-dashed border-gray-200 pt-2 dark:border-gray-700">
+                  <p className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" />
+                    </svg>
+                    Coupons Applied
+                  </p>
+                  {invoice.coupon_discounts.map((coupon) => (
+                    <div key={coupon.code} className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-flex items-center rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 font-mono text-xs font-semibold tracking-wider text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400">
+                          {coupon.code}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {coupon.discount_type === "percentage"
+                            ? `${coupon.discount_value}% off`
+                            : "Fixed discount"}
+                        </span>
                       </div>
-                    ))}
-                  </div>
-                </>
+                      <span className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                        -{coupon.discount_amount}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {invoice.credit && invoice.credit.startsWith("-") && (
+                <div className="flex justify-between">
+                  <dt className="text-gray-500 dark:text-gray-400">Credits Applied</dt>
+                  <dd className="text-emerald-600 dark:text-emerald-400">{invoice.credit}</dd>
+                </div>
               )}
 
               <div className="flex justify-between border-t border-gray-200 pt-2 dark:border-gray-700">
-                <dt className="font-semibold text-gray-900 dark:text-white">
-                  Total
-                </dt>
-                <dd className="font-semibold text-gray-900 dark:text-white">
-                  {invoice.total}
-                </dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="font-medium text-gray-500 dark:text-gray-400">
-                  Credit
-                </dt>
-                <dd className="text-gray-700 dark:text-gray-300">
-                  {invoice.credit}
-                </dd>
+                <dt className="font-semibold text-gray-900 dark:text-white">Total</dt>
+                <dd className="font-semibold text-gray-900 dark:text-white">{invoice.total}</dd>
               </div>
             </dl>
           </div>
