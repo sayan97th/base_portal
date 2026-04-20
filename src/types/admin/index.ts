@@ -194,7 +194,7 @@ export interface LaravelPaginatedResponse<T> {
 
 // ── Invoices ──────────────────────────────────────────────────────────────────
 
-export type InvoiceStatus = "paid" | "void";
+export type InvoiceStatus = "paid" | "unpaid" | "overdue" | "refund" | "void";
 
 export type InvoiceSortField =
   | "date_issued"
@@ -262,6 +262,7 @@ export interface AdminInvoice {
   currency_type: InvoiceCurrencyType;
   subtotal_amount: number;
   discount_amount?: number;
+  discount_type?: "bulk" | "percentage" | "fixed_amount";
   total_amount: number;
   credit_amount: number;
   date_issued: string | null;
@@ -273,6 +274,38 @@ export interface AdminInvoice {
   line_items: InvoiceLineItem[];
   billed_to: InvoiceBilledTo | null;
   coupon_discounts?: InvoiceCouponDiscount[];
+}
+
+// ── Invoice Creation & History ────────────────────────────────────────────────
+
+export interface CreateInvoiceLineItemPayload {
+  item_name: string;
+  description?: string;
+  price: number;
+  quantity: number;
+  discount_percent?: number;
+}
+
+export interface CreateInvoicePayload {
+  user_id: number;
+  date_due: string;
+  line_items: CreateInvoiceLineItemPayload[];
+  notes?: string;
+  send_client_notification: boolean;
+  send_admin_notification: boolean;
+  currency_type?: InvoiceCurrencyType;
+}
+
+export type InvoiceHistoryActorType = "system" | "client" | "admin";
+
+export interface InvoiceHistoryEntry {
+  id: number;
+  event: string;
+  description: string | null;
+  actor_name: string;
+  actor_initials: string;
+  actor_type: InvoiceHistoryActorType;
+  created_at: string;
 }
 
 // ── Invitations ───────────────────────────────────────────────────────────────

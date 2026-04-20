@@ -13,6 +13,11 @@ function matchesAny(pathname: string, prefixes: string[]): boolean {
   return prefixes.some((p) => pathname === p || pathname.startsWith(p + "/"));
 }
 
+// Matches /invoices/{id}/view (public token-based invoice view)
+function isPublicInvoiceView(pathname: string): boolean {
+  return /^\/invoices\/[^/]+\/view$/.test(pathname);
+}
+
 export function middleware(request: NextRequest) {
   const token = request.cookies.get("access_token")?.value;
   const primary_role = request.cookies.get(ROLE_COOKIE_NAME)?.value;
@@ -22,12 +27,13 @@ export function middleware(request: NextRequest) {
   const is_invitation_route = matchesAny(pathname, invitation_routes);
   const is_password_reset_route = matchesAny(pathname, password_reset_routes);
   const is_admin_route = pathname === "/admin" || pathname.startsWith("/admin/");
+  const is_public_invoice_view = isPublicInvoiceView(pathname);
 
   // ── Unauthenticated users ─────────────────────────────────────────────────
 
   if (!token) {
-    // Allow access to auth pages, invitation acceptance, and password reset.
-    if (is_auth_route || is_invitation_route || is_password_reset_route) {
+    // Allow access to auth pages, invitation acceptance, password reset, and public invoice views.
+    if (is_auth_route || is_invitation_route || is_password_reset_route || is_public_invoice_view) {
       return NextResponse.next();
     }
     // Everything else requires authentication.
@@ -51,6 +57,11 @@ export function middleware(request: NextRequest) {
     if (!is_staff) {
       return NextResponse.redirect(new URL("/", request.url));
     }
+    return NextResponse.next();
+  }
+
+  // Always allow the public invoice view regardless of role.
+  if (is_public_invoice_view) {
     return NextResponse.next();
   }
 

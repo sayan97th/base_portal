@@ -1,4 +1,4 @@
-export type InvoiceStatus = "paid" | "void";
+export type InvoiceStatus = "paid" | "unpaid" | "overdue" | "refund" | "void";
 
 export interface InvoiceLineItem {
   item_name: string;
@@ -34,6 +34,7 @@ export interface InvoiceDetail {
   status: InvoiceStatus;
   subtotal: string;
   discount?: string;
+  discount_type?: string;
   total: string;
   credit: string;
   billed_to: InvoiceBilledTo | null;

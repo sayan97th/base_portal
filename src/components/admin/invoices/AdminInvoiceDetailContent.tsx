@@ -1,9 +1,27 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { getAdminInvoice } from "@/services/admin/invoice.service";
-import type { AdminInvoice, InvoiceCouponDiscount } from "@/types/admin";
+import { useRouter } from "next/navigation";
+import {
+  getAdminInvoice,
+  getAdminInvoiceHistory,
+  getAdminInvoiceShareLinks,
+  toggleAdminInvoiceSharing,
+  type InvoiceShareLinks,
+} from "@/services/admin/invoice.service";
+import type { AdminInvoice, InvoiceCouponDiscount, InvoiceHistoryEntry, InvoiceHistoryActorType } from "@/types/admin";
+import {
+  EmailInvoiceDialog,
+  EditBillingDetailsDialog,
+  MarkAsPaidDialog,
+  MarkAsUnpaidDialog,
+  MarkAsOverdueDialog,
+  RefundInvoiceDialog,
+  DuplicateInvoiceDialog,
+  DeleteInvoiceDialog,
+  VoidInvoiceDialog,
+} from "./InvoiceActionDialogs";
 
 interface AdminInvoiceDetailContentProps {
   invoice_id: string;
@@ -11,6 +29,12 @@ interface AdminInvoiceDetailContentProps {
 
 const formatCurrency = (amount: number): string =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount);
+
+const isBulkDiscount = (discount_type?: string): boolean =>
+  discount_type === "bulk";
+
+const getDiscountLabel = (discount_type?: string): string =>
+  isBulkDiscount(discount_type) ? "Bulk Discount (10% off)" : "Discount";
 
 const formatDate = (date_string: string): string =>
   new Date(date_string).toLocaleDateString("en-US", {
@@ -31,20 +55,22 @@ const BackLink: React.FC = () => (
   </Link>
 );
 
-const StatusBadge: React.FC<{ status: "paid" | "void" }> = ({ status }) => {
-  const is_paid = status === "paid";
+type StatusConfig = { label: string; badge_class: string; dot_class: string };
+
+const STATUS_CONFIG: Record<import("@/types/admin").InvoiceStatus, StatusConfig> = {
+  paid:    { label: "Paid",    badge_class: "bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400",   dot_class: "bg-success-500" },
+  unpaid:  { label: "Unpaid",  badge_class: "bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400",   dot_class: "bg-warning-500" },
+  overdue: { label: "Overdue", badge_class: "bg-error-50 text-error-700 dark:bg-error-500/15 dark:text-error-400",           dot_class: "bg-error-500" },
+  refund:  { label: "Refund",  badge_class: "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400",               dot_class: "bg-blue-500" },
+  void:    { label: "Void",    badge_class: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",                 dot_class: "bg-gray-500" },
+};
+
+const StatusBadge: React.FC<{ status: import("@/types/admin").InvoiceStatus }> = ({ status }) => {
+  const cfg = STATUS_CONFIG[status];
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
-        is_paid
-          ? "bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400"
-          : "bg-error-50 text-error-700 dark:bg-error-500/15 dark:text-error-400"
-      }`}
-    >
-      <span
-        className={`h-1.5 w-1.5 rounded-full ${is_paid ? "bg-success-500" : "bg-error-500"}`}
-      />
-      {is_paid ? "Paid" : "Void"}
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${cfg.badge_class}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot_class}`} />
+      {cfg.label}
     </span>
   );
 };
@@ -128,9 +154,15 @@ function generateAdminInvoicePdf(invoice: AdminInvoice): void {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...COLORS.primary);
     doc.text("Invoice", right_x - 50, 25);
-    const is_paid = invoice.status === "paid";
-    const badge_color = is_paid ? COLORS.success : COLORS.error;
-    const badge_text = is_paid ? "Paid" : "Void";
+    const PDF_STATUS_COLORS: Record<string, [number, number, number]> = {
+      paid:    COLORS.success,
+      unpaid:  [217, 119, 6],
+      overdue: COLORS.error,
+      refund:  [37, 99, 235],
+      void:    [107, 114, 128],
+    };
+    const badge_color = PDF_STATUS_COLORS[invoice.status] ?? COLORS.secondary;
+    const badge_text = STATUS_CONFIG[invoice.status]?.label ?? invoice.status;
     doc.setFontSize(9);
     const text_w = doc.getTextWidth(badge_text);
     doc.setFillColor(...badge_color);
@@ -239,9 +271,10 @@ function generateAdminInvoicePdf(invoice: AdminInvoice): void {
     doc.text(formatCurrency(invoice.subtotal_amount), right_x, y, { align: "right" });
     y += 7;
     if (invoice.discount_amount != null && invoice.discount_amount > 0) {
+      const is_bulk = isBulkDiscount(invoice.discount_type);
       doc.setFont("helvetica", "normal");
-      doc.setTextColor(109, 40, 217); // violet-700
-      doc.text("Bulk Discount (10% off)", sum_label_x, y);
+      doc.setTextColor(...(is_bulk ? ([109, 40, 217] as [number, number, number]) : COLORS.success));
+      doc.text(getDiscountLabel(invoice.discount_type), sum_label_x, y);
       doc.setFont("helvetica", "bold");
       doc.text(`-${formatCurrency(invoice.discount_amount)}`, right_x, y, { align: "right" });
       doc.setTextColor(...COLORS.secondary);
@@ -279,10 +312,322 @@ function generateAdminInvoicePdf(invoice: AdminInvoice): void {
   });
 }
 
+// ── Share Dialog ─────────────────────────────────────────────────────────────
+
+interface ShareDialogProps {
+  invoice_id: string;
+  onClose: () => void;
+}
+
+function ShareDialog({ invoice_id, onClose }: ShareDialogProps) {
+  const [share_links, setShareLinks] = useState<InvoiceShareLinks | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [toggling, setToggling] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [copied_key, setCopiedKey] = useState<"private" | "public" | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const data = await getAdminInvoiceShareLinks(invoice_id);
+        setShareLinks(data);
+      } catch {
+        setError("Failed to load share links.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [invoice_id]);
+
+  const handleToggle = async () => {
+    if (!share_links || toggling) return;
+    setToggling(true);
+    try {
+      const updated = await toggleAdminInvoiceSharing(invoice_id, !share_links.sharing_enabled);
+      setShareLinks(updated);
+    } catch {
+      setError("Failed to update sharing settings.");
+    } finally {
+      setToggling(false);
+    }
+  };
+
+  const handleCopy = async (type: "private" | "public") => {
+    if (!share_links) return;
+    const url = type === "private" ? share_links.private_link : share_links.public_link;
+    await navigator.clipboard.writeText(url);
+    setCopiedKey(type);
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-lg rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-gray-800">
+          <div className="flex items-center gap-2.5">
+            <svg className="h-4 w-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
+            </svg>
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Get link</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6">
+          {loading && (
+            <div className="space-y-5">
+              {[1, 2].map((i) => (
+                <div key={i} className="space-y-2">
+                  <div className="h-4 w-24 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
+                  <div className="flex gap-2">
+                    <div className="h-10 flex-1 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700" />
+                    <div className="h-10 w-28 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700" />
+                  </div>
+                  <div className="h-3 w-48 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {error && !loading && (
+            <p className="text-sm text-error-600 dark:text-error-400">{error}</p>
+          )}
+
+          {!loading && share_links && (
+            <div className="space-y-5">
+              {/* Sharing toggle */}
+              <div className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-white/[0.02]">
+                <div>
+                  <p className="text-sm font-medium text-gray-800 dark:text-white">Shared links</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {share_links.sharing_enabled ? "Links are currently active" : "Links are currently disabled"}
+                  </p>
+                </div>
+                <button
+                  onClick={handleToggle}
+                  disabled={toggling}
+                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${
+                    share_links.sharing_enabled
+                      ? "bg-brand-500 dark:bg-brand-400"
+                      : "bg-gray-300 dark:bg-gray-600"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                      share_links.sharing_enabled ? "translate-x-4" : "translate-x-0.5"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Private link */}
+              <div className="space-y-1.5">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Private link</p>
+                <div className="flex gap-2">
+                  <input
+                    readOnly
+                    value={share_links.private_link}
+                    className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-xs text-gray-600 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400"
+                  />
+                  <button
+                    onClick={() => handleCopy("private")}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                  >
+                    {copied_key === "private" ? (
+                      <>
+                        <svg className="h-3.5 w-3.5 text-success-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+                        </svg>
+                        Copy link
+                      </>
+                    )}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 dark:text-gray-500">Client will need to sign in to view invoice.</p>
+              </div>
+
+              {/* Public link */}
+              <div className="space-y-1.5">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Public link</p>
+                <div className="flex gap-2">
+                  <input
+                    readOnly
+                    value={share_links.public_link}
+                    className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-xs text-gray-600 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400"
+                  />
+                  <button
+                    onClick={() => handleCopy("public")}
+                    disabled={!share_links.sharing_enabled}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                  >
+                    {copied_key === "public" ? (
+                      <>
+                        <svg className="h-3.5 w-3.5 text-success-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+                        </svg>
+                        Copy link
+                      </>
+                    )}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 dark:text-gray-500">Anybody with this link can view and pay the invoice.</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── History timeline helpers ──────────────────────────────────────────────────
+
+const ACTOR_STYLES: Record<InvoiceHistoryActorType, string> = {
+  system:  "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400",
+  client:  "bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-400",
+  admin:   "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-400",
+};
+
+function groupHistoryByDate(entries: InvoiceHistoryEntry[]): Array<{ date_label: string; entries: InvoiceHistoryEntry[] }> {
+  const groups: Record<string, InvoiceHistoryEntry[]> = {};
+  entries.forEach((entry) => {
+    const label = new Date(entry.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    if (!groups[label]) groups[label] = [];
+    groups[label].push(entry);
+  });
+  return Object.entries(groups).map(([date_label, entries]) => ({ date_label, entries }));
+}
+
+// ── Actions dropdown ──────────────────────────────────────────────────────────
+
+type ActiveDialog = "email" | "edit" | "edit_billing" | "mark_paid" | "mark_unpaid" | "mark_overdue" | "refund" | "duplicate" | "delete" | "void" | null;
+// "edit" is intercepted in handleDialogSelect and navigates to the full edit page
+
+interface ActionsDropdownProps {
+  onSelect: (dialog: ActiveDialog) => void;
+}
+
+function ActionsDropdown({ onSelect }: ActionsDropdownProps) {
+  const [open, setOpen] = useState(false);
+  const container_ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleOutside(e: MouseEvent) {
+      if (container_ref.current && !container_ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, []);
+
+  const handleSelect = (dialog: ActiveDialog) => {
+    setOpen(false);
+    onSelect(dialog);
+  };
+
+  const menu_items: { label: string; dialog: ActiveDialog; danger?: boolean; separator_before?: boolean }[] = [
+    { label: "Email invoice",   dialog: "email" },
+    { label: "Edit",            dialog: "edit" },
+    { label: "Edit Billing Details", dialog: "edit_billing" },
+    { label: "Mark as Paid",    dialog: "mark_paid",    separator_before: true },
+    { label: "Mark as Unpaid",  dialog: "mark_unpaid" },
+    { label: "Mark as Overdue", dialog: "mark_overdue" },
+    { label: "Refund",          dialog: "refund" },
+    { label: "Duplicate",       dialog: "duplicate",   separator_before: true },
+    { label: "Void",            dialog: "void",        separator_before: true },
+    { label: "Delete",          dialog: "delete",      danger: true },
+  ];
+
+  return (
+    <div className="relative" ref={container_ref}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+      >
+        Actions
+        <svg
+          className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          strokeWidth={2}
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full z-40 mt-1.5 w-52 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
+          {menu_items.map((item) => (
+            <React.Fragment key={item.dialog}>
+              {item.separator_before && (
+                <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
+              )}
+              <button
+                onClick={() => handleSelect(item.dialog)}
+                className={`flex w-full items-center px-4 py-2.5 text-sm transition-colors ${
+                  item.danger
+                    ? "text-error-600 hover:bg-error-50 dark:text-error-400 dark:hover:bg-error-500/10"
+                    : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                }`}
+              >
+                {item.label}
+              </button>
+            </React.Fragment>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
 export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDetailContentProps) {
+  const router = useRouter();
   const [invoice, setInvoice] = useState<AdminInvoice | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [active_tab, setActiveTab] = useState<"details" | "history">("details");
+  const [share_dialog_open, setShareDialogOpen] = useState(false);
+  const [active_dialog, setActiveDialog] = useState<ActiveDialog>(null);
+  const [history_entries, setHistoryEntries] = useState<InvoiceHistoryEntry[]>([]);
+  const [history_loading, setHistoryLoading] = useState(false);
+  const [history_error, setHistoryError] = useState<string | null>(null);
+
+  function handleDialogSelect(dialog: ActiveDialog) {
+    if (dialog === "edit" && invoice) {
+      router.push(`/admin/invoices/${invoice.id}/edit`);
+      return;
+    }
+    setActiveDialog(dialog);
+  }
 
   useEffect(() => {
     const loadInvoice = async () => {
@@ -304,6 +649,23 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
     };
     loadInvoice();
   }, [invoice_id]);
+
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    setHistoryError(null);
+    try {
+      const data = await getAdminInvoiceHistory(invoice_id);
+      setHistoryEntries(data);
+    } catch {
+      setHistoryError("Failed to load history.");
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [invoice_id]);
+
+  useEffect(() => {
+    if (active_tab === "history") loadHistory();
+  }, [active_tab, loadHistory]);
 
   if (loading) return <SkeletonLoader />;
 
@@ -352,17 +714,153 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
           </h1>
           <StatusBadge status={invoice.status} />
         </div>
-        <button
-          onClick={() => generateAdminInvoicePdf(invoice)}
-          className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-          </svg>
-          Download PDF
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShareDialogOpen(true)}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
+            </svg>
+            Share
+          </button>
+          <button
+            onClick={() => generateAdminInvoicePdf(invoice)}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+            Download PDF
+          </button>
+          <ActionsDropdown onSelect={handleDialogSelect} />
+        </div>
       </div>
 
+      {/* Tabs */}
+      <div className="border-b border-gray-200 dark:border-gray-800">
+        <nav className="-mb-px flex gap-0" aria-label="Invoice tabs">
+          <button
+            onClick={() => setActiveTab("details")}
+            className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
+              active_tab === "details"
+                ? "border-brand-500 text-brand-600 dark:border-brand-400 dark:text-brand-400"
+                : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-300"
+            }`}
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
+            </svg>
+            Details
+          </button>
+          <button
+            onClick={() => setActiveTab("history")}
+            className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
+              active_tab === "history"
+                ? "border-brand-500 text-brand-600 dark:border-brand-400 dark:text-brand-400"
+                : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-300"
+            }`}
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            History
+          </button>
+        </nav>
+      </div>
+
+      {/* ── History tab ───────────────────────────────────── */}
+      {active_tab === "history" && (
+        <div className="min-h-[300px]">
+          {history_loading && (
+            <div className="space-y-6 py-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-start gap-4">
+                  <div className="h-8 w-8 shrink-0 animate-pulse rounded-full bg-gray-200 dark:bg-gray-700" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-48 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
+                    <div className="h-3 w-24 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {history_error && !history_loading && (
+            <div className="flex items-center gap-3 rounded-xl border border-error-200 bg-error-50 p-4 text-sm text-error-600 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
+              <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+              </svg>
+              {history_error}
+              <button
+                onClick={loadHistory}
+                className="ml-auto text-xs font-medium underline underline-offset-2"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {!history_loading && !history_error && history_entries.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
+                <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">No history yet</p>
+              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Activity for this invoice will appear here</p>
+            </div>
+          )}
+
+          {!history_loading && !history_error && history_entries.length > 0 && (
+            <div className="space-y-8">
+              {groupHistoryByDate(history_entries).map(({ date_label, entries }) => (
+                <div key={date_label}>
+                  <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                    {date_label}
+                  </p>
+                  <div className="relative space-y-0">
+                    {/* Vertical connector line */}
+                    <div className="absolute left-4 top-4 bottom-4 w-px bg-gray-200 dark:bg-gray-700" />
+                    {entries.map((entry) => (
+                      <div key={entry.id} className="relative flex items-start gap-4 py-3">
+                        <div
+                          className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${ACTOR_STYLES[entry.actor_type]}`}
+                        >
+                          {entry.actor_initials}
+                        </div>
+                        <div className="min-w-0 flex-1 pt-1">
+                          <p className="text-sm text-gray-800 dark:text-gray-200">
+                            <span className="font-medium">{entry.actor_name}</span>
+                            {" "}
+                            <span className="text-gray-600 dark:text-gray-400">{entry.event}</span>
+                          </p>
+                          {entry.description && (
+                            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                              {entry.description}
+                            </p>
+                          )}
+                          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                            {new Date(entry.created_at).toLocaleTimeString("en-US", {
+                              hour: "numeric",
+                              minute: "2-digit",
+                              hour12: true,
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Details tab ───────────────────────────────────── */}
+      {active_tab === "details" && (
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* ── Main column ───────────────────────────────── */}
         <div className="space-y-6 lg:col-span-8">
@@ -495,13 +993,13 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
                 </div>
                 {invoice.discount_amount != null && invoice.discount_amount > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span className="flex items-center gap-1.5 font-medium text-violet-600 dark:text-violet-400">
+                    <span className={`flex items-center gap-1.5 font-medium ${isBulkDiscount(invoice.discount_type) ? "text-violet-600 dark:text-violet-400" : "text-emerald-600 dark:text-emerald-400"}`}>
                       <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
                       </svg>
-                      Bulk Discount (10% off)
+                      {getDiscountLabel(invoice.discount_type)}
                     </span>
-                    <span className="font-semibold tabular-nums text-violet-600 dark:text-violet-400">
+                    <span className={`font-semibold tabular-nums ${isBulkDiscount(invoice.discount_type) ? "text-violet-600 dark:text-violet-400" : "text-emerald-600 dark:text-emerald-400"}`}>
                       -{formatAmount(invoice.discount_amount)}
                     </span>
                   </div>
@@ -604,14 +1102,14 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
               {invoice.discount_amount != null && invoice.discount_amount > 0 && (
                 <InfoRow
                   label={
-                    <span className="flex items-center gap-1.5 font-medium text-violet-600 dark:text-violet-400">
+                    <span className={`flex items-center gap-1.5 font-medium ${isBulkDiscount(invoice.discount_type) ? "text-violet-600 dark:text-violet-400" : "text-emerald-600 dark:text-emerald-400"}`}>
                       <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
                       </svg>
-                      Bulk Discount (10%)
+                      {getDiscountLabel(invoice.discount_type)}
                     </span>
                   }
-                  value={<span className="font-semibold tabular-nums text-violet-600 dark:text-violet-400">-{formatAmount(invoice.discount_amount)}</span>}
+                  value={<span className={`font-semibold tabular-nums ${isBulkDiscount(invoice.discount_type) ? "text-violet-600 dark:text-violet-400" : "text-emerald-600 dark:text-emerald-400"}`}>-{formatAmount(invoice.discount_amount)}</span>}
                 />
               )}
               {invoice.coupon_discounts && invoice.coupon_discounts.length > 0 && (
@@ -695,6 +1193,75 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
           </div>
         </div>
       </div>
+      )}
+
+      {share_dialog_open && (
+        <ShareDialog invoice_id={invoice_id} onClose={() => setShareDialogOpen(false)} />
+      )}
+
+      {active_dialog === "email" && (
+        <EmailInvoiceDialog
+          invoice={invoice}
+          onClose={() => setActiveDialog(null)}
+        />
+      )}
+      {active_dialog === "edit_billing" && (
+        <EditBillingDetailsDialog
+          invoice={invoice}
+          onClose={() => setActiveDialog(null)}
+          onSuccess={(updated) => { setInvoice(updated); setActiveDialog(null); }}
+        />
+      )}
+      {active_dialog === "mark_paid" && (
+        <MarkAsPaidDialog
+          invoice={invoice}
+          onClose={() => setActiveDialog(null)}
+          onSuccess={(updated) => { setInvoice(updated); setActiveDialog(null); }}
+        />
+      )}
+      {active_dialog === "mark_unpaid" && (
+        <MarkAsUnpaidDialog
+          invoice={invoice}
+          onClose={() => setActiveDialog(null)}
+          onSuccess={(updated) => { setInvoice(updated); setActiveDialog(null); }}
+        />
+      )}
+      {active_dialog === "mark_overdue" && (
+        <MarkAsOverdueDialog
+          invoice={invoice}
+          onClose={() => setActiveDialog(null)}
+          onSuccess={(updated) => { setInvoice(updated); setActiveDialog(null); }}
+        />
+      )}
+      {active_dialog === "refund" && (
+        <RefundInvoiceDialog
+          invoice={invoice}
+          onClose={() => setActiveDialog(null)}
+          onSuccess={(updated) => { setInvoice(updated); setActiveDialog(null); }}
+        />
+      )}
+      {active_dialog === "duplicate" && (
+        <DuplicateInvoiceDialog
+          invoice={invoice}
+          onClose={() => setActiveDialog(null)}
+          onSuccess={() => setActiveDialog(null)}
+        />
+      )}
+      {active_dialog === "delete" && (
+        <DeleteInvoiceDialog
+          invoice={invoice}
+          onClose={() => setActiveDialog(null)}
+          onSuccess={() => setActiveDialog(null)}
+        />
+      )}
+      {active_dialog === "void" && (
+        <VoidInvoiceDialog
+          invoice={invoice}
+          onClose={() => setActiveDialog(null)}
+          onVoidSuccess={(updated) => { setInvoice(updated); setActiveDialog(null); }}
+          onDeleteSuccess={() => setActiveDialog(null)}
+        />
+      )}
     </div>
   );
 }

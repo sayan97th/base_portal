@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { listAdminInvoices } from "@/services/admin/invoice.service";
 import type {
   AdminInvoice,
@@ -14,8 +15,19 @@ import { useDebounce } from "@/hooks/useDebounce";
 import InvoiceFiltersBar from "./InvoiceFiltersBar";
 
 const STATUS_STYLES: Record<InvoiceStatus, string> = {
-  paid: "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400",
-  void: "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400",
+  paid:     "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400",
+  unpaid:   "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400",
+  overdue:  "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400",
+  refund:   "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400",
+  void:     "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+};
+
+const STATUS_LABELS: Record<InvoiceStatus, string> = {
+  paid:    "Paid",
+  unpaid:  "Unpaid",
+  overdue: "Overdue",
+  refund:  "Refund",
+  void:    "Void",
 };
 
 type SortableColumn = "invoice_number" | "customer" | "status" | "total_amount" | "date_issued";
@@ -63,6 +75,7 @@ function SortIcon({
 }
 
 export default function AdminInvoicesContent() {
+  const router = useRouter();
   const [invoices, setInvoices] = useState<AdminInvoice[]>([]);
   const [is_loading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -153,13 +166,24 @@ export default function AdminInvoicesContent() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-          Invoices
-        </h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          {total > 0 ? `${total} total invoices` : "Manage all platform invoices"}
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+            Invoices
+          </h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            {total > 0 ? `${total} total invoices` : "Manage all platform invoices"}
+          </p>
+        </div>
+        <button
+          onClick={() => router.push("/admin/invoices/create")}
+          className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-brand-700 active:scale-[0.98] dark:bg-brand-500 dark:hover:bg-brand-600"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+          Generate Invoice
+        </button>
       </div>
 
       {/* Filters */}
@@ -299,7 +323,7 @@ export default function AdminInvoicesContent() {
                       className="cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-white/2"
                     >
                       <td className="px-6 py-4">
-                        <Link href={`/admin/invoices/${invoice.unique_id}`} className="block">
+                        <Link href={`/admin/invoices/${invoice.id}`} className="block">
                           <p className="font-medium text-gray-900 dark:text-white">
                             {invoice.invoice_number}
                           </p>
@@ -309,30 +333,30 @@ export default function AdminInvoicesContent() {
                         </Link>
                       </td>
                       <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
-                        <Link href={`/admin/invoices/${invoice.unique_id}`} className="block">
+                        <Link href={`/admin/invoices/${invoice.id}`} className="block">
                           <p>{invoice.user.first_name} {invoice.user.last_name}</p>
                           <p className="text-xs text-gray-400">{invoice.user.email}</p>
                         </Link>
                       </td>
                       <td className="px-6 py-4">
-                        <Link href={`/admin/invoices/${invoice.unique_id}`} className="block">
-                          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[invoice.status]}`}>
-                            {invoice.status}
+                        <Link href={`/admin/invoices/${invoice.id}`} className="block">
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[invoice.status]}`}>
+                            {STATUS_LABELS[invoice.status]}
                           </span>
                         </Link>
                       </td>
                       <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
-                        <Link href={`/admin/invoices/${invoice.unique_id}`} className="block">
+                        <Link href={`/admin/invoices/${invoice.id}`} className="block">
                           {invoice.payment_method}
                         </Link>
                       </td>
                       <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
-                        <Link href={`/admin/invoices/${invoice.unique_id}`} className="block">
+                        <Link href={`/admin/invoices/${invoice.id}`} className="block">
                           ${invoice.total_amount.toFixed(2)}
                         </Link>
                       </td>
                       <td className="px-6 py-4 text-gray-500 dark:text-gray-400">
-                        <Link href={`/admin/invoices/${invoice.unique_id}`} className="block">
+                        <Link href={`/admin/invoices/${invoice.id}`} className="block">
                           {invoice.date_issued
                             ? new Date(invoice.date_issued).toLocaleDateString()
                             : <span className="text-gray-400">—</span>}
@@ -340,7 +364,7 @@ export default function AdminInvoicesContent() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <Link
-                          href={`/admin/invoices/${invoice.unique_id}`}
+                          href={`/admin/invoices/${invoice.id}`}
                           className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:border-brand-700 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
                         >
                           View Details

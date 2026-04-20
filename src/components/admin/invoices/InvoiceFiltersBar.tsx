@@ -149,9 +149,12 @@ const SORT_OPTIONS: SortOption[] = [
 // ── Status options ─────────────────────────────────────────────────────────────
 
 const STATUS_OPTIONS: { value: InvoiceStatus | ""; label: string; dot_class: string }[] = [
-  { value: "", label: "All", dot_class: "bg-gray-400" },
-  { value: "paid", label: "Paid", dot_class: "bg-success-500" },
-  { value: "void", label: "Void", dot_class: "bg-error-500" },
+  { value: "",        label: "All",     dot_class: "bg-gray-400" },
+  { value: "paid",    label: "Paid",    dot_class: "bg-success-500" },
+  { value: "unpaid",  label: "Unpaid",  dot_class: "bg-warning-500" },
+  { value: "overdue", label: "Overdue", dot_class: "bg-error-500" },
+  { value: "refund",  label: "Refund",  dot_class: "bg-blue-500" },
+  { value: "void",    label: "Void",    dot_class: "bg-gray-500" },
 ];
 
 // ── Props ──────────────────────────────────────────────────────────────────────
