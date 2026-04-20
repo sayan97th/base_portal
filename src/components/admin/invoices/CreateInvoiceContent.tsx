@@ -589,7 +589,7 @@ export default function CreateInvoiceContent() {
       };
 
       const invoice = await createAdminInvoice(payload);
-      router.push(`/admin/invoices/${invoice.unique_id}`);
+      router.push(`/admin/invoices/${invoice.id}`);
     } catch (err: unknown) {
       const api_error = err as { message?: string };
       setSubmitError(api_error?.message || "Failed to create invoice. Please try again.");
