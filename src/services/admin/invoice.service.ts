@@ -106,6 +106,7 @@ export interface InvoiceShareLinks {
   sharing_enabled: boolean;
   private_link: string;
   public_link: string;
+  payment_link: string;
 }
 
 function applyShareDomain(link: string): string {
@@ -120,11 +121,17 @@ function applyShareDomain(link: string): string {
   }
 }
 
+function derivePaymentLink(public_link: string): string {
+  return public_link.replace(/\/view(\?|#|$)/, "/pay$1");
+}
+
 function normalizeShareLinks(raw: InvoiceShareLinks): InvoiceShareLinks {
+  const normalized_public = applyShareDomain(raw.public_link);
   return {
     ...raw,
     private_link: applyShareDomain(raw.private_link),
-    public_link: applyShareDomain(raw.public_link),
+    public_link: normalized_public,
+    payment_link: derivePaymentLink(normalized_public),
   };
 }
 

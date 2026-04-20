@@ -324,7 +324,7 @@ function ShareDialog({ invoice_id, onClose }: ShareDialogProps) {
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copied_key, setCopiedKey] = useState<"private" | "public" | null>(null);
+  const [copied_key, setCopiedKey] = useState<"private" | "public" | "payment" | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -353,9 +353,14 @@ function ShareDialog({ invoice_id, onClose }: ShareDialogProps) {
     }
   };
 
-  const handleCopy = async (type: "private" | "public") => {
+  const handleCopy = async (type: "private" | "public" | "payment") => {
     if (!share_links) return;
-    const url = type === "private" ? share_links.private_link : share_links.public_link;
+    const url =
+      type === "private"
+        ? share_links.private_link
+        : type === "payment"
+        ? share_links.payment_link
+        : share_links.public_link;
     await navigator.clipboard.writeText(url);
     setCopiedKey(type);
     setTimeout(() => setCopiedKey(null), 2000);
@@ -496,6 +501,47 @@ function ShareDialog({ invoice_id, onClose }: ShareDialogProps) {
                   </button>
                 </div>
                 <p className="text-xs text-gray-400 dark:text-gray-500">Anybody with this link can view and pay the invoice.</p>
+              </div>
+
+              {/* Payment link */}
+              <div className="space-y-1.5 rounded-xl border border-brand-200 bg-brand-50/50 p-4 dark:border-brand-500/20 dark:bg-brand-500/5">
+                <div className="flex items-center gap-2">
+                  <svg className="h-3.5 w-3.5 text-brand-500 dark:text-brand-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+                  </svg>
+                  <p className="text-sm font-semibold text-brand-700 dark:text-brand-400">Payment link</p>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    readOnly
+                    value={share_links.payment_link}
+                    className="min-w-0 flex-1 rounded-lg border border-brand-200 bg-white px-3 py-2 font-mono text-xs text-gray-600 focus:outline-none dark:border-brand-500/30 dark:bg-gray-800 dark:text-gray-400"
+                  />
+                  <button
+                    onClick={() => handleCopy("payment")}
+                    disabled={!share_links.sharing_enabled}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-300 bg-brand-500 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-brand-500 dark:bg-brand-500 dark:hover:bg-brand-600"
+                  >
+                    {copied_key === "payment" ? (
+                      <>
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+                        </svg>
+                        Copy link
+                      </>
+                    )}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Share this link so anyone can pay this invoice directly — no sign-in required.
+                </p>
               </div>
             </div>
           )}
@@ -724,6 +770,17 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
             </svg>
             Share
           </button>
+          {invoice.status !== "paid" && invoice.status !== "void" && invoice.status !== "refund" && invoice.currency_type !== "credits" && (
+            <button
+              onClick={() => setShareDialogOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-brand-300 bg-brand-50 px-4 py-2 text-sm font-medium text-brand-700 transition-colors hover:bg-brand-100 dark:border-brand-500/40 dark:bg-brand-500/10 dark:text-brand-400 dark:hover:bg-brand-500/20"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+              </svg>
+              Pay Link
+            </button>
+          )}
           <button
             onClick={() => generateAdminInvoicePdf(invoice)}
             className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
