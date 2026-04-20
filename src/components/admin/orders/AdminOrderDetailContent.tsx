@@ -229,9 +229,12 @@ interface InvoiceCardProps {
 }
 
 const InvoiceCard = ({ invoice }: InvoiceCardProps) => {
-  const status_styles = {
-    paid: "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400",
-    void: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+  const status_styles: Record<string, string> = {
+    paid:    "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400",
+    unpaid:  "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400",
+    overdue: "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400",
+    refund:  "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400",
+    void:    "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
   };
 
   return (
