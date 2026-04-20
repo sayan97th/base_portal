@@ -100,8 +100,17 @@ const PublicInvoiceView: React.FC<PublicInvoiceViewProps> = ({
     );
   }
 
-  const status_color = invoice.status === "paid" ? "success" : "error";
-  const status_label = invoice.status === "paid" ? "Paid" : "Void";
+  const STATUS_CONFIG: Record<string, { color: "success" | "warning" | "error" | "info" | "light"; dot: string; label: string }> = {
+    paid:    { color: "success", dot: "bg-success-500", label: "Paid" },
+    unpaid:  { color: "warning", dot: "bg-warning-500", label: "Unpaid" },
+    overdue: { color: "error",   dot: "bg-error-500",   label: "Overdue" },
+    refund:  { color: "info",    dot: "bg-blue-500",    label: "Refund" },
+    void:    { color: "light",   dot: "bg-gray-500",    label: "Void" },
+  };
+  const status_cfg = STATUS_CONFIG[invoice.status] ?? STATUS_CONFIG.void;
+  const status_color = status_cfg.color;
+  const status_label = status_cfg.label;
+  const status_dot = status_cfg.dot;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 px-4 py-10 sm:px-6 lg:px-8">
@@ -119,7 +128,7 @@ const PublicInvoiceView: React.FC<PublicInvoiceViewProps> = ({
               startIcon={
                 <span
                   className={`inline-block h-2 w-2 rounded-full ${
-                    invoice.status === "paid" ? "bg-success-500" : "bg-error-500"
+                    status_dot
                   }`}
                 />
               }

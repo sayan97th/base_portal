@@ -8,6 +8,9 @@ import {
   updateAdminInvoice,
   updateAdminInvoiceBilling,
   markAdminInvoiceAsPaid,
+  markAdminInvoiceAsUnpaid,
+  markAdminInvoiceAsOverdue,
+  refundAdminInvoice,
   duplicateAdminInvoice,
   deleteAdminInvoice,
   voidAdminInvoice,
@@ -705,6 +708,301 @@ export function MarkAsPaidDialog({ invoice, onClose, onSuccess }: MarkAsPaidDial
             </svg>
           )}
           Mark as Paid
+        </button>
+      </DialogFooter>
+    </DialogShell>
+  );
+}
+
+// ── Mark as Unpaid Dialog ─────────────────────────────────────────────────────
+
+interface MarkAsUnpaidDialogProps {
+  invoice: AdminInvoice;
+  onClose: () => void;
+  onSuccess: (updated: AdminInvoice) => void;
+}
+
+export function MarkAsUnpaidDialog({ invoice, onClose, onSuccess }: MarkAsUnpaidDialogProps) {
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const customer_name = `${invoice.user.first_name} ${invoice.user.last_name}`;
+
+  const handleConfirm = async () => {
+    setError(null);
+    setSubmitting(true);
+    try {
+      const updated = await markAdminInvoiceAsUnpaid(invoice.id);
+      onSuccess(updated);
+    } catch {
+      setError("Failed to mark invoice as unpaid. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <DialogShell onClose={onClose}>
+      <DialogHeader
+        title="Mark as Unpaid"
+        onClose={onClose}
+        icon={
+          <svg className="h-4 w-4 text-warning-600 dark:text-warning-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        }
+      />
+
+      <div className="p-6">
+        <div className="mb-5 flex items-center gap-4 rounded-xl border border-warning-200 bg-warning-50 p-4 dark:border-warning-500/30 dark:bg-warning-500/10">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-warning-100 dark:bg-warning-500/20">
+            <svg className="h-5 w-5 text-warning-600 dark:text-warning-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-warning-800 dark:text-warning-300">Confirm status change to Unpaid</p>
+            <p className="mt-0.5 text-xs text-warning-700 dark:text-warning-400">
+              Invoice <span className="font-mono font-semibold">{invoice.invoice_number}</span> will be marked as unpaid and the payment date will be cleared.
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-2 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500 dark:text-gray-400">Customer</span>
+            <span className="font-medium text-gray-900 dark:text-white">{customer_name}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500 dark:text-gray-400">Invoice Amount</span>
+            <span className="font-semibold text-gray-900 dark:text-white">
+              {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(invoice.total_amount)}
+            </span>
+          </div>
+        </div>
+
+        {error && <div className="mt-4"><ErrorBanner message={error} /></div>}
+      </div>
+
+      <DialogFooter>
+        <button
+          onClick={onClose}
+          disabled={submitting}
+          className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleConfirm}
+          disabled={submitting}
+          className="inline-flex items-center gap-2 rounded-lg bg-warning-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-warning-700 disabled:opacity-50 dark:bg-warning-500 dark:hover:bg-warning-400"
+        >
+          {submitting && (
+            <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          )}
+          Mark as Unpaid
+        </button>
+      </DialogFooter>
+    </DialogShell>
+  );
+}
+
+// ── Mark as Overdue Dialog ────────────────────────────────────────────────────
+
+interface MarkAsOverdueDialogProps {
+  invoice: AdminInvoice;
+  onClose: () => void;
+  onSuccess: (updated: AdminInvoice) => void;
+}
+
+export function MarkAsOverdueDialog({ invoice, onClose, onSuccess }: MarkAsOverdueDialogProps) {
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const customer_name = `${invoice.user.first_name} ${invoice.user.last_name}`;
+
+  const handleConfirm = async () => {
+    setError(null);
+    setSubmitting(true);
+    try {
+      const updated = await markAdminInvoiceAsOverdue(invoice.id);
+      onSuccess(updated);
+    } catch {
+      setError("Failed to mark invoice as overdue. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <DialogShell onClose={onClose}>
+      <DialogHeader
+        title="Mark as Overdue"
+        onClose={onClose}
+        variant="danger"
+        icon={
+          <svg className="h-4 w-4 text-error-600 dark:text-error-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+        }
+      />
+
+      <div className="p-6">
+        <div className="mb-5 flex items-center gap-4 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-error-100 dark:bg-error-500/20">
+            <svg className="h-5 w-5 text-error-600 dark:text-error-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-error-800 dark:text-error-300">Confirm status change to Overdue</p>
+            <p className="mt-0.5 text-xs text-error-700 dark:text-error-400">
+              Invoice <span className="font-mono font-semibold">{invoice.invoice_number}</span> will be flagged as overdue. The client will be notified if reminders are enabled.
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-2 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500 dark:text-gray-400">Customer</span>
+            <span className="font-medium text-gray-900 dark:text-white">{customer_name}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500 dark:text-gray-400">Invoice Amount</span>
+            <span className="font-semibold text-gray-900 dark:text-white">
+              {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(invoice.total_amount)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500 dark:text-gray-400">Due Date</span>
+            <span className="font-medium text-error-600 dark:text-error-400">
+              {invoice.date_due ? new Date(invoice.date_due).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}
+            </span>
+          </div>
+        </div>
+
+        {error && <div className="mt-4"><ErrorBanner message={error} /></div>}
+      </div>
+
+      <DialogFooter>
+        <button
+          onClick={onClose}
+          disabled={submitting}
+          className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleConfirm}
+          disabled={submitting}
+          className="inline-flex items-center gap-2 rounded-lg bg-error-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-error-700 disabled:opacity-50 dark:bg-error-500 dark:hover:bg-error-400"
+        >
+          {submitting && (
+            <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          )}
+          Mark as Overdue
+        </button>
+      </DialogFooter>
+    </DialogShell>
+  );
+}
+
+// ── Refund Invoice Dialog ─────────────────────────────────────────────────────
+
+interface RefundInvoiceDialogProps {
+  invoice: AdminInvoice;
+  onClose: () => void;
+  onSuccess: (updated: AdminInvoice) => void;
+}
+
+export function RefundInvoiceDialog({ invoice, onClose, onSuccess }: RefundInvoiceDialogProps) {
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const customer_name = `${invoice.user.first_name} ${invoice.user.last_name}`;
+
+  const handleConfirm = async () => {
+    setError(null);
+    setSubmitting(true);
+    try {
+      const updated = await refundAdminInvoice(invoice.id);
+      onSuccess(updated);
+    } catch {
+      setError("Failed to process refund. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <DialogShell onClose={onClose}>
+      <DialogHeader
+        title="Refund Invoice"
+        onClose={onClose}
+        icon={
+          <svg className="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+          </svg>
+        }
+      />
+
+      <div className="p-6">
+        <div className="mb-5 flex items-center gap-4 rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-500/30 dark:bg-blue-500/10">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-500/20">
+            <svg className="h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-blue-800 dark:text-blue-300">Confirm refund for this invoice</p>
+            <p className="mt-0.5 text-xs text-blue-700 dark:text-blue-400">
+              Invoice <span className="font-mono font-semibold">{invoice.invoice_number}</span> will be marked as refunded. This records that payment was returned to the customer.
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-2 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500 dark:text-gray-400">Customer</span>
+            <span className="font-medium text-gray-900 dark:text-white">{customer_name}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500 dark:text-gray-400">Refund Amount</span>
+            <span className="font-semibold text-blue-700 dark:text-blue-400">
+              {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(invoice.total_amount)}
+            </span>
+          </div>
+        </div>
+
+        {error && <div className="mt-4"><ErrorBanner message={error} /></div>}
+      </div>
+
+      <DialogFooter>
+        <button
+          onClick={onClose}
+          disabled={submitting}
+          className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleConfirm}
+          disabled={submitting}
+          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-400"
+        >
+          {submitting && (
+            <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          )}
+          Process Refund
         </button>
       </DialogFooter>
     </DialogShell>

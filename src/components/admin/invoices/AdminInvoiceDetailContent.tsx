@@ -15,6 +15,9 @@ import {
   EmailInvoiceDialog,
   EditBillingDetailsDialog,
   MarkAsPaidDialog,
+  MarkAsUnpaidDialog,
+  MarkAsOverdueDialog,
+  RefundInvoiceDialog,
   DuplicateInvoiceDialog,
   DeleteInvoiceDialog,
   VoidInvoiceDialog,
@@ -52,20 +55,22 @@ const BackLink: React.FC = () => (
   </Link>
 );
 
-const StatusBadge: React.FC<{ status: "paid" | "void" }> = ({ status }) => {
-  const is_paid = status === "paid";
+type StatusConfig = { label: string; badge_class: string; dot_class: string };
+
+const STATUS_CONFIG: Record<import("@/types/admin").InvoiceStatus, StatusConfig> = {
+  paid:    { label: "Paid",    badge_class: "bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400",   dot_class: "bg-success-500" },
+  unpaid:  { label: "Unpaid",  badge_class: "bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400",   dot_class: "bg-warning-500" },
+  overdue: { label: "Overdue", badge_class: "bg-error-50 text-error-700 dark:bg-error-500/15 dark:text-error-400",           dot_class: "bg-error-500" },
+  refund:  { label: "Refund",  badge_class: "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400",               dot_class: "bg-blue-500" },
+  void:    { label: "Void",    badge_class: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",                 dot_class: "bg-gray-500" },
+};
+
+const StatusBadge: React.FC<{ status: import("@/types/admin").InvoiceStatus }> = ({ status }) => {
+  const cfg = STATUS_CONFIG[status];
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
-        is_paid
-          ? "bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400"
-          : "bg-error-50 text-error-700 dark:bg-error-500/15 dark:text-error-400"
-      }`}
-    >
-      <span
-        className={`h-1.5 w-1.5 rounded-full ${is_paid ? "bg-success-500" : "bg-error-500"}`}
-      />
-      {is_paid ? "Paid" : "Void"}
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${cfg.badge_class}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot_class}`} />
+      {cfg.label}
     </span>
   );
 };
@@ -149,9 +154,15 @@ function generateAdminInvoicePdf(invoice: AdminInvoice): void {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...COLORS.primary);
     doc.text("Invoice", right_x - 50, 25);
-    const is_paid = invoice.status === "paid";
-    const badge_color = is_paid ? COLORS.success : COLORS.error;
-    const badge_text = is_paid ? "Paid" : "Void";
+    const PDF_STATUS_COLORS: Record<string, [number, number, number]> = {
+      paid:    COLORS.success,
+      unpaid:  [217, 119, 6],
+      overdue: COLORS.error,
+      refund:  [37, 99, 235],
+      void:    [107, 114, 128],
+    };
+    const badge_color = PDF_STATUS_COLORS[invoice.status] ?? COLORS.secondary;
+    const badge_text = STATUS_CONFIG[invoice.status]?.label ?? invoice.status;
     doc.setFontSize(9);
     const text_w = doc.getTextWidth(badge_text);
     doc.setFillColor(...badge_color);
@@ -514,7 +525,7 @@ function groupHistoryByDate(entries: InvoiceHistoryEntry[]): Array<{ date_label:
 
 // ── Actions dropdown ──────────────────────────────────────────────────────────
 
-type ActiveDialog = "email" | "edit" | "edit_billing" | "mark_paid" | "duplicate" | "delete" | "void" | null;
+type ActiveDialog = "email" | "edit" | "edit_billing" | "mark_paid" | "mark_unpaid" | "mark_overdue" | "refund" | "duplicate" | "delete" | "void" | null;
 // "edit" is intercepted in handleDialogSelect and navigates to the full edit page
 
 interface ActionsDropdownProps {
@@ -541,13 +552,16 @@ function ActionsDropdown({ onSelect }: ActionsDropdownProps) {
   };
 
   const menu_items: { label: string; dialog: ActiveDialog; danger?: boolean; separator_before?: boolean }[] = [
-    { label: "Email invoice", dialog: "email" },
-    { label: "Edit", dialog: "edit" },
+    { label: "Email invoice",   dialog: "email" },
+    { label: "Edit",            dialog: "edit" },
     { label: "Edit Billing Details", dialog: "edit_billing" },
-    { label: "Mark as paid", dialog: "mark_paid", separator_before: true },
-    { label: "Duplicate", dialog: "duplicate" },
-    { label: "Void", dialog: "void", separator_before: true },
-    { label: "Delete", dialog: "delete", danger: true },
+    { label: "Mark as Paid",    dialog: "mark_paid",    separator_before: true },
+    { label: "Mark as Unpaid",  dialog: "mark_unpaid" },
+    { label: "Mark as Overdue", dialog: "mark_overdue" },
+    { label: "Refund",          dialog: "refund" },
+    { label: "Duplicate",       dialog: "duplicate",   separator_before: true },
+    { label: "Void",            dialog: "void",        separator_before: true },
+    { label: "Delete",          dialog: "delete",      danger: true },
   ];
 
   return (
@@ -1200,6 +1214,27 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
       )}
       {active_dialog === "mark_paid" && (
         <MarkAsPaidDialog
+          invoice={invoice}
+          onClose={() => setActiveDialog(null)}
+          onSuccess={(updated) => { setInvoice(updated); setActiveDialog(null); }}
+        />
+      )}
+      {active_dialog === "mark_unpaid" && (
+        <MarkAsUnpaidDialog
+          invoice={invoice}
+          onClose={() => setActiveDialog(null)}
+          onSuccess={(updated) => { setInvoice(updated); setActiveDialog(null); }}
+        />
+      )}
+      {active_dialog === "mark_overdue" && (
+        <MarkAsOverdueDialog
+          invoice={invoice}
+          onClose={() => setActiveDialog(null)}
+          onSuccess={(updated) => { setInvoice(updated); setActiveDialog(null); }}
+        />
+      )}
+      {active_dialog === "refund" && (
+        <RefundInvoiceDialog
           invoice={invoice}
           onClose={() => setActiveDialog(null)}
           onSuccess={(updated) => { setInvoice(updated); setActiveDialog(null); }}

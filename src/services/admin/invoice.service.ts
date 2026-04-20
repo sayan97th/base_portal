@@ -86,6 +86,18 @@ export async function voidAdminInvoice(invoice_id: string): Promise<AdminInvoice
   return apiClient.post<AdminInvoice>(`/api/admin/invoices/${invoice_id}/void`, {});
 }
 
+export async function markAdminInvoiceAsUnpaid(invoice_id: string): Promise<AdminInvoice> {
+  return apiClient.post<AdminInvoice>(`/api/admin/invoices/${invoice_id}/mark-unpaid`, {});
+}
+
+export async function markAdminInvoiceAsOverdue(invoice_id: string): Promise<AdminInvoice> {
+  return apiClient.post<AdminInvoice>(`/api/admin/invoices/${invoice_id}/mark-overdue`, {});
+}
+
+export async function refundAdminInvoice(invoice_id: string): Promise<AdminInvoice> {
+  return apiClient.post<AdminInvoice>(`/api/admin/invoices/${invoice_id}/refund`, {});
+}
+
 export async function emailAdminInvoice(invoice_id: string): Promise<void> {
   return apiClient.post<void>(`/api/admin/invoices/${invoice_id}/send-reminder`, {});
 }

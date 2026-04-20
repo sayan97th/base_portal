@@ -197,20 +197,26 @@ const InvoicesPage: React.FC = () => {
                     {invoice.total}
                   </TableCell>
                   <TableCell className="whitespace-nowrap py-3">
-                    <Badge
-                      variant="light"
-                      size="sm"
-                      color={invoice.status === "paid" ? "success" : "error"}
-                      startIcon={
-                        <span
-                          className={`inline-block h-2 w-2 rounded-full ${
-                            invoice.status === "paid" ? "bg-success-500" : "bg-error-500"
-                          }`}
-                        />
-                      }
-                    >
-                      {invoice.status === "paid" ? "Paid" : "Void"}
-                    </Badge>
+                    {(() => {
+                      const STATUS_BADGE: Record<string, { color: "success" | "warning" | "error" | "info" | "light"; dot: string; label: string }> = {
+                        paid:    { color: "success", dot: "bg-success-500", label: "Paid" },
+                        unpaid:  { color: "warning", dot: "bg-warning-500", label: "Unpaid" },
+                        overdue: { color: "error",   dot: "bg-error-500",   label: "Overdue" },
+                        refund:  { color: "info",    dot: "bg-blue-500",    label: "Refund" },
+                        void:    { color: "light",   dot: "bg-gray-500",    label: "Void" },
+                      };
+                      const cfg = STATUS_BADGE[invoice.status] ?? STATUS_BADGE.void;
+                      return (
+                        <Badge
+                          variant="light"
+                          size="sm"
+                          color={cfg.color}
+                          startIcon={<span className={`inline-block h-2 w-2 rounded-full ${cfg.dot}`} />}
+                        >
+                          {cfg.label}
+                        </Badge>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell className="whitespace-nowrap py-3">
                     <Link
