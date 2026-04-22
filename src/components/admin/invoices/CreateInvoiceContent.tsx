@@ -6,7 +6,6 @@ import Link from "next/link";
 import flatpickr from "flatpickr";
 import { listAdminClients } from "@/services/admin/user.service";
 import { createAdminInvoice } from "@/services/admin/invoice.service";
-import { useDebounce } from "@/hooks/useDebounce";
 import type { AdminUser, CreateInvoicePayload } from "@/types/admin";
 
 // ── Local line item state ─────────────────────────────────────────────────────
@@ -64,9 +63,9 @@ function calcTotalDiscount(items: LocalLineItem[]): number {
   return items.reduce((s, item) => s + calcItemDiscount(item), 0);
 }
 
-// ── Client search dropdown ────────────────────────────────────────────────────
+// ── Client select dropdown ─────────────────────────────────────────────────────
 
-function ClientSearchDropdown({
+function ClientSelectDropdown({
   selected_client,
   on_select,
   error,
@@ -75,24 +74,20 @@ function ClientSearchDropdown({
   on_select: (client: AdminUser | null) => void;
   error?: string;
 }) {
+  const [all_clients, setAllClients] = useState<AdminUser[]>([]);
   const [search_input, setSearchInput] = useState("");
   const [is_open, setIsOpen] = useState(false);
-  const [results, setResults] = useState<AdminUser[]>([]);
-  const [is_loading, setIsLoading] = useState(false);
-  const debounced_search = useDebounce(search_input, 350);
+  const [is_loading, setIsLoading] = useState(true);
   const container_ref = useRef<HTMLDivElement>(null);
+  const search_input_ref = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!debounced_search.trim()) {
-      setResults([]);
-      return;
-    }
     setIsLoading(true);
-    listAdminClients({ search: debounced_search, page: 1 })
-      .then((data) => setResults(data.data.slice(0, 8)))
-      .catch(() => setResults([]))
+    listAdminClients({ page: 1 })
+      .then((data) => setAllClients(data.data || []))
+      .catch(() => setAllClients([]))
       .finally(() => setIsLoading(false));
-  }, [debounced_search]);
+  }, []);
 
   useEffect(() => {
     function handleOutside(e: MouseEvent) {
@@ -103,6 +98,22 @@ function ClientSearchDropdown({
     document.addEventListener("mousedown", handleOutside);
     return () => document.removeEventListener("mousedown", handleOutside);
   }, []);
+
+  useEffect(() => {
+    if (is_open && search_input_ref.current) {
+      search_input_ref.current.focus();
+    }
+  }, [is_open]);
+
+  const filtered_clients = search_input.trim()
+    ? all_clients.filter(
+        (client) =>
+          `${client.first_name} ${client.last_name}`
+            .toLowerCase()
+            .includes(search_input.toLowerCase()) ||
+          client.email.toLowerCase().includes(search_input.toLowerCase())
+      )
+    : all_clients;
 
   if (selected_client) {
     return (
@@ -144,54 +155,114 @@ function ClientSearchDropdown({
   return (
     <div ref={container_ref} className="relative">
       <div className="relative">
-        <svg
-          className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={2}
-          stroke="currentColor"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-        </svg>
-        <input
-          type="text"
-          placeholder="Search clients by name or email..."
-          value={search_input}
-          onChange={(e) => { setSearchInput(e.target.value); setIsOpen(true); }}
-          onFocus={() => setIsOpen(true)}
-          className={`w-full rounded-xl border bg-white py-2.5 pl-10 pr-10 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:ring-2 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500 ${
-            error
-              ? "border-error-400 focus:border-error-500 focus:ring-error-100 dark:border-error-500 dark:focus:ring-error-500/20"
-              : "border-gray-200 focus:border-brand-400 focus:ring-brand-100 dark:border-gray-700 dark:focus:border-brand-500 dark:focus:ring-brand-500/20"
-          }`}
-        />
-        {is_loading && (
-          <div className="absolute right-3.5 top-1/2 -translate-y-1/2">
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-200 border-t-brand-600" />
-          </div>
+        {!is_open ? (
+          <>
+            <svg
+              className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+            </svg>
+            <button
+              type="button"
+              onClick={() => setIsOpen(true)}
+              disabled={is_loading}
+              className={`w-full rounded-xl border bg-white py-2.5 pl-10 pr-10 text-left text-sm text-gray-900 outline-none transition focus:ring-2 dark:bg-gray-800 dark:text-white ${
+                error
+                  ? "border-error-400 focus:border-error-500 focus:ring-error-100 dark:border-error-500 dark:focus:ring-error-500/20"
+                  : "border-gray-200 focus:border-brand-400 focus:ring-brand-100 dark:border-gray-700 dark:focus:border-brand-500 dark:focus:ring-brand-500/20"
+              } ${is_loading ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:border-gray-300 dark:hover:border-gray-600"}`}
+            >
+              {is_loading ? (
+                <span className="text-gray-400">Loading clients...</span>
+              ) : (
+                <span className="text-gray-400">Select a client...</span>
+              )}
+            </button>
+            <div className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2">
+              {is_loading ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-200 border-t-brand-600" />
+              ) : (
+                <svg
+                  className="h-4 w-4 text-gray-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                </svg>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <svg
+              className="pointer-events-none absolute left-3.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-gray-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+            </svg>
+            <input
+              ref={search_input_ref}
+              type="text"
+              placeholder="Search clients..."
+              value={search_input}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className={`w-full rounded-xl border bg-white py-2.5 pl-10 pr-10 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:ring-2 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500 ${
+                error
+                  ? "border-error-400 focus:border-error-500 focus:ring-error-100 dark:border-error-500 dark:focus:ring-error-500/20"
+                  : "border-gray-200 focus:border-brand-400 focus:ring-brand-100 dark:border-gray-700 dark:focus:border-brand-500 dark:focus:ring-brand-500/20"
+              }`}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                setSearchInput("");
+              }}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-lg p-1 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
+              aria-label="Close dropdown"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </>
         )}
       </div>
 
-      {is_open && search_input.length > 0 && (
+      {is_open && !is_loading && (
         <div className="absolute z-50 mt-1.5 w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800">
-          {results.length === 0 && !is_loading ? (
+          {filtered_clients.length === 0 ? (
             <div className="flex items-center gap-2 px-4 py-3.5 text-sm text-gray-500 dark:text-gray-400">
               <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
               </svg>
-              No clients found for &quot;{search_input}&quot;
+              {search_input.trim() ? "No clients found" : "No clients available"}
             </div>
           ) : (
-            <ul className="max-h-60 overflow-y-auto py-1.5">
-              {results.map((client) => (
+            <ul className="max-h-80 overflow-y-auto py-1.5">
+              {filtered_clients.map((client) => (
                 <li key={client.id}>
                   <button
                     type="button"
-                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                    onClick={() => { on_select(client); setIsOpen(false); setSearchInput(""); }}
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                    onClick={() => {
+                      on_select(client);
+                      setIsOpen(false);
+                      setSearchInput("");
+                    }}
                   >
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-600 dark:bg-gray-700 dark:text-gray-300">
-                      {client.first_name.charAt(0).toUpperCase()}{client.last_name.charAt(0).toUpperCase()}
+                      {client.first_name.charAt(0).toUpperCase()}
+                      {client.last_name.charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
@@ -646,7 +717,7 @@ export default function CreateInvoiceContent() {
               </span>
             </div>
             <div className="p-6">
-              <ClientSearchDropdown
+              <ClientSelectDropdown
                 selected_client={selected_client}
                 on_select={setSelectedClient}
                 error={validation_errors.client}
