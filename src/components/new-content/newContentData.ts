@@ -1,9 +1,4 @@
-export interface ArticleTier {
-  id: string;
-  label: string;
-  turnaround_time: string;
-  price: number;
-}
+import type { ArticleTier } from "@/types/client/new-content";
 
 export const article_tiers: ArticleTier[] = [
   {
@@ -11,30 +6,35 @@ export const article_tiers: ArticleTier[] = [
     label: "500 Word Optimized SEO Article",
     turnaround_time: "6 Business Days",
     price: 300,
+    is_active: true,
   },
   {
     id: "article_600",
     label: "600 Word Optimized SEO Article",
     turnaround_time: "6 Business Days",
     price: 330,
+    is_active: true,
   },
   {
     id: "article_750",
     label: "750 Word Optimized SEO Article",
     turnaround_time: "6 Business Days",
     price: 425,
+    is_active: true,
   },
   {
     id: "article_1000",
     label: "1,000 Word Optimized SEO Article",
     turnaround_time: "7 Business Days",
     price: 550,
+    is_active: true,
   },
   {
     id: "article_1500",
     label: "1,500 Word Optimized SEO Article",
     turnaround_time: "7 Business Days",
     price: 775,
+    is_active: true,
   },
 ];
 

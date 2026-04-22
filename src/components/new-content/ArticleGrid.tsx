@@ -1,16 +1,36 @@
 import React from "react";
-import { article_tiers } from "./newContentData";
 import ArticleCard from "./ArticleCard";
+import type { ArticleTier } from "@/types/client/new-content";
 
 interface ArticleGridProps {
+  article_tiers: ArticleTier[];
   selected_quantities: Record<string, number>;
   onQuantityChange: (tier_id: string, quantity: number) => void;
+  is_loading?: boolean;
 }
 
 const ArticleGrid: React.FC<ArticleGridProps> = ({
+  article_tiers,
   selected_quantities,
   onQuantityChange,
+  is_loading = false,
 }) => {
+  if (is_loading) {
+    return (
+      <div className="animate-pulse space-y-4">
+        <div className="mb-3 h-6 w-48 rounded bg-gray-200 dark:bg-gray-800" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-64 rounded-2xl border border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-gray-900"
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="mb-3 flex items-center gap-2">

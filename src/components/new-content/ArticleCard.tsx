@@ -1,5 +1,5 @@
 import React from "react";
-import { ArticleTier } from "./newContentData";
+import type { ArticleTier } from "@/types/client/new-content";
 
 interface ArticleCardProps {
   tier: ArticleTier;
@@ -32,7 +32,7 @@ const ArticleCard: React.FC<ArticleCardProps> = ({
   return (
     <div
       onClick={handleToggle}
-      className={`relative cursor-pointer rounded-2xl border bg-white p-5 transition-all dark:bg-white/[0.03] ${
+      className={`relative cursor-pointer rounded-2xl border bg-white p-5 transition-all dark:bg-white/3 ${
         is_selected
           ? "border-coral-500 ring-2 ring-coral-500/20 dark:border-coral-500"
           : "border-gray-200 hover:border-gray-300 dark:border-gray-800 dark:hover:border-gray-700"
