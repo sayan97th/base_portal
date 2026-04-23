@@ -88,9 +88,12 @@ const LinkBuildingOrderSummary: React.FC<LinkBuildingOrderSummaryProps> = ({
     total_links >= BULK_DISCOUNT_THRESHOLD &&
     bulk_discount_amount > 0;
 
-  // Minimum cart requirement for promo codes
+  // Minimum cart requirement for promo codes — only surface once the user
+  // has started typing a code so it doesn't appear before any interaction.
   const cart_below_minimum =
-    min_cart_for_coupon !== undefined && total < min_cart_for_coupon;
+    min_cart_for_coupon !== undefined &&
+    total < min_cart_for_coupon &&
+    (coupon_state?.input_code ?? "").trim().length > 0;
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/3 lg:sticky lg:top-24">
