@@ -1,8 +1,8 @@
 import React from "react";
-import { OptimizationTier } from "./contentOptimizationData";
+import type { ContentOptimizationTier } from "@/types/client/content-optimization";
 
 interface ContentOptimizationCardProps {
-  tier: OptimizationTier;
+  tier: ContentOptimizationTier;
   quantity: number;
   onQuantityChange: (quantity: number) => void;
 }
@@ -66,7 +66,7 @@ const ContentOptimizationCard: React.FC<ContentOptimizationCardProps> = ({
 
       {/* Turnaround Time */}
       <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-        Turnaround time: {tier.turnaround_time}
+        Turnaround time: {tier.turnaround_days} {tier.turnaround_days === 1 ? "Day" : "Days"}
       </p>
 
       {/* Quantity Dropdown */}

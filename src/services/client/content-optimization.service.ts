@@ -1,5 +1,7 @@
 import { apiClient } from "@/lib/api-client";
 import type {
+  ContentOptimizationTier,
+  ContentOptimizationTiersResponse,
   CreateContentOptimizationOrderPayload,
   CreateContentOptimizationOrderResponse,
   ContentOptimizationOrderSummary,
@@ -14,6 +16,13 @@ interface OrdersListApiResponse {
 }
 
 export const contentOptimizationService = {
+  async fetchTiers(): Promise<ContentOptimizationTier[]> {
+    const response = await apiClient.get<ContentOptimizationTiersResponse>(
+      "/api/content-optimization-tiers"
+    );
+    return response.data;
+  },
+
   async createOrder(
     payload: CreateContentOptimizationOrderPayload
   ): Promise<CreateContentOptimizationOrderResponse> {

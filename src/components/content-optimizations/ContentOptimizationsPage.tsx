@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback, useRef } from "react";
+import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Elements } from "@stripe/react-stripe-js";
@@ -16,7 +16,7 @@ import CheckoutStep, {
   type CheckoutStepHandle,
 } from "@/components/shared/CheckoutStep";
 import { getStripe } from "@/lib/stripe";
-import { optimization_tiers } from "./contentOptimizationData";
+import type { ContentOptimizationTier } from "@/types/client/content-optimization";
 import { contentOptimizationService } from "@/services/client/content-optimization.service";
 import { validateCoupon } from "@/services/client/coupons.service";
 import { useNotifications } from "@/context/NotificationsContext";
@@ -29,6 +29,27 @@ const MINIMUM_CART_FOR_COUPON = 500;
 const ContentOptimizationsPage: React.FC = () => {
   const router = useRouter();
   const { addNotification } = useNotifications();
+
+  const [tiers, setTiers] = useState<ContentOptimizationTier[]>([]);
+  const [is_loading_tiers, setIsLoadingTiers] = useState(true);
+  const [tiers_error, setTiersError] = useState<string | null>(null);
+
+  const fetchTiers = useCallback(async () => {
+    setIsLoadingTiers(true);
+    setTiersError(null);
+    try {
+      const data = await contentOptimizationService.fetchTiers();
+      setTiers(data.sort((a, b) => a.sort_order - b.sort_order));
+    } catch {
+      setTiersError("Failed to load optimization tiers. Please refresh the page.");
+    } finally {
+      setIsLoadingTiers(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTiers();
+  }, [fetchTiers]);
 
   const [current_step, setCurrentStep] = useState<Step>("selection");
   const [selected_quantities, setSelectedQuantities] = useState<
@@ -68,7 +89,7 @@ const ContentOptimizationsPage: React.FC = () => {
   const [checkout_is_processing, setCheckoutIsProcessing] = useState(false);
 
   const selected_items: OrderSummaryItem[] = useMemo(() => {
-    return optimization_tiers
+    return tiers
       .filter((tier) => (selected_quantities[tier.id] || 0) > 0)
       .map((tier) => ({
         id: tier.id,
@@ -76,14 +97,14 @@ const ContentOptimizationsPage: React.FC = () => {
         quantity: selected_quantities[tier.id],
         unit_price: tier.price,
       }));
-  }, [selected_quantities]);
+  }, [tiers, selected_quantities]);
 
   const subtotal = useMemo(() => {
-    return optimization_tiers.reduce((sum, tier) => {
+    return tiers.reduce((sum: number, tier: ContentOptimizationTier) => {
       const qty = selected_quantities[tier.id] || 0;
       return sum + qty * tier.price;
     }, 0);
-  }, [selected_quantities]);
+  }, [tiers, selected_quantities]);
 
   const total_discount = coupons_state.applied_coupons.reduce(
     (sum, c) => sum + c.discount_amount,
@@ -215,7 +236,7 @@ const ContentOptimizationsPage: React.FC = () => {
     setSubmitError(null);
 
     try {
-      const items = optimization_tiers
+      const items = tiers
         .filter((tier) => (selected_quantities[tier.id] || 0) > 0)
         .map((tier) => ({
           tier_id: tier.id,
@@ -240,7 +261,7 @@ const ContentOptimizationsPage: React.FC = () => {
         payment: { payment_method_id: payment_intent_id },
       });
 
-      const total_items = items.reduce((sum, item) => sum + item.quantity, 0);
+      const total_items = items.reduce((sum: number, item: { quantity: number }) => sum + item.quantity, 0);
       const formatted_amount = total.toLocaleString("en-US", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
@@ -291,12 +312,25 @@ const ContentOptimizationsPage: React.FC = () => {
           </Link>
         </div>
 
+        {/* Tiers loading / error states */}
+        {is_loading_tiers && (
+          <div className="flex items-center justify-center py-16 text-sm text-gray-500 dark:text-gray-400">
+            Loading optimization tiers...
+          </div>
+        )}
+        {!is_loading_tiers && tiers_error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+            {tiers_error}
+          </div>
+        )}
+
         {/* Selection step */}
-        {current_step === "selection" && (
+        {!is_loading_tiers && !tiers_error && current_step === "selection" && (
           <div className="grid grid-cols-12 gap-6">
             <div className="col-span-12 space-y-6 lg:col-span-8">
               <ContentOptimizationHeader />
               <ContentOptimizationGrid
+                tiers={tiers}
                 selected_quantities={selected_quantities}
                 onQuantityChange={handleQuantityChange}
               />
@@ -317,7 +351,7 @@ const ContentOptimizationsPage: React.FC = () => {
 
         {/* Checkout step — Elements wraps both columns so the summary button
             can trigger CheckoutStep's Stripe hooks via the imperative ref */}
-        {current_step === "checkout" && (
+        {!is_loading_tiers && !tiers_error && current_step === "checkout" && (
           <Elements stripe={getStripe()}>
             <div className="grid grid-cols-12 gap-6">
               <div className="col-span-12 lg:col-span-8">
