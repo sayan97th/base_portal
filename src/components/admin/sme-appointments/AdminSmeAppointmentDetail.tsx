@@ -689,7 +689,7 @@ export default function AdminSmeAppointmentDetail({ appointment_id }: AdminSmeAp
                         )}
                       </div>
                       <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-                        <span>${tier.price.toFixed(2)}</span>
+                        <span>${Number(tier.price).toFixed(2)}</span>
                         <span className="rounded-full bg-gray-100 px-2.5 py-0.5 font-semibold text-gray-700 dark:bg-gray-800 dark:text-gray-300">
                           Qty: {tier.quantity}
                         </span>

@@ -75,7 +75,7 @@ const ContentRefreshUpsell: React.FC = () => {
             </p>
             <div className="h-px w-full bg-gray-100 dark:bg-gray-800" />
             <p className="mt-4 text-base font-bold text-gray-800 dark:text-white/90">
-              ${tier.price.toFixed(2)}
+              ${Number(tier.price).toFixed(2)}
             </p>
           </div>
         ))}

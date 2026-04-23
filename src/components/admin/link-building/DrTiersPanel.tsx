@@ -258,7 +258,7 @@ export default function DrTiersPanel({
                     {/* Price */}
                     <td className="px-6 py-4">
                       <span className="font-semibold text-gray-900 dark:text-white">
-                        ${tier.price_per_link.toFixed(2)}
+                        ${Number(tier.price_per_link).toFixed(2)}
                       </span>
                     </td>
 

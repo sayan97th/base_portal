@@ -88,7 +88,7 @@ const ContentOptimizationCard: React.FC<ContentOptimizationCardProps> = ({
 
       {/* Price */}
       <p className="text-lg font-semibold text-gray-800 dark:text-white/90">
-        ${tier.price.toFixed(2)}
+        ${Number(tier.price).toFixed(2)}
       </p>
     </div>
   );
