@@ -40,6 +40,8 @@ interface CheckoutStepProps {
   total_amount: number;
   saved_billing_address?: BillingAddress | null;
   onApplySavedAddress?: () => void;
+  /** Label for the back navigation button. Defaults to "Back to Keywords". */
+  back_label?: string;
   /** Called whenever the internal processing state changes so the parent can
    *  reflect it on an external submit button (e.g. in the order summary). */
   onProcessingChange?: (is_processing: boolean) => void;
@@ -224,6 +226,7 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
   total_amount,
   saved_billing_address,
   onApplySavedAddress,
+  back_label = "Back to Keywords",
   onProcessingChange,
 }, ref) {
   const stripe = useStripe();
@@ -428,7 +431,7 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
         </svg>
-        Back to Keywords
+        {back_label}
       </button>
 
       {/* ── Payment Method Section ── */}
@@ -874,7 +877,7 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
       <p className="text-xs text-gray-400 dark:text-gray-500">
         Need to change your selection? Click{" "}
         <span className="font-medium text-gray-500 dark:text-gray-400">
-          &quot;Back to Keywords&quot;
+          &quot;{back_label}&quot;
         </span>{" "}
         above — all entered information will be preserved.
       </p>
