@@ -6,7 +6,7 @@ import type {
   AdminContentRefreshTier,
   CreateContentRefreshTierPayload,
   UpdateContentRefreshTierPayload,
-} from "@/types/admin/content-refresh-tiers";
+} from "@/types/admin/content-refresh";
 import {
   listAdminDrTiers,
   createAdminDrTier,

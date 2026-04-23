@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import type {
   AdminContentRefreshTier,
   CreateContentRefreshTierPayload,
-} from "@/types/admin/content-refresh-tiers";
+} from "@/types/admin/content-refresh";
 
 interface ContentRefreshTierFormModalProps {
   is_open: boolean;

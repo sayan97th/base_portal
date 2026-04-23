@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import type { AdminContentRefreshTier } from "@/types/admin/content-refresh-tiers";
+import type { AdminContentRefreshTier } from "@/types/admin/content-refresh";
 
 interface ContentRefreshTierCardProps {
   tier: AdminContentRefreshTier;
