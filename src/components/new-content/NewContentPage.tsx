@@ -129,15 +129,57 @@ const NewContentPage: React.FC = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleComplete = (_payment_intent_id: string) => {
-    // TODO: Submit order to API
-    console.log("Order completed:", {
-      selected_quantities,
-      billing_address,
-      total,
-    });
-    clearCart();
-  };
+  const handleComplete = useCallback(
+    async (payment_intent_id: string, is_using_saved_method: boolean) => {
+      setIsSubmitting(true);
+      setSubmitError(null);
+      try {
+        const items = new_content_tiers
+          .filter((tier) => (selected_quantities[tier.id] ?? 0) > 0)
+          .map((tier) => ({
+            tier_id: tier.id,
+            quantity: selected_quantities[tier.id],
+            unit_price: tier.price,
+          }));
+
+        const result = await newContentService.createOrder({
+          total_amount: total,
+          items,
+          billing: is_using_saved_method
+            ? { company: null, address: "", city: "", state: "", country: "", postal_code: "" }
+            : {
+                company: billing_address.company || null,
+                address: billing_address.address,
+                city: billing_address.city,
+                state: billing_address.state,
+                country: billing_address.country,
+                postal_code: billing_address.postal_code,
+              },
+          payment: { payment_method_id: payment_intent_id },
+        });
+
+        const total_articles = items.reduce((sum, item) => sum + item.quantity, 0);
+        const formatted_amount = total.toLocaleString("en-US", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+
+        await addNotification({
+          type: "order",
+          message: "Your new content order has been placed successfully.",
+          preview_text: `Order #${result.order_id} · ${total_articles} article${total_articles !== 1 ? "s" : ""} · $${formatted_amount}`,
+        });
+
+        clearCart();
+        router.push("/new-content/orders");
+      } catch {
+        setSubmitError("Failed to submit order. Please try again.");
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [new_content_tiers, selected_quantities, total, billing_address, clearCart, addNotification, router]
+  );
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">

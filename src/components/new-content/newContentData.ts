@@ -7,6 +7,10 @@ export const new_content_tiers: NewContentTier[] = [
     turnaround_time: "6 Business Days",
     price: 300,
     is_active: true,
+    is_most_popular: false,
+    max_quantity: null,
+    is_hidden: false,
+    sort_order: 1,
   },
   {
     id: "article_600",
@@ -14,6 +18,10 @@ export const new_content_tiers: NewContentTier[] = [
     turnaround_time: "6 Business Days",
     price: 330,
     is_active: true,
+    is_most_popular: false,
+    max_quantity: null,
+    is_hidden: false,
+    sort_order: 2,
   },
   {
     id: "article_750",
@@ -21,6 +29,10 @@ export const new_content_tiers: NewContentTier[] = [
     turnaround_time: "6 Business Days",
     price: 425,
     is_active: true,
+    is_most_popular: true,
+    max_quantity: null,
+    is_hidden: false,
+    sort_order: 3,
   },
   {
     id: "article_1000",
@@ -28,6 +40,10 @@ export const new_content_tiers: NewContentTier[] = [
     turnaround_time: "7 Business Days",
     price: 550,
     is_active: true,
+    is_most_popular: false,
+    max_quantity: null,
+    is_hidden: false,
+    sort_order: 4,
   },
   {
     id: "article_1500",
@@ -35,6 +51,10 @@ export const new_content_tiers: NewContentTier[] = [
     turnaround_time: "7 Business Days",
     price: 775,
     is_active: true,
+    is_most_popular: false,
+    max_quantity: null,
+    is_hidden: false,
+    sort_order: 5,
   },
 ];
 

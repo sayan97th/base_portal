@@ -2,7 +2,7 @@ export interface NewContentTier {
   id: string;
   label: string;
   turnaround_time: string;
-  price: string | number;
+  price: number;
   is_active: boolean;
   is_most_popular: boolean;
   max_quantity: number | null;
@@ -16,19 +16,27 @@ export interface NewContentTiersResponse {
   data: NewContentTier[];
 }
 
-export interface CreateNewContentOrderPayload {
+export interface NewContentOrderItem {
   tier_id: string;
+  quantity: number;
+  unit_price: number;
+}
+
+export interface NewContentOrderBilling {
+  company?: string | null;
+  address: string;
+  city: string;
+  state: string;
+  country: string;
+  postal_code: string;
+}
+
+export interface CreateNewContentOrderPayload {
   order_notes?: string | null;
   total_amount: number;
   coupon_ids?: string[];
-  billing: {
-    company?: string | null;
-    address: string;
-    city: string;
-    state: string;
-    country: string;
-    postal_code: string;
-  };
+  items: NewContentOrderItem[];
+  billing: NewContentOrderBilling;
   payment: {
     payment_method_id: string;
   };
@@ -39,4 +47,17 @@ export interface CreateNewContentOrderResponse {
   status: string;
   total_amount: number;
   created_at: string;
+}
+
+export interface NewContentOrderSummary {
+  id: string;
+  order_notes: string | null;
+  total_amount: number;
+  status: string;
+  created_at: string;
+  items_count: number;
+}
+
+export interface NewContentOrdersResponse {
+  data: NewContentOrderSummary[];
 }
