@@ -1,6 +1,6 @@
-import type { ArticleTier } from "@/types/client/new-content";
+import type { NewContentTier } from "@/types/client/new-content";
 
-export const article_tiers: ArticleTier[] = [
+export const new_content_tiers: NewContentTier[] = [
   {
     id: "article_500",
     label: "500 Word Optimized SEO Article",

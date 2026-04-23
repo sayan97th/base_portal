@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Elements } from "@stripe/react-stripe-js";
 import NewContentHeader from "./NewContentHeader";
-import ArticleGrid from "./ArticleGrid";
+import ArticleGrid from "./NewContentGrid";
 import OrderSummary, {
   SummaryItem,
 } from "@/components/shared/OrderSummary";
@@ -13,13 +13,13 @@ import CheckoutStep, {
   BillingAddress,
   type CheckoutStepHandle,
 } from "@/components/shared/CheckoutStep";
-import { article_tiers as fallback_article_tiers } from "./newContentData";
+import { new_content_tiers as fallback_new_content_tiers } from "./newContentData";
 import { newContentService } from "@/services/client/new-content.service";
 import { useNotifications } from "@/context/NotificationsContext";
 import { useBillingAddress } from "@/hooks/useBillingAddress";
 import { useCartPersistence } from "@/hooks/useCartPersistence";
 import { getStripe } from "@/lib/stripe";
-import type { ArticleTier } from "@/types/client/new-content";
+import type { NewContentTier } from "@/types/client/new-content";
 
 type Step = "selection" | "checkout";
 
@@ -28,11 +28,11 @@ const NewContentPage: React.FC = () => {
   const { addNotification } = useNotifications();
 
   // Article tiers state
-  const [article_tiers, setArticleTiers] = useState<ArticleTier[]>([
-    ...fallback_article_tiers,
+  const [new_content_tiers, setNewContentTiers] = useState<NewContentTier[]>([
+    ...fallback_new_content_tiers,
   ]);
-  const [article_tiers_loading, setArticleTiersLoading] = useState(true);
-  const [article_tiers_error, setArticleTiersError] = useState<string | null>(
+  const [new_content_tiers_loading, setNewContentTiersLoading] = useState(true);
+  const [new_content_tiers_error, setNewContentTiersError] = useState<string | null>(
     null
   );
 
@@ -64,25 +64,25 @@ const NewContentPage: React.FC = () => {
   // Tracks CheckoutStep's internal processing state so the summary button stays in sync
   const [checkout_is_processing, setCheckoutIsProcessing] = useState(false);
 
-  const loadArticleTiers = useCallback(async () => {
-    setArticleTiersLoading(true);
-    setArticleTiersError(null);
+  const loadNewContentTiers = useCallback(async () => {
+    setNewContentTiersLoading(true);
+    setNewContentTiersError(null);
     try {
-      const tiers = await newContentService.fetchArticleTiers();
-      setArticleTiers(tiers.filter((t) => t.is_active));
+      const tiers = await newContentService.fetchNewContentTiers();
+      setNewContentTiers(tiers.filter((t) => t.is_active));
     } catch {
-      setArticleTiersError("Failed to load article tiers. Showing default catalog.");
+      setNewContentTiersError("Failed to load article tiers. Showing default catalog.");
     } finally {
-      setArticleTiersLoading(false);
+      setNewContentTiersLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadArticleTiers();
-  }, [loadArticleTiers]);
+    loadNewContentTiers();
+  }, [loadNewContentTiers]);
 
   const selected_items: SummaryItem[] = useMemo(() => {
-    return article_tiers
+    return new_content_tiers
       .filter((tier) => (selected_quantities[tier.id] ?? 0) > 0)
       .map((tier) => ({
         id: tier.id,
@@ -90,14 +90,14 @@ const NewContentPage: React.FC = () => {
         quantity: selected_quantities[tier.id],
         unit_price: tier.price,
       }));
-  }, [selected_quantities, article_tiers]);
+  }, [selected_quantities, new_content_tiers]);
 
   const total = useMemo(() => {
-    return article_tiers.reduce((sum, tier) => {
+    return new_content_tiers.reduce((sum, tier) => {
       const qty = selected_quantities[tier.id] ?? 0;
       return sum + qty * tier.price;
     }, 0);
-  }, [selected_quantities, article_tiers]);
+  }, [selected_quantities, new_content_tiers]);
 
   const handleQuantityChange = (tier_id: string, quantity: number) => {
     setSelectedQuantities((prev) => {
@@ -147,16 +147,16 @@ const NewContentPage: React.FC = () => {
           {current_step === "selection" && (
             <>
               <NewContentHeader />
-              {article_tiers_error && (
+              {new_content_tiers_error && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-900/20 dark:text-amber-200">
-                  {article_tiers_error}
+                  {new_content_tiers_error}
                 </div>
               )}
               <ArticleGrid
-                article_tiers={article_tiers}
+                new_content_tiers={new_content_tiers}
                 selected_quantities={selected_quantities}
                 onQuantityChange={handleQuantityChange}
-                is_loading={article_tiers_loading}
+                is_loading={new_content_tiers_loading}
               />
 
               {/* Next Button */}

@@ -1,8 +1,8 @@
 import React from "react";
-import type { ArticleTier } from "@/types/client/new-content";
+import type { NewContentTier } from "@/types/client/new-content";
 
 interface ArticleCardProps {
-  tier: ArticleTier;
+  tier: NewContentTier;
   quantity: number;
   onQuantityChange: (quantity: number) => void;
 }

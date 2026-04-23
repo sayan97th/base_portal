@@ -11,7 +11,7 @@ interface CreateOrderApiResponse {
 }
 
 export const newContentService = {
-  async fetchTiers(): Promise<NewContentTier[]> {
+  async fetchNewContentTiers(): Promise<NewContentTier[]> {
     const response = await apiClient.get<NewContentTiersResponse>(
       "/api/new-content-tiers"
     );

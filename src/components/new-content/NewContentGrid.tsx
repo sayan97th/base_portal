@@ -1,16 +1,16 @@
 import React from "react";
-import ArticleCard from "./ArticleCard";
-import type { ArticleTier } from "@/types/client/new-content";
+import ArticleCard from "./NewContentCard";
+import type { NewContentTier } from "@/types/client/new-content";
 
 interface ArticleGridProps {
-  article_tiers: ArticleTier[];
+  new_content_tiers: NewContentTier[];
   selected_quantities: Record<string, number>;
   onQuantityChange: (tier_id: string, quantity: number) => void;
   is_loading?: boolean;
 }
 
 const ArticleGrid: React.FC<ArticleGridProps> = ({
-  article_tiers,
+  new_content_tiers,
   selected_quantities,
   onQuantityChange,
   is_loading = false,
@@ -45,7 +45,7 @@ const ArticleGrid: React.FC<ArticleGridProps> = ({
         </span>
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {article_tiers.map((tier) => (
+        {new_content_tiers.map((tier) => (
           <ArticleCard
             key={tier.id}
             tier={tier}
