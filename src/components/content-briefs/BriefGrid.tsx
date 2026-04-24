@@ -1,15 +1,19 @@
 import React from "react";
-import { brief_tiers } from "./contentBriefsData";
+import type { ContentBriefTier } from "@/types/client/content-briefs";
 import BriefCard from "./BriefCard";
 
 interface BriefGridProps {
+  tiers: ContentBriefTier[];
   selected_quantities: Record<string, number>;
   onQuantityChange: (tier_id: string, quantity: number) => void;
+  is_loading?: boolean;
 }
 
 const BriefGrid: React.FC<BriefGridProps> = ({
+  tiers,
   selected_quantities,
   onQuantityChange,
+  is_loading = false,
 }) => {
   return (
     <div>
@@ -22,14 +26,21 @@ const BriefGrid: React.FC<BriefGridProps> = ({
         </span>
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {brief_tiers.map((tier) => (
-          <BriefCard
-            key={tier.id}
-            tier={tier}
-            quantity={selected_quantities[tier.id] || 0}
-            onQuantityChange={(qty) => onQuantityChange(tier.id, qty)}
-          />
-        ))}
+        {is_loading
+          ? Array.from({ length: 1 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-36 animate-pulse rounded-2xl border border-gray-200 bg-gray-100 dark:border-gray-800 dark:bg-white/3"
+              />
+            ))
+          : tiers.map((tier) => (
+              <BriefCard
+                key={tier.id}
+                tier={tier}
+                quantity={selected_quantities[tier.id] || 0}
+                onQuantityChange={(qty) => onQuantityChange(tier.id, qty)}
+              />
+            ))}
       </div>
     </div>
   );

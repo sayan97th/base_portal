@@ -1,5 +1,7 @@
 import { apiClient } from "@/lib/api-client";
 import type {
+  ContentBriefTier,
+  ContentBriefTiersResponse,
   CreateContentBriefOrderPayload,
   CreateContentBriefOrderResponse,
 } from "@/types/client/content-briefs";
@@ -9,6 +11,13 @@ interface CreateOrderApiResponse {
 }
 
 export const contentBriefsService = {
+  async fetchTiers(): Promise<ContentBriefTier[]> {
+    const response = await apiClient.get<ContentBriefTiersResponse>(
+      "/api/content-brief-tiers"
+    );
+    return response.data;
+  },
+
   async createOrder(
     payload: CreateContentBriefOrderPayload
   ): Promise<CreateContentBriefOrderResponse> {

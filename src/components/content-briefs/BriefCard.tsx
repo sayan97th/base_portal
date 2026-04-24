@@ -1,8 +1,8 @@
 import React from "react";
-import { BriefTier } from "./contentBriefsData";
+import type { ContentBriefTier } from "@/types/client/content-briefs";
 
 interface BriefCardProps {
-  tier: BriefTier;
+  tier: ContentBriefTier;
   quantity: number;
   onQuantityChange: (quantity: number) => void;
 }
@@ -66,7 +66,7 @@ const BriefCard: React.FC<BriefCardProps> = ({
 
       {/* Turnaround Time */}
       <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-        Turnaround Time: {tier.turnaround_time}
+        Turnaround Time: {tier.turnaround_days} Business Days
       </p>
 
       {/* Quantity Dropdown */}

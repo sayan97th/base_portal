@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useRef, useCallback } from "react";
+import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Elements } from "@stripe/react-stripe-js";
 import ContentBriefsHeader from "./ContentBriefsHeader";
@@ -15,7 +15,7 @@ import CheckoutStep, {
   type BillingAddress,
   type CheckoutStepHandle,
 } from "@/components/shared/CheckoutStep";
-import { brief_tiers } from "./contentBriefsData";
+import type { ContentBriefTier } from "@/types/client/content-briefs";
 import { contentBriefsService } from "@/services/client/content-briefs.service";
 import { validateCoupon } from "@/services/client/coupons.service";
 import { useNotifications } from "@/context/NotificationsContext";
@@ -27,6 +27,10 @@ type Step = "selection" | "checkout";
 const ContentBriefsPage: React.FC = () => {
   const router = useRouter();
   const { addNotification } = useNotifications();
+
+  const [tiers, setTiers] = useState<ContentBriefTier[]>([]);
+  const [tiers_loading, setTiersLoading] = useState(true);
+  const [tiers_error, setTiersError] = useState<string | null>(null);
 
   const [current_step, setCurrentStep] = useState<Step>("selection");
   const [selected_quantities, setSelectedQuantities] = useState<
@@ -54,6 +58,20 @@ const ContentBriefsPage: React.FC = () => {
   const checkout_ref = useRef<CheckoutStepHandle>(null);
   const [checkout_is_processing, setCheckoutIsProcessing] = useState(false);
 
+  useEffect(() => {
+    contentBriefsService
+      .fetchTiers()
+      .then((data) => {
+        setTiers(data.filter((t) => t.is_active && !t.is_hidden));
+      })
+      .catch(() => {
+        setTiersError("Failed to load available tiers. Please refresh the page.");
+      })
+      .finally(() => {
+        setTiersLoading(false);
+      });
+  }, []);
+
   const coupons_state: MultiCouponState = {
     input_code: coupon_input_code,
     applied_coupons,
@@ -65,7 +83,7 @@ const ContentBriefsPage: React.FC = () => {
   const user_email = "marketing@basesearchmarketing.com";
 
   const selected_items: OrderSummaryItem[] = useMemo(() => {
-    return brief_tiers
+    return tiers
       .filter((tier) => (selected_quantities[tier.id] || 0) > 0)
       .map((tier) => ({
         id: tier.id,
@@ -73,14 +91,14 @@ const ContentBriefsPage: React.FC = () => {
         quantity: selected_quantities[tier.id],
         unit_price: tier.price,
       }));
-  }, [selected_quantities]);
+  }, [tiers, selected_quantities]);
 
   const subtotal = useMemo(() => {
-    return brief_tiers.reduce((sum, tier) => {
+    return tiers.reduce((sum: number, tier: ContentBriefTier) => {
       const qty = selected_quantities[tier.id] || 0;
       return sum + qty * tier.price;
     }, 0);
-  }, [selected_quantities]);
+  }, [tiers, selected_quantities]);
 
   const total_discount = applied_coupons.reduce(
     (sum, c) => sum + c.discount_amount,
@@ -198,7 +216,7 @@ const ContentBriefsPage: React.FC = () => {
     setSubmitError(null);
 
     try {
-      const items = brief_tiers
+      const items = tiers
         .filter((tier) => (selected_quantities[tier.id] ?? 0) > 0)
         .map((tier) => ({
           tier_id: tier.id,
@@ -230,7 +248,7 @@ const ContentBriefsPage: React.FC = () => {
         payment: { payment_method_id: payment_intent_id },
       });
 
-      const total_briefs = items.reduce((sum, item) => sum + item.quantity, 0);
+      const total_briefs = items.reduce((sum: number, item) => sum + item.quantity, 0);
       const formatted_amount = total.toLocaleString("en-US", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
@@ -255,6 +273,14 @@ const ContentBriefsPage: React.FC = () => {
     }
   };
 
+  if (tiers_error) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+        <p className="text-sm text-red-500">{tiers_error}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
       {/* ── Selection step ── */}
@@ -264,8 +290,10 @@ const ContentBriefsPage: React.FC = () => {
             <ContentBriefsHeader />
             <EmailField email={user_email} />
             <BriefGrid
+              tiers={tiers}
               selected_quantities={selected_quantities}
               onQuantityChange={handleQuantityChange}
+              is_loading={tiers_loading}
             />
           </div>
 
