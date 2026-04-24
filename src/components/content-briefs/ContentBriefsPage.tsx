@@ -4,7 +4,6 @@ import React, { useState, useMemo, useRef, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation";
 import { Elements } from "@stripe/react-stripe-js";
 import ContentBriefsHeader from "./ContentBriefsHeader";
-import EmailField from "@/components/shared/EmailField";
 import BriefGrid from "./BriefGrid";
 import LinkBuildingOrderSummary, {
   type OrderSummaryItem,
@@ -78,9 +77,6 @@ const ContentBriefsPage: React.FC = () => {
     error: coupon_error,
     is_applying: coupon_is_applying,
   };
-
-  // Placeholder email — replace with actual user data when auth is integrated
-  const user_email = "marketing@basesearchmarketing.com";
 
   const selected_items: OrderSummaryItem[] = useMemo(() => {
     return tiers
@@ -288,7 +284,6 @@ const ContentBriefsPage: React.FC = () => {
         <div className="grid grid-cols-12 gap-6">
           <div className="col-span-12 space-y-6 lg:col-span-8">
             <ContentBriefsHeader />
-            <EmailField email={user_email} />
             <BriefGrid
               tiers={tiers}
               selected_quantities={selected_quantities}
