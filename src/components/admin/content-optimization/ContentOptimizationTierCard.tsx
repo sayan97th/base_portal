@@ -109,7 +109,7 @@ export default function ContentOptimizationTierCard({
         {/* Price */}
         <div className="mt-4 flex items-end gap-1">
           <span className="text-3xl font-bold text-gray-900 dark:text-white">
-            ${tier.price.toFixed(0)}
+            ${Number(tier.price).toFixed(0)}
           </span>
           <span className="mb-1 text-sm text-gray-400 dark:text-gray-500">/ page</span>
         </div>
