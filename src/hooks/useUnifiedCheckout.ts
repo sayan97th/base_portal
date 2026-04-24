@@ -34,6 +34,33 @@ function getOrderDetailLink(
   }
 }
 
+/**
+ * Extracts a readable message from an API error response.
+ * When Laravel returns a 422 with an `errors` map, we surface each field
+ * error on its own line instead of the generic truncated message.
+ */
+function extractApiErrorMessage(err: unknown): string {
+  if (!err || typeof err !== "object") {
+    return "Something went wrong. Please try again.";
+  }
+
+  const error = err as Record<string, unknown>;
+
+  if ("errors" in error && error.errors && typeof error.errors === "object") {
+    const errors = error.errors as Record<string, string[]>;
+    const messages = Object.values(errors).flat();
+    if (messages.length > 0) {
+      return messages.join("\n");
+    }
+  }
+
+  if ("message" in error && typeof error.message === "string") {
+    return error.message;
+  }
+
+  return "Something went wrong. Please try again.";
+}
+
 export interface UseUnifiedCheckoutReturn {
   is_submitting: boolean;
   submit_error: string | null;
@@ -107,26 +134,54 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
           (i) => i.product_type === "content_brief"
         );
 
+        // Only include coupon_ids when coupons are actually applied.
+        // Laravel's `required` rule rejects empty arrays, so omitting the
+        // field entirely when there are no coupons avoids a validation error.
+        const coupon_ids =
+          applied_coupons.length > 0
+            ? applied_coupons.map((c) => c.coupon_id)
+            : undefined;
+
         const result = await unifiedCartService.checkout({
           payment_method_id: payment_intent_id,
           total_amount: total,
-          coupon_ids: applied_coupons.map((c) => c.coupon_id),
+          coupon_ids,
           billing,
           order_title: order_title || null,
           order_notes: order_notes || null,
           link_building_items:
             lb_items.length > 0
-              ? lb_items.map((item) => ({
-                  dr_tier_id: item.tier_id,
-                  quantity: item.quantity,
-                  unit_price: item.unit_price,
-                  placements: (item.keyword_data ?? []).map((row, idx) => ({
-                    row_index: idx,
-                    keyword: row.keyword || null,
-                    landing_page: row.landing_page || null,
-                    exact_match: row.exact_match,
-                  })),
-                }))
+              ? lb_items.map((item) => {
+                  const keyword_rows = item.keyword_data ?? [];
+                  // The API requires at least one placement per item.
+                  // When the user hasn't entered keywords yet (e.g. checked
+                  // out from another product page), we send a single null-value
+                  // placeholder so the order is created and keywords can be
+                  // provided via the intake form.
+                  const placements =
+                    keyword_rows.length > 0
+                      ? keyword_rows.map((row, idx) => ({
+                          row_index: idx,
+                          keyword: row.keyword || null,
+                          landing_page: row.landing_page || null,
+                          exact_match: row.exact_match,
+                        }))
+                      : [
+                          {
+                            row_index: 0,
+                            keyword: null,
+                            landing_page: null,
+                            exact_match: false,
+                          },
+                        ];
+
+                  return {
+                    dr_tier_id: item.tier_id,
+                    quantity: item.quantity,
+                    unit_price: item.unit_price,
+                    placements,
+                  };
+                })
               : undefined,
           content_optimization_items:
             co_items.length > 0
@@ -188,11 +243,7 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
           router.push(getOrderDetailLink(primary!.product_type, primary!.order_id));
         }
       } catch (err: unknown) {
-        const message =
-          err && typeof err === "object" && "message" in err
-            ? String((err as { message: string }).message)
-            : "Something went wrong. Please try again.";
-        setSubmitError(message);
+        setSubmitError(extractApiErrorMessage(err));
       } finally {
         setIsSubmitting(false);
       }

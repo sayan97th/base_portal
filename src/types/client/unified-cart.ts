@@ -69,7 +69,7 @@ export interface UnifiedCheckoutBilling {
 export interface UnifiedCheckoutPayload {
   payment_method_id: string;
   total_amount: number;
-  coupon_ids: string[];
+  coupon_ids?: string[] | null;
   billing: UnifiedCheckoutBilling;
   order_title?: string | null;
   order_notes?: string | null;

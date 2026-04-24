@@ -883,26 +883,38 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
       </p>
 
       {/* ── Error messages ── */}
-      {(stripe_error || error_message) && (
-        <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-500/20 dark:bg-red-500/10">
-          <svg
-            className="mt-0.5 h-4 w-4 shrink-0 text-red-500"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={2}
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008z"
-            />
-          </svg>
-          <p className="text-sm text-red-700 dark:text-red-400">
-            {stripe_error || error_message}
-          </p>
-        </div>
-      )}
+      {(stripe_error || error_message) && (() => {
+        const active_message = stripe_error || error_message!;
+        const lines = active_message.split("\n").filter(Boolean);
+        return (
+          <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-500/20 dark:bg-red-500/10">
+            <svg
+              className="mt-0.5 h-4 w-4 shrink-0 text-red-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008z"
+              />
+            </svg>
+            <div className="text-sm text-red-700 dark:text-red-400">
+              {lines.length > 1 ? (
+                <ul className="list-disc list-inside space-y-1">
+                  {lines.map((line, i) => (
+                    <li key={i}>{line}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p>{active_message}</p>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
     </div>
   );
