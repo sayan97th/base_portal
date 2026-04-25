@@ -14,6 +14,7 @@ import { linkBuildingService } from "@/services/client/link-building.service";
 import { newContentService } from "@/services/client/new-content.service";
 import { contentOptimizationService } from "@/services/client/content-optimization.service";
 import { contentBriefsService } from "@/services/client/content-briefs.service";
+import { findSessionByOrderId } from "@/lib/checkout-session";
 import { useDebounce } from "@/hooks/useDebounce";
 import type { CartProductType } from "@/types/client/unified-cart";
 
@@ -120,15 +121,14 @@ const PRODUCT_TYPE_CONFIG: Record<
 };
 
 function getDetailLink(order: UnifiedOrder): string {
+  const session = findSessionByOrderId(order.id);
+  if (session) return `/orders/session/${session.session_id}`;
+
   switch (order.product_type) {
     case "link_building":
       return `/link-building/orders/${order.id}`;
-    case "content_optimization":
-      return `/content-refresh/content-optimizations`;
-    case "new_content":
-      return `/new-content`;
-    case "content_brief":
-      return `/content-refresh/content-briefs`;
+    default:
+      return `/orders/${order.id}?type=${order.product_type}`;
   }
 }
 

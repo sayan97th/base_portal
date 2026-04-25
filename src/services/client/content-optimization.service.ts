@@ -5,6 +5,7 @@ import type {
   CreateContentOptimizationOrderPayload,
   CreateContentOptimizationOrderResponse,
   ContentOptimizationOrderSummary,
+  ContentOptimizationOrderDetail,
 } from "@/types/client/content-optimization";
 
 interface CreateOrderApiResponse {
@@ -36,6 +37,15 @@ export const contentOptimizationService = {
   async fetchMyOrders(): Promise<ContentOptimizationOrderSummary[]> {
     const response = await apiClient.get<OrdersListApiResponse>(
       "/api/content-optimization/orders"
+    );
+    return response.data;
+  },
+
+  async fetchOrderDetail(
+    order_id: string
+  ): Promise<ContentOptimizationOrderDetail> {
+    const response = await apiClient.get<{ data: ContentOptimizationOrderDetail }>(
+      `/api/content-optimization/orders/${order_id}`
     );
     return response.data;
   },

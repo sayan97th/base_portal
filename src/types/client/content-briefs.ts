@@ -56,3 +56,22 @@ export interface ContentBriefOrderSummary {
   created_at: string;
   items_count: number;
 }
+
+export interface ContentBriefOrderItemDetail {
+  id: string;
+  tier_id: string;
+  quantity: number;
+  unit_price: number;
+  subtotal: number;
+  tier: ContentBriefTier;
+}
+
+export interface ContentBriefOrderDetail {
+  id: string;
+  order_notes: string | null;
+  total_amount: number;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  items: ContentBriefOrderItemDetail[];
+}

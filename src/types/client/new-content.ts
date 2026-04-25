@@ -61,3 +61,23 @@ export interface NewContentOrderSummary {
 export interface NewContentOrdersResponse {
   data: NewContentOrderSummary[];
 }
+
+export interface NewContentOrderItemDetail {
+  id: string;
+  tier_id: string;
+  quantity: number;
+  unit_price: number;
+  subtotal: number;
+  tier: NewContentTier;
+}
+
+export interface NewContentOrderDetail {
+  id: string;
+  order_notes: string | null;
+  total_amount: number;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  items: NewContentOrderItemDetail[];
+}
+

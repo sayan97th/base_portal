@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { useNotifications } from "@/context/NotificationsContext";
 import { unifiedCartService } from "@/services/client/unified-cart.service";
+import { saveCheckoutSession } from "@/lib/checkout-session";
 import type { BillingAddress } from "@/components/shared/CheckoutStep";
 import type {
   CartProductType,
@@ -209,6 +210,19 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
               : undefined,
         });
 
+        const session_id = crypto.randomUUID();
+        saveCheckoutSession({
+          session_id,
+          created_at: new Date().toISOString(),
+          order_title: order_title || null,
+          total_amount: total,
+          orders: result.orders.map((o) => ({
+            order_id: o.order_id,
+            product_type: o.product_type,
+            total_amount: o.total_amount,
+          })),
+        });
+
         for (const order of result.orders) {
           const label = PRODUCT_TYPE_LABELS[order.product_type];
           const formatted_amount = order.total_amount.toLocaleString("en-US", {
@@ -219,29 +233,13 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
             type: "order",
             message: `Your ${label} order has been placed successfully.`,
             preview_text: `Order #${order.order_id} · $${formatted_amount}`,
-            link: getOrderDetailLink(order.product_type, order.order_id),
+            link: `/orders/session/${session_id}`,
           });
         }
 
         clearCart();
 
-        if (result.orders.length === 1) {
-          const order = result.orders[0];
-          router.push(getOrderDetailLink(order.product_type, order.order_id));
-        } else {
-          // Multiple product types — redirect to the most prominent order.
-          const priority: CartProductType[] = [
-            "link_building",
-            "content_optimization",
-            "content_brief",
-            "new_content",
-          ];
-          const primary =
-            priority
-              .map((pt) => result.orders.find((o) => o.product_type === pt))
-              .find(Boolean) ?? result.orders[0];
-          router.push(getOrderDetailLink(primary!.product_type, primary!.order_id));
-        }
+        router.push(`/orders/session/${session_id}`);
       } catch (err: unknown) {
         setSubmitError(extractApiErrorMessage(err));
       } finally {

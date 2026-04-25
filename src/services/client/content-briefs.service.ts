@@ -3,6 +3,7 @@ import type {
   ContentBriefTier,
   ContentBriefTiersResponse,
   ContentBriefOrderSummary,
+  ContentBriefOrderDetail,
   CreateContentBriefOrderPayload,
   CreateContentBriefOrderResponse,
 } from "@/types/client/content-briefs";
@@ -26,6 +27,13 @@ export const contentBriefsService = {
   async fetchMyOrders(): Promise<ContentBriefOrderSummary[]> {
     const response = await apiClient.get<OrdersListApiResponse>(
       "/api/content-briefs/orders"
+    );
+    return response.data;
+  },
+
+  async fetchOrderDetail(order_id: string): Promise<ContentBriefOrderDetail> {
+    const response = await apiClient.get<{ data: ContentBriefOrderDetail }>(
+      `/api/content-briefs/orders/${order_id}`
     );
     return response.data;
   },

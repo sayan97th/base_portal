@@ -4,6 +4,7 @@ import type {
   NewContentTiersResponse,
   NewContentOrderSummary,
   NewContentOrdersResponse,
+  NewContentOrderDetail,
   CreateNewContentOrderPayload,
   CreateNewContentOrderResponse,
 } from "@/types/client/new-content";
@@ -23,6 +24,13 @@ export const newContentService = {
   async fetchMyOrders(): Promise<NewContentOrderSummary[]> {
     const response = await apiClient.get<NewContentOrdersResponse>(
       "/api/new-content/orders"
+    );
+    return response.data;
+  },
+
+  async fetchOrderDetail(order_id: string): Promise<NewContentOrderDetail> {
+    const response = await apiClient.get<{ data: NewContentOrderDetail }>(
+      `/api/new-content/orders/${order_id}`
     );
     return response.data;
   },
