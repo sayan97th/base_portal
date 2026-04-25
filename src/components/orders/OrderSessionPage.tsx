@@ -312,8 +312,8 @@ function ProductSectionCard({
         <>
           <ItemsTableHeader border_class={cfg.border} />
           <div className="bg-white dark:bg-gray-900/30">
-            {items.map((item) => (
-              <ItemRow key={item.id} item={item} divider_class={cfg.border} />
+            {items.map((item, index) => (
+              <ItemRow key={`${item.id}-${index}`} item={item} divider_class={cfg.border} />
             ))}
           </div>
         </>
