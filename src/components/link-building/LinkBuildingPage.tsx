@@ -37,6 +37,7 @@ const LinkBuildingPage: React.FC = () => {
   const [dr_tiers_error, setDrTiersError] = useState<string | null>(null);
 
   const [current_step, setCurrentStep] = useState<Step>("selection");
+  const [keyword_step_error, setKeywordStepError] = useState<string | null>(null);
   const [billing_address, setBillingAddress] = useState<BillingAddress>({
     address: "",
     city: "",
@@ -141,12 +142,22 @@ const LinkBuildingPage: React.FC = () => {
     );
   };
 
+  const checkKeywordsComplete = useCallback((): boolean => {
+    for (const rows of Object.values(computed_keyword_rows)) {
+      for (const row of rows) {
+        if (!row.keyword.trim() || !row.landing_page.trim()) return false;
+      }
+    }
+    return true;
+  }, [computed_keyword_rows]);
+
   const handleKeywordChange = (
     tier_id: string,
     row_index: number,
     field: keyof KeywordRow,
     value: string | boolean
   ) => {
+    if (keyword_step_error) setKeywordStepError(null);
     const base_rows = (computed_keyword_rows[tier_id] ?? []).map((r) => ({
       ...r,
     }));
@@ -175,6 +186,14 @@ const LinkBuildingPage: React.FC = () => {
   }, [saved_billing_address]);
 
   const handleReview = () => {
+    if (!checkKeywordsComplete()) {
+      setKeywordStepError(
+        "Please fill in the keyword and landing page for every row before continuing."
+      );
+      scrollToTop();
+      return;
+    }
+    setKeywordStepError(null);
     if (has_saved_address && saved_billing_address) {
       const is_billing_empty =
         !billing_address.address &&
@@ -275,6 +294,33 @@ const LinkBuildingPage: React.FC = () => {
                       placement.
                     </p>
                   </div>
+
+                  {keyword_step_error && (
+                    <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-500/30 dark:bg-amber-500/10">
+                      <svg
+                        className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"
+                        />
+                      </svg>
+                      <div>
+                        <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                          Incomplete keyword data
+                        </p>
+                        <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">
+                          {keyword_step_error}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   <KeywordEntryStep
                     selected_items={selected_items}
                     keyword_data={computed_keyword_rows}
