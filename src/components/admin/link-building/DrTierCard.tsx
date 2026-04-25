@@ -83,7 +83,7 @@ export default function DrTierCard({ tier, onViewDetail, onEdit }: DrTierCardPro
             </div>
             <div>
               <h3 className="font-semibold text-gray-900 dark:text-white">
-                {tier.dr_label}
+                {tier.label}
               </h3>
               {tier.is_most_popular && !tier.is_hidden && (
                 <span className="inline-flex items-center gap-1 rounded-md bg-warning-50 px-1.5 py-0.5 text-xs font-medium text-warning-700 dark:bg-warning-500/10 dark:text-warning-400">

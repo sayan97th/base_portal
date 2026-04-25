@@ -11,7 +11,7 @@ interface DrTierFormModalProps {
 }
 
 const EMPTY_FORM: CreateDrTierPayload = {
-  dr_label: "",
+  label: "",
   traffic_range: "",
   word_count: 500,
   price_per_link: 0,
@@ -34,7 +34,7 @@ export default function DrTierFormModal({
   useEffect(() => {
     if (tier) {
       setFormData({
-        dr_label: tier.dr_label,
+        label: tier.label,
         traffic_range: tier.traffic_range,
         word_count: tier.word_count,
         price_per_link: tier.price_per_link,
@@ -49,7 +49,7 @@ export default function DrTierFormModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form_data.dr_label.trim()) {
+    if (!form_data.label.trim()) {
       setError("DR label is required.");
       return;
     }
@@ -107,8 +107,8 @@ export default function DrTierFormModal({
             </label>
             <input
               type="text"
-              value={form_data.dr_label}
-              onChange={(e) => setFormData((p) => ({ ...p, dr_label: e.target.value }))}
+              value={form_data.label}
+              onChange={(e) => setFormData((p) => ({ ...p, label: e.target.value }))}
               placeholder="e.g. DR 20-30"
               className="h-11 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
             />

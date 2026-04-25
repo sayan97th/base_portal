@@ -17,13 +17,13 @@ interface DrTiersPanelProps {
 }
 
 interface DeleteConfirmProps {
-  tier_label: string;
+  label: string;
   onConfirm: () => void;
   onCancel: () => void;
   is_loading: boolean;
 }
 
-function DeleteConfirmModal({ tier_label, onConfirm, onCancel, is_loading }: DeleteConfirmProps) {
+function DeleteConfirmModal({ label, onConfirm, onCancel, is_loading }: DeleteConfirmProps) {
   return (
     <div className="fixed inset-0 z-99999 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onCancel} />
@@ -38,7 +38,7 @@ function DeleteConfirmModal({ tier_label, onConfirm, onCancel, is_loading }: Del
             Remove DR Tier
           </h3>
           <p className="mt-2 text-center text-sm text-gray-500 dark:text-gray-400">
-            Are you sure you want to remove <span className="font-medium text-gray-700 dark:text-gray-300">{tier_label}</span>? This action will mark it as unavailable.
+            Are you sure you want to remove <span className="font-medium text-gray-700 dark:text-gray-300">{label}</span>? This action will mark it as unavailable.
           </p>
           <div className="mt-5 flex gap-3">
             <button
@@ -240,7 +240,7 @@ export default function DrTiersPanel({
                           </svg>
                         </div>
                         <span className="font-medium text-gray-900 dark:text-white">
-                          {tier.dr_label}
+                          {tier.label}
                         </span>
                       </div>
                     </td>
@@ -335,7 +335,7 @@ export default function DrTiersPanel({
       {/* Delete confirmation */}
       {deleting_tier && (
         <DeleteConfirmModal
-          tier_label={deleting_tier.dr_label}
+          label={deleting_tier.label}
           onConfirm={handleDelete}
           onCancel={() => setDeletingTier(null)}
           is_loading={is_deleting}

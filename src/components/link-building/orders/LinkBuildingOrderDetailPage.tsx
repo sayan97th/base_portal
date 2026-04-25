@@ -143,7 +143,7 @@ const OrderItemCard: React.FC<OrderItemCardProps> = ({ item, index }) => {
           </span>
           <div>
             <p className="text-sm font-semibold text-gray-900 dark:text-white">
-              {item.dr_tier.dr_label}
+              {item.dr_tier.label}
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               {formatCurrency(item.unit_price)} per link &middot;{" "}
@@ -176,7 +176,7 @@ const OrderItemCard: React.FC<OrderItemCardProps> = ({ item, index }) => {
       {/* Tier Meta Row */}
       <div className="grid grid-cols-2 gap-0 border-t border-gray-100 bg-gray-50/50 dark:border-gray-800 dark:bg-white/[0.01] sm:grid-cols-4">
         {[
-          { label: "DR Tier", value: item.dr_tier.dr_label },
+          { label: "DR Tier", value: item.dr_tier.label },
           { label: "Traffic Range", value: item.dr_tier.traffic_range },
           { label: "Word Count", value: `${item.dr_tier.word_count} words` },
           { label: "Links", value: `${item.quantity}` },
@@ -520,7 +520,7 @@ const LinkBuildingOrderDetailPage: React.FC<
                   {order.items.map((item) => (
                     <div key={item.id} className="flex justify-between gap-2">
                       <dt className="text-sm text-gray-600 dark:text-gray-400">
-                        {item.dr_tier.dr_label}{" "}
+                        {item.dr_tier.label}{" "}
                         <span className="text-gray-400">
                           &times; {item.quantity}
                         </span>

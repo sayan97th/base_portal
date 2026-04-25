@@ -122,7 +122,7 @@ const LinkBuildingPage: React.FC = () => {
         .filter((tier) => (selected_quantities[tier.id] ?? 0) > 0)
         .map((tier) => ({
           id: tier.id,
-          label: tier.dr_label,
+          label: tier.label,
           quantity: selected_quantities[tier.id],
           unit_price: tier.price_per_link,
         })),
@@ -135,7 +135,7 @@ const LinkBuildingPage: React.FC = () => {
     setItemQuantity(
       "link_building",
       tier_id,
-      tier.dr_label,
+      tier.label,
       tier.price_per_link,
       quantity
     );

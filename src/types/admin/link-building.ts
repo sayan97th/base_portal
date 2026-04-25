@@ -4,7 +4,7 @@ export type PricingModel = "tiered" | "fixed" | "per_unit" | "subscription" | "c
 
 export interface AdminDrTier {
   id: string;
-  dr_label: string;
+  label: string;
   traffic_range: string;
   word_count: number;
   price_per_link: number;
@@ -65,7 +65,7 @@ export interface CreateLinkBuildingServicePayload {
 export type UpdateLinkBuildingServicePayload = Partial<CreateLinkBuildingServicePayload>;
 
 export interface CreateDrTierPayload {
-  dr_label: string;
+  label: string;
   traffic_range: string;
   word_count: number;
   price_per_link: number;

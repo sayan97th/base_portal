@@ -217,7 +217,7 @@ interface ItemGroupHeaderProps {
 function ItemGroupHeader({ item, selected_count, total_count, is_disabled, onToggleAll }: ItemGroupHeaderProps) {
   const is_all = selected_count === total_count;
   const is_partial = selected_count > 0 && !is_all;
-  const tier_label = item.dr_tier?.dr_label ?? `Tier ${item.dr_tier_id}`;
+  const tier_label = item.dr_tier?.label ?? `Tier ${item.dr_tier_id}`;
 
   return (
     <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800/60">

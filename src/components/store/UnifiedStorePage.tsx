@@ -481,7 +481,7 @@ const UnifiedStorePage: React.FC = () => {
         .filter((t) => (lb_quantities[t.id] ?? 0) > 0)
         .map((t) => ({
           id: t.id,
-          label: t.dr_label,
+          label: t.label,
           quantity: lb_quantities[t.id],
           unit_price: t.price_per_link,
         })),
@@ -513,7 +513,7 @@ const UnifiedStorePage: React.FC = () => {
   const handleLbQuantityChange = (tier_id: string, quantity: number) => {
     const tier = dr_tiers.find((t) => t.id === tier_id);
     if (!tier) return;
-    setItemQuantity("link_building", tier_id, tier.dr_label, tier.price_per_link, quantity);
+    setItemQuantity("link_building", tier_id, tier.label, tier.price_per_link, quantity);
   };
 
   const handleNcQuantityChange = (tier_id: string, quantity: number) => {

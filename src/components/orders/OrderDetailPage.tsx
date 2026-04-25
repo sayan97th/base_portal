@@ -120,7 +120,7 @@ function normalizeLinkBuilding(order_id: string, d: LinkBuildingOrderDetail): No
     product_type: "link_building",
     items: d.items.map((item) => ({
       id: item.id,
-      label: item.dr_tier.dr_label,
+      label: item.dr_tier.label,
       meta: `${item.dr_tier.traffic_range} traffic · ${item.dr_tier.word_count.toLocaleString()} words`,
       quantity: item.quantity,
       unit_price: item.unit_price,

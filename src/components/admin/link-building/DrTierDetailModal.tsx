@@ -229,7 +229,7 @@ export default function DrTierDetailModal({
                     </div>
                     <div>
                       <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                        {tier.dr_label}
+                        {tier.label}
                       </h2>
                       <div className="mt-1 flex flex-wrap items-center gap-2">
                         <span className="inline-flex items-center rounded-md bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">

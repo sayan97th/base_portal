@@ -483,7 +483,7 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
         quantity: item.quantity,
         unit_price: item.unit_price,
         subtotal: item.subtotal,
-        label: item.dr_tier.dr_label,
+        label: item.dr_tier.label,
         meta: `${item.dr_tier.traffic_range} traffic · DR tier`,
       }));
     }
