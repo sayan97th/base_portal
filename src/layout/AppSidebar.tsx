@@ -14,6 +14,7 @@ import {
   CopyIcon,
   PencilIcon,
   BoxCubeIcon,
+  BoxIconLine,
   UserCircleIcon,
   GroupIcon,
   DollarLineIcon,
@@ -48,6 +49,7 @@ const sidebar_sections: SidebarSection[] = [
   {
     items: [
       { name: "Dashboard", icon: <GridIcon />, path: "/", highlight: true },
+      { name: "Store", icon: <BoxIconLine />, path: "/store", highlight: true },
       { name: "Deliverables", icon: <DocsIcon />, path: "/deliverables" },
       { name: "Resources", icon: <FolderIcon />, path: "/resources" },
     ],

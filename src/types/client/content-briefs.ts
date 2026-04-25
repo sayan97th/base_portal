@@ -47,3 +47,12 @@ export interface CreateContentBriefOrderResponse {
   total_amount: number;
   created_at: string;
 }
+
+export interface ContentBriefOrderSummary {
+  id: string;
+  order_notes: string | null;
+  total_amount: number;
+  status: string;
+  created_at: string;
+  items_count: number;
+}
