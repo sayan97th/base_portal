@@ -332,11 +332,10 @@ const OrderItemsTable = ({ items, coupons, total_amount, product_type, order_tit
 
 interface SessionItemsViewProps {
   session_orders: AdminOrder[];
-  current_order_id: string;
   session_title: string | null;
 }
 
-const SessionItemsView = ({ session_orders, current_order_id, session_title }: SessionItemsViewProps) => {
+const SessionItemsView = ({ session_orders, session_title }: SessionItemsViewProps) => {
   const total_items = session_orders.reduce((s, o) => s + o.items.length, 0);
   const session_total = session_orders.reduce((s, o) => s + o.total_amount, 0);
 
@@ -395,20 +394,7 @@ const SessionItemsView = ({ session_orders, current_order_id, session_title }: S
 
       {/* One table per order, all visible at once */}
       {session_orders.map((order) => (
-        <div
-          key={order.id}
-          className={
-            order.id === current_order_id
-              ? "ring-2 ring-brand-300 dark:ring-brand-500/40 rounded-xl"
-              : ""
-          }
-        >
-          {order.id === current_order_id && (
-            <p className="mb-1 flex items-center gap-1.5 px-1 text-[11px] font-semibold uppercase tracking-wide text-brand-600 dark:text-brand-400">
-              <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
-              Current Order
-            </p>
-          )}
+        <div key={order.id}>
           <OrderItemsTable
             items={order.items}
             coupons={order.coupons}
@@ -718,7 +704,6 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
               {is_session_view ? (
                 <SessionItemsView
                   session_orders={session_orders}
-                  current_order_id={order.id}
                   session_title={order.session_title ?? null}
                 />
               ) : (
