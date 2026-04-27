@@ -249,61 +249,74 @@ const UserAvatarIcon = () => (
   </svg>
 );
 
-// ── Expanded items list ────────────────────────────────────────────────────────
+// ── Inline products panel (always-visible, no toggle) ─────────────────────────
 
-interface ExpandedItemsListProps {
+interface ProductsPanelProps {
   items: OrderItem[];
   product_type?: AdminOrderProductType | null;
+  compact?: boolean;
 }
 
-function ExpandedItemsList({ items, product_type }: ExpandedItemsListProps) {
-  if (!items.length) return null;
-  const subtotal = items.reduce((sum, i) => sum + i.subtotal, 0);
+function ProductsPanel({ items, product_type, compact = false }: ProductsPanelProps) {
+  if (!items?.length) return null;
+  const total = items.reduce((sum, i) => sum + i.subtotal, 0);
 
   return (
-    <div className="mx-4 mb-3 mt-1 overflow-hidden rounded-xl border border-gray-100 dark:border-gray-700/50">
-      {/* Header */}
-      <div className="flex items-center gap-1.5 border-b border-gray-100 bg-gray-50 px-3 py-1.5 dark:border-gray-700/50 dark:bg-gray-800/50">
-        <svg className="h-3 w-3 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+    <div className={`border-t border-gray-100 dark:border-gray-800 ${compact ? "px-4 py-2.5" : "px-5 py-3"}`}>
+      {/* Section label */}
+      <div className="mb-2 flex items-center gap-1.5">
+        <svg className="h-3 w-3 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h12M6 10h12M6 14h8" />
         </svg>
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
-          {items.length} {items.length === 1 ? "item" : "items"}
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-300 dark:text-gray-600">
+          Products
         </span>
       </div>
 
-      {/* Rows */}
-      <div className="divide-y divide-gray-100 bg-white dark:divide-gray-700/50 dark:bg-transparent">
-        {items.map((item) => (
-          <div key={item.id} className="flex items-start gap-3 px-3 py-2.5">
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-medium text-gray-700 dark:text-gray-300">
-                {getItemLabel(item, product_type)}
-              </p>
-              {item.dr_tier && (
-                <p className="mt-0.5 text-[10px] text-gray-400 dark:text-gray-500">
-                  DR {item.dr_tier.traffic_range} · {item.dr_tier.word_count.toLocaleString()} words · {formatCurrency(item.dr_tier.price_per_link)}/link
-                </p>
-              )}
-            </div>
-            <div className="flex shrink-0 items-center gap-3 text-xs">
-              <span className="text-gray-400 dark:text-gray-500">
-                {item.quantity}× · {formatCurrency(item.unit_price)}
+      {/* Items grid */}
+      <div className="flex flex-col gap-1">
+        {items.map((item) => {
+          const label = getItemLabel(item, product_type);
+          return (
+            <div
+              key={item.id}
+              className="group flex items-center gap-2.5 rounded-lg bg-gray-50 px-2.5 py-2 dark:bg-white/[0.03]"
+            >
+              {/* Quantity badge */}
+              <span className="flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded-md bg-gray-200/80 px-1.5 text-[10px] font-bold tabular-nums text-gray-500 dark:bg-gray-700/60 dark:text-gray-400">
+                {item.quantity}×
               </span>
-              <span className="w-16 text-right font-semibold text-gray-700 dark:text-gray-300">
+
+              {/* Name + tier detail */}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-medium text-gray-700 dark:text-gray-300">{label}</p>
+                {item.dr_tier && (
+                  <p className="mt-0.5 truncate text-[10px] text-gray-400 dark:text-gray-500">
+                    DR {item.dr_tier.traffic_range} &middot; {item.dr_tier.word_count.toLocaleString()} words &middot; {formatCurrency(item.dr_tier.price_per_link)}/link
+                  </p>
+                )}
+              </div>
+
+              {/* Unit price */}
+              <span className="shrink-0 text-[11px] text-gray-400 tabular-nums dark:text-gray-500">
+                {formatCurrency(item.unit_price)}
+              </span>
+
+              {/* Line subtotal */}
+              <span className="w-16 shrink-0 text-right text-xs font-semibold tabular-nums text-gray-700 dark:text-gray-200">
                 {formatCurrency(item.subtotal)}
               </span>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {/* Footer subtotal — only when more than one item */}
+      {/* Total row — only when multiple items */}
       {items.length > 1 && (
-        <div className="flex items-center justify-end gap-3 border-t border-gray-100 bg-gray-50 px-3 py-1.5 dark:border-gray-700/50 dark:bg-gray-800/50">
-          <span className="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">Subtotal</span>
-          <span className="text-xs font-bold text-gray-800 dark:text-white/90">
-            {formatCurrency(subtotal)}
+        <div className="mt-2 flex items-center justify-end gap-2 border-t border-gray-100 pt-2 dark:border-gray-800">
+          <span className="text-[10px] font-medium uppercase tracking-widest text-gray-300 dark:text-gray-600">Total</span>
+          <span className="text-xs font-bold tabular-nums text-gray-800 dark:text-white/90">
+            {formatCurrency(total)}
           </span>
         </div>
       )}
@@ -365,7 +378,6 @@ interface OrderRowProps {
 }
 
 function OrderRow({ order, is_last, compact = false }: OrderRowProps) {
-  const [is_items_open, setIsItemsOpen] = useState(false);
   const type_config = order.product_type ? PRODUCT_TYPE_CONFIG[order.product_type] : null;
   const items_count = getOrderItemsCount(order);
   const has_items = (order.items?.length ?? 0) > 0;
@@ -406,19 +418,9 @@ function OrderRow({ order, is_last, compact = false }: OrderRowProps) {
               {items_count > 0 && (
                 <>
                   <span className="text-gray-200 dark:text-gray-700">·</span>
-                  {has_items ? (
-                    <button
-                      onClick={() => setIsItemsOpen((v) => !v)}
-                      className="inline-flex items-center gap-1 text-xs text-gray-400 transition-colors hover:text-brand-600 dark:text-gray-500 dark:hover:text-brand-400"
-                    >
-                      {items_count} {items_count === 1 ? "item" : "items"}
-                      <ChevronDownIcon expanded={is_items_open} />
-                    </button>
-                  ) : (
-                    <span className="text-xs text-gray-400 dark:text-gray-500">
-                      {items_count} {items_count === 1 ? "item" : "items"}
-                    </span>
-                  )}
+                  <span className="text-xs text-gray-400 dark:text-gray-500">
+                    {items_count} {items_count === 1 ? "item" : "items"}
+                  </span>
                 </>
               )}
               <span className="text-gray-200 dark:text-gray-700">·</span>
@@ -450,9 +452,9 @@ function OrderRow({ order, is_last, compact = false }: OrderRowProps) {
         </div>
       </div>
 
-      {/* Expandable items */}
-      {is_items_open && has_items && (
-        <ExpandedItemsList items={order.items} product_type={order.product_type} />
+      {/* Inline products — always visible */}
+      {has_items && (
+        <ProductsPanel items={order.items} product_type={order.product_type} compact />
       )}
     </div>
   );
@@ -461,7 +463,6 @@ function OrderRow({ order, is_last, compact = false }: OrderRowProps) {
 // ── Single-order card (no session) ─────────────────────────────────────────────
 
 function SingleOrderCard({ group }: { group: AdminOrderGroup }) {
-  const [is_items_open, setIsItemsOpen] = useState(false);
   const order = group.orders[0];
   const type_config = order.product_type ? PRODUCT_TYPE_CONFIG[order.product_type] : null;
   const items_count = getOrderItemsCount(order);
@@ -504,19 +505,9 @@ function SingleOrderCard({ group }: { group: AdminOrderGroup }) {
             {items_count > 0 && (
               <>
                 <span className="text-gray-200 dark:text-gray-700">·</span>
-                {has_items ? (
-                  <button
-                    onClick={() => setIsItemsOpen((v) => !v)}
-                    className="inline-flex items-center gap-1 text-xs text-gray-400 transition-colors hover:text-brand-600 dark:text-gray-500 dark:hover:text-brand-400"
-                  >
-                    {items_count} {items_count === 1 ? "item" : "items"}
-                    <ChevronDownIcon expanded={is_items_open} />
-                  </button>
-                ) : (
-                  <span className="text-xs text-gray-400 dark:text-gray-500">
-                    {items_count} {items_count === 1 ? "item" : "items"}
-                  </span>
-                )}
+                <span className="text-xs text-gray-400 dark:text-gray-500">
+                  {items_count} {items_count === 1 ? "item" : "items"}
+                </span>
               </>
             )}
             {!type_config && (
@@ -553,11 +544,9 @@ function SingleOrderCard({ group }: { group: AdminOrderGroup }) {
         </div>
       </div>
 
-      {/* Expandable items */}
-      {is_items_open && has_items && (
-        <div className="border-t border-gray-100 pb-1 dark:border-gray-800">
-          <ExpandedItemsList items={order.items} product_type={order.product_type} />
-        </div>
+      {/* Inline products — always visible */}
+      {has_items && (
+        <ProductsPanel items={order.items} product_type={order.product_type} />
       )}
     </div>
   );
