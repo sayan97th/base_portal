@@ -639,11 +639,21 @@ function SessionOrderCard({ group }: { group: AdminOrderGroup }) {
             </div>
           </div>
 
-          {/* Right: total + chevron */}
+          {/* Right: total + view all + chevron */}
           <div className="flex shrink-0 items-center gap-3">
             <span className="text-sm font-bold text-gray-800 dark:text-white/90">
               {formatCurrency(group.total_amount)}
             </span>
+            <Link
+              href={`/admin/orders/${group.orders[0].id}`}
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-600 transition-colors hover:bg-brand-50 dark:border-brand-500/30 dark:bg-white/3 dark:text-brand-400 dark:hover:bg-brand-500/10"
+            >
+              View All Details
+              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+              </svg>
+            </Link>
             <ChevronDownIcon expanded={is_expanded} />
           </div>
         </div>

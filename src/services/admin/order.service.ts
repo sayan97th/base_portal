@@ -26,6 +26,7 @@ export async function listAdminOrders(
     sort_direction,
     date_from,
     date_to,
+    session_id,
   } = filters;
 
   const params = new URLSearchParams();
@@ -37,6 +38,7 @@ export async function listAdminOrders(
   if (sort_direction) params.set("sort_direction", sort_direction);
   if (date_from) params.set("date_from", date_from);
   if (date_to) params.set("date_to", date_to);
+  if (session_id) params.set("session_id", session_id);
 
   return apiClient.get<PaginatedResponse<AdminOrder>>(
     `/api/admin/orders?${params.toString()}`

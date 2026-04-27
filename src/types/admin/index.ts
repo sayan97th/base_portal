@@ -103,6 +103,7 @@ export interface AdminOrderFilters {
   sort_direction?: SortDirection;
   date_from?: string;
   date_to?: string;
+  session_id?: string;
 }
 
 export interface OrderUser {
