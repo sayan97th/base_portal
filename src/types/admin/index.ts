@@ -44,6 +44,12 @@ export interface PaginatedResponse<T> {
 
 export type OrderStatus = "pending" | "processing" | "completed" | "cancelled";
 
+export type AdminOrderProductType =
+  | "link_building"
+  | "new_content"
+  | "content_optimization"
+  | "content_brief";
+
 export type OrderSortField =
   | "created_at"
   | "total_amount"
@@ -133,10 +139,11 @@ export interface OrderPlacementDetail {
 
 export interface OrderItem {
   id: number;
-  dr_tier_id: number;
+  dr_tier_id?: number | null;
   quantity: number;
   unit_price: number;
   subtotal: number;
+  item_name?: string | null;
   dr_tier?: OrderItemDrTier;
   placements?: OrderPlacementDetail[];
 }
@@ -157,6 +164,21 @@ export interface AdminOrder {
   billing: OrderBilling | null;
   invoice: AdminInvoice | null;
   coupons?: OrderCouponDetail[];
+  session_id?: string | null;
+  session_title?: string | null;
+  product_type?: AdminOrderProductType;
+  items_count?: number;
+}
+
+export interface AdminOrderGroup {
+  group_id: string;
+  session_id: string | null;
+  session_title: string | null;
+  created_at: string;
+  total_amount: number;
+  orders: AdminOrder[];
+  is_multi_order: boolean;
+  user: OrderUser;
 }
 
 export interface AdminLinkBuildingOrder {
