@@ -4,7 +4,15 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import Badge from "@/components/ui/badge/Badge";
 import { getAdminOrder } from "@/services/admin/order.service";
-import type { AdminOrder, AdminInvoice, OrderItem, OrderStatus, OrderCouponDetail, InvoiceCouponDiscount } from "@/types/admin";
+import type {
+  AdminOrder,
+  AdminInvoice,
+  OrderItem,
+  OrderStatus,
+  OrderCouponDetail,
+  InvoiceCouponDiscount,
+  AdminOrderProductType,
+} from "@/types/admin";
 import OrderTrackingPanel from "./OrderTrackingPanel";
 
 interface AdminOrderDetailContentProps {
@@ -42,6 +50,47 @@ function getStatusConfig(status: OrderStatus): {
     case "cancelled":
       return { color: "error", label: "Cancelled", dot: "bg-error-500" };
   }
+}
+
+const PRODUCT_TYPE_CONFIG: Record<
+  AdminOrderProductType,
+  { label: string; column_label: string; color: string; bg: string; border: string }
+> = {
+  link_building: {
+    label: "Link Building",
+    column_label: "Link / DR Tier",
+    color: "text-violet-700 dark:text-violet-300",
+    bg: "bg-violet-50 dark:bg-violet-500/10",
+    border: "border-violet-200 dark:border-violet-500/30",
+  },
+  new_content: {
+    label: "New Content",
+    column_label: "Content Package",
+    color: "text-blue-700 dark:text-blue-300",
+    bg: "bg-blue-50 dark:bg-blue-500/10",
+    border: "border-blue-200 dark:border-blue-500/30",
+  },
+  content_optimization: {
+    label: "Content Optimization",
+    column_label: "Optimization Package",
+    color: "text-emerald-700 dark:text-emerald-300",
+    bg: "bg-emerald-50 dark:bg-emerald-500/10",
+    border: "border-emerald-200 dark:border-emerald-500/30",
+  },
+  content_brief: {
+    label: "Content Briefs",
+    column_label: "Brief Package",
+    color: "text-amber-700 dark:text-amber-300",
+    bg: "bg-amber-50 dark:bg-amber-500/10",
+    border: "border-amber-200 dark:border-amber-500/30",
+  },
+};
+
+function getItemPrimaryLabel(item: OrderItem): string {
+  if (item.item_name) return item.item_name;
+  if (item.dr_tier?.label) return item.dr_tier.label;
+  if (item.dr_tier_id) return `DR Tier #${item.dr_tier_id}`;
+  return `Item #${item.id}`;
 }
 
 const BackIcon = () => (
@@ -82,9 +131,10 @@ interface OrderItemsTableProps {
   items: OrderItem[];
   coupons?: OrderCouponDetail[];
   total_amount?: number;
+  product_type?: AdminOrderProductType | null;
 }
 
-const OrderItemsTable = ({ items, coupons, total_amount }: OrderItemsTableProps) => {
+const OrderItemsTable = ({ items, coupons, total_amount, product_type }: OrderItemsTableProps) => {
   const items_subtotal = items.reduce((sum, i) => sum + i.subtotal, 0);
   const coupon_total = coupons?.reduce((sum, c) => sum + c.discount_amount, 0) ?? 0;
   const bulk_discount_amount = Math.max(
@@ -95,8 +145,23 @@ const OrderItemsTable = ({ items, coupons, total_amount }: OrderItemsTableProps)
   const has_coupons = coupons && coupons.length > 0;
   const has_any_discount = has_bulk_discount || !!has_coupons;
 
+  const type_cfg = product_type ? PRODUCT_TYPE_CONFIG[product_type] : null;
+  const column_label = type_cfg?.column_label ?? "Product";
+
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
+      {/* Product type identity strip */}
+      {type_cfg && (
+        <div className={`flex items-center gap-3 border-b px-5 py-2.5 ${type_cfg.bg} ${type_cfg.border}`}>
+          <span className={`inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold ${type_cfg.bg} ${type_cfg.color} ${type_cfg.border}`}>
+            {type_cfg.label}
+          </span>
+          <span className={`text-xs ${type_cfg.color} opacity-70`}>
+            {items.length} {items.length === 1 ? "item" : "items"} in this order
+          </span>
+        </div>
+      )}
+
       <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
         <h3 className="text-sm font-semibold text-gray-800 dark:text-white/90">
           Order Items
@@ -113,7 +178,7 @@ const OrderItemsTable = ({ items, coupons, total_amount }: OrderItemsTableProps)
                 #
               </th>
               <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                DR Tier
+                {column_label}
               </th>
               <th className="px-5 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                 Qty
@@ -131,9 +196,32 @@ const OrderItemsTable = ({ items, coupons, total_amount }: OrderItemsTableProps)
               <tr key={item.id} className="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                 <td className="px-5 py-3.5 text-xs text-gray-400 dark:text-gray-500">{index + 1}</td>
                 <td className="px-5 py-3.5">
-                  <span className="inline-flex items-center gap-1.5 rounded-md bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700 dark:bg-brand-500/10 dark:text-brand-400">
-                    DR Tier #{item.dr_tier_id}
-                  </span>
+                  <div>
+                    <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${
+                      type_cfg
+                        ? `border ${type_cfg.border} ${type_cfg.bg} ${type_cfg.color}`
+                        : "bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400"
+                    }`}>
+                      {getItemPrimaryLabel(item)}
+                    </span>
+                    {item.dr_tier && product_type === "link_building" && (
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-gray-400 dark:text-gray-500">
+                        <span>DR {item.dr_tier.traffic_range}</span>
+                        <span className="text-gray-200 dark:text-gray-700">·</span>
+                        <span>{item.dr_tier.word_count.toLocaleString()} words</span>
+                        <span className="text-gray-200 dark:text-gray-700">·</span>
+                        <span>{formatCurrency(item.dr_tier.price_per_link)}/link</span>
+                        {item.placements && item.placements.length > 0 && (
+                          <>
+                            <span className="text-gray-200 dark:text-gray-700">·</span>
+                            <span className="font-medium text-violet-500 dark:text-violet-400">
+                              {item.placements.length} placement{item.placements.length !== 1 ? "s" : ""}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </td>
                 <td className="px-5 py-3.5 text-right font-medium text-gray-800 dark:text-white/90">
                   {item.quantity}
@@ -238,7 +326,7 @@ const InvoiceCard = ({ invoice }: InvoiceCardProps) => {
   };
 
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
       <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-gray-800">
         <div className="flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-white/90">
           <ReceiptIcon />
@@ -334,6 +422,7 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
 
   const effective_status = current_status ?? order?.status ?? "pending";
   const status_config = order ? getStatusConfig(effective_status) : null;
+  const product_type_cfg = order?.product_type ? PRODUCT_TYPE_CONFIG[order.product_type] : null;
 
   return (
     <div className="space-y-6">
@@ -388,6 +477,20 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
           {/* Page Header */}
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
+              {/* Product type indicator banner */}
+              {product_type_cfg && (
+                <div className={`mb-2 inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 ${product_type_cfg.bg} ${product_type_cfg.border}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${
+                    order.product_type === "link_building" ? "bg-violet-500" :
+                    order.product_type === "new_content" ? "bg-blue-500" :
+                    order.product_type === "content_optimization" ? "bg-emerald-500" :
+                    "bg-amber-500"
+                  }`} />
+                  <span className={`text-xs font-semibold uppercase tracking-wide ${product_type_cfg.color}`}>
+                    {product_type_cfg.label}
+                  </span>
+                </div>
+              )}
               <div className="flex flex-wrap items-center gap-3">
                 <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
                   {order.order_title || "Order Details"}
@@ -436,7 +539,7 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
             {/* Left Column */}
             <div className="col-span-12 space-y-5 lg:col-span-8">
               {/* Customer Info */}
-              <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+              <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
                 <div className="flex items-center gap-2 border-b border-gray-200 px-5 py-4 dark:border-gray-800">
                   <span className="text-gray-400 dark:text-gray-500">
                     <UserIcon />
@@ -459,7 +562,7 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
                     <div className="ml-auto">
                       <Link
                         href={`/admin/users/${order.user_id}`}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-400 dark:hover:bg-white/[0.05]"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-white/3 dark:text-gray-400 dark:hover:bg-white/5"
                       >
                         View User
                       </Link>
@@ -469,11 +572,16 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
               </div>
 
               {/* Order Items */}
-              <OrderItemsTable items={order.items} coupons={order.coupons} total_amount={order.total_amount} />
+              <OrderItemsTable
+                items={order.items}
+                coupons={order.coupons}
+                total_amount={order.total_amount}
+                product_type={order.product_type}
+              />
 
               {/* Notes */}
               {order.order_notes && (
-                <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3">
                   <h3 className="mb-2 text-sm font-semibold text-gray-800 dark:text-white/90">
                     Order Notes
                   </h3>
@@ -485,11 +593,22 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
             {/* Right Column */}
             <div className="col-span-12 space-y-5 lg:col-span-4">
               {/* Order Summary */}
-              <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+              <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
                 <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
                   <h3 className="text-sm font-semibold text-gray-800 dark:text-white/90">Order Summary</h3>
                 </div>
                 <dl className="px-5 py-1">
+                  {/* Product type row */}
+                  {product_type_cfg && (
+                    <InfoRow
+                      label="Product Type"
+                      value={
+                        <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold ${product_type_cfg.bg} ${product_type_cfg.color} ${product_type_cfg.border}`}>
+                          {product_type_cfg.label}
+                        </span>
+                      }
+                    />
+                  )}
                   <InfoRow label="Status" value={
                     <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
                       effective_status === "pending" ? "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400" :
@@ -588,7 +707,7 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
 
               {/* Billing Address */}
               {order.billing && (
-                <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+                <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
                   <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
                     <h3 className="text-sm font-semibold text-gray-800 dark:text-white/90">Billing Address</h3>
                   </div>
@@ -607,7 +726,7 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
 
               {/* Payment Intent */}
               {order.payment_intent_id && (
-                <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3">
                   <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     Payment Reference
                   </h3>

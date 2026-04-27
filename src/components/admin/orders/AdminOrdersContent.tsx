@@ -161,7 +161,7 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-function getItemLabel(item: OrderItem, product_type?: AdminOrderProductType | null): string {
+function getItemLabel(item: OrderItem, _product_type?: AdminOrderProductType | null): string {
   if (item.item_name) return item.item_name;
   if (item.dr_tier?.label) return item.dr_tier.label;
   return `Item #${item.id}`;
@@ -436,7 +436,11 @@ function OrderRow({ order, is_last, compact = false }: OrderRowProps) {
           </span>
           <Link
             href={`/admin/orders/${order.id}`}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-white/3 dark:text-gray-400 dark:hover:bg-white/6"
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+              type_config
+                ? `${type_config.border} ${type_config.bg} ${type_config.color} hover:opacity-80`
+                : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-white/3 dark:text-gray-400 dark:hover:bg-white/6"
+            }`}
           >
             View Details
             <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -535,7 +539,11 @@ function SingleOrderCard({ group }: { group: AdminOrderGroup }) {
           </span>
           <Link
             href={`/admin/orders/${order.id}`}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-white/3 dark:text-gray-400 dark:hover:bg-white/6"
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+              type_config
+                ? `${type_config.border} ${type_config.bg} ${type_config.color} hover:opacity-80`
+                : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-white/3 dark:text-gray-400 dark:hover:bg-white/6"
+            }`}
           >
             View Details
             <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
