@@ -274,6 +274,14 @@ export interface InvoiceLineItem {
   item_total: number;
 }
 
+export interface InvoiceProductGroup {
+  product_type: AdminOrderProductType;
+  order_id: string;
+  label: string;
+  items: InvoiceLineItem[];
+  subtotal: number;
+}
+
 export interface AdminInvoice {
   id: string;
   unique_id: string;
@@ -297,6 +305,10 @@ export interface AdminInvoice {
   line_items: InvoiceLineItem[];
   billed_to: InvoiceBilledTo | null;
   coupon_discounts?: InvoiceCouponDiscount[];
+  session_id?: string | null;
+  session_title?: string | null;
+  product_type?: AdminOrderProductType | null;
+  invoice_products?: InvoiceProductGroup[];
 }
 
 // ── Invoice Creation & History ────────────────────────────────────────────────
