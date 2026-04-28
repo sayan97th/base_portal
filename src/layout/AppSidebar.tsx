@@ -9,12 +9,10 @@ import {
   FolderIcon,
   PlugInIcon,
   ShootingStarIcon,
-  PaperPlaneIcon,
   FileIcon,
   CopyIcon,
   PencilIcon,
   BoxCubeIcon,
-  BoxIconLine,
   UserCircleIcon,
   GroupIcon,
   DollarLineIcon,
@@ -22,7 +20,6 @@ import {
   ChatIcon,
   ChevronDownIcon,
   CalenderIcon,
-  TaskIcon,
   ListIcon,
 } from "../icons/index";
 import SidebarWidget from "./SidebarWidget";
@@ -49,7 +46,6 @@ const sidebar_sections: SidebarSection[] = [
   {
     items: [
       { name: "Dashboard", icon: <GridIcon />, path: "/", highlight: true },
-      { name: "Store", icon: <BoxIconLine />, path: "/store", highlight: true },
       { name: "Deliverables", icon: <DocsIcon />, path: "/deliverables" },
       { name: "Resources", icon: <FolderIcon />, path: "/resources" },
     ],

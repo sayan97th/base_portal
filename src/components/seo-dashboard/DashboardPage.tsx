@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { dashboardService } from "@/services/client/dashboard.service";
 import type { LinkBuildingOrderSummary } from "@/types/client/link-building";
 import type { DashboardTableRow } from "@/services/client/dashboard.service";
 import { useDebounce } from "@/hooks/useDebounce";
-import { useCart } from "@/context/CartContext";
 import ClientProfile from "./ClientProfile";
 import OrderHistory from "./OrderHistory";
 import NewsCard from "./NewsCard";
@@ -15,13 +15,11 @@ import DashboardStatsCards from "./DashboardStatsCards";
 import SmeContentWidget from "./SmeContentWidget";
 import DashboardProducts from "./DashboardProducts";
 
-type DashboardTab = "overview" | "products";
-
 const TABLE_PER_PAGE = 10;
 
 export default function DashboardPage() {
-  const [active_tab, setActiveTab] = useState<DashboardTab>("overview");
-  const { item_count } = useCart();
+  const search_params = useSearchParams();
+  const active_tab = search_params.get("tab") ?? "overview";
 
   // ── Summary data (stats + order history cards) ─────────────────────────────
   const [orders, setOrders] = useState<LinkBuildingOrderSummary[]>([]);
@@ -99,69 +97,11 @@ export default function DashboardPage() {
       {/* Client Profile Header */}
       <ClientProfile />
 
-      {/* Tab navigation */}
-      <div className="border-b border-gray-200 dark:border-gray-800">
-        <nav className="-mb-px flex gap-1">
-          <button
-            onClick={() => setActiveTab("overview")}
-            className={`inline-flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
-              active_tab === "overview"
-                ? "border-coral-500 text-coral-600 dark:text-coral-400"
-                : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-200"
-            }`}
-          >
-            <svg
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={1.8}
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z"
-              />
-            </svg>
-            Overview
-          </button>
-
-          <button
-            onClick={() => setActiveTab("products")}
-            className={`inline-flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
-              active_tab === "products"
-                ? "border-coral-500 text-coral-600 dark:text-coral-400"
-                : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-200"
-            }`}
-          >
-            <svg
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={1.8}
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349M3.75 21V9.349m0 0a3.001 3.001 0 0 0 3.75-.615A2.993 2.993 0 0 0 9.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 0 0 2.25 1.016c.896 0 1.7-.393 2.25-1.015a3.001 3.001 0 0 0 3.75.614m-16.5 0a3.004 3.004 0 0 1-.621-4.72l1.189-1.19A1.5 1.5 0 0 1 5.378 3h13.243a1.5 1.5 0 0 1 1.06.44l1.19 1.189a3 3 0 0 1-.621 4.72M6.75 18h3.75a.75.75 0 0 0 .75-.75V13.5a.75.75 0 0 0-.75-.75H6.75a.75.75 0 0 0-.75.75v3.75c0 .414.336.75.75.75Z"
-              />
-            </svg>
-            Products
-            {item_count > 0 && (
-              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-coral-500 px-1 text-[10px] font-bold text-white">
-                {item_count}
-              </span>
-            )}
-          </button>
-        </nav>
-      </div>
-
       {/* ── Products tab ─────────────────────────────────────────────────────── */}
       {active_tab === "products" && <DashboardProducts />}
 
       {/* ── Overview tab ─────────────────────────────────────────────────────── */}
-      {active_tab === "overview" && (
+      {active_tab !== "products" && (
         <>
 
       {/* Error Banner */}
