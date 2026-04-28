@@ -578,6 +578,10 @@ const MyOrdersPage: React.FC = () => {
   const loadOrders = useCallback(async () => {
     setIsLoading(true);
     setError(null);
+
+    const merged: UnifiedOrder[] = [];
+    const failed_services: string[] = [];
+
     try {
       const [lb_result, nc_result, co_result, cb_result] = await Promise.allSettled([
         linkBuildingService.fetchMyOrders({ per_page: 200 }),
@@ -586,26 +590,31 @@ const MyOrdersPage: React.FC = () => {
         contentBriefsService.fetchMyOrders(),
       ]);
 
-      const merged: UnifiedOrder[] = [];
-
       if (lb_result.status === "fulfilled") {
-        lb_result.value.data.forEach((o) =>
-          merged.push({
-            id: o.id,
-            product_type: "link_building",
-            label: o.order_title ?? "Link Building Order",
-            total_amount: o.total_amount,
-            status: o.status,
-            created_at: o.created_at,
-            items_count: o.items_count,
-            updates_count: o.updates_count,
-            last_update_at: o.last_update_at,
-          })
-        );
+        const lb_data = lb_result.value?.data;
+        if (Array.isArray(lb_data)) {
+          lb_data.forEach((o) =>
+            merged.push({
+              id: o.id,
+              product_type: "link_building",
+              label: o.order_title ?? "Link Building Order",
+              total_amount: o.total_amount,
+              status: o.status,
+              created_at: o.created_at,
+              items_count: o.items_count,
+              updates_count: o.updates_count,
+              last_update_at: o.last_update_at,
+            })
+          );
+        }
+      } else {
+        failed_services.push("Link Building");
+        console.error("[MyOrders] Link Building orders failed:", lb_result.reason);
       }
 
       if (nc_result.status === "fulfilled") {
-        nc_result.value.forEach((o) =>
+        const nc_data = Array.isArray(nc_result.value) ? nc_result.value : [];
+        nc_data.forEach((o) =>
           merged.push({
             id: o.id,
             product_type: "new_content",
@@ -616,10 +625,14 @@ const MyOrdersPage: React.FC = () => {
             items_count: o.items_count,
           })
         );
+      } else {
+        failed_services.push("New Content");
+        console.error("[MyOrders] New Content orders failed:", nc_result.reason);
       }
 
       if (co_result.status === "fulfilled") {
-        co_result.value.forEach((o) =>
+        const co_data = Array.isArray(co_result.value) ? co_result.value : [];
+        co_data.forEach((o) =>
           merged.push({
             id: o.id,
             product_type: "content_optimization",
@@ -630,10 +643,14 @@ const MyOrdersPage: React.FC = () => {
             items_count: o.items_count,
           })
         );
+      } else {
+        failed_services.push("Content Optimization");
+        console.error("[MyOrders] Content Optimization orders failed:", co_result.reason);
       }
 
       if (cb_result.status === "fulfilled") {
-        cb_result.value.forEach((o) =>
+        const cb_data = Array.isArray(cb_result.value) ? cb_result.value : [];
+        cb_data.forEach((o) =>
           merged.push({
             id: o.id,
             product_type: "content_brief",
@@ -644,15 +661,26 @@ const MyOrdersPage: React.FC = () => {
             items_count: o.items_count,
           })
         );
+      } else {
+        failed_services.push("Content Briefs");
+        console.error("[MyOrders] Content Briefs orders failed:", cb_result.reason);
       }
-
+    } catch {
+      setError("We couldn't load your orders. Please try again.");
+    } finally {
       merged.sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
       setAllOrders(merged);
-    } catch {
-      setError("We couldn't load your orders. Please try again.");
-    } finally {
+
+      if (failed_services.length === 4) {
+        setError("We couldn't load your orders. Please try again.");
+      } else if (failed_services.length > 0) {
+        setError(
+          `Could not load orders for: ${failed_services.join(", ")}. Other order types are shown below.`
+        );
+      }
+
       setIsLoading(false);
     }
   }, []);
