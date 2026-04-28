@@ -14,11 +14,15 @@ interface ContentRefreshTierFormModalProps {
 }
 
 const EMPTY_FORM: CreateContentRefreshTierPayload = {
+  id: "",
   label: "",
   word_count_range: "",
   turnaround_days: 5,
   price: 0,
   is_active: true,
+  is_most_popular: false,
+  max_quantity: null,
+  is_hidden: false,
   sort_order: 1,
 };
 
@@ -37,11 +41,15 @@ export default function ContentRefreshTierFormModal({
   useEffect(() => {
     if (tier) {
       setFormData({
+        id: tier.id,
         label: tier.label,
         word_count_range: tier.word_count_range,
         turnaround_days: tier.turnaround_days,
         price: tier.price,
         is_active: tier.is_active,
+        is_most_popular: tier.is_most_popular,
+        max_quantity: tier.max_quantity,
+        is_hidden: tier.is_hidden,
         sort_order: tier.sort_order,
       });
     } else {
