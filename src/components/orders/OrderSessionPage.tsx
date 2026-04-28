@@ -9,10 +9,9 @@ import { linkBuildingService } from "@/services/client/link-building.service";
 import { newContentService } from "@/services/client/new-content.service";
 import { contentOptimizationService } from "@/services/client/content-optimization.service";
 import { contentBriefsService } from "@/services/client/content-briefs.service";
-import {
-  getCheckoutSession,
-  type CheckoutSession,
-} from "@/lib/checkout-session";
+import { getPurchaseGroup, savePurchaseGroup } from "@/lib/checkout-session";
+import { purchaseGroupsService } from "@/services/client/purchase-groups.service";
+import type { PurchaseGroup } from "@/types/client/purchase-groups";
 import type { LinkBuildingOrderDetail } from "@/types/client/link-building";
 import type { NewContentOrderDetail } from "@/types/client/new-content";
 import type { ContentOptimizationOrderDetail } from "@/types/client/content-optimization";
@@ -392,19 +391,29 @@ interface OrderSessionPageProps {
 
 const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
   const router = useRouter();
-  const [session, setSession] = useState<CheckoutSession | null>(null);
+  const [session, setSession] = useState<PurchaseGroup | null>(null);
   const [sections, setSections] = useState<ResolvedOrderSection[]>([]);
   const [is_loading, setIsLoading] = useState(true);
   const [not_found, setNotFound] = useState(false);
 
   useEffect(() => {
     const fetchDetails = async () => {
-      const loaded = getCheckoutSession(session_id);
+      // Try the API first so the receipt works on any device
+      let loaded = await purchaseGroupsService.fetchPurchaseGroup(session_id);
+
+      if (!loaded) {
+        // Fall back to the local cache (covers the device that placed the order)
+        loaded = getPurchaseGroup(session_id);
+      }
+
       if (!loaded) {
         setNotFound(true);
         setIsLoading(false);
         return;
       }
+
+      // Keep the local cache warm with the latest API data
+      savePurchaseGroup(loaded);
       setSession(loaded);
 
       const resolved: ResolvedOrderSection[] = await Promise.all(

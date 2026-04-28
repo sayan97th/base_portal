@@ -240,7 +240,7 @@ const OrderDetailPage: React.FC<OrderDetailPageProps> = ({ order_id }) => {
   useEffect(() => {
     const session = findSessionByOrderId(order_id);
     if (session) {
-      setSessionLink(`/orders/session/${session.session_id}`);
+      setSessionLink(`/orders/session/${session.purchase_group_id}`);
     }
   }, [order_id]);
 

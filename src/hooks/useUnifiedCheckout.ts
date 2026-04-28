@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { useNotifications } from "@/context/NotificationsContext";
 import { unifiedCartService } from "@/services/client/unified-cart.service";
-import { saveCheckoutSession } from "@/lib/checkout-session";
+import { savePurchaseGroup } from "@/lib/checkout-session";
+import { purchaseGroupsService } from "@/services/client/purchase-groups.service";
 import type { BillingAddress } from "@/components/shared/CheckoutStep";
 import type {
   CartProductType,
@@ -210,9 +211,9 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
               : undefined,
         });
 
-        const session_id = crypto.randomUUID();
-        saveCheckoutSession({
-          session_id,
+        const purchase_group_id = crypto.randomUUID();
+        const purchase_group = {
+          purchase_group_id,
           created_at: new Date().toISOString(),
           order_title: order_title || null,
           total_amount: total,
@@ -221,7 +222,14 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
             product_type: o.product_type,
             total_amount: o.total_amount,
           })),
-        });
+        };
+
+        // Save locally for instant access on this device
+        savePurchaseGroup(purchase_group);
+
+        // Persist to the API so the grouping survives across devices.
+        // Fire-and-forget: the localStorage cache is the fallback if this fails.
+        purchaseGroupsService.createPurchaseGroup(purchase_group).catch(() => {});
 
         for (const order of result.orders) {
           const label = PRODUCT_TYPE_LABELS[order.product_type];
@@ -233,13 +241,13 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
             type: "order",
             message: `Your ${label} order has been placed successfully.`,
             preview_text: `Order #${order.order_id} · $${formatted_amount}`,
-            link: `/orders/session/${session_id}`,
+            link: `/orders/session/${purchase_group_id}`,
           });
         }
 
         clearCart();
 
-        router.push(`/orders/session/${session_id}`);
+        router.push(`/orders/session/${purchase_group_id}`);
       } catch (err: unknown) {
         setSubmitError(extractApiErrorMessage(err));
       } finally {
