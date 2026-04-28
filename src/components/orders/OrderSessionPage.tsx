@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Badge from "@/components/ui/badge/Badge";
+import OrderComments from "@/components/orders/OrderComments";
 import { linkBuildingService } from "@/services/client/link-building.service";
 import { newContentService } from "@/services/client/new-content.service";
 import { contentOptimizationService } from "@/services/client/content-optimization.service";
@@ -700,6 +701,9 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
           </div>
         </div>
       )}
+
+      {/* ── Order Discussion ── */}
+      <OrderComments session_id={session_id} />
     </div>
   );
 };
