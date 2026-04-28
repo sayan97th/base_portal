@@ -5,6 +5,7 @@ import { SidebarProvider } from '@/context/SidebarContext';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { AuthProvider } from '@/context/AuthContext';
 import { NotificationsProvider } from '@/context/NotificationsContext';
+import { CartProvider } from '@/context/CartContext';
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -21,7 +22,9 @@ export default function RootLayout({
         <ThemeProvider>
           <AuthProvider>
             <NotificationsProvider>
-              <SidebarProvider>{children}</SidebarProvider>
+              <CartProvider>
+                <SidebarProvider>{children}</SidebarProvider>
+              </CartProvider>
             </NotificationsProvider>
           </AuthProvider>
         </ThemeProvider>

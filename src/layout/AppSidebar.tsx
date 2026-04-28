@@ -9,7 +9,6 @@ import {
   FolderIcon,
   PlugInIcon,
   ShootingStarIcon,
-  PaperPlaneIcon,
   FileIcon,
   CopyIcon,
   PencilIcon,
@@ -21,7 +20,6 @@ import {
   ChatIcon,
   ChevronDownIcon,
   CalenderIcon,
-  TaskIcon,
   ListIcon,
 } from "../icons/index";
 import SidebarWidget from "./SidebarWidget";

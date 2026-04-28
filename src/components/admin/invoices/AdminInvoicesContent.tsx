@@ -10,9 +10,20 @@ import type {
   InvoiceStatus,
   InvoiceSortField,
   SortDirection,
+  AdminOrderProductType,
 } from "@/types/admin";
 import { useDebounce } from "@/hooks/useDebounce";
 import InvoiceFiltersBar from "./InvoiceFiltersBar";
+
+const PRODUCT_TYPE_CONFIG: Record<
+  AdminOrderProductType,
+  { label: string; color: string; bg: string; border: string }
+> = {
+  link_building:        { label: "Link Building",        color: "text-violet-700 dark:text-violet-300", bg: "bg-violet-100 dark:bg-violet-500/20",  border: "border-violet-200 dark:border-violet-500/30" },
+  new_content:          { label: "New Content",          color: "text-blue-700 dark:text-blue-300",    bg: "bg-blue-100 dark:bg-blue-500/20",      border: "border-blue-200 dark:border-blue-500/30" },
+  content_optimization: { label: "Content Optimization", color: "text-emerald-700 dark:text-emerald-300", bg: "bg-emerald-100 dark:bg-emerald-500/20", border: "border-emerald-200 dark:border-emerald-500/30" },
+  content_brief:        { label: "Content Briefs",       color: "text-amber-700 dark:text-amber-300",  bg: "bg-amber-100 dark:bg-amber-500/20",    border: "border-amber-200 dark:border-amber-500/30" },
+};
 
 const STATUS_STYLES: Record<InvoiceStatus, string> = {
   paid:     "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400",
@@ -317,10 +328,14 @@ export default function AdminInvoicesContent() {
                       </td>
                     </tr>
                   )
-                  : invoices.map((invoice) => (
+                  : invoices.map((invoice) => {
+                    const is_multi = (invoice.invoice_products?.length ?? 0) > 1;
+                    return (
                     <tr
                       key={invoice.id}
-                      className="cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-white/2"
+                      className={`cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-white/2 ${
+                        is_multi ? "border-l-2 border-l-brand-500 dark:border-l-brand-400" : ""
+                      }`}
                     >
                       <td className="px-6 py-4">
                         <Link href={`/admin/invoices/${invoice.id}`} className="block">
@@ -330,6 +345,36 @@ export default function AdminInvoicesContent() {
                           <p className="font-mono text-xs text-gray-400">
                             {invoice.unique_id}
                           </p>
+                          {/* Product type badges */}
+                          {is_multi ? (
+                            <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-semibold text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">
+                                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
+                                </svg>
+                                Multi-Product ({invoice.invoice_products!.length})
+                              </span>
+                              {invoice.invoice_products!.map((pg) => {
+                                const cfg = PRODUCT_TYPE_CONFIG[pg.product_type];
+                                return cfg ? (
+                                  <span key={pg.product_type} className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[9px] font-semibold ${cfg.bg} ${cfg.color} ${cfg.border}`}>
+                                    {cfg.label}
+                                  </span>
+                                ) : null;
+                              })}
+                            </div>
+                          ) : invoice.product_type ? (
+                            <div className="mt-1.5">
+                              {(() => {
+                                const cfg = PRODUCT_TYPE_CONFIG[invoice.product_type!];
+                                return cfg ? (
+                                  <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[9px] font-semibold ${cfg.bg} ${cfg.color} ${cfg.border}`}>
+                                    {cfg.label}
+                                  </span>
+                                ) : null;
+                              })()}
+                            </div>
+                          ) : null}
                         </Link>
                       </td>
                       <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
@@ -374,7 +419,8 @@ export default function AdminInvoicesContent() {
                         </Link>
                       </td>
                     </tr>
-                  ))}
+                  );
+                  })}
             </tbody>
           </table>
         </div>

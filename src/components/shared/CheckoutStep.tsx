@@ -40,6 +40,8 @@ interface CheckoutStepProps {
   total_amount: number;
   saved_billing_address?: BillingAddress | null;
   onApplySavedAddress?: () => void;
+  /** Label for the back navigation button. Defaults to "Back to Keywords". */
+  back_label?: string;
   /** Called whenever the internal processing state changes so the parent can
    *  reflect it on an external submit button (e.g. in the order summary). */
   onProcessingChange?: (is_processing: boolean) => void;
@@ -224,6 +226,7 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
   total_amount,
   saved_billing_address,
   onApplySavedAddress,
+  back_label = "Back to Keywords",
   onProcessingChange,
 }, ref) {
   const stripe = useStripe();
@@ -428,7 +431,7 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
         </svg>
-        Back to Keywords
+        {back_label}
       </button>
 
       {/* ── Payment Method Section ── */}
@@ -874,32 +877,44 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
       <p className="text-xs text-gray-400 dark:text-gray-500">
         Need to change your selection? Click{" "}
         <span className="font-medium text-gray-500 dark:text-gray-400">
-          &quot;Back to Keywords&quot;
+          &quot;{back_label}&quot;
         </span>{" "}
         above — all entered information will be preserved.
       </p>
 
       {/* ── Error messages ── */}
-      {(stripe_error || error_message) && (
-        <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-500/20 dark:bg-red-500/10">
-          <svg
-            className="mt-0.5 h-4 w-4 shrink-0 text-red-500"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={2}
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008z"
-            />
-          </svg>
-          <p className="text-sm text-red-700 dark:text-red-400">
-            {stripe_error || error_message}
-          </p>
-        </div>
-      )}
+      {(stripe_error || error_message) && (() => {
+        const active_message = stripe_error || error_message!;
+        const lines = active_message.split("\n").filter(Boolean);
+        return (
+          <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-500/20 dark:bg-red-500/10">
+            <svg
+              className="mt-0.5 h-4 w-4 shrink-0 text-red-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008z"
+              />
+            </svg>
+            <div className="text-sm text-red-700 dark:text-red-400">
+              {lines.length > 1 ? (
+                <ul className="list-disc list-inside space-y-1">
+                  {lines.map((line, i) => (
+                    <li key={i}>{line}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p>{active_message}</p>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
     </div>
   );

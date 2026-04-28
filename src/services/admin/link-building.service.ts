@@ -12,7 +12,7 @@ import type {
   AdminContentRefreshTier,
   CreateContentRefreshTierPayload,
   UpdateContentRefreshTierPayload,
-} from "@/types/admin/content-refresh-tiers";
+} from "@/types/admin/content-refresh";
 
 export async function listAdminLinkBuildingServices(): Promise<AdminLinkBuildingService[]> {
   return apiClient.get<AdminLinkBuildingService[]>("/api/admin/services");

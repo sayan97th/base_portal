@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import type { AdminContentRefreshTier } from "@/types/admin/content-refresh-tiers";
+import type { AdminContentRefreshTier } from "@/types/admin/content-refresh";
 
 interface ContentRefreshTierCardProps {
   tier: AdminContentRefreshTier;
@@ -46,7 +46,7 @@ export default function ContentRefreshTierCard({
             Price
           </p>
           <p className="mt-0.5 text-sm font-bold text-gray-900 dark:text-white">
-            ${tier.price.toFixed(2)}
+            ${Number(tier.price).toFixed(2)}
           </p>
         </div>
         <div className="rounded-lg bg-gray-50 px-3 py-2 dark:bg-gray-800">

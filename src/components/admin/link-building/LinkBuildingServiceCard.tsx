@@ -226,7 +226,7 @@ export default function LinkBuildingServiceCard({
           <span className="text-xs text-gray-500 dark:text-gray-400">
             {PRICING_MODEL_LABELS[service.pricing_model]}
             {service.base_price !== null && (
-              <> · <span className="font-medium text-gray-700 dark:text-gray-300">${service.base_price.toFixed(2)}</span></>
+              <> · <span className="font-medium text-gray-700 dark:text-gray-300">${Number(service.base_price).toFixed(2)}</span></>
             )}
           </span>
         </div>

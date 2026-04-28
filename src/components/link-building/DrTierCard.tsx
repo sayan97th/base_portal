@@ -86,7 +86,7 @@ const DrTierCard: React.FC<DrTierCardProps> = ({
       {/* Header */}
       <div className="mb-4 pr-8">
         <h3 className="text-base font-bold text-gray-800 dark:text-white/90">
-          {tier.dr_label}
+          {tier.label}
         </h3>
         <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
           {tier.traffic_range}
@@ -129,7 +129,7 @@ const DrTierCard: React.FC<DrTierCardProps> = ({
             <button
               onClick={(e) => { e.stopPropagation(); onQuantityChange(1); }}
               className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-coral-500 text-coral-500 transition-colors hover:bg-coral-500 hover:text-white"
-              aria-label={`Add ${tier.dr_label}`}
+              aria-label={`Add ${tier.label}`}
             >
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                 <path

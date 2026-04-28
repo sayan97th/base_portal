@@ -369,7 +369,7 @@ export default function CouponFormModal({
                   <option value="">-- Select a tier --</option>
                   {dr_tiers.map((tier) => (
                     <option key={tier.id} value={tier.id}>
-                      {tier.dr_label} — {tier.traffic_range}
+                      {tier.label} — {tier.traffic_range}
                     </option>
                   ))}
                 </select>

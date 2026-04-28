@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { dashboardService } from "@/services/client/dashboard.service";
 import type { LinkBuildingOrderSummary } from "@/types/client/link-building";
 import type { DashboardTableRow } from "@/services/client/dashboard.service";
@@ -12,10 +13,14 @@ import ResourcesCard from "./ResourcesCard";
 import OrderStatusTable from "./OrderStatusTable";
 import DashboardStatsCards from "./DashboardStatsCards";
 import SmeContentWidget from "./SmeContentWidget";
+import DashboardProducts from "./DashboardProducts";
 
 const TABLE_PER_PAGE = 10;
 
 export default function DashboardPage() {
+  const search_params = useSearchParams();
+  const active_tab = search_params.get("tab") ?? "overview";
+
   // ── Summary data (stats + order history cards) ─────────────────────────────
   const [orders, setOrders] = useState<LinkBuildingOrderSummary[]>([]);
   const [is_loading_summary, setIsLoadingSummary] = useState(true);
@@ -92,6 +97,13 @@ export default function DashboardPage() {
       {/* Client Profile Header */}
       <ClientProfile />
 
+      {/* ── Products tab ─────────────────────────────────────────────────────── */}
+      {active_tab === "products" && <DashboardProducts />}
+
+      {/* ── Overview tab ─────────────────────────────────────────────────────── */}
+      {active_tab !== "products" && (
+        <>
+
       {/* Error Banner */}
       {error && (
         <div className="flex items-center gap-3 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
@@ -151,6 +163,8 @@ export default function DashboardPage() {
         onSearchChange={handleSearchChange}
         onPageChange={setTablePage}
       />
+        </>
+      )}
     </div>
   );
 }

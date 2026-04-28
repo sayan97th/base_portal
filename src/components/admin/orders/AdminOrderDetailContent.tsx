@@ -4,7 +4,16 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import Badge from "@/components/ui/badge/Badge";
 import { getAdminOrder } from "@/services/admin/order.service";
-import type { AdminOrder, AdminInvoice, OrderItem, OrderStatus, OrderCouponDetail, InvoiceCouponDiscount } from "@/types/admin";
+import { listAdminOrders } from "@/services/admin/order.service";
+import type {
+  AdminOrder,
+  AdminInvoice,
+  OrderItem,
+  OrderStatus,
+  OrderCouponDetail,
+  InvoiceCouponDiscount,
+  AdminOrderProductType,
+} from "@/types/admin";
 import OrderTrackingPanel from "./OrderTrackingPanel";
 
 interface AdminOrderDetailContentProps {
@@ -44,6 +53,47 @@ function getStatusConfig(status: OrderStatus): {
   }
 }
 
+const PRODUCT_TYPE_CONFIG: Record<
+  AdminOrderProductType,
+  { label: string; column_label: string; color: string; bg: string; border: string }
+> = {
+  link_building: {
+    label: "Link Building",
+    column_label: "Link / DR Tier",
+    color: "text-violet-700 dark:text-violet-300",
+    bg: "bg-violet-50 dark:bg-violet-500/10",
+    border: "border-violet-200 dark:border-violet-500/30",
+  },
+  new_content: {
+    label: "New Content",
+    column_label: "Content Package",
+    color: "text-blue-700 dark:text-blue-300",
+    bg: "bg-blue-50 dark:bg-blue-500/10",
+    border: "border-blue-200 dark:border-blue-500/30",
+  },
+  content_optimization: {
+    label: "Content Optimization",
+    column_label: "Optimization Package",
+    color: "text-emerald-700 dark:text-emerald-300",
+    bg: "bg-emerald-50 dark:bg-emerald-500/10",
+    border: "border-emerald-200 dark:border-emerald-500/30",
+  },
+  content_brief: {
+    label: "Content Briefs",
+    column_label: "Brief Package",
+    color: "text-amber-700 dark:text-amber-300",
+    bg: "bg-amber-50 dark:bg-amber-500/10",
+    border: "border-amber-200 dark:border-amber-500/30",
+  },
+};
+
+function getItemPrimaryLabel(item: OrderItem): string {
+  if (item.item_name) return item.item_name;
+  if (item.dr_tier?.label) return item.dr_tier.label;
+  if (item.dr_tier_id) return `DR Tier #${item.dr_tier_id}`;
+  return `Item #${item.id}`;
+}
+
 const BackIcon = () => (
   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
@@ -59,6 +109,12 @@ const UserIcon = () => (
 const ReceiptIcon = () => (
   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" d="M9 14.25l6-6m4.5-3.493V21.75l-3.75-1.5-3.75 1.5-3.75-1.5-3.75 1.5V4.757c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0c1.1.128 1.907 1.077 1.907 2.185z" />
+  </svg>
+);
+
+const CartIcon = () => (
+  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
   </svg>
 );
 
@@ -82,9 +138,11 @@ interface OrderItemsTableProps {
   items: OrderItem[];
   coupons?: OrderCouponDetail[];
   total_amount?: number;
+  product_type?: AdminOrderProductType | null;
+  order_title?: string;
 }
 
-const OrderItemsTable = ({ items, coupons, total_amount }: OrderItemsTableProps) => {
+const OrderItemsTable = ({ items, coupons, total_amount, product_type, order_title }: OrderItemsTableProps) => {
   const items_subtotal = items.reduce((sum, i) => sum + i.subtotal, 0);
   const coupon_total = coupons?.reduce((sum, c) => sum + c.discount_amount, 0) ?? 0;
   const bulk_discount_amount = Math.max(
@@ -95,16 +153,37 @@ const OrderItemsTable = ({ items, coupons, total_amount }: OrderItemsTableProps)
   const has_coupons = coupons && coupons.length > 0;
   const has_any_discount = has_bulk_discount || !!has_coupons;
 
+  const type_cfg = product_type ? PRODUCT_TYPE_CONFIG[product_type] : null;
+  const column_label = type_cfg?.column_label ?? "Product";
+
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-      <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
-        <h3 className="text-sm font-semibold text-gray-800 dark:text-white/90">
-          Order Items
-          <span className="ml-2 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-            {items.length}
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
+      {/* Product type identity strip */}
+      {type_cfg && (
+        <div className={`flex items-center gap-3 border-b px-5 py-2.5 ${type_cfg.bg} ${type_cfg.border}`}>
+          <span className={`inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold ${type_cfg.bg} ${type_cfg.color} ${type_cfg.border}`}>
+            {type_cfg.label}
           </span>
-        </h3>
-      </div>
+          {order_title && (
+            <span className={`text-xs font-medium ${type_cfg.color}`}>{order_title}</span>
+          )}
+          <span className={`text-xs ${type_cfg.color} opacity-70 ml-auto`}>
+            {items.length} {items.length === 1 ? "item" : "items"}
+          </span>
+        </div>
+      )}
+
+      {!type_cfg && (
+        <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
+          <h3 className="text-sm font-semibold text-gray-800 dark:text-white/90">
+            Order Items
+            <span className="ml-2 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+              {items.length}
+            </span>
+          </h3>
+        </div>
+      )}
+
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -113,7 +192,7 @@ const OrderItemsTable = ({ items, coupons, total_amount }: OrderItemsTableProps)
                 #
               </th>
               <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                DR Tier
+                {column_label}
               </th>
               <th className="px-5 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                 Qty
@@ -131,9 +210,32 @@ const OrderItemsTable = ({ items, coupons, total_amount }: OrderItemsTableProps)
               <tr key={item.id} className="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                 <td className="px-5 py-3.5 text-xs text-gray-400 dark:text-gray-500">{index + 1}</td>
                 <td className="px-5 py-3.5">
-                  <span className="inline-flex items-center gap-1.5 rounded-md bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700 dark:bg-brand-500/10 dark:text-brand-400">
-                    DR Tier #{item.dr_tier_id}
-                  </span>
+                  <div>
+                    <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${
+                      type_cfg
+                        ? `border ${type_cfg.border} ${type_cfg.bg} ${type_cfg.color}`
+                        : "bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400"
+                    }`}>
+                      {getItemPrimaryLabel(item)}
+                    </span>
+                    {item.dr_tier && product_type === "link_building" && (
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-gray-400 dark:text-gray-500">
+                        <span>DR {item.dr_tier.traffic_range}</span>
+                        <span className="text-gray-200 dark:text-gray-700">·</span>
+                        <span>{item.dr_tier.word_count.toLocaleString()} words</span>
+                        <span className="text-gray-200 dark:text-gray-700">·</span>
+                        <span>{formatCurrency(item.dr_tier.price_per_link)}/link</span>
+                        {item.placements && item.placements.length > 0 && (
+                          <>
+                            <span className="text-gray-200 dark:text-gray-700">·</span>
+                            <span className="font-medium text-violet-500 dark:text-violet-400">
+                              {item.placements.length} placement{item.placements.length !== 1 ? "s" : ""}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </td>
                 <td className="px-5 py-3.5 text-right font-medium text-gray-800 dark:text-white/90">
                   {item.quantity}
@@ -224,6 +326,88 @@ const OrderItemsTable = ({ items, coupons, total_amount }: OrderItemsTableProps)
   );
 };
 
+// ── Session Items View ─────────────────────────────────────────────────────────
+// Shown when the current order belongs to a multi-order session.
+// Renders one OrderItemsTable per order so all items are visible at once.
+
+interface SessionItemsViewProps {
+  session_orders: AdminOrder[];
+  session_title: string | null;
+}
+
+const SessionItemsView = ({ session_orders, session_title }: SessionItemsViewProps) => {
+  const total_items = session_orders.reduce((s, o) => s + o.items.length, 0);
+  const session_total = session_orders.reduce((s, o) => s + o.total_amount, 0);
+
+  const unique_types = [
+    ...new Set(
+      session_orders
+        .map((o) => o.product_type)
+        .filter((t): t is AdminOrderProductType => t != null)
+    ),
+  ];
+
+  return (
+    <div className="space-y-4">
+      {/* Session banner */}
+      <div className="flex items-center justify-between rounded-xl border border-brand-200 bg-brand-50/60 px-5 py-3.5 dark:border-brand-500/25 dark:bg-brand-500/10">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-500 text-white shadow-sm">
+            <CartIcon />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-brand-800 dark:text-brand-200">
+              {session_title ?? "Multi-Product Purchase"}
+            </p>
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-brand-600/80 dark:text-brand-400/80">
+              <span>{session_orders.length} services</span>
+              <span>·</span>
+              <span>{total_items} {total_items === 1 ? "item" : "items"} total</span>
+              {unique_types.length > 0 && (
+                <>
+                  <span>·</span>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {unique_types.map((pt) => {
+                      const cfg = PRODUCT_TYPE_CONFIG[pt];
+                      return (
+                        <span
+                          key={pt}
+                          className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-semibold ${cfg.bg} ${cfg.color} ${cfg.border}`}
+                        >
+                          {cfg.label}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-brand-600/70 dark:text-brand-400/70">Session Total</p>
+          <p className="text-base font-bold text-brand-700 dark:text-brand-300">
+            {formatCurrency(session_total)}
+          </p>
+        </div>
+      </div>
+
+      {/* One table per order, all visible at once */}
+      {session_orders.map((order) => (
+        <div key={order.id}>
+          <OrderItemsTable
+            items={order.items}
+            coupons={order.coupons}
+            total_amount={order.total_amount}
+            product_type={order.product_type}
+            order_title={order.order_title}
+          />
+        </div>
+      ))}
+    </div>
+  );
+};
+
 interface InvoiceCardProps {
   invoice: AdminInvoice;
 }
@@ -238,7 +422,7 @@ const InvoiceCard = ({ invoice }: InvoiceCardProps) => {
   };
 
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
       <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-gray-800">
         <div className="flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-white/90">
           <ReceiptIcon />
@@ -311,6 +495,7 @@ const InvoiceCard = ({ invoice }: InvoiceCardProps) => {
 
 const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order_id }) => {
   const [order, setOrder] = useState<AdminOrder | null>(null);
+  const [session_orders, setSessionOrders] = useState<AdminOrder[]>([]);
   const [current_status, setCurrentStatus] = useState<OrderStatus | null>(null);
   const [is_loading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -323,6 +508,22 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
         const data = await getAdminOrder(order_id);
         setOrder(data);
         setCurrentStatus(data.status);
+
+        if (data.session_id) {
+          try {
+            const session_data = await listAdminOrders({
+              session_id: data.session_id,
+              per_page: 50,
+            });
+            // Client-side guard: keep only orders that actually belong to this session
+            const related = session_data.data.filter(
+              (o) => o.session_id === data.session_id
+            );
+            setSessionOrders(related.length > 1 ? related : []);
+          } catch {
+            setSessionOrders([]);
+          }
+        }
       } catch {
         setError("We couldn't load this order. Please try again.");
       } finally {
@@ -334,6 +535,8 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
 
   const effective_status = current_status ?? order?.status ?? "pending";
   const status_config = order ? getStatusConfig(effective_status) : null;
+  const product_type_cfg = order?.product_type ? PRODUCT_TYPE_CONFIG[order.product_type] : null;
+  const is_session_view = session_orders.length > 1;
 
   return (
     <div className="space-y-6">
@@ -388,9 +591,36 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
           {/* Page Header */}
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
+              {/* Product type indicator banner (single order) or session indicator */}
+              {is_session_view ? (
+                <div className="mb-2 inline-flex items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 dark:border-brand-500/30 dark:bg-brand-500/10">
+                  <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
+                  <span className="text-xs font-semibold uppercase tracking-wide text-brand-700 dark:text-brand-300">
+                    Multi-Product Purchase
+                  </span>
+                  <span className="text-xs text-brand-600/70 dark:text-brand-400/70">
+                    · {session_orders.length} services
+                  </span>
+                </div>
+              ) : product_type_cfg ? (
+                <div className={`mb-2 inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 ${product_type_cfg.bg} ${product_type_cfg.border}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${
+                    order.product_type === "link_building" ? "bg-violet-500" :
+                    order.product_type === "new_content" ? "bg-blue-500" :
+                    order.product_type === "content_optimization" ? "bg-emerald-500" :
+                    "bg-amber-500"
+                  }`} />
+                  <span className={`text-xs font-semibold uppercase tracking-wide ${product_type_cfg.color}`}>
+                    {product_type_cfg.label}
+                  </span>
+                </div>
+              ) : null}
+
               <div className="flex flex-wrap items-center gap-3">
                 <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {order.order_title || "Order Details"}
+                  {is_session_view
+                    ? (order.session_title ?? "Multi-Product Purchase")
+                    : (order.order_title || "Order Details")}
                 </h1>
                 <Badge
                   variant="light"
@@ -404,8 +634,10 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
                 </Badge>
               </div>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Order ID:{" "}
-                <span className="font-mono text-gray-700 dark:text-gray-300">{order.id}</span>
+                {is_session_view ? "Session" : "Order"} ID:{" "}
+                <span className="font-mono text-gray-700 dark:text-gray-300">
+                  {is_session_view ? order.session_id : order.id}
+                </span>
                 {" "}&middot; Placed on {formatDate(order.created_at)}
               </p>
             </div>
@@ -436,7 +668,7 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
             {/* Left Column */}
             <div className="col-span-12 space-y-5 lg:col-span-8">
               {/* Customer Info */}
-              <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+              <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
                 <div className="flex items-center gap-2 border-b border-gray-200 px-5 py-4 dark:border-gray-800">
                   <span className="text-gray-400 dark:text-gray-500">
                     <UserIcon />
@@ -459,7 +691,7 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
                     <div className="ml-auto">
                       <Link
                         href={`/admin/users/${order.user_id}`}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-400 dark:hover:bg-white/[0.05]"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-white/3 dark:text-gray-400 dark:hover:bg-white/5"
                       >
                         View User
                       </Link>
@@ -468,12 +700,24 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
                 </div>
               </div>
 
-              {/* Order Items */}
-              <OrderItemsTable items={order.items} coupons={order.coupons} total_amount={order.total_amount} />
+              {/* Order Items — session view shows all orders; single view shows this order only */}
+              {is_session_view ? (
+                <SessionItemsView
+                  session_orders={session_orders}
+                  session_title={order.session_title ?? null}
+                />
+              ) : (
+                <OrderItemsTable
+                  items={order.items}
+                  coupons={order.coupons}
+                  total_amount={order.total_amount}
+                  product_type={order.product_type}
+                />
+              )}
 
               {/* Notes */}
               {order.order_notes && (
-                <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3">
                   <h3 className="mb-2 text-sm font-semibold text-gray-800 dark:text-white/90">
                     Order Notes
                   </h3>
@@ -485,11 +729,30 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
             {/* Right Column */}
             <div className="col-span-12 space-y-5 lg:col-span-4">
               {/* Order Summary */}
-              <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+              <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
                 <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
-                  <h3 className="text-sm font-semibold text-gray-800 dark:text-white/90">Order Summary</h3>
+                  <h3 className="text-sm font-semibold text-gray-800 dark:text-white/90">
+                    {is_session_view ? "This Order Summary" : "Order Summary"}
+                  </h3>
+                  {is_session_view && (
+                    <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
+                      For order:{" "}
+                      <span className="font-mono">{order.id.slice(0, 8).toUpperCase()}</span>
+                    </p>
+                  )}
                 </div>
                 <dl className="px-5 py-1">
+                  {/* Product type row */}
+                  {product_type_cfg && (
+                    <InfoRow
+                      label="Product Type"
+                      value={
+                        <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold ${product_type_cfg.bg} ${product_type_cfg.color} ${product_type_cfg.border}`}>
+                          {product_type_cfg.label}
+                        </span>
+                      }
+                    />
+                  )}
                   <InfoRow label="Status" value={
                     <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
                       effective_status === "pending" ? "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400" :
@@ -580,6 +843,18 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
                       />
                     );
                   })()}
+
+                  {/* Session total row */}
+                  {is_session_view && (
+                    <div className="mt-1 flex items-center justify-between rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2.5 dark:border-brand-500/25 dark:bg-brand-500/10">
+                      <dt className="text-sm font-semibold text-brand-700 dark:text-brand-300">
+                        Session Total ({session_orders.length} orders)
+                      </dt>
+                      <dd className="text-base font-bold text-brand-700 dark:text-brand-300">
+                        {formatCurrency(session_orders.reduce((s, o) => s + o.total_amount, 0))}
+                      </dd>
+                    </div>
+                  )}
                 </dl>
               </div>
 
@@ -588,7 +863,7 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
 
               {/* Billing Address */}
               {order.billing && (
-                <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+                <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
                   <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
                     <h3 className="text-sm font-semibold text-gray-800 dark:text-white/90">Billing Address</h3>
                   </div>
@@ -607,7 +882,7 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
 
               {/* Payment Intent */}
               {order.payment_intent_id && (
-                <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3">
                   <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     Payment Reference
                   </h3>

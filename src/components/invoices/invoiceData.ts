@@ -1,10 +1,42 @@
 export type InvoiceStatus = "paid" | "unpaid" | "overdue" | "refund" | "void";
+export type ProductType = "link_building" | "new_content" | "content_optimization" | "content_brief";
+
+export const INVOICE_PRODUCT_CONFIG: Record<
+  ProductType,
+  { label: string; color: string; bg: string; border: string }
+> = {
+  link_building: {
+    label: "Link Building",
+    color: "text-violet-700 dark:text-violet-300",
+    bg: "bg-violet-100 dark:bg-violet-500/20",
+    border: "border-violet-200 dark:border-violet-500/30",
+  },
+  new_content: {
+    label: "New Content",
+    color: "text-blue-700 dark:text-blue-300",
+    bg: "bg-blue-100 dark:bg-blue-500/20",
+    border: "border-blue-200 dark:border-blue-500/30",
+  },
+  content_optimization: {
+    label: "Content Optimization",
+    color: "text-emerald-700 dark:text-emerald-300",
+    bg: "bg-emerald-100 dark:bg-emerald-500/20",
+    border: "border-emerald-200 dark:border-emerald-500/30",
+  },
+  content_brief: {
+    label: "Content Briefs",
+    color: "text-amber-700 dark:text-amber-300",
+    bg: "bg-amber-100 dark:bg-amber-500/20",
+    border: "border-amber-200 dark:border-amber-500/30",
+  },
+};
 
 export interface InvoiceLineItem {
   item_name: string;
   price: string;
   quantity: number;
   item_total: string;
+  product_type?: ProductType;
 }
 
 export interface InvoiceBilledTo {
@@ -48,24 +80,25 @@ export interface InvoiceSummary {
   date_due: string;
   total: string;
   status: InvoiceStatus;
+  product_types?: ProductType[];
 }
 
 export const invoice_list: InvoiceSummary[] = [
-  { unique_id: "53A0EC35", date: "Nov 17, 2025", date_due: "Nov 17, 2025", total: "$715.00", status: "void" },
-  { unique_id: "C26149E9", date: "Nov 17, 2025", date_due: "Nov 17, 2025", total: "$715.00", status: "void" },
-  { unique_id: "2507C497", date: "Nov 14, 2025", date_due: "Nov 14, 2025", total: "$715.00", status: "void" },
-  { unique_id: "235BE096", date: "Oct 9, 2025", date_due: "Oct 10, 2025", total: "$0.00", status: "paid" },
-  { unique_id: "FF06B612", date: "Apr 9, 2025", date_due: "Apr 9, 2025", total: "99 credits", status: "paid" },
-  { unique_id: "7B47EB9B", date: "Apr 9, 2025", date_due: "Apr 9, 2025", total: "200 credits", status: "paid" },
-  { unique_id: "8A3B233D", date: "Apr 9, 2025", date_due: "Apr 9, 2025", total: "683 credits", status: "paid" },
-  { unique_id: "874FD062", date: "Apr 2, 2025", date_due: "Apr 2, 2025", total: "925 credits", status: "paid" },
-  { unique_id: "A7FB1724", date: "Apr 2, 2025", date_due: "Apr 2, 2025", total: "250 credits", status: "paid" },
+  { unique_id: "53A0EC35", date: "Nov 17, 2025", date_due: "Nov 17, 2025", total: "$715.00", status: "void", product_types: ["link_building"] },
+  { unique_id: "C26149E9", date: "Nov 17, 2025", date_due: "Nov 17, 2025", total: "$715.00", status: "void", product_types: ["link_building"] },
+  { unique_id: "2507C497", date: "Nov 14, 2025", date_due: "Nov 14, 2025", total: "$715.00", status: "void", product_types: ["link_building"] },
+  { unique_id: "235BE096", date: "Oct 9, 2025", date_due: "Oct 10, 2025", total: "$0.00", status: "paid", product_types: ["content_optimization"] },
+  { unique_id: "FF06B612", date: "Apr 9, 2025", date_due: "Apr 9, 2025", total: "99 credits", status: "paid", product_types: ["content_brief"] },
+  { unique_id: "7B47EB9B", date: "Apr 9, 2025", date_due: "Apr 9, 2025", total: "200 credits", status: "paid", product_types: ["new_content"] },
+  { unique_id: "8A3B233D", date: "Apr 9, 2025", date_due: "Apr 9, 2025", total: "683 credits", status: "paid", product_types: ["link_building"] },
+  { unique_id: "874FD062", date: "Apr 2, 2025", date_due: "Apr 2, 2025", total: "925 credits", status: "paid", product_types: ["link_building"] },
+  { unique_id: "A7FB1724", date: "Apr 2, 2025", date_due: "Apr 2, 2025", total: "250 credits", status: "paid", product_types: ["link_building"] },
   { unique_id: "A60C185C", date: "Mar 18, 2025", date_due: "Mar 18, 2025", total: "$0.00", status: "paid" },
-  { unique_id: "A273B943", date: "Dec 6, 2024", date_due: "Dec 6, 2024", total: "625 credits", status: "paid" },
+  { unique_id: "A273B943", date: "Dec 6, 2024", date_due: "Dec 6, 2024", total: "625 credits", status: "paid", product_types: ["content_optimization"] },
   { unique_id: "6061E693", date: "Dec 5, 2024", date_due: "Dec 5, 2024", total: "$0.00", status: "paid" },
   { unique_id: "2FCE73DE", date: "Dec 18, 2023", date_due: "Dec 19, 2023", total: "$0.00", status: "paid" },
   { unique_id: "23861878", date: "Dec 18, 2023", date_due: "Dec 19, 2023", total: "$0.00", status: "paid" },
-  { unique_id: "C3210330", date: "Dec 15, 2023", date_due: "Dec 15, 2023", total: "$6,007.50", status: "void" },
+  { unique_id: "C3210330", date: "Dec 15, 2023", date_due: "Dec 15, 2023", total: "$6,007.50", status: "void", product_types: ["link_building", "new_content", "content_optimization", "content_brief"] },
 ];
 
 export const invoice_details: Record<string, InvoiceDetail> = {
@@ -87,7 +120,7 @@ export const invoice_details: Record<string, InvoiceDetail> = {
       country: "United States",
     },
     line_items: [
-      { item_name: "Organic Performance Brief (Credits)", price: "99 credits", quantity: 1, item_total: "99 credits" },
+      { item_name: "Organic Performance Brief (Credits)", price: "99 credits", quantity: 1, item_total: "99 credits", product_type: "content_brief" },
     ],
     subtotal: "99 credits",
     credit: "-99 credits",
@@ -110,7 +143,7 @@ export const invoice_details: Record<string, InvoiceDetail> = {
       country: "United States",
     },
     line_items: [
-      { item_name: "Link Building - DR 50+", price: "$715.00", quantity: 1, item_total: "$715.00" },
+      { item_name: "Link Building - DR 50+", price: "$715.00", quantity: 1, item_total: "$715.00", product_type: "link_building" },
     ],
     subtotal: "$715.00",
     credit: "$0.00",
@@ -133,7 +166,7 @@ export const invoice_details: Record<string, InvoiceDetail> = {
       country: "United States",
     },
     line_items: [
-      { item_name: "Link Building - DR 50+", price: "$715.00", quantity: 1, item_total: "$715.00" },
+      { item_name: "Link Building - DR 50+", price: "$715.00", quantity: 1, item_total: "$715.00", product_type: "link_building" },
     ],
     subtotal: "$715.00",
     credit: "$0.00",
@@ -156,7 +189,7 @@ export const invoice_details: Record<string, InvoiceDetail> = {
       country: "United States",
     },
     line_items: [
-      { item_name: "Link Building - DR 50+", price: "$715.00", quantity: 1, item_total: "$715.00" },
+      { item_name: "Link Building - DR 50+", price: "$715.00", quantity: 1, item_total: "$715.00", product_type: "link_building" },
     ],
     subtotal: "$715.00",
     credit: "$0.00",
@@ -179,7 +212,7 @@ export const invoice_details: Record<string, InvoiceDetail> = {
       country: "United States",
     },
     line_items: [
-      { item_name: "Content Optimization", price: "$0.00", quantity: 1, item_total: "$0.00" },
+      { item_name: "Content Optimization", price: "$0.00", quantity: 1, item_total: "$0.00", product_type: "content_optimization" },
     ],
     subtotal: "$0.00",
     credit: "$0.00",
@@ -202,7 +235,7 @@ export const invoice_details: Record<string, InvoiceDetail> = {
       country: "United States",
     },
     line_items: [
-      { item_name: "New Content Article (Credits)", price: "200 credits", quantity: 1, item_total: "200 credits" },
+      { item_name: "New Content Article (Credits)", price: "200 credits", quantity: 1, item_total: "200 credits", product_type: "new_content" },
     ],
     subtotal: "200 credits",
     credit: "-200 credits",
@@ -225,7 +258,7 @@ export const invoice_details: Record<string, InvoiceDetail> = {
       country: "United States",
     },
     line_items: [
-      { item_name: "Link Building Bundle (Credits)", price: "683 credits", quantity: 1, item_total: "683 credits" },
+      { item_name: "Link Building Bundle (Credits)", price: "683 credits", quantity: 1, item_total: "683 credits", product_type: "link_building" },
     ],
     subtotal: "683 credits",
     credit: "-683 credits",
@@ -248,7 +281,7 @@ export const invoice_details: Record<string, InvoiceDetail> = {
       country: "United States",
     },
     line_items: [
-      { item_name: "SEO Package Credits", price: "925 credits", quantity: 1, item_total: "925 credits" },
+      { item_name: "SEO Package Credits", price: "925 credits", quantity: 1, item_total: "925 credits", product_type: "link_building" },
     ],
     subtotal: "925 credits",
     credit: "-925 credits",
@@ -271,7 +304,7 @@ export const invoice_details: Record<string, InvoiceDetail> = {
       country: "United States",
     },
     line_items: [
-      { item_name: "Premium Mention (Credits)", price: "250 credits", quantity: 1, item_total: "250 credits" },
+      { item_name: "Premium Mention (Credits)", price: "250 credits", quantity: 1, item_total: "250 credits", product_type: "link_building" },
     ],
     subtotal: "250 credits",
     credit: "-250 credits",
@@ -317,7 +350,7 @@ export const invoice_details: Record<string, InvoiceDetail> = {
       country: "United States",
     },
     line_items: [
-      { item_name: "Content Refresh Bundle (Credits)", price: "625 credits", quantity: 1, item_total: "625 credits" },
+      { item_name: "Content Refresh Bundle (Credits)", price: "625 credits", quantity: 1, item_total: "625 credits", product_type: "content_optimization" },
     ],
     subtotal: "625 credits",
     credit: "-625 credits",
@@ -395,7 +428,7 @@ export const invoice_details: Record<string, InvoiceDetail> = {
     invoice_number: "BSM-6351",
     unique_id: "C3210330",
     date_issued: "Dec 15, 2023",
-    date_paid: "Dec 15, 2023",
+    date_paid: null,
     payment_method: "Credit Card",
     status: "void",
     total: "$6,007.50",
@@ -409,7 +442,10 @@ export const invoice_details: Record<string, InvoiceDetail> = {
       country: "United States",
     },
     line_items: [
-      { item_name: "Full Scale SEO Plan", price: "$6,007.50", quantity: 1, item_total: "$6,007.50" },
+      { item_name: "Link Building - DR 50+", price: "$2,500.00", quantity: 1, item_total: "$2,500.00", product_type: "link_building" },
+      { item_name: "New Content Article (1,500 words)", price: "$300.00", quantity: 5, item_total: "$1,500.00", product_type: "new_content" },
+      { item_name: "Content Optimization Pack", price: "$607.50", quantity: 3, item_total: "$1,822.50", product_type: "content_optimization" },
+      { item_name: "Organic Performance Brief", price: "$185.00", quantity: 1, item_total: "$185.00", product_type: "content_brief" },
     ],
     subtotal: "$6,007.50",
     credit: "$0.00",

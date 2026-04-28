@@ -1,6 +1,6 @@
 export interface DrTier {
   id: string;
-  dr_label: string;
+  label: string;
   traffic_range: string;
   word_count: number;
   price_per_link: number;

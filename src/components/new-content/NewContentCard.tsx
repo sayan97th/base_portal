@@ -1,8 +1,8 @@
 import React from "react";
-import { ArticleTier } from "./newContentData";
+import type { NewContentTier } from "@/types/client/new-content";
 
 interface ArticleCardProps {
-  tier: ArticleTier;
+  tier: NewContentTier;
   quantity: number;
   onQuantityChange: (quantity: number) => void;
 }
@@ -32,7 +32,7 @@ const ArticleCard: React.FC<ArticleCardProps> = ({
   return (
     <div
       onClick={handleToggle}
-      className={`relative cursor-pointer rounded-2xl border bg-white p-5 transition-all dark:bg-white/[0.03] ${
+      className={`relative cursor-pointer rounded-2xl border bg-white p-5 transition-all dark:bg-white/3 ${
         is_selected
           ? "border-coral-500 ring-2 ring-coral-500/20 dark:border-coral-500"
           : "border-gray-200 hover:border-gray-300 dark:border-gray-800 dark:hover:border-gray-700"
@@ -88,7 +88,7 @@ const ArticleCard: React.FC<ArticleCardProps> = ({
 
       {/* Price */}
       <p className="text-lg font-semibold text-gray-800 dark:text-white/90">
-        ${tier.price.toFixed(2)}
+        ${Number(tier.price).toFixed(2)}
       </p>
     </div>
   );

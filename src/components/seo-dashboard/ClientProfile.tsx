@@ -1,8 +1,9 @@
 "use client";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { useCart } from "@/context/CartContext";
 
 // ── Tab icons ─────────────────────────────────────────────────────────────────
 
@@ -63,17 +64,19 @@ function ToolsIcon({ active }: { active: boolean }) {
 // ── Navigation tabs ───────────────────────────────────────────────────────────
 
 const nav_tabs = [
-  { label: "Overview",  href: "/",              icon: DashboardIcon    },
-  { label: "Products",  href: "/link-building", icon: LinkBuildingIcon },
-  { label: "Resources", href: "/resources",     icon: ResourcesIcon    },
-  { label: "Tools",     href: "/tools",         icon: ToolsIcon        },
+  { label: "Overview",  href: "/",                icon: DashboardIcon    },
+  { label: "Products",  href: "/?tab=products",   icon: LinkBuildingIcon },
+  { label: "Resources", href: "/resources",       icon: ResourcesIcon    },
+  { label: "Tools",     href: "/tools",           icon: ToolsIcon        },
 ];
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function ClientProfile() {
   const pathname = usePathname();
+  const search_params = useSearchParams();
   const { user } = useAuth();
+  const { item_count } = useCart();
 
   const org_name =
     user?.organization?.name ??
@@ -85,9 +88,13 @@ export default function ClientProfile() {
     .map((w: string) => w.charAt(0).toUpperCase())
     .join("");
 
-  // Dashboard tab is only active on the exact root; all others match by prefix.
-  const getIsActive = (href: string) =>
-    href === "/" ? pathname === "/" : pathname.startsWith(href);
+  const tab_param = search_params.get("tab");
+
+  const getIsActive = (href: string) => {
+    if (href === "/") return pathname === "/" && !tab_param;
+    if (href === "/?tab=products") return pathname === "/" && tab_param === "products";
+    return pathname.startsWith(href);
+  };
 
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
@@ -130,7 +137,7 @@ export default function ClientProfile() {
 
         {/* Place Order CTA */}
         <Link
-          href="/link-building"
+          href="/?tab=products"
           className="hidden shrink-0 items-center gap-2 rounded-xl bg-brand-500 px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-brand-600 sm:flex"
         >
           <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true">
@@ -163,6 +170,11 @@ export default function ClientProfile() {
             >
               <Icon active={is_active} />
               {tab.label}
+              {tab.label === "Products" && item_count > 0 && (
+                <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-coral-500 px-1 text-[10px] font-bold text-white">
+                  {item_count}
+                </span>
+              )}
 
               {/* Active underline */}
               {is_active && (

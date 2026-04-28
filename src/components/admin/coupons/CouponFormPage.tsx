@@ -213,7 +213,7 @@ function PreviewCard({ form, dr_tiers, toggles }: PreviewCardProps) {
 
   const applies_label =
     form.applies_to === "specific_product" && selected_tier
-      ? `On ${selected_tier.dr_label}`
+      ? `On ${selected_tier.label}`
       : form.applies_to === "minimum_purchase" && form.minimum_purchase_amount
         ? `Orders over $${parseFloat(form.minimum_purchase_amount).toLocaleString("en-US", { minimumFractionDigits: 0 })}`
         : "On all products";
@@ -855,7 +855,7 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
                     <option value="">— Select a DR tier —</option>
                     {dr_tiers.map((tier) => (
                       <option key={tier.id} value={tier.id}>
-                        {tier.dr_label} — {tier.traffic_range} · ${tier.price_per_link.toLocaleString("en-US")} / link
+                        {tier.label} — {tier.traffic_range} · ${tier.price_per_link.toLocaleString("en-US")} / link
                       </option>
                     ))}
                   </select>

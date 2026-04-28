@@ -44,6 +44,12 @@ export interface PaginatedResponse<T> {
 
 export type OrderStatus = "pending" | "processing" | "completed" | "cancelled";
 
+export type AdminOrderProductType =
+  | "link_building"
+  | "new_content"
+  | "content_optimization"
+  | "content_brief";
+
 export type OrderSortField =
   | "created_at"
   | "total_amount"
@@ -97,6 +103,7 @@ export interface AdminOrderFilters {
   sort_direction?: SortDirection;
   date_from?: string;
   date_to?: string;
+  session_id?: string;
 }
 
 export interface OrderUser {
@@ -117,7 +124,7 @@ export interface OrderBilling {
 
 export interface OrderItemDrTier {
   id: string;
-  dr_label: string;
+  label: string;
   traffic_range: string;
   word_count: number;
   price_per_link: number;
@@ -133,10 +140,11 @@ export interface OrderPlacementDetail {
 
 export interface OrderItem {
   id: number;
-  dr_tier_id: number;
+  dr_tier_id?: number | null;
   quantity: number;
   unit_price: number;
   subtotal: number;
+  item_name?: string | null;
   dr_tier?: OrderItemDrTier;
   placements?: OrderPlacementDetail[];
 }
@@ -157,6 +165,21 @@ export interface AdminOrder {
   billing: OrderBilling | null;
   invoice: AdminInvoice | null;
   coupons?: OrderCouponDetail[];
+  session_id?: string | null;
+  session_title?: string | null;
+  product_type?: AdminOrderProductType;
+  items_count?: number;
+}
+
+export interface AdminOrderGroup {
+  group_id: string;
+  session_id: string | null;
+  session_title: string | null;
+  created_at: string;
+  total_amount: number;
+  orders: AdminOrder[];
+  is_multi_order: boolean;
+  user: OrderUser;
 }
 
 export interface AdminLinkBuildingOrder {
@@ -251,6 +274,14 @@ export interface InvoiceLineItem {
   item_total: number;
 }
 
+export interface InvoiceProductGroup {
+  product_type: AdminOrderProductType;
+  order_id: string;
+  label: string;
+  items: InvoiceLineItem[];
+  subtotal: number;
+}
+
 export interface AdminInvoice {
   id: string;
   unique_id: string;
@@ -274,6 +305,10 @@ export interface AdminInvoice {
   line_items: InvoiceLineItem[];
   billed_to: InvoiceBilledTo | null;
   coupon_discounts?: InvoiceCouponDiscount[];
+  session_id?: string | null;
+  session_title?: string | null;
+  product_type?: AdminOrderProductType | null;
+  invoice_products?: InvoiceProductGroup[];
 }
 
 // ── Invoice Creation & History ────────────────────────────────────────────────

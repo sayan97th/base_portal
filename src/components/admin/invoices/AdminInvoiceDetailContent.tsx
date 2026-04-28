@@ -10,7 +10,7 @@ import {
   toggleAdminInvoiceSharing,
   type InvoiceShareLinks,
 } from "@/services/admin/invoice.service";
-import type { AdminInvoice, InvoiceCouponDiscount, InvoiceHistoryEntry, InvoiceHistoryActorType } from "@/types/admin";
+import type { AdminInvoice, AdminOrderProductType, InvoiceCouponDiscount, InvoiceHistoryEntry, InvoiceHistoryActorType, InvoiceProductGroup } from "@/types/admin";
 import {
   EmailInvoiceDialog,
   EditBillingDetailsDialog,
@@ -26,6 +26,66 @@ import {
 interface AdminInvoiceDetailContentProps {
   invoice_id: string;
 }
+
+type ProductTypeConfig = {
+  label: string;
+  color: string;
+  bg: string;
+  border: string;
+  accent: string;
+  icon: React.ReactElement;
+};
+
+const PRODUCT_TYPE_CONFIG: Record<AdminOrderProductType, ProductTypeConfig> = {
+  link_building: {
+    label: "Link Building",
+    color: "text-violet-700 dark:text-violet-300",
+    bg: "bg-violet-50 dark:bg-violet-500/10",
+    border: "border-violet-200 dark:border-violet-500/30",
+    accent: "bg-violet-500",
+    icon: (
+      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+      </svg>
+    ),
+  },
+  new_content: {
+    label: "New Content",
+    color: "text-blue-700 dark:text-blue-300",
+    bg: "bg-blue-50 dark:bg-blue-500/10",
+    border: "border-blue-200 dark:border-blue-500/30",
+    accent: "bg-blue-500",
+    icon: (
+      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+      </svg>
+    ),
+  },
+  content_optimization: {
+    label: "Content Optimization",
+    color: "text-emerald-700 dark:text-emerald-300",
+    bg: "bg-emerald-50 dark:bg-emerald-500/10",
+    border: "border-emerald-200 dark:border-emerald-500/30",
+    accent: "bg-emerald-500",
+    icon: (
+      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+      </svg>
+    ),
+  },
+  content_brief: {
+    label: "Content Briefs",
+    color: "text-amber-700 dark:text-amber-300",
+    bg: "bg-amber-50 dark:bg-amber-500/10",
+    border: "border-amber-200 dark:border-amber-500/30",
+    accent: "bg-amber-500",
+    icon: (
+      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
+      </svg>
+    ),
+  },
+};
 
 const formatCurrency = (amount: number): string =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount);
@@ -744,6 +804,7 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
   }
 
   const is_credits = invoice.currency_type === "credits";
+  const is_multi = (invoice.invoice_products?.length ?? 0) > 1;
 
   const formatAmount = (amount: number): string =>
     is_credits ? `${amount} credits` : formatCurrency(amount);
@@ -991,54 +1052,154 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
               </div>
             </div>
 
-            {/* Line items table */}
+            {/* Multi-product banner */}
+            {is_multi && invoice.invoice_products && (
+              <div className="border-t border-brand-100 bg-linear-to-r from-brand-50 to-transparent px-6 py-3 dark:border-brand-500/20 dark:from-brand-500/5 dark:to-transparent">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <svg className="h-4 w-4 text-brand-500 dark:text-brand-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
+                    </svg>
+                    <span className="text-xs font-semibold text-brand-700 dark:text-brand-400">Multi-Product Purchase</span>
+                    <span className="inline-flex items-center rounded-full bg-brand-100 px-1.5 py-0.5 text-[10px] font-bold text-brand-700 dark:bg-brand-500/20 dark:text-brand-400">
+                      {invoice.invoice_products.length} products
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {invoice.invoice_products.map((group) => {
+                      const cfg = PRODUCT_TYPE_CONFIG[group.product_type];
+                      return cfg ? (
+                        <span key={group.product_type} className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold ${cfg.bg} ${cfg.color} ${cfg.border}`}>
+                          {cfg.icon}
+                          {cfg.label}
+                        </span>
+                      ) : null;
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Single-product type badge */}
+            {!is_multi && invoice.product_type && PRODUCT_TYPE_CONFIG[invoice.product_type] && (
+              <div className="border-t border-gray-100 px-6 py-3 dark:border-gray-800">
+                {(() => {
+                  const cfg = PRODUCT_TYPE_CONFIG[invoice.product_type!];
+                  return (
+                    <span className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold ${cfg.bg} ${cfg.color} ${cfg.border}`}>
+                      {cfg.icon}
+                      {cfg.label}
+                    </span>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* Line items — grouped for multi-product, flat for single */}
             <div className="border-t border-gray-100 dark:border-gray-800">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 dark:bg-white/[0.02]">
-                      <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                        Item
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                        Unit Price
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                        Qty
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                        Item Total
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                    {invoice.line_items.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="px-6 py-8 text-center text-sm text-gray-400">
-                          No line items.
-                        </td>
+              {is_multi && invoice.invoice_products ? (
+                invoice.invoice_products.map((group: InvoiceProductGroup, group_index: number) => {
+                  const cfg = PRODUCT_TYPE_CONFIG[group.product_type];
+                  if (!cfg) return null;
+                  return (
+                    <div key={group.product_type} className={group_index > 0 ? "border-t border-gray-100 dark:border-gray-800" : ""}>
+                      {/* Product group header */}
+                      <div className={`flex items-center justify-between px-6 py-3 ${cfg.bg} border-b ${cfg.border}`}>
+                        <div className="flex items-center gap-3">
+                          <span className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold ${cfg.bg} ${cfg.color} ${cfg.border}`}>
+                            {cfg.icon}
+                            {cfg.label}
+                          </span>
+                          {group.order_id && (
+                            <Link
+                              href={`/admin/orders/${group.order_id}`}
+                              className="flex items-center gap-1 text-xs text-gray-400 transition-colors hover:text-brand-600 dark:hover:text-brand-400"
+                            >
+                              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                              </svg>
+                              View order
+                            </Link>
+                          )}
+                          <span className="text-xs text-gray-400">
+                            {group.items.length} {group.items.length === 1 ? "item" : "items"}
+                          </span>
+                        </div>
+                        <span className={`text-sm font-semibold ${cfg.color}`}>
+                          {formatAmount(group.subtotal)}
+                        </span>
+                      </div>
+                      {/* Group items table */}
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="bg-gray-50/60 dark:bg-white/1.5">
+                              <th className="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">Item</th>
+                              <th className="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">Unit Price</th>
+                              <th className="px-6 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">Qty</th>
+                              <th className="px-6 py-2.5 text-right text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                            {group.items.map((item) => (
+                              <tr key={item.id} className="hover:bg-gray-50/50 dark:hover:bg-white/1">
+                                <td className="px-6 py-3.5 font-medium text-gray-900 dark:text-white">
+                                  <div className="flex items-center gap-2">
+                                    <div className={`h-1.5 w-1.5 shrink-0 rounded-full ${cfg.accent}`} />
+                                    {item.item_name}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-3.5 text-gray-600 dark:text-gray-400">{formatAmount(item.price)}</td>
+                                <td className="px-6 py-3.5 text-gray-600 dark:text-gray-400">&times; {item.quantity}</td>
+                                <td className="px-6 py-3.5 text-right text-gray-700 dark:text-gray-300">{formatAmount(item.item_total)}</td>
+                              </tr>
+                            ))}
+                            <tr className={`border-t ${cfg.border} ${cfg.bg}`}>
+                              <td colSpan={3} className={`px-6 py-2.5 text-xs font-semibold uppercase tracking-wider ${cfg.color}`}>
+                                {cfg.label} Subtotal
+                              </td>
+                              <td className={`px-6 py-2.5 text-right text-sm font-semibold ${cfg.color}`}>
+                                {formatAmount(group.subtotal)}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 dark:bg-white/2">
+                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Item</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Unit Price</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Qty</th>
+                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Item Total</th>
                       </tr>
-                    ) : (
-                      invoice.line_items.map((item) => (
-                        <tr key={item.id} className="hover:bg-gray-50/50 dark:hover:bg-white/[0.01]">
-                          <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
-                            {item.item_name}
-                          </td>
-                          <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
-                            {formatAmount(item.price)}
-                          </td>
-                          <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
-                            &times; {item.quantity}
-                          </td>
-                          <td className="px-6 py-4 text-right text-gray-700 dark:text-gray-300">
-                            {formatAmount(item.item_total)}
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                      {invoice.line_items.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="px-6 py-8 text-center text-sm text-gray-400">
+                            No line items.
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                      ) : (
+                        invoice.line_items.map((item) => (
+                          <tr key={item.id} className="hover:bg-gray-50/50 dark:hover:bg-white/1">
+                            <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{item.item_name}</td>
+                            <td className="px-6 py-4 text-gray-600 dark:text-gray-400">{formatAmount(item.price)}</td>
+                            <td className="px-6 py-4 text-gray-600 dark:text-gray-400">&times; {item.quantity}</td>
+                            <td className="px-6 py-4 text-right text-gray-700 dark:text-gray-300">{formatAmount(item.item_total)}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
             {/* Summary */}
@@ -1210,6 +1371,71 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
               )}
             </dl>
           </div>
+
+          {/* Products Purchased card (multi-product) */}
+          {is_multi && invoice.invoice_products && (
+            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+              <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-gray-800">
+                <div className="flex items-center gap-2">
+                  <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
+                  </svg>
+                  <span className="text-sm font-semibold text-gray-800 dark:text-white/90">Products Purchased</span>
+                </div>
+                <span className="inline-flex items-center rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-bold text-brand-700 dark:bg-brand-500/15 dark:text-brand-400">
+                  {invoice.invoice_products.length} types
+                </span>
+              </div>
+              <div className="divide-y divide-gray-100 p-2 dark:divide-gray-800">
+                {invoice.invoice_products.map((group: InvoiceProductGroup) => {
+                  const cfg = PRODUCT_TYPE_CONFIG[group.product_type];
+                  if (!cfg) return null;
+                  return (
+                    <div key={group.product_type} className="flex items-center gap-3 px-3 py-3">
+                      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${cfg.bg} ${cfg.border}`}>
+                        <span className={cfg.color}>{cfg.icon}</span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-xs font-semibold ${cfg.color}`}>{cfg.label}</p>
+                        <p className="text-xs text-gray-400">
+                          {group.items.length} {group.items.length === 1 ? "item" : "items"}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-sm font-semibold text-gray-900 dark:text-white">
+                        {formatAmount(group.subtotal)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Single product type badge in sidebar */}
+          {!is_multi && invoice.product_type && PRODUCT_TYPE_CONFIG[invoice.product_type] && (
+            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+              <div className="flex items-center gap-2 border-b border-gray-100 px-5 py-4 dark:border-gray-800">
+                <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" />
+                </svg>
+                <span className="text-sm font-semibold text-gray-800 dark:text-white/90">Product Type</span>
+              </div>
+              <div className="px-5 py-4">
+                {(() => {
+                  const cfg = PRODUCT_TYPE_CONFIG[invoice.product_type!];
+                  return (
+                    <div className={`flex items-center gap-3 rounded-xl border p-3 ${cfg.bg} ${cfg.border}`}>
+                      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/60 dark:bg-black/10 ${cfg.color}`}>
+                        {cfg.icon}
+                      </div>
+                      <span className={`text-sm font-semibold ${cfg.color}`}>{cfg.label}</span>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
 
           {/* Related order card */}
           {invoice.order_id && (

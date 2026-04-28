@@ -6,7 +6,7 @@ import type {
   AdminContentRefreshTier,
   CreateContentRefreshTierPayload,
   UpdateContentRefreshTierPayload,
-} from "@/types/admin/content-refresh-tiers";
+} from "@/types/admin/content-refresh";
 import {
   listAdminDrTiers,
   createAdminDrTier,
@@ -160,7 +160,7 @@ export default function AdminLinkBuildingContent() {
   const filtered_tiers = visible_tiers.filter((t) => {
     const matches_search =
       !search_query ||
-      t.dr_label.toLowerCase().includes(search_query.toLowerCase()) ||
+      t.label.toLowerCase().includes(search_query.toLowerCase()) ||
       t.traffic_range.toLowerCase().includes(search_query.toLowerCase());
 
     const matches_status =

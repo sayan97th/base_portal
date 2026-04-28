@@ -1,13 +1,15 @@
 import React from "react";
-import { optimization_tiers } from "./contentOptimizationData";
+import type { ContentOptimizationTier } from "@/types/client/content-optimization";
 import ContentOptimizationCard from "./ContentOptimizationCard";
 
 interface ContentOptimizationGridProps {
+  tiers: ContentOptimizationTier[];
   selected_quantities: Record<string, number>;
   onQuantityChange: (tier_id: string, quantity: number) => void;
 }
 
 const ContentOptimizationGrid: React.FC<ContentOptimizationGridProps> = ({
+  tiers,
   selected_quantities,
   onQuantityChange,
 }) => {
@@ -23,7 +25,7 @@ const ContentOptimizationGrid: React.FC<ContentOptimizationGridProps> = ({
         </span>
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {optimization_tiers.map((tier) => (
+        {tiers.map((tier) => (
           <ContentOptimizationCard
             key={tier.id}
             tier={tier}
