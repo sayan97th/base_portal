@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import ResourcesPage from "@/components/resources/ResourcesPage";
 
@@ -7,5 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function Resources() {
-  return <ResourcesPage />;
+  return (
+    <Suspense>
+      <ResourcesPage />
+    </Suspense>
+  );
 }
