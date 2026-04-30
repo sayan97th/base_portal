@@ -3,6 +3,8 @@ import type {
   SeoPackage,
   CreateSeoSubscriptionPayload,
   CreateSeoSubscriptionResponse,
+  CreateSeoAppointmentPayload,
+  SeoAppointmentResponse,
 } from "@/types/client/seo-packages";
 
 interface SeoPackagesResponse {
@@ -11,6 +13,10 @@ interface SeoPackagesResponse {
 
 interface CreateSeoSubscriptionApiResponse {
   data: CreateSeoSubscriptionResponse;
+}
+
+interface SeoAppointmentApiResponse {
+  data: SeoAppointmentResponse;
 }
 
 export const seoPackagesService = {
@@ -25,6 +31,23 @@ export const seoPackagesService = {
     const response = await apiClient.post<CreateSeoSubscriptionApiResponse>(
       "/api/seo-packages/subscriptions",
       payload
+    );
+    return response.data;
+  },
+
+  async saveAppointment(
+    payload: CreateSeoAppointmentPayload
+  ): Promise<SeoAppointmentResponse> {
+    const response = await apiClient.post<SeoAppointmentApiResponse>(
+      "/api/seo-packages/appointments",
+      payload
+    );
+    return response.data;
+  },
+
+  async fetchAppointment(appointment_id: number): Promise<SeoAppointmentResponse> {
+    const response = await apiClient.get<SeoAppointmentApiResponse>(
+      `/api/seo-packages/appointments/${appointment_id}`
     );
     return response.data;
   },

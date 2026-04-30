@@ -39,3 +39,18 @@ export interface CreateSeoSubscriptionResponse {
   total_amount: number;
   created_at: string;
 }
+
+export interface CreateSeoAppointmentPayload {
+  event_uri: string;
+  invitee_uri: string;
+  package_id: string;
+}
+
+export interface SeoAppointmentResponse {
+  id: number;
+  event_uri: string;
+  invitee_uri: string;
+  package_id: string;
+  scheduled_at: string;
+  created_at: string;
+}

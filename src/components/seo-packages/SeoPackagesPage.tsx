@@ -1,48 +1,30 @@
 "use client";
 
-import React, { useState, useCallback, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { Elements } from "@stripe/react-stripe-js";
+import React, { useState, useCallback, useEffect } from "react";
 import SeoPackagesHeader from "./SeoPackagesHeader";
 import SeoPackageGrid from "./SeoPackageGrid";
 import SeoPackageOrderSummary from "./SeoPackageOrderSummary";
-import CheckoutStep, {
-  BillingAddress,
-  type CheckoutStepHandle,
-} from "@/components/shared/CheckoutStep";
+import CalendlyWidget, {
+  CalendlyEventPayload,
+} from "@/components/shared/CalendlyWidget";
 import { seo_packages as fallback_packages } from "./seoPackageData";
 import { seoPackagesService } from "@/services/client/seo-packages.service";
-import { useNotifications } from "@/context/NotificationsContext";
-import { useBillingAddress } from "@/hooks/useBillingAddress";
-import { getStripe } from "@/lib/stripe";
 import type { SeoPackage } from "@/types/client/seo-packages";
 
-type Step = "selection" | "checkout";
+const CALENDLY_URL = "https://calendly.com/ernesto-97thfloor/30min";
+
+type Step = "selection" | "schedule";
 
 const SeoPackagesPage: React.FC = () => {
-  const router = useRouter();
-  const { addNotification } = useNotifications();
-
   const [packages, setPackages] = useState<SeoPackage[]>(fallback_packages);
   const [packages_loading, setPackagesLoading] = useState(true);
 
   const [selected_package_id, setSelectedPackageId] = useState<string | null>(null);
   const [current_step, setCurrentStep] = useState<Step>("selection");
-  const [is_submitting, setIsSubmitting] = useState(false);
-  const [submit_error, setSubmitError] = useState<string | null>(null);
 
-  const [billing_address, setBillingAddress] = useState<BillingAddress>({
-    address: "",
-    city: "",
-    country: "United States",
-    state: "Alabama",
-    postal_code: "",
-    company: "",
-  });
-
-  const { saved_billing_address, has_saved_address } = useBillingAddress();
-  const checkout_ref = useRef<CheckoutStepHandle>(null);
-  const [checkout_is_processing, setCheckoutIsProcessing] = useState(false);
+  const [appointment_scheduled, setAppointmentScheduled] = useState(false);
+  const [is_saving_appointment, setIsSavingAppointment] = useState(false);
+  const [appointment_error, setAppointmentError] = useState<string | null>(null);
 
   const loadPackages = useCallback(async () => {
     setPackagesLoading(true);
@@ -66,80 +48,48 @@ const SeoPackagesPage: React.FC = () => {
     setSelectedPackageId((prev) => (prev === package_id ? null : package_id));
   };
 
-  const handleBillingChange = (field: keyof BillingAddress, value: string) => {
-    setBillingAddress((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleApplySavedAddress = useCallback(() => {
-    if (saved_billing_address) setBillingAddress(saved_billing_address);
-  }, [saved_billing_address]);
-
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
   const handleContinue = () => {
     if (!selected_package_id) return;
-    if (has_saved_address && saved_billing_address) {
-      const is_billing_empty =
-        !billing_address.address && !billing_address.city && !billing_address.postal_code;
-      if (is_billing_empty) setBillingAddress(saved_billing_address);
-    }
-    setCurrentStep("checkout");
+    setCurrentStep("schedule");
     scrollToTop();
   };
 
-  const handlePrevious = () => {
+  const handleBackToSelection = () => {
     setCurrentStep("selection");
+    setAppointmentScheduled(false);
+    setAppointmentError(null);
     scrollToTop();
   };
 
-  const handleComplete = async (
-    payment_intent_id: string,
-    is_using_saved_method: boolean
-  ) => {
-    if (!selected_package) return;
-    setIsSubmitting(true);
-    setSubmitError(null);
-
-    try {
-      await seoPackagesService.createSeoSubscription({
-        package_id: selected_package.id,
-        total_amount: selected_package.price_per_month,
-        billing: is_using_saved_method
-          ? { company: null, address: "", city: "", state: "", country: "", postal_code: "" }
-          : {
-              company: billing_address.company || null,
-              address: billing_address.address,
-              city: billing_address.city,
-              state: billing_address.state,
-              country: billing_address.country,
-              postal_code: billing_address.postal_code,
-            },
-        payment: { payment_method_id: payment_intent_id },
-      });
-
-      const formatted_amount = selected_package.price_per_month.toLocaleString("en-US", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
-
-      await addNotification({
-        type: "order",
-        message: "Your SEO subscription has been activated successfully.",
-        preview_text: `${selected_package.name} · $${formatted_amount}/month`,
-        link: `/orders`,
-      });
-
-      router.push(`/orders`);
-    } catch (err: unknown) {
-      const message =
-        err && typeof err === "object" && "message" in err
-          ? String((err as { message: string }).message)
-          : "Something went wrong. Please try again.";
-      setSubmitError(message);
-    } finally {
-      setIsSubmitting(false);
-    }
+  const handleFinish = () => {
+    window.location.reload();
   };
+
+  const handleEventScheduled = useCallback(
+    async (payload: CalendlyEventPayload) => {
+      if (!selected_package) return;
+      setIsSavingAppointment(true);
+      setAppointmentError(null);
+      try {
+        await seoPackagesService.saveAppointment({
+          event_uri: payload.event_uri,
+          invitee_uri: payload.invitee_uri,
+          package_id: selected_package.id,
+        });
+        setAppointmentScheduled(true);
+      } catch {
+        setAppointmentError(
+          "Your appointment was booked in Calendly, but we could not save it on our end. Please contact support."
+        );
+        setAppointmentScheduled(true);
+      } finally {
+        setIsSavingAppointment(false);
+      }
+    },
+    [selected_package]
+  );
 
   return (
     <div className="space-y-6">
@@ -170,7 +120,7 @@ const SeoPackagesPage: React.FC = () => {
             <div className="col-span-12 lg:col-span-4">
               <SeoPackageOrderSummary
                 selected_package={selected_package}
-                action_label="Continue to Checkout"
+                action_label="Schedule a Consultation"
                 onAction={handleContinue}
                 is_action_disabled={!selected_package_id}
               />
@@ -178,42 +128,112 @@ const SeoPackagesPage: React.FC = () => {
           </div>
         )}
 
-        {/* Checkout step — Elements wraps both columns so the summary button
-            can trigger CheckoutStep's Stripe hooks via the imperative ref */}
-        {current_step === "checkout" && (
-          <Elements stripe={getStripe()}>
-            <div className="grid grid-cols-12 gap-6">
-              <div className="col-span-12 lg:col-span-8">
-                <CheckoutStep
-                  ref={checkout_ref}
-                  billing_address={billing_address}
-                  onBillingChange={handleBillingChange}
-                  onPrevious={handlePrevious}
-                  onComplete={handleComplete}
-                  is_loading={is_submitting}
-                  error_message={submit_error}
-                  total_amount={selected_package?.price_per_month ?? 0}
-                  saved_billing_address={saved_billing_address}
-                  onApplySavedAddress={handleApplySavedAddress}
-                  onProcessingChange={setCheckoutIsProcessing}
-                />
+        {/* Schedule step */}
+        {current_step === "schedule" && (
+          <div className="grid grid-cols-12 gap-6">
+            <div className="col-span-12 space-y-6 lg:col-span-8">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                  Schedule Your SEO Consultation
+                </h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  Pick a date and time that works best for you. Our team will
+                  review your selected plan before the call.
+                </p>
               </div>
 
-              <div className="col-span-12 lg:col-span-4">
-                <SeoPackageOrderSummary
-                  selected_package={selected_package}
-                  action_label="Continue to Checkout"
-                  onAction={() => {}}
-                  is_action_disabled
-                  checkout_action={{
-                    total: selected_package?.price_per_month ?? 0,
-                    is_processing: checkout_is_processing || is_submitting,
-                    onSubmit: () => checkout_ref.current?.triggerSubmit(),
-                  }}
+              {appointment_scheduled && (
+                <div className="flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3">
+                  <svg
+                    className="mt-0.5 h-5 w-5 shrink-0 text-green-500"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-medium text-green-800">
+                      Appointment confirmed!
+                    </p>
+                    <p className="mt-0.5 text-sm text-green-700">
+                      You should receive a calendar invite shortly. Our team
+                      will reach out to discuss your SEO plan.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {is_saving_appointment && (
+                <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+                  <svg
+                    className="h-4 w-4 animate-spin text-blue-500"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                    />
+                  </svg>
+                  <p className="text-sm text-blue-700">Saving your appointment…</p>
+                </div>
+              )}
+
+              {appointment_error && (
+                <div className="rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-3">
+                  <p className="text-sm text-yellow-800">{appointment_error}</p>
+                </div>
+              )}
+
+              {!appointment_scheduled && (
+                <CalendlyWidget
+                  calendly_url={CALENDLY_URL}
+                  onEventScheduled={handleEventScheduled}
                 />
-              </div>
+              )}
+
+              {appointment_scheduled ? (
+                <button
+                  onClick={handleFinish}
+                  className="w-full rounded-lg bg-coral-500 px-6 py-3.5 text-sm font-medium text-white shadow-theme-xs transition-colors hover:bg-coral-600"
+                >
+                  Done — Return to SEO Packages
+                </button>
+              ) : (
+                <button
+                  onClick={handleBackToSelection}
+                  className="w-full rounded-lg border border-gray-200 bg-white px-6 py-3.5 text-sm font-medium text-gray-700 shadow-theme-xs transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                >
+                  Back to Plan Selection
+                </button>
+              )}
             </div>
-          </Elements>
+
+            <div className="col-span-12 lg:col-span-4">
+              <SeoPackageOrderSummary
+                selected_package={selected_package}
+                action_label="Schedule a Consultation"
+                onAction={() => {}}
+                is_action_disabled
+              />
+            </div>
+          </div>
         )}
       </div>
     </div>
