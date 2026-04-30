@@ -1,63 +1,94 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import CallList from "./CallList";
-import ScheduleCallForm from "./ScheduleCallForm";
-import { ScheduledCall, scheduled_calls_list } from "./scheduleCallData";
+import BookCallView from "./BookCallView";
+import RescheduleRequestModal from "./RescheduleRequestModal";
+import {
+  scheduledCallService,
+  ScheduledCallAppointment,
+} from "@/services/client/scheduled-call.service";
 
-type ScheduleCallView = "list" | "new_call";
+type ScheduleCallView = "list" | "book";
 
 const ScheduleCallPage: React.FC = () => {
-  const [current_view, setCurrentView] =
-    useState<ScheduleCallView>("list");
-  const [calls, setCalls] = useState<ScheduledCall[]>(scheduled_calls_list);
+  const [current_view, setCurrentView] = useState<ScheduleCallView>("list");
+  const [appointments, setAppointments] = useState<ScheduledCallAppointment[]>(
+    []
+  );
+  const [is_loading, setIsLoading] = useState(true);
+  const [fetch_error, setFetchError] = useState<string | null>(null);
 
-  const handleScheduleCall = (call_data: {
-    contact_name: string;
-    contact_email: string;
-    call_type: string;
-    scheduled_date: string;
-    scheduled_time: string;
-    duration: string;
-    notes: string;
-  }) => {
-    const new_call: ScheduledCall = {
-      id: `CALL-${String(calls.length + 1).padStart(3, "0")}`,
-      contact_name: call_data.contact_name,
-      contact_email: call_data.contact_email,
-      call_type: call_data.call_type as ScheduledCall["call_type"],
-      scheduled_date: new Date(call_data.scheduled_date).toLocaleDateString(
-        "en-US",
-        {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-        }
-      ),
-      scheduled_time: call_data.scheduled_time,
-      duration: call_data.duration,
-      status: "scheduled",
-      notes: call_data.notes,
-    };
+  const [reschedule_target, setRescheduleTarget] =
+    useState<ScheduledCallAppointment | null>(null);
 
-    setCalls((prev) => [new_call, ...prev]);
+  const loadAppointments = useCallback(async () => {
+    setIsLoading(true);
+    setFetchError(null);
+    try {
+      const result = await scheduledCallService.fetchAppointments({
+        per_page: 50,
+        sort_field: "scheduled_at",
+        sort_direction: "desc",
+      });
+      setAppointments(result.data);
+    } catch {
+      setFetchError("Could not load your scheduled calls. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAppointments();
+  }, [loadAppointments]);
+
+  const handleBookingComplete = (
+    appointment: ScheduledCallAppointment | null
+  ) => {
+    if (appointment) {
+      setAppointments((prev) => [appointment, ...prev]);
+    }
     setCurrentView("list");
   };
 
+  const handleRescheduleRequest = (appointment: ScheduledCallAppointment) => {
+    setRescheduleTarget(appointment);
+  };
+
+  const handleRescheduleSuccess = (updated: ScheduledCallAppointment) => {
+    setAppointments((prev) =>
+      prev.map((a) => (a.id === updated.id ? updated : a))
+    );
+    setRescheduleTarget(null);
+  };
+
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-8">
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3 lg:p-8">
       {current_view === "list" && (
         <CallList
-          calls={calls}
-          onNewCall={() => setCurrentView("new_call")}
+          appointments={appointments}
+          is_loading={is_loading}
+          fetch_error={fetch_error}
+          onBook={() => setCurrentView("book")}
+          onReschedule={handleRescheduleRequest}
+          onRetry={loadAppointments}
         />
       )}
-      {current_view === "new_call" && (
-        <ScheduleCallForm
+
+      {current_view === "book" && (
+        <BookCallView
           onBack={() => setCurrentView("list")}
-          onSubmit={handleScheduleCall}
+          onBookingComplete={handleBookingComplete}
         />
       )}
+
+      <RescheduleRequestModal
+        is_open={reschedule_target !== null}
+        appointment={reschedule_target}
+        on_close={() => setRescheduleTarget(null)}
+        on_success={handleRescheduleSuccess}
+      />
     </div>
   );
 };
