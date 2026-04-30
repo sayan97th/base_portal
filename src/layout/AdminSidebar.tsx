@@ -419,8 +419,8 @@ const AdminSidebar: React.FC = () => {
                                                   <Link
                                                     href={ssi.path}
                                                     className={`flex items-center gap-2 px-2 py-1 text-xs rounded-md transition-colors ${
-                                                      isActive(ssi.path)
-                                                        ? "text-brand-400 font-medium"
+                                                      pathname === ssi.path
+                                                        ? "text-brand-400 font-medium bg-brand-500/10"
                                                         : "text-gray-500 hover:text-gray-300 hover:bg-white/5"
                                                     }`}
                                                   >
