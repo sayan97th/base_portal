@@ -161,4 +161,12 @@ export const adminSeoSubscriptionService = {
     );
     return response.data;
   },
+
+  async listAllClients(): Promise<AdminUserSearchResult[]> {
+    const params = new URLSearchParams({ type: "client", per_page: "500" });
+    const response = await apiClient.get<AdminUserSearchApiResponse>(
+      `/api/admin/users?${params.toString()}`
+    );
+    return response.data;
+  },
 };

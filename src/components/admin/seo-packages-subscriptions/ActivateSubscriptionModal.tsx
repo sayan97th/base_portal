@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { adminSeoSubscriptionService } from "@/services/admin/seo-packages-subscription.service";
 import type {
   AdminUserSearchResult,
@@ -8,7 +8,6 @@ import type {
 } from "@/services/admin/seo-packages-subscription.service";
 import { listAdminSeoPackages } from "@/services/admin/seo-packages.service";
 import type { AdminSeoPackage } from "@/types/admin/seo-packages";
-import { useDebounce } from "@/hooks/useDebounce";
 
 interface Props {
   onSuccess: () => void;
@@ -19,12 +18,12 @@ export default function ActivateSubscriptionModal({ onSuccess, onCancel }: Props
   const [packages, setPackages] = useState<AdminSeoPackage[]>([]);
   const [packages_loading, setPackagesLoading] = useState(true);
 
-  const [user_search, setUserSearch] = useState("");
-  const [user_results, setUserResults] = useState<AdminUserSearchResult[]>([]);
-  const [user_searching, setUserSearching] = useState(false);
+  const [all_clients, setAllClients] = useState<AdminUserSearchResult[]>([]);
+  const [clients_loading, setClientsLoading] = useState(true);
+  const [client_filter, setClientFilter] = useState("");
   const [selected_user, setSelectedUser] = useState<AdminUserSearchResult | null>(null);
-  const [show_user_dropdown, setShowUserDropdown] = useState(false);
-  const user_search_ref = useRef<HTMLDivElement>(null);
+  const [show_client_dropdown, setShowClientDropdown] = useState(false);
+  const client_select_ref = useRef<HTMLDivElement>(null);
 
   const [selected_package_id, setSelectedPackageId] = useState("");
   const [starts_at, setStartsAt] = useState(() => new Date().toISOString().split("T")[0]);
@@ -32,8 +31,6 @@ export default function ActivateSubscriptionModal({ onSuccess, onCancel }: Props
   const [notes, setNotes] = useState("");
   const [is_submitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const debounced_user_search = useDebounce(user_search, 400);
 
   useEffect(() => {
     setPackagesLoading(true);
@@ -44,42 +41,49 @@ export default function ActivateSubscriptionModal({ onSuccess, onCancel }: Props
   }, []);
 
   useEffect(() => {
-    if (!debounced_user_search || debounced_user_search.length < 2) {
-      setUserResults([]);
-      return;
-    }
-    setUserSearching(true);
+    setClientsLoading(true);
     adminSeoSubscriptionService
-      .searchUsers(debounced_user_search)
-      .then((results) => {
-        setUserResults(results);
-        setShowUserDropdown(true);
-      })
-      .catch(() => setUserResults([]))
-      .finally(() => setUserSearching(false));
-  }, [debounced_user_search]);
+      .listAllClients()
+      .then((data) => setAllClients(data))
+      .catch(() => setAllClients([]))
+      .finally(() => setClientsLoading(false));
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (user_search_ref.current && !user_search_ref.current.contains(e.target as Node)) {
-        setShowUserDropdown(false);
+      if (client_select_ref.current && !client_select_ref.current.contains(e.target as Node)) {
+        setShowClientDropdown(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const filtered_clients = useMemo(() => {
+    const query = client_filter.trim().toLowerCase();
+    if (!query) return all_clients;
+    return all_clients.filter(
+      (c) =>
+        `${c.first_name} ${c.last_name}`.toLowerCase().includes(query) ||
+        c.email.toLowerCase().includes(query) ||
+        (c.organization ?? "").toLowerCase().includes(query)
+    );
+  }, [all_clients, client_filter]);
+
   const handleSelectUser = useCallback((user: AdminUserSearchResult) => {
     setSelectedUser(user);
-    setUserSearch(`${user.first_name} ${user.last_name} — ${user.email}`);
-    setShowUserDropdown(false);
-    setUserResults([]);
+    setShowClientDropdown(false);
+    setClientFilter("");
   }, []);
 
   const handleClearUser = useCallback(() => {
     setSelectedUser(null);
-    setUserSearch("");
-    setUserResults([]);
+    setClientFilter("");
+  }, []);
+
+  const toggleClientDropdown = useCallback(() => {
+    setShowClientDropdown((prev) => !prev);
+    setClientFilter("");
   }, []);
 
   const handleSubmit = useCallback(
@@ -142,71 +146,97 @@ export default function ActivateSubscriptionModal({ onSuccess, onCancel }: Props
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-5 p-6">
-          {/* Client search */}
+          {/* Client searchable select */}
           <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
               Client <span className="text-error-500">*</span>
             </label>
-            <div className="relative" ref={user_search_ref}>
-              <div className="relative">
-                <svg className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                <input
-                  type="text"
-                  value={user_search}
-                  onChange={(e) => {
-                    setUserSearch(e.target.value);
-                    if (selected_user) setSelectedUser(null);
-                    setShowUserDropdown(true);
-                  }}
-                  placeholder="Search client by name or email…"
-                  autoComplete="off"
-                  className="h-10 w-full rounded-xl border border-gray-200 bg-white pl-10 pr-9 text-sm text-gray-900 placeholder-gray-400 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
-                />
-                {user_searching && (
-                  <svg className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                  </svg>
+            <div className="relative" ref={client_select_ref}>
+              {/* Trigger */}
+              <button
+                type="button"
+                onClick={toggleClientDropdown}
+                disabled={clients_loading}
+                className="flex h-10 w-full items-center justify-between rounded-xl border border-gray-200 bg-white px-3 text-sm transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/10 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800"
+              >
+                {clients_loading ? (
+                  <span className="text-gray-400 dark:text-gray-500">Loading clients…</span>
+                ) : selected_user ? (
+                  <span className="truncate text-gray-900 dark:text-white">
+                    {selected_user.first_name} {selected_user.last_name}
+                    <span className="ml-1.5 text-gray-400 dark:text-gray-500">— {selected_user.email}</span>
+                  </span>
+                ) : (
+                  <span className="text-gray-400 dark:text-gray-500">Select a client…</span>
                 )}
-                {selected_user && !user_searching && (
-                  <button
-                    type="button"
-                    onClick={handleClearUser}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                  >
-                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-
-              {show_user_dropdown && user_results.length > 0 && (
-                <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800">
-                  {user_results.map((user) => (
-                    <button
-                      key={user.id}
-                      type="button"
-                      onClick={() => handleSelectUser(user)}
-                      className="flex w-full flex-col px-4 py-2.5 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
+                <div className="ml-2 flex shrink-0 items-center gap-1">
+                  {selected_user && !clients_loading && (
+                    <span
+                      role="button"
+                      aria-label="Clear selection"
+                      onClick={(e) => { e.stopPropagation(); handleClearUser(); }}
+                      className="rounded p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                     >
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">
-                        {user.first_name} {user.last_name}
-                      </span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {user.email}
-                        {user.organization ? ` · ${user.organization}` : ""}
-                      </span>
-                    </button>
-                  ))}
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </span>
+                  )}
+                  <svg
+                    className={`h-4 w-4 text-gray-400 transition-transform ${show_client_dropdown ? "rotate-180" : ""}`}
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
                 </div>
-              )}
+              </button>
 
-              {show_user_dropdown && !user_searching && debounced_user_search.length >= 2 && user_results.length === 0 && (
-                <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-lg dark:border-gray-700 dark:bg-gray-800">
-                  <p className="text-sm text-gray-500 dark:text-gray-400">No clients found.</p>
+              {/* Dropdown */}
+              {show_client_dropdown && (
+                <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800">
+                  {/* Search input */}
+                  <div className="border-b border-gray-100 p-2 dark:border-gray-700">
+                    <div className="relative">
+                      <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      <input
+                        type="text"
+                        value={client_filter}
+                        onChange={(e) => setClientFilter(e.target.value)}
+                        placeholder="Search by name, email or organization…"
+                        autoFocus
+                        autoComplete="off"
+                        className="h-8 w-full rounded-lg border border-gray-200 bg-gray-50 pl-8 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:border-brand-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Client list */}
+                  <div className="max-h-52 overflow-y-auto">
+                    {filtered_clients.length === 0 ? (
+                      <p className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                        No clients found.
+                      </p>
+                    ) : (
+                      filtered_clients.map((client) => (
+                        <button
+                          key={client.id}
+                          type="button"
+                          onClick={() => handleSelectUser(client)}
+                          className="flex w-full flex-col px-4 py-2.5 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
+                        >
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">
+                            {client.first_name} {client.last_name}
+                          </span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            {client.email}
+                            {client.organization ? ` · ${client.organization}` : ""}
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
                 </div>
               )}
             </div>
