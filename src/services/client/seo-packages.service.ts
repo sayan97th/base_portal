@@ -5,6 +5,7 @@ import type {
   CreateSeoSubscriptionResponse,
   CreateSeoAppointmentPayload,
   SeoAppointmentResponse,
+  ActiveSeoSubscription,
 } from "@/types/client/seo-packages";
 
 interface SeoPackagesResponse {
@@ -17,6 +18,10 @@ interface CreateSeoSubscriptionApiResponse {
 
 interface SeoAppointmentApiResponse {
   data: SeoAppointmentResponse;
+}
+
+interface ActiveSeoSubscriptionApiResponse {
+  data: ActiveSeoSubscription | null;
 }
 
 export const seoPackagesService = {
@@ -50,5 +55,16 @@ export const seoPackagesService = {
       `/api/seo-packages/appointments/${appointment_id}`
     );
     return response.data;
+  },
+
+  async fetchActiveSubscription(): Promise<ActiveSeoSubscription | null> {
+    try {
+      const response = await apiClient.get<ActiveSeoSubscriptionApiResponse>(
+        "/api/seo-packages/subscriptions/active"
+      );
+      return response.data;
+    } catch {
+      return null;
+    }
   },
 };

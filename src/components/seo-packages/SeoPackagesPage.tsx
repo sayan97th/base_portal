@@ -4,12 +4,13 @@ import React, { useState, useCallback, useEffect } from "react";
 import SeoPackagesHeader from "./SeoPackagesHeader";
 import SeoPackageGrid from "./SeoPackageGrid";
 import SeoPackageOrderSummary from "./SeoPackageOrderSummary";
+import ActiveSubscriptionBanner from "./ActiveSubscriptionBanner";
 import CalendlyWidget, {
   CalendlyEventPayload,
 } from "@/components/shared/CalendlyWidget";
 import { seo_packages as fallback_packages } from "./seoPackageData";
 import { seoPackagesService } from "@/services/client/seo-packages.service";
-import type { SeoPackage } from "@/types/client/seo-packages";
+import type { SeoPackage, ActiveSeoSubscription } from "@/types/client/seo-packages";
 
 const CALENDLY_URL = "https://calendly.com/ernesto-97thfloor/30min";
 
@@ -18,6 +19,7 @@ type Step = "selection" | "schedule";
 const SeoPackagesPage: React.FC = () => {
   const [packages, setPackages] = useState<SeoPackage[]>(fallback_packages);
   const [packages_loading, setPackagesLoading] = useState(true);
+  const [active_subscription, setActiveSubscription] = useState<ActiveSeoSubscription | null>(null);
 
   const [selected_package_id, setSelectedPackageId] = useState<string | null>(null);
   const [current_step, setCurrentStep] = useState<Step>("selection");
@@ -38,9 +40,15 @@ const SeoPackagesPage: React.FC = () => {
     }
   }, []);
 
+  const loadActiveSubscription = useCallback(async () => {
+    const sub = await seoPackagesService.fetchActiveSubscription();
+    setActiveSubscription(sub);
+  }, []);
+
   useEffect(() => {
     loadPackages();
-  }, [loadPackages]);
+    loadActiveSubscription();
+  }, [loadPackages, loadActiveSubscription]);
 
   const selected_package = packages.find((p) => p.id === selected_package_id) ?? null;
 
@@ -94,6 +102,13 @@ const SeoPackagesPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="mx-auto max-w-7xl">
+        {/* Active subscription banner */}
+        {active_subscription && (
+          <div className="mb-6">
+            <ActiveSubscriptionBanner subscription={active_subscription} />
+          </div>
+        )}
+
         {/* Selection step */}
         {current_step === "selection" && (
           <div className="grid grid-cols-12 gap-6">

@@ -54,3 +54,19 @@ export interface SeoAppointmentResponse {
   scheduled_at: string;
   created_at: string;
 }
+
+export interface ActiveSeoSubscriptionPackage {
+  id: string;
+  name: string;
+  slug: string;
+  price_per_month: number;
+}
+
+export interface ActiveSeoSubscription {
+  id: number;
+  package: ActiveSeoSubscriptionPackage;
+  status: "active" | "cancelled" | "expired";
+  starts_at: string;
+  ends_at: string | null;
+  created_at: string;
+}
