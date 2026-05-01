@@ -7,9 +7,11 @@ import { linkBuildingService } from "@/services/client/link-building.service";
 import { newContentService } from "@/services/client/new-content.service";
 import { contentOptimizationService } from "@/services/client/content-optimization.service";
 import { contentBriefsService } from "@/services/client/content-briefs.service";
-import { findSessionByOrderId } from "@/lib/checkout-session";
+import { purchaseGroupsService } from "@/services/client/purchase-groups.service";
+import { cachePurchaseGroups } from "@/lib/checkout-session";
 import { useDebounce } from "@/hooks/useDebounce";
 import type { CartProductType } from "@/types/client/unified-cart";
+import type { PurchaseGroup } from "@/types/client/purchase-groups";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -30,12 +32,12 @@ interface UnifiedOrder {
 
 interface OrderGroup {
   group_id: string;
-  session_id: string | null;
+  purchase_group_id: string | null;
   session_title: string | null;
   created_at: string;
   total_amount: number;
   orders: UnifiedOrder[];
-  is_session: boolean;
+  is_multi_purchase: boolean;
 }
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
@@ -147,9 +149,8 @@ function getGroupOverallStatus(orders: UnifiedOrder[]): string {
   return orders[0]?.status ?? "pending";
 }
 
-function getDetailLink(order: UnifiedOrder): string {
-  const session = findSessionByOrderId(order.id);
-  if (session) return `/orders/session/${session.session_id}`;
+function getDetailLink(order: UnifiedOrder, purchase_group_id: string | null): string {
+  if (purchase_group_id) return `/orders/session/${purchase_group_id}`;
   switch (order.product_type) {
     case "link_building":
       return `/link-building/orders/${order.id}`;
@@ -170,49 +171,59 @@ function getReportLink(order: UnifiedOrder): string | null {
     : null;
 }
 
-function groupOrdersBySession(orders: UnifiedOrder[]): OrderGroup[] {
-  const session_map = new Map<string, OrderGroup>();
+function groupOrdersByPurchaseGroups(
+  orders: UnifiedOrder[],
+  purchase_groups: PurchaseGroup[]
+): OrderGroup[] {
+  // Build a lookup: order_id → PurchaseGroup
+  const order_to_group = new Map<string, PurchaseGroup>();
+  for (const group of purchase_groups) {
+    for (const order of group.orders) {
+      order_to_group.set(order.order_id, group);
+    }
+  }
+
+  const group_map = new Map<string, OrderGroup>();
   const ungrouped: OrderGroup[] = [];
 
   for (const order of orders) {
-    const session = findSessionByOrderId(order.id);
-    if (session) {
-      if (session_map.has(session.session_id)) {
-        const group = session_map.get(session.session_id)!;
+    const purchase_group = order_to_group.get(order.id);
+    if (purchase_group) {
+      if (group_map.has(purchase_group.purchase_group_id)) {
+        const group = group_map.get(purchase_group.purchase_group_id)!;
         if (!group.orders.find((o) => o.id === order.id)) {
           group.orders.push(order);
-          group.total_amount += order.total_amount;
         }
       } else {
-        session_map.set(session.session_id, {
-          group_id: session.session_id,
-          session_id: session.session_id,
-          session_title: session.order_title,
-          created_at: session.created_at,
-          total_amount: order.total_amount,
+        group_map.set(purchase_group.purchase_group_id, {
+          group_id: purchase_group.purchase_group_id,
+          purchase_group_id: purchase_group.purchase_group_id,
+          session_title: purchase_group.order_title,
+          created_at: purchase_group.created_at,
+          total_amount: purchase_group.total_amount,
           orders: [order],
-          is_session: false,
+          is_multi_purchase: false,
         });
       }
     } else {
       ungrouped.push({
         group_id: order.id,
-        session_id: null,
+        purchase_group_id: null,
         session_title: null,
         created_at: order.created_at,
         total_amount: order.total_amount,
         orders: [order],
-        is_session: false,
+        is_multi_purchase: false,
       });
     }
   }
 
-  const session_groups = [...session_map.values()].map((g) => ({
+  const purchase_groups_result = [...group_map.values()].map((g) => ({
     ...g,
-    is_session: g.orders.length > 1,
+    is_multi_purchase: g.orders.length > 1,
   }));
 
-  const all_groups = [...session_groups, ...ungrouped];
+  const all_groups = [...purchase_groups_result, ...ungrouped];
   all_groups.sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
@@ -307,18 +318,19 @@ function GroupSkeleton() {
 
 interface OrderItemRowProps {
   order: UnifiedOrder;
+  purchase_group_id: string | null;
   is_last: boolean;
   compact?: boolean;
 }
 
-function OrderItemRow({ order, is_last, compact = false }: OrderItemRowProps) {
+function OrderItemRow({ order, purchase_group_id, is_last, compact = false }: OrderItemRowProps) {
   const status_config = getStatusConfig(order.status);
   const is_active = order.status === "pending" || order.status === "processing";
   const has_updates = (order.updates_count ?? 0) > 0;
   const type_config = PRODUCT_TYPE_CONFIG[order.product_type];
   const tracking_link = getTrackingLink(order);
   const report_link = getReportLink(order);
-  const detail_link = getDetailLink(order);
+  const detail_link = getDetailLink(order, purchase_group_id);
 
   return (
     <div
@@ -436,7 +448,7 @@ function OrderItemRow({ order, is_last, compact = false }: OrderItemRowProps) {
 function OrderGroupCard({ group }: { group: OrderGroup }) {
   const [is_expanded, setIsExpanded] = useState(true);
 
-  if (!group.is_session) {
+  if (!group.is_multi_purchase) {
     const order = group.orders[0];
     const type_config = PRODUCT_TYPE_CONFIG[order.product_type];
     return (
@@ -452,12 +464,17 @@ function OrderGroupCard({ group }: { group: OrderGroup }) {
             {formatDate(order.created_at)}
           </span>
         </div>
-        <OrderItemRow order={order} is_last={true} compact={false} />
+        <OrderItemRow
+          order={order}
+          purchase_group_id={null}
+          is_last={true}
+          compact={false}
+        />
       </div>
     );
   }
 
-  // Multi-product session group
+  // Multi-product purchase group
   const overall_status = getGroupOverallStatus(group.orders);
   const status_config = getStatusConfig(overall_status);
   const total_items = group.orders.reduce((sum, o) => sum + o.items_count, 0);
@@ -465,7 +482,7 @@ function OrderGroupCard({ group }: { group: OrderGroup }) {
 
   return (
     <div className="overflow-hidden rounded-2xl border border-brand-200 bg-white shadow-sm dark:border-brand-500/25 dark:bg-white/3">
-      {/* Session header — clickable to expand/collapse */}
+      {/* Group header — clickable to expand/collapse */}
       <button
         onClick={() => setIsExpanded((v) => !v)}
         className="w-full bg-linear-to-r from-brand-50 via-brand-50/60 to-transparent px-4 py-3.5 text-left transition-colors hover:from-brand-100 dark:from-brand-500/10 dark:via-brand-500/5 dark:to-transparent dark:hover:from-brand-500/15"
@@ -543,6 +560,7 @@ function OrderGroupCard({ group }: { group: OrderGroup }) {
             <OrderItemRow
               key={`${order.product_type}-${order.id}`}
               order={order}
+              purchase_group_id={group.purchase_group_id}
               is_last={idx === group.orders.length - 1}
               compact
             />
@@ -557,6 +575,7 @@ function OrderGroupCard({ group }: { group: OrderGroup }) {
 
 const MyOrdersPage: React.FC = () => {
   const [all_orders, setAllOrders] = useState<UnifiedOrder[]>([]);
+  const [purchase_groups, setPurchaseGroups] = useState<PurchaseGroup[]>([]);
   const [is_loading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [active_filter, setActiveFilter] = useState<FilterTab>("all");
@@ -583,12 +602,19 @@ const MyOrdersPage: React.FC = () => {
     const failed_services: string[] = [];
 
     try {
-      const [lb_result, nc_result, co_result, cb_result] = await Promise.allSettled([
-        linkBuildingService.fetchMyOrders({ per_page: 200 }),
-        newContentService.fetchMyOrders(),
-        contentOptimizationService.fetchMyOrders(),
-        contentBriefsService.fetchMyOrders(),
-      ]);
+      const [lb_result, nc_result, co_result, cb_result, groups_result] =
+        await Promise.allSettled([
+          linkBuildingService.fetchMyOrders({ per_page: 200 }),
+          newContentService.fetchMyOrders(),
+          contentOptimizationService.fetchMyOrders(),
+          contentBriefsService.fetchMyOrders(),
+          purchaseGroupsService.fetchPurchaseGroups(),
+        ]);
+
+      if (groups_result.status === "fulfilled") {
+        setPurchaseGroups(groups_result.value);
+        cachePurchaseGroups(groups_result.value);
+      }
 
       if (lb_result.status === "fulfilled") {
         const lb_data = lb_result.value?.data;
@@ -711,8 +737,8 @@ const MyOrdersPage: React.FC = () => {
   }, [all_orders, active_filter, debounced_search]);
 
   const order_groups = React.useMemo(
-    () => groupOrdersBySession(filtered_orders),
-    [filtered_orders]
+    () => groupOrdersByPurchaseGroups(filtered_orders, purchase_groups),
+    [filtered_orders, purchase_groups]
   );
 
   const total_orders = filtered_orders.length;

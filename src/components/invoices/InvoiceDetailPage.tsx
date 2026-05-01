@@ -60,6 +60,8 @@ function getOrderedProductTypes(
   return result;
 }
 
+const PAYABLE_STATUSES: string[] = ["unpaid", "overdue"];
+
 const BackLink: React.FC = () => (
   <Link
     href="/invoices"
@@ -71,6 +73,63 @@ const BackLink: React.FC = () => (
     Back to Invoices
   </Link>
 );
+
+function PayInvoiceBanner({ invoice }: { invoice: InvoiceDetail }) {
+  const is_overdue = invoice.status === "overdue";
+
+  return (
+    <div
+      className={`flex flex-col gap-4 rounded-xl border p-5 sm:flex-row sm:items-center sm:justify-between ${
+        is_overdue
+          ? "border-error-200 bg-error-50 dark:border-error-500/30 dark:bg-error-500/10"
+          : "border-warning-200 bg-warning-50 dark:border-warning-500/30 dark:bg-warning-500/10"
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+            is_overdue
+              ? "bg-error-100 dark:bg-error-500/20"
+              : "bg-warning-100 dark:bg-warning-500/20"
+          }`}
+        >
+          <svg
+            className={`h-4 w-4 ${is_overdue ? "text-error-600 dark:text-error-400" : "text-warning-600 dark:text-warning-400"}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+        </div>
+        <div>
+          <p className={`text-sm font-semibold ${is_overdue ? "text-error-700 dark:text-error-300" : "text-warning-700 dark:text-warning-300"}`}>
+            {is_overdue ? "This invoice is overdue" : "Payment pending"}
+          </p>
+          <p className={`mt-0.5 text-xs ${is_overdue ? "text-error-600 dark:text-error-400" : "text-warning-600 dark:text-warning-400"}`}>
+            {is_overdue
+              ? `Due date has passed — amount due: ${invoice.total}`
+              : `Amount due: ${invoice.total} — due ${invoice.date_due}`}
+          </p>
+        </div>
+      </div>
+      <Link
+        href={`/invoices/${invoice.unique_id}/pay`}
+        className={`inline-flex shrink-0 items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold text-white transition-colors ${
+          is_overdue
+            ? "bg-error-600 hover:bg-error-700 dark:bg-error-500 dark:hover:bg-error-600"
+            : "bg-warning-500 hover:bg-warning-600 dark:bg-warning-500 dark:hover:bg-warning-600"
+        }`}
+      >
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+        </svg>
+        Pay Invoice Now
+      </Link>
+    </div>
+  );
+}
 
 function LineItemsTable({ items }: { items: InvoiceLineItem[] }) {
   return (
@@ -273,6 +332,8 @@ const InvoiceDetailPage: React.FC<InvoiceDetailPageProps> = ({ invoice_id }) => 
     (a, b) => PRODUCT_TYPE_ORDER.indexOf(a) - PRODUCT_TYPE_ORDER.indexOf(b)
   );
 
+  const can_pay = PAYABLE_STATUSES.includes(invoice.status);
+
   return (
     <div className="space-y-6">
       <BackLink />
@@ -292,16 +353,32 @@ const InvoiceDetailPage: React.FC<InvoiceDetailPageProps> = ({ invoice_id }) => 
             {status_cfg.label}
           </Badge>
         </div>
-        <button
-          onClick={() => generateInvoicePdf(invoice)}
-          className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-theme-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-          </svg>
-          Download PDF
-        </button>
+        <div className="flex items-center gap-2">
+          {can_pay && (
+            <Link
+              href={`/invoices/${invoice.unique_id}/pay`}
+              className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-theme-sm font-semibold text-white transition-colors hover:bg-brand-700 dark:bg-brand-500 dark:hover:bg-brand-600"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+              </svg>
+              Pay Invoice
+            </Link>
+          )}
+          <button
+            onClick={() => generateInvoicePdf(invoice)}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-theme-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+            Download PDF
+          </button>
+        </div>
       </div>
+
+      {/* Payment banner for unpaid / overdue invoices */}
+      {can_pay && <PayInvoiceBanner invoice={invoice} />}
 
       {/* Invoice Card */}
       <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/3 sm:p-8">
@@ -448,7 +525,40 @@ const InvoiceDetailPage: React.FC<InvoiceDetailPageProps> = ({ invoice_id }) => 
             </div>
           </dl>
         </div>
+
+        {/* Notes from admin */}
+        {invoice.notes && (
+          <div className="mt-8 rounded-xl border border-amber-200/60 bg-amber-50/60 p-5 dark:border-amber-500/20 dark:bg-amber-500/5">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
+              </svg>
+              Note from BASE
+            </p>
+            <p className="whitespace-pre-wrap text-theme-sm text-gray-700 dark:text-gray-300">
+              {invoice.notes}
+            </p>
+          </div>
+        )}
       </div>
+
+      {/* Bottom pay CTA for unpaid / overdue */}
+      {can_pay && (
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-gray-200 bg-white p-6 text-center dark:border-gray-800 dark:bg-white/3">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Ready to settle this invoice? Proceed to secure payment.
+          </p>
+          <Link
+            href={`/invoices/${invoice.unique_id}/pay`}
+            className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700 dark:bg-brand-500 dark:hover:bg-brand-600"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+            </svg>
+            Pay Invoice — {invoice.total}
+          </Link>
+        </div>
+      )}
     </div>
   );
 };
