@@ -69,6 +69,7 @@ export interface InvoiceDetail {
   discount_type?: string;
   total: string;
   credit: string;
+  notes?: string;
   billed_to: InvoiceBilledTo | null;
   line_items: InvoiceLineItem[];
   coupon_discounts?: InvoiceCouponDiscount[];

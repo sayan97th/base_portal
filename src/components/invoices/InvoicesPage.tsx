@@ -79,8 +79,11 @@ function InvoiceRowSkeleton() {
   );
 }
 
+const PAYABLE_STATUSES = new Set(["unpaid", "overdue"]);
+
 function InvoiceRow({ invoice }: { invoice: InvoiceSummary }) {
   const cfg = STATUS_BADGE[invoice.status] ?? STATUS_BADGE.void;
+  const can_pay = PAYABLE_STATUSES.has(invoice.status);
 
   return (
     <div className="flex flex-col gap-3 px-4 py-3.5 transition-colors hover:bg-gray-50/70 dark:hover:bg-white/2 sm:flex-row sm:items-center sm:justify-between border-b border-gray-100 dark:border-gray-800 last:border-0">
@@ -113,7 +116,7 @@ function InvoiceRow({ invoice }: { invoice: InvoiceSummary }) {
         </div>
       </div>
 
-      {/* Right: status + view */}
+      {/* Right: status + actions */}
       <div className="flex shrink-0 items-center gap-2">
         <Badge
           variant="light"
@@ -123,6 +126,18 @@ function InvoiceRow({ invoice }: { invoice: InvoiceSummary }) {
         >
           {cfg.label}
         </Badge>
+
+        {can_pay && (
+          <Link
+            href={`/invoices/${invoice.unique_id}/pay`}
+            className="inline-flex items-center gap-1 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-600 transition-colors hover:bg-brand-500 hover:text-white dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400 dark:hover:bg-brand-500 dark:hover:text-white"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+            </svg>
+            Pay
+          </Link>
+        )}
 
         <Link
           href={`/invoices/${invoice.unique_id}`}
