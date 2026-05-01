@@ -100,9 +100,6 @@ const CallList: React.FC<CallListProps> = ({
       ? appointments
       : appointments.filter((a) => a.status === active_tab);
 
-  const count = (status: ScheduledCallStatus) =>
-    appointments.filter((a) => a.status === status).length;
-
   const can_reschedule = (status: ScheduledCallStatus) =>
     status === "pending" || status === "confirmed";
 
@@ -121,34 +118,6 @@ const CallList: React.FC<CallListProps> = ({
         <Button variant="coral" size="sm" onClick={onBook}>
           Book a Call
         </Button>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-white/[0.02]">
-          <p className="text-sm text-gray-500 dark:text-gray-400">Total</p>
-          <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
-            {appointments.length}
-          </p>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-white/[0.02]">
-          <p className="text-sm text-gray-500 dark:text-gray-400">Confirmed</p>
-          <p className="mt-1 text-2xl font-semibold text-brand-500">
-            {count("confirmed")}
-          </p>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-white/[0.02]">
-          <p className="text-sm text-gray-500 dark:text-gray-400">Completed</p>
-          <p className="mt-1 text-2xl font-semibold text-success-500">
-            {count("completed")}
-          </p>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-white/[0.02]">
-          <p className="text-sm text-gray-500 dark:text-gray-400">Cancelled</p>
-          <p className="mt-1 text-2xl font-semibold text-error-500">
-            {count("cancelled")}
-          </p>
-        </div>
       </div>
 
       {/* Error Banner */}
