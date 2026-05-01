@@ -56,9 +56,7 @@ export default function IntakeFormTable({
         <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
           {tier_name}
         </span>
-        <span className="text-sm font-medium text-brand-500 dark:text-brand-400">
-          Spreadsheet View
-        </span>
+       
       </div>
 
       {/* Table — bordered spreadsheet */}
