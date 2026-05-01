@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback } from "react";
+import { useCallback } from "react";
 import type { CartIntakeRow } from "@/types/client/unified-cart";
 
 const CONTENT_TYPES = [
@@ -90,10 +90,10 @@ export default function IntakeFormTable({
                 key={idx}
                 className="bg-white transition-colors hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-white/2"
               >
-                <td className="border-b border-r border-gray-200 py-2 text-center text-xs font-medium text-gray-500 last:border-b-0 dark:border-gray-700 dark:text-gray-500">
+                <td className="border-b border-r border-gray-200 py-2 text-center text-xs font-medium text-gray-500 dark:border-gray-700 dark:text-gray-500">
                   {idx + 1}
                 </td>
-                <td className="border-b border-r border-gray-200 p-1 last:border-b-0 dark:border-gray-700">
+                <td className="border-b border-r border-gray-200 p-1 dark:border-gray-700">
                   <input
                     type="text"
                     value={row.keyword_phrase}
@@ -103,7 +103,7 @@ export default function IntakeFormTable({
                     className="h-8 w-full rounded border-0 bg-transparent px-2.5 text-sm text-gray-700 placeholder:text-gray-300 focus:bg-blue-50/40 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-200 dark:text-white/80 dark:placeholder:text-white/20 dark:focus:bg-blue-950/20 dark:focus:ring-blue-900"
                   />
                 </td>
-                <td className="border-b border-r border-gray-200 p-1 last:border-b-0 dark:border-gray-700">
+                <td className="border-b border-r border-gray-200 p-1 dark:border-gray-700">
                   <select
                     value={row.type_of_content}
                     onChange={(e) =>
@@ -119,7 +119,7 @@ export default function IntakeFormTable({
                     ))}
                   </select>
                 </td>
-                <td className="border-b border-gray-200 p-1 last:border-b-0 dark:border-gray-700">
+                <td className="border-b border-gray-200 p-1 dark:border-gray-700">
                   <input
                     type="text"
                     value={row.notes}
