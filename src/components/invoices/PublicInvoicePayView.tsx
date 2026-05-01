@@ -270,9 +270,10 @@ interface StatusPageProps {
   title: string;
   description: string;
   success?: boolean;
+  action_link?: { label: string; href: string };
 }
 
-function StatusPage({ icon, title, description, success = false }: StatusPageProps) {
+function StatusPage({ icon, title, description, success = false, action_link }: StatusPageProps) {
   const icon_background = success
     ? "bg-emerald-100 dark:bg-emerald-500/15"
     : "bg-gray-100 dark:bg-gray-800";
@@ -320,6 +321,14 @@ function StatusPage({ icon, title, description, success = false }: StatusPagePro
               A confirmation email will be sent to you shortly.
             </p>
           </div>
+        )}
+        {action_link && (
+          <a
+            href={action_link.href}
+            className="mt-5 inline-flex items-center justify-center gap-2 rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
+          >
+            {action_link.label}
+          </a>
         )}
       </div>
     </div>
@@ -525,6 +534,7 @@ export default function PublicInvoicePayView({
         title="Payment successful!"
         description={`Your payment of ${formatCurrency(total_cents_value / 100)} has been processed successfully. Thank you!`}
         success
+        action_link={is_authenticated_flow ? { label: "Return to Invoices", href: "/invoices" } : undefined}
       />
     );
   }
@@ -628,13 +638,13 @@ export default function PublicInvoicePayView({
                       onSuccess={() => setPageState("success")}
                       on_confirm_payment={
                         is_authenticated_flow
-                          ? (payment_intent_id) =>
-                              invoicesService
-                                .payClientInvoice(invoice_id, {
-                                  payment_method: "credit_card",
-                                  payment_intent_id,
-                                })
-                                .then(() => undefined)
+                          ? async (payment_intent_id) => {
+                              await invoicesService.payClientInvoice(invoice_id, {
+                                payment_method: "credit_card",
+                                payment_intent_id,
+                              });
+                              await invoicesService.sendInvoicePaymentNotification(invoice_id);
+                            }
                           : (payment_intent_id) =>
                               confirmInvoicePayment(invoice_id, token, payment_intent_id)
                       }
