@@ -126,15 +126,13 @@ const NewContentPage: React.FC = () => {
         notes: "",
       });
       let rows: CartIntakeRow[];
-      if (stored.length === item.quantity) {
+      if (stored.length >= item.quantity) {
         rows = stored;
-      } else if (stored.length < item.quantity) {
+      } else {
         rows = [
           ...stored,
           ...Array.from({ length: item.quantity - stored.length }, empty_row),
         ];
-      } else {
-        rows = stored.slice(0, item.quantity);
       }
       return {
         tier_id: item.tier_id,
