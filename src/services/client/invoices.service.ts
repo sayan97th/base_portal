@@ -34,6 +34,7 @@ interface CreateInvoiceResponse {
 export interface PayInvoicePayload {
   payment_method: "account_balance" | "credit_card";
   stripe_token?: string;
+  payment_intent_id?: string;
 }
 
 interface PayInvoiceResponse {
