@@ -10,6 +10,12 @@ export interface CartKeywordRow {
   exact_match: boolean;
 }
 
+export interface CartIntakeRow {
+  keyword_phrase: string;
+  type_of_content: string;
+  notes: string;
+}
+
 export interface CartItem {
   cart_item_id: string;
   product_type: CartProductType;
@@ -18,6 +24,7 @@ export interface CartItem {
   quantity: number;
   unit_price: number;
   keyword_data?: CartKeywordRow[];
+  intake_data?: CartIntakeRow[];
 }
 
 export interface CartAppliedCoupon {
@@ -57,6 +64,13 @@ export interface UnifiedCheckoutGenericItem {
   unit_price: number;
 }
 
+export interface UnifiedCheckoutNewContentItem {
+  tier_id: string;
+  quantity: number;
+  unit_price: number;
+  intake_rows?: CartIntakeRow[];
+}
+
 export interface UnifiedCheckoutBilling {
   company: string | null;
   address: string;
@@ -75,7 +89,7 @@ export interface UnifiedCheckoutPayload {
   order_notes?: string | null;
   link_building_items?: UnifiedCheckoutLinkBuildingItem[];
   content_optimization_items?: UnifiedCheckoutGenericItem[];
-  new_content_items?: UnifiedCheckoutGenericItem[];
+  new_content_items?: UnifiedCheckoutNewContentItem[];
   content_brief_items?: UnifiedCheckoutGenericItem[];
 }
 

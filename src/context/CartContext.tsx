@@ -17,6 +17,7 @@ import type {
   CartProductType,
   UnifiedCartPayload,
   CartKeywordRow,
+  CartIntakeRow,
 } from "@/types/client/unified-cart";
 import { unifiedCartService } from "@/services/client/unified-cart.service";
 
@@ -93,6 +94,11 @@ export interface CartContextType {
     tier_id: string,
     keyword_data: CartKeywordRow[]
   ) => void;
+  updateNewContentIntakeData: (
+    tier_id: string,
+    intake_data: CartIntakeRow[]
+  ) => void;
+  getIntakeDataForTier: (tier_id: string) => CartIntakeRow[];
   clearCart: () => void;
   setAppliedCoupons: Dispatch<SetStateAction<CartAppliedCoupon[]>>;
   setCouponInputCode: Dispatch<SetStateAction<string>>;
@@ -262,6 +268,29 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const updateNewContentIntakeData = useCallback(
+    (tier_id: string, intake_data: CartIntakeRow[]) => {
+      setItems((prev) =>
+        prev.map((item) =>
+          item.product_type === "new_content" && item.tier_id === tier_id
+            ? { ...item, intake_data }
+            : item
+        )
+      );
+    },
+    []
+  );
+
+  const getIntakeDataForTier = useCallback(
+    (tier_id: string): CartIntakeRow[] => {
+      const item = items.find(
+        (i) => i.product_type === "new_content" && i.tier_id === tier_id
+      );
+      return item?.intake_data ?? [];
+    },
+    [items]
+  );
+
   const clearCart = useCallback(() => {
     setItems([]);
     setAppliedCoupons([]);
@@ -347,6 +376,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         is_cart_ready,
         setItemQuantity,
         updateLinkBuildingKeywords,
+        updateNewContentIntakeData,
+        getIntakeDataForTier,
         clearCart,
         setAppliedCoupons,
         setCouponInputCode,

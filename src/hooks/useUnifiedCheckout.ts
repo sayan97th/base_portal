@@ -199,6 +199,10 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
                   tier_id: item.tier_id,
                   quantity: item.quantity,
                   unit_price: item.unit_price,
+                  intake_rows:
+                    item.intake_data && item.intake_data.length > 0
+                      ? item.intake_data
+                      : undefined,
                 }))
               : undefined,
           content_brief_items:

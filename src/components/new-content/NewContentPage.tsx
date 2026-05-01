@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Elements } from "@stripe/react-stripe-js";
 import NewContentHeader from "./NewContentHeader";
 import ArticleGrid from "./NewContentGrid";
+import IntakeFormStep, { type IntakeFormTierData } from "./IntakeFormStep";
 import KeywordEntryStep, {
   type KeywordData,
   type KeywordRow,
@@ -22,8 +23,9 @@ import { useCart } from "@/context/CartContext";
 import { useUnifiedCheckout } from "@/hooks/useUnifiedCheckout";
 import { getStripe } from "@/lib/stripe";
 import type { NewContentTier } from "@/types/client/new-content";
+import type { CartIntakeRow } from "@/types/client/unified-cart";
 
-type Step = "selection" | "keywords" | "checkout";
+type Step = "selection" | "intake" | "keywords" | "checkout";
 
 const empty_keyword_row = (): KeywordRow => ({
   keyword: "",
@@ -41,6 +43,7 @@ const NewContentPage: React.FC = () => {
   >(null);
 
   const [current_step, setCurrentStep] = useState<Step>("selection");
+  const [intake_step_error, setIntakeStepError] = useState<string | null>(null);
   const [keyword_step_error, setKeywordStepError] = useState<string | null>(null);
   const [billing_address, setBillingAddress] = useState<BillingAddress>({
     address: "",
@@ -57,6 +60,8 @@ const NewContentPage: React.FC = () => {
     setItemQuantity,
     updateLinkBuildingKeywords,
     getKeywordDataForTier,
+    updateNewContentIntakeData,
+    getIntakeDataForTier,
     item_count,
     total,
     order_title,
@@ -107,6 +112,39 @@ const NewContentPage: React.FC = () => {
 
   const has_lb_items = lb_selected_items.length > 0;
 
+  const nc_selected_items = useMemo(
+    () => items.filter((item) => item.product_type === "new_content"),
+    [items]
+  );
+
+  const computed_intake_data = useMemo<IntakeFormTierData[]>(() => {
+    return nc_selected_items.map((item) => {
+      const stored = getIntakeDataForTier(item.tier_id);
+      const empty_row = (): CartIntakeRow => ({
+        keyword_phrase: "",
+        type_of_content: "",
+        notes: "",
+      });
+      let rows: CartIntakeRow[];
+      if (stored.length === item.quantity) {
+        rows = stored;
+      } else if (stored.length < item.quantity) {
+        rows = [
+          ...stored,
+          ...Array.from({ length: item.quantity - stored.length }, empty_row),
+        ];
+      } else {
+        rows = stored.slice(0, item.quantity);
+      }
+      return {
+        tier_id: item.tier_id,
+        tier_name: item.tier_name,
+        quantity: item.quantity,
+        rows,
+      };
+    });
+  }, [nc_selected_items, getIntakeDataForTier]);
+
   const computed_keyword_rows = useMemo<KeywordData>(() => {
     const result: KeywordData = {};
     lb_selected_items.forEach(({ id, quantity }) => {
@@ -133,6 +171,36 @@ const NewContentPage: React.FC = () => {
     }
     return true;
   }, [computed_keyword_rows]);
+
+  const handleIntakeRowChange = useCallback(
+    (tier_id: string, rows: CartIntakeRow[]) => {
+      if (intake_step_error) setIntakeStepError(null);
+      updateNewContentIntakeData(tier_id, rows);
+    },
+    [intake_step_error, updateNewContentIntakeData]
+  );
+
+  const handleProceedFromIntake = useCallback(() => {
+    const has_empty = computed_intake_data.some((tier) =>
+      tier.rows.some((row) => !row.keyword_phrase.trim())
+    );
+    if (has_empty) {
+      setIntakeStepError(
+        "Please fill in the keyword phrase for every row before continuing."
+      );
+      scrollToTop();
+      return;
+    }
+    setIntakeStepError(null);
+    if (has_lb_items) {
+      setCurrentStep("keywords");
+    } else {
+      applyBillingIfEmpty();
+      setCurrentStep("checkout");
+    }
+    scrollToTop();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [computed_intake_data, has_lb_items, has_saved_address, saved_billing_address, billing_address]);
 
   const handleQuantityChange = (tier_id: string, quantity: number) => {
     const tier = new_content_tiers.find((t) => t.id === tier_id);
@@ -172,7 +240,9 @@ const NewContentPage: React.FC = () => {
 
   const handleNext = () => {
     if (item_count === 0) return;
-    if (has_lb_items) {
+    if (nc_selected_items.length > 0) {
+      setCurrentStep("intake");
+    } else if (has_lb_items) {
       setCurrentStep("keywords");
     } else {
       applyBillingIfEmpty();
@@ -199,6 +269,10 @@ const NewContentPage: React.FC = () => {
   const handlePrevious = () => {
     if (current_step === "checkout" && has_lb_items) {
       setCurrentStep("keywords");
+    } else if (current_step === "checkout" && nc_selected_items.length > 0) {
+      setCurrentStep("intake");
+    } else if (current_step === "keywords") {
+      setCurrentStep(nc_selected_items.length > 0 ? "intake" : "selection");
     } else {
       setCurrentStep("selection");
     }
@@ -269,10 +343,38 @@ const NewContentPage: React.FC = () => {
             <div className="col-span-12 lg:col-span-4">
               <UnifiedCartSummary
                 action_label={
-                  has_lb_items ? "Continue to Keywords" : "Continue to Checkout"
+                  nc_selected_items.length > 0
+                    ? "Continue to Intake Form"
+                    : has_lb_items
+                    ? "Continue to Keywords"
+                    : "Continue to Checkout"
                 }
                 onAction={handleNext}
                 is_action_disabled={item_count === 0}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Intake form step */}
+        {current_step === "intake" && (
+          <div className="grid grid-cols-12 gap-6">
+            <div className="col-span-12 space-y-6 lg:col-span-8">
+              <IntakeFormStep
+                tier_data={computed_intake_data}
+                onRowsChange={handleIntakeRowChange}
+                error={intake_step_error}
+                onBack={() => { setCurrentStep("selection"); scrollToTop(); }}
+                onNext={handleProceedFromIntake}
+              />
+            </div>
+            <div className="col-span-12 lg:col-span-4">
+              <UnifiedCartSummary
+                action_label={
+                  has_lb_items ? "Continue to Keywords" : "Continue to Checkout"
+                }
+                onAction={handleProceedFromIntake}
+                is_action_disabled={nc_selected_items.length === 0}
               />
             </div>
           </div>
@@ -372,7 +474,13 @@ const NewContentPage: React.FC = () => {
                   total_amount={total}
                   saved_billing_address={saved_billing_address}
                   onApplySavedAddress={handleApplySavedAddress}
-                  back_label={has_lb_items ? "Back to Keywords" : "Back to Selection"}
+                  back_label={
+                    has_lb_items
+                      ? "Back to Keywords"
+                      : nc_selected_items.length > 0
+                      ? "Back to Intake Form"
+                      : "Back to Selection"
+                  }
                   onProcessingChange={setCheckoutIsProcessing}
                 />
               </div>
