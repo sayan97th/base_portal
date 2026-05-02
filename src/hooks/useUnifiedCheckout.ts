@@ -201,7 +201,7 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
                   unit_price: item.unit_price,
                   intake_rows:
                     item.intake_data && item.intake_data.length > 0
-                      ? item.intake_data
+                      ? item.intake_data.flat()
                       : undefined,
                 }))
               : undefined,

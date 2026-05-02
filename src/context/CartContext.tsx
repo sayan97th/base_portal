@@ -96,9 +96,9 @@ export interface CartContextType {
   ) => void;
   updateNewContentIntakeData: (
     tier_id: string,
-    intake_data: CartIntakeRow[]
+    intake_data: CartIntakeRow[][]
   ) => void;
-  getIntakeDataForTier: (tier_id: string) => CartIntakeRow[];
+  getIntakeDataForTier: (tier_id: string) => CartIntakeRow[][];
   clearCart: () => void;
   setAppliedCoupons: Dispatch<SetStateAction<CartAppliedCoupon[]>>;
   setCouponInputCode: Dispatch<SetStateAction<string>>;
@@ -269,7 +269,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   );
 
   const updateNewContentIntakeData = useCallback(
-    (tier_id: string, intake_data: CartIntakeRow[]) => {
+    (tier_id: string, intake_data: CartIntakeRow[][]) => {
       setItems((prev) =>
         prev.map((item) =>
           item.product_type === "new_content" && item.tier_id === tier_id
@@ -282,7 +282,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   );
 
   const getIntakeDataForTier = useCallback(
-    (tier_id: string): CartIntakeRow[] => {
+    (tier_id: string): CartIntakeRow[][] => {
       const item = items.find(
         (i) => i.product_type === "new_content" && i.tier_id === tier_id
       );

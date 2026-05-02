@@ -33,6 +33,12 @@ const empty_keyword_row = (): KeywordRow => ({
   exact_match: false,
 });
 
+const empty_intake_row = (): CartIntakeRow => ({
+  keyword_phrase: "",
+  type_of_content: "",
+  notes: "",
+});
+
 const NewContentPage: React.FC = () => {
   const [new_content_tiers, setNewContentTiers] = useState<NewContentTier[]>([
     ...fallback_new_content_tiers,
@@ -118,29 +124,26 @@ const NewContentPage: React.FC = () => {
   );
 
   const computed_intake_data = useMemo<IntakeFormTierData[]>(() => {
-    return nc_selected_items.map((item) => {
-      const stored = getIntakeDataForTier(item.tier_id);
-      const empty_row = (): CartIntakeRow => ({
-        keyword_phrase: "",
-        type_of_content: "",
-        notes: "",
-      });
-      let rows: CartIntakeRow[];
-      if (stored.length >= item.quantity) {
-        rows = stored;
-      } else {
-        rows = [
-          ...stored,
-          ...Array.from({ length: item.quantity - stored.length }, empty_row),
-        ];
+    const result: IntakeFormTierData[] = [];
+    for (const item of nc_selected_items) {
+      const stored = getIntakeDataForTier(item.tier_id); // CartIntakeRow[][]
+      for (let i = 0; i < item.quantity; i++) {
+        const instance_rows = stored[i];
+        result.push({
+          tier_id: `${item.tier_id}:${i}`,
+          tier_name:
+            item.quantity > 1
+              ? `${item.tier_name} (${i + 1} of ${item.quantity})`
+              : item.tier_name,
+          quantity: 1,
+          rows:
+            instance_rows && instance_rows.length > 0
+              ? instance_rows
+              : [empty_intake_row()],
+        });
       }
-      return {
-        tier_id: item.tier_id,
-        tier_name: item.tier_name,
-        quantity: item.quantity,
-        rows,
-      };
-    });
+    }
+    return result;
   }, [nc_selected_items, getIntakeDataForTier]);
 
   const computed_keyword_rows = useMemo<KeywordData>(() => {
@@ -171,11 +174,20 @@ const NewContentPage: React.FC = () => {
   }, [computed_keyword_rows]);
 
   const handleIntakeRowChange = useCallback(
-    (tier_id: string, rows: CartIntakeRow[]) => {
+    (virtual_tier_id: string, rows: CartIntakeRow[]) => {
       if (intake_step_error) setIntakeStepError(null);
-      updateNewContentIntakeData(tier_id, rows);
+      const sep = virtual_tier_id.lastIndexOf(":");
+      const tier_id = virtual_tier_id.slice(0, sep);
+      const instance_index = parseInt(virtual_tier_id.slice(sep + 1), 10);
+      const item = nc_selected_items.find((i) => i.tier_id === tier_id);
+      if (!item) return;
+      const stored = getIntakeDataForTier(tier_id); // CartIntakeRow[][]
+      const updated: CartIntakeRow[][] = Array.from({ length: item.quantity }, (_, k) =>
+        k === instance_index ? rows : (stored[k] ?? [empty_intake_row()])
+      );
+      updateNewContentIntakeData(tier_id, updated);
     },
-    [intake_step_error, updateNewContentIntakeData]
+    [intake_step_error, nc_selected_items, getIntakeDataForTier, updateNewContentIntakeData]
   );
 
   const handleProceedFromIntake = useCallback(() => {

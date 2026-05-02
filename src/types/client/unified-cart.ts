@@ -24,7 +24,8 @@ export interface CartItem {
   quantity: number;
   unit_price: number;
   keyword_data?: CartKeywordRow[];
-  intake_data?: CartIntakeRow[];
+  /** One inner array per quantity unit; each inner array holds that instance's rows. */
+  intake_data?: CartIntakeRow[][];
 }
 
 export interface CartAppliedCoupon {
