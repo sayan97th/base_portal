@@ -51,6 +51,13 @@ export default function IntakeFormTable({
     onChange([...rows, ...Array.from({ length: 5 }, empty_row)]);
   }, [rows, onChange]);
 
+  const deleteRow = useCallback(
+    (row_index: number) => {
+      onChange(rows.filter((_, i) => i !== row_index));
+    },
+    [rows, onChange]
+  );
+
   return (
     <div className="space-y-3">
       {/* Label row — outside the table border */}
@@ -69,6 +76,7 @@ export default function IntakeFormTable({
             <col />
             <col className="w-52" />
             <col />
+            <col className="w-10" />
           </colgroup>
           <thead>
             <tr className="bg-gray-50 dark:bg-gray-800/60">
@@ -79,16 +87,17 @@ export default function IntakeFormTable({
               <th className="border-b border-r border-gray-200 px-3 py-2.5 text-center text-xs font-semibold text-gray-600 dark:border-gray-700 dark:text-gray-400">
                 Type of Content
               </th>
-              <th className="border-b border-gray-200 px-3 py-2.5 text-center text-xs font-semibold text-gray-600 dark:border-gray-700 dark:text-gray-400">
+              <th className="border-b border-r border-gray-200 px-3 py-2.5 text-center text-xs font-semibold text-gray-600 dark:border-gray-700 dark:text-gray-400">
                 Notes
               </th>
+              <th className="border-b border-gray-200 py-2.5 dark:border-gray-700" />
             </tr>
           </thead>
           <tbody>
             {rows.map((row, idx) => (
               <tr
                 key={idx}
-                className="bg-white transition-colors hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-white/2"
+                className="group bg-white transition-colors hover:bg-red-50/30 dark:bg-gray-900 dark:hover:bg-red-950/10"
               >
                 <td className="border-b border-r border-gray-200 py-2 text-center text-xs font-medium text-gray-500 dark:border-gray-700 dark:text-gray-500">
                   {idx + 1}
@@ -119,7 +128,7 @@ export default function IntakeFormTable({
                     ))}
                   </select>
                 </td>
-                <td className="border-b border-gray-200 p-1 dark:border-gray-700">
+                <td className="border-b border-r border-gray-200 p-1 dark:border-gray-700">
                   <input
                     type="text"
                     value={row.notes}
@@ -129,6 +138,30 @@ export default function IntakeFormTable({
                     placeholder='Notes or "none"'
                     className="h-8 w-full rounded border-0 bg-transparent px-2.5 text-sm text-gray-700 placeholder:text-gray-300 focus:bg-blue-50/40 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-200 dark:text-white/80 dark:placeholder:text-white/20 dark:focus:bg-blue-950/20 dark:focus:ring-blue-900"
                   />
+                </td>
+                <td className="border-b border-gray-200 dark:border-gray-700">
+                  {!hide_actions && (
+                    <button
+                      type="button"
+                      onClick={() => deleteRow(idx)}
+                      title="Delete row"
+                      className="flex h-full w-full items-center justify-center opacity-0 transition-all group-hover:opacity-100 hover:text-red-500 dark:hover:text-red-400"
+                    >
+                      <svg
+                        className="h-3.5 w-3.5 text-gray-300 transition-colors group-hover:text-red-400 dark:text-gray-600 dark:group-hover:text-red-500"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth={2}
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
