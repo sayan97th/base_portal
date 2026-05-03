@@ -138,6 +138,12 @@ export interface OrderPlacementDetail {
   exact_match: boolean;
 }
 
+export interface NewContentIntakeRow {
+  keyword_phrase: string;
+  type_of_content: string;
+  notes: string;
+}
+
 export interface OrderItem {
   id: number;
   dr_tier_id?: number | null;
@@ -147,6 +153,7 @@ export interface OrderItem {
   item_name?: string | null;
   dr_tier?: OrderItemDrTier;
   placements?: OrderPlacementDetail[];
+  intake_rows?: NewContentIntakeRow[];
 }
 
 export interface AdminOrder {
