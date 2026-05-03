@@ -140,9 +140,10 @@ interface OrderItemsTableProps {
   total_amount?: number;
   product_type?: AdminOrderProductType | null;
   order_title?: string;
+  order_id?: string;
 }
 
-const OrderItemsTable = ({ items, coupons, total_amount, product_type, order_title }: OrderItemsTableProps) => {
+const OrderItemsTable = ({ items, coupons, total_amount, product_type, order_title, order_id }: OrderItemsTableProps) => {
   const items_subtotal = items.reduce((sum, i) => sum + i.subtotal, 0);
   const coupon_total = coupons?.reduce((sum, c) => sum + c.discount_amount, 0) ?? 0;
   const bulk_discount_amount = Math.max(
@@ -170,6 +171,17 @@ const OrderItemsTable = ({ items, coupons, total_amount, product_type, order_tit
           <span className={`text-xs ${type_cfg.color} opacity-70 ml-auto`}>
             {items.length} {items.length === 1 ? "item" : "items"}
           </span>
+          {product_type === "new_content" && order_id && (
+            <Link
+              href={`/admin/new-content/orders/${order_id}`}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-blue-300 bg-white px-2.5 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-50 dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20"
+            >
+              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+              View Keywords
+            </Link>
+          )}
         </div>
       )}
 
@@ -401,6 +413,7 @@ const SessionItemsView = ({ session_orders, session_title }: SessionItemsViewPro
             total_amount={order.total_amount}
             product_type={order.product_type}
             order_title={order.order_title}
+            order_id={order.id}
           />
         </div>
       ))}
