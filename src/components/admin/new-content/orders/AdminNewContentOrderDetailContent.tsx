@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import Badge from "@/components/ui/badge/Badge";
 import { getAdminNewContentOrder } from "@/services/admin/new-content.service";
-import type { AdminOrder, AdminInvoice, OrderItem, OrderStatus, OrderCouponDetail, InvoiceCouponDiscount, NewContentIntakeRow } from "@/types/admin";
+import type { AdminOrder, AdminInvoice, OrderItem, OrderStatus, OrderCouponDetail, InvoiceCouponDiscount } from "@/types/admin";
 
 interface AdminNewContentOrderDetailContentProps {
   order_id: string;
@@ -39,341 +39,6 @@ function getStatusConfig(status: OrderStatus): {
     case "completed": return { color: "success", label: "Completed", dot: "bg-success-500" };
     case "cancelled": return { color: "error", label: "Cancelled", dot: "bg-error-500" };
   }
-}
-
-// ── Content type badge colors ──────────────────────────────────────────────────
-
-const CONTENT_TYPE_STYLES: Record<string, { bg: string; text: string; border: string }> = {
-  "Blog Article": {
-    bg: "bg-blue-50 dark:bg-blue-500/10",
-    text: "text-blue-700 dark:text-blue-300",
-    border: "border-blue-200 dark:border-blue-500/30",
-  },
-  "Product Page": {
-    bg: "bg-violet-50 dark:bg-violet-500/10",
-    text: "text-violet-700 dark:text-violet-300",
-    border: "border-violet-200 dark:border-violet-500/30",
-  },
-  "Home Page": {
-    bg: "bg-emerald-50 dark:bg-emerald-500/10",
-    text: "text-emerald-700 dark:text-emerald-300",
-    border: "border-emerald-200 dark:border-emerald-500/30",
-  },
-  "About Us Page": {
-    bg: "bg-amber-50 dark:bg-amber-500/10",
-    text: "text-amber-700 dark:text-amber-300",
-    border: "border-amber-200 dark:border-amber-500/30",
-  },
-  "Other": {
-    bg: "bg-gray-100 dark:bg-gray-800",
-    text: "text-gray-600 dark:text-gray-400",
-    border: "border-gray-200 dark:border-gray-700",
-  },
-};
-
-function getContentTypeStyle(type: string) {
-  return CONTENT_TYPE_STYLES[type] ?? CONTENT_TYPE_STYLES["Other"];
-}
-
-// ── CSV export ─────────────────────────────────────────────────────────────────
-
-function exportIntakeToCsv(order: AdminOrder) {
-  const rows: string[][] = [["Item", "Tier", "#", "Keyword Phrase", "Type of Content", "Notes"]];
-
-  order.items.forEach((item, item_index) => {
-    const tier_label = item.item_name ?? `Item ${item_index + 1}`;
-    (item.intake_rows ?? []).forEach((row, row_index) => {
-      rows.push([
-        String(item_index + 1),
-        tier_label,
-        String(row_index + 1),
-        row.keyword_phrase,
-        row.type_of_content,
-        row.notes,
-      ]);
-    });
-  });
-
-  const csv_content = rows
-    .map((row) =>
-      row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")
-    )
-    .join("\n");
-
-  const blob = new Blob([csv_content], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `intake-${order.id.slice(0, 8).toUpperCase()}.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
-// ── Intake Data Modal ──────────────────────────────────────────────────────────
-
-interface IntakeDataModalProps {
-  order: AdminOrder;
-  on_close: () => void;
-}
-
-function IntakeDataModal({ order, on_close }: IntakeDataModalProps) {
-  const overlay_ref = useRef<HTMLDivElement>(null);
-  const total_articles = order.items.reduce(
-    (sum, item) => sum + (item.intake_rows?.length ?? 0),
-    0
-  );
-  const items_with_intake = order.items.filter(
-    (item) => item.intake_rows && item.intake_rows.length > 0
-  );
-
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") on_close();
-    };
-    document.addEventListener("keydown", handleKey);
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", handleKey);
-      document.body.style.overflow = "";
-    };
-  }, [on_close]);
-
-  const handleOverlayClick = (e: React.MouseEvent) => {
-    if (e.target === overlay_ref.current) on_close();
-  };
-
-  if (items_with_intake.length === 0) {
-    return (
-      <div
-        ref={overlay_ref}
-        onClick={handleOverlayClick}
-        className="fixed inset-0 z-99999 flex items-center justify-center p-4 backdrop-blur-sm bg-gray-900/60"
-      >
-        <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-900">
-          <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-gray-800">
-            <h2 className="text-base font-semibold text-gray-900 dark:text-white">Intake Form Data</h2>
-            <button onClick={on_close} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800">
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          <div className="flex flex-col items-center gap-3 p-12 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
-              <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-              </svg>
-            </div>
-            <p className="text-sm font-semibold text-gray-900 dark:text-white">No intake data</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              This order does not have any intake form data attached.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      ref={overlay_ref}
-      onClick={handleOverlayClick}
-      className="fixed inset-0 z-99999 flex items-start justify-center overflow-y-auto p-4 py-10 backdrop-blur-sm bg-gray-900/70"
-    >
-      <div className="w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-900">
-        {/* Modal header */}
-        <div className="sticky top-0 z-10 border-b border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900">
-          <div className="flex items-center justify-between px-6 py-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500 shadow-sm shadow-blue-500/30">
-                <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h1.5C5.496 19.5 6 18.996 6 18.375m-3.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-1.5A1.125 1.125 0 0118 18.375M20.625 4.5H3.375m17.25 0c.621 0 1.125.504 1.125 1.125M20.625 4.5h-1.5C18.504 4.5 18 5.004 18 5.625m3.75 0v1.5c0 .621-.504 1.125-1.125 1.125M3.375 4.5c-.621 0-1.125.504-1.125 1.125M3.375 4.5h1.5C5.496 4.5 6 5.004 6 5.625m-3.75 0v1.5c0 .621.504 1.125 1.125 1.125m0 0h1.5m-1.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m1.5-3.75C5.496 8.25 6 8.754 6 9.375v1.5m0-5.25v5.25m0-5.25C6 5.004 6.504 4.5 7.125 4.5h9.75c.621 0 1.125.504 1.125 1.125m1.125 2.625h1.5m-1.5 0A1.125 1.125 0 0118 7.875v1.5m1.125-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125M18 5.625v5.25M7.125 12h9.75m-9.75 0A1.125 1.125 0 016 10.875M7.125 12C6.504 12 6 12.504 6 13.125m0-2.25C6 11.496 5.496 12 4.875 12M18 10.875c0 .621-.504 1.125-1.125 1.125M18 10.875c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125M4.875 12H6m0 0v1.5m0-1.5C6 12.504 6.504 13.125 7.125 13.125m-3 0h1.5m-1.5 0C3.996 13.125 3.375 13.629 3.375 14.25v1.5c0 .621.504 1.125 1.125 1.125h1.5" />
-                </svg>
-              </div>
-              <div>
-                <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-                  Intake Form Data
-                </h2>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {order.order_title} ·{" "}
-                  <span className="font-medium text-blue-600 dark:text-blue-400">
-                    {total_articles} {total_articles === 1 ? "article" : "articles"}
-                  </span>
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {/* Export CSV */}
-              <button
-                onClick={() => exportIntakeToCsv(order)}
-                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-white/4 dark:text-gray-300 dark:hover:bg-white/[0.07]"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                </svg>
-                Export CSV
-              </button>
-
-              {/* Close */}
-              <button
-                onClick={on_close}
-                className="rounded-xl p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          {/* Summary bar */}
-          <div className="flex flex-wrap items-center gap-4 border-t border-gray-100 bg-blue-50/40 px-6 py-2.5 dark:border-gray-800 dark:bg-blue-500/5">
-            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-              <svg className="h-3.5 w-3.5 text-blue-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
-              </svg>
-              <span>
-                <span className="font-semibold text-gray-700 dark:text-gray-200">{items_with_intake.length}</span>{" "}
-                {items_with_intake.length === 1 ? "package" : "packages"} ·{" "}
-                <span className="font-semibold text-gray-700 dark:text-gray-200">{total_articles}</span>{" "}
-                {total_articles === 1 ? "article" : "articles"} total
-              </span>
-            </div>
-            {/* Content type legend */}
-            <div className="ml-auto flex flex-wrap items-center gap-2">
-              {Object.entries(CONTENT_TYPE_STYLES).map(([type, style]) => (
-                <span
-                  key={type}
-                  className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${style.bg} ${style.text} ${style.border}`}
-                >
-                  {type}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Modal body */}
-        <div className="space-y-8 p-6">
-          {items_with_intake.map((item, item_index) => {
-            const tier_label = item.item_name ?? `Package ${item_index + 1}`;
-            const row_count = item.intake_rows?.length ?? 0;
-
-            return (
-              <div key={item.id} className="space-y-3">
-                {/* Section header */}
-                <div className="flex items-center gap-3">
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-xs font-bold text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">
-                    {item_index + 1}
-                  </div>
-                  <div className="flex flex-1 items-center gap-3">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                      {tier_label}
-                    </h3>
-                    <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300">
-                      {row_count} {row_count === 1 ? "article" : "articles"}
-                    </span>
-                    <span className="text-xs text-gray-400 dark:text-gray-500">
-                      Qty ordered: {item.quantity}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Intake table */}
-                <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
-                  <table className="w-full table-fixed border-collapse text-sm">
-                    <colgroup>
-                      <col className="w-12" />
-                      <col />
-                      <col className="w-44" />
-                      <col />
-                    </colgroup>
-                    <thead>
-                      <tr className="bg-gray-50 dark:bg-gray-800/60">
-                        <th className="border-b border-r border-gray-200 py-2.5 text-center text-xs font-semibold text-gray-400 dark:border-gray-700 dark:text-gray-500">
-                          #
-                        </th>
-                        <th className="border-b border-r border-gray-200 px-4 py-2.5 text-left text-xs font-semibold text-gray-600 dark:border-gray-700 dark:text-gray-400">
-                          Keyword Phrase
-                        </th>
-                        <th className="border-b border-r border-gray-200 px-4 py-2.5 text-left text-xs font-semibold text-gray-600 dark:border-gray-700 dark:text-gray-400">
-                          Type of Content
-                        </th>
-                        <th className="border-b border-gray-200 px-4 py-2.5 text-left text-xs font-semibold text-gray-600 dark:border-gray-700 dark:text-gray-400">
-                          Notes
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(item.intake_rows ?? []).map((row: NewContentIntakeRow, row_index: number) => {
-                        const type_style = getContentTypeStyle(row.type_of_content);
-                        const is_empty_keyword = !row.keyword_phrase.trim();
-
-                        return (
-                          <tr
-                            key={row_index}
-                            className="border-b border-gray-100 bg-white last:border-b-0 dark:border-gray-800 dark:bg-gray-900"
-                          >
-                            <td className="border-r border-gray-200 py-3 text-center text-xs font-medium text-gray-400 dark:border-gray-700 dark:text-gray-500">
-                              {row_index + 1}
-                            </td>
-                            <td className="border-r border-gray-200 px-4 py-3 dark:border-gray-700">
-                              {is_empty_keyword ? (
-                                <span className="italic text-gray-300 dark:text-gray-600">—</span>
-                              ) : (
-                                <span className="font-medium text-gray-800 dark:text-white/80">
-                                  {row.keyword_phrase}
-                                </span>
-                              )}
-                            </td>
-                            <td className="border-r border-gray-200 px-4 py-3 dark:border-gray-700">
-                              {row.type_of_content ? (
-                                <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${type_style.bg} ${type_style.text} ${type_style.border}`}>
-                                  {row.type_of_content}
-                                </span>
-                              ) : (
-                                <span className="italic text-gray-300 dark:text-gray-600">—</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3">
-                              {row.notes && row.notes.toLowerCase() !== "none" ? (
-                                <span className="text-gray-600 dark:text-gray-400">{row.notes}</span>
-                              ) : (
-                                <span className="italic text-gray-300 dark:text-gray-600">
-                                  {row.notes || "—"}
-                                </span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Modal footer */}
-        <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50/60 px-6 py-4 dark:border-gray-800 dark:bg-gray-800/30">
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            <span className="font-semibold text-gray-700 dark:text-gray-200">{total_articles}</span>{" "}
-            {total_articles === 1 ? "article" : "articles"} across{" "}
-            <span className="font-semibold text-gray-700 dark:text-gray-200">{items_with_intake.length}</span>{" "}
-            {items_with_intake.length === 1 ? "package" : "packages"}
-          </p>
-          <button
-            onClick={on_close}
-            className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-white/4 dark:text-gray-300 dark:hover:bg-white/[0.07]"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
@@ -561,7 +226,6 @@ export default function AdminNewContentOrderDetailContent({ order_id }: AdminNew
   const [order, setOrder] = useState<AdminOrder | null>(null);
   const [is_loading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [intake_modal_open, setIntakeModalOpen] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -585,8 +249,7 @@ export default function AdminNewContentOrderDetailContent({ order_id }: AdminNew
   const total_intake_rows = order?.items.reduce((sum, i) => sum + (i.intake_rows?.length ?? 0), 0) ?? 0;
 
   return (
-    <>
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* Back link */}
         <Link
           href="/admin/new-content/orders"
@@ -678,26 +341,30 @@ export default function AdminNewContentOrderDetailContent({ order_id }: AdminNew
 
               <div className="flex flex-wrap items-center gap-2">
                 {/* View Intake Data button */}
-                <button
-                  onClick={() => setIntakeModalOpen(true)}
-                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold shadow-sm transition ${
-                    has_intake_data
-                      ? "bg-blue-500 text-white shadow-blue-500/25 hover:bg-blue-600"
-                      : "cursor-not-allowed border border-gray-200 bg-white text-gray-400 dark:border-gray-700 dark:bg-white/3"
-                  }`}
-                  disabled={!has_intake_data}
-                  title={has_intake_data ? "View intake form data" : "No intake data available"}
-                >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h1.5C5.496 19.5 6 18.996 6 18.375m-3.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-1.5A1.125 1.125 0 0118 18.375M20.625 4.5H3.375m17.25 0c.621 0 1.125.504 1.125 1.125M20.625 4.5h-1.5C18.504 4.5 18 5.004 18 5.625m3.75 0v1.5c0 .621-.504 1.125-1.125 1.125M3.375 4.5c-.621 0-1.125.504-1.125 1.125M3.375 4.5h1.5C5.496 4.5 6 5.004 6 5.625m-3.75 0v1.5c0 .621.504 1.125 1.125 1.125m0 0h1.5m-1.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m1.5-3.75C5.496 8.25 6 8.754 6 9.375v1.5m0-5.25v5.25m0-5.25C6 5.004 6.504 4.5 7.125 4.5h9.75c.621 0 1.125.504 1.125 1.125m1.125 2.625h1.5m-1.5 0A1.125 1.125 0 0118 7.875v1.5m1.125-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125M18 5.625v5.25M7.125 12h9.75m-9.75 0A1.125 1.125 0 016 10.875M7.125 12C6.504 12 6 12.504 6 13.125m0-2.25C6 11.496 5.496 12 4.875 12M18 10.875c0 .621-.504 1.125-1.125 1.125M18 10.875c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125M4.875 12H6m0 0v1.5m0-1.5C6 12.504 6.504 13.125 7.125 13.125m-3 0h1.5m-1.5 0C3.996 13.125 3.375 13.629 3.375 14.25v1.5c0 .621.504 1.125 1.125 1.125h1.5" />
-                  </svg>
-                  View Intake Data
-                  {has_intake_data && (
+                {has_intake_data ? (
+                  <Link
+                    href={`/admin/new-content/orders/${order_id}/intake`}
+                    className="inline-flex items-center gap-2 rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-500/25 transition hover:bg-blue-600"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h1.5C5.496 19.5 6 18.996 6 18.375m-3.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-1.5A1.125 1.125 0 0118 18.375M20.625 4.5H3.375m17.25 0c.621 0 1.125.504 1.125 1.125M20.625 4.5h-1.5C18.504 4.5 18 5.004 18 5.625m3.75 0v1.5c0 .621-.504 1.125-1.125 1.125M3.375 4.5c-.621 0-1.125.504-1.125 1.125M3.375 4.5h1.5C5.496 4.5 6 5.004 6 5.625m-3.75 0v1.5c0 .621.504 1.125 1.125 1.125m0 0h1.5m-1.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m1.5-3.75C5.496 8.25 6 8.754 6 9.375v1.5m0-5.25v5.25m0-5.25C6 5.004 6.504 4.5 7.125 4.5h9.75c.621 0 1.125.504 1.125 1.125m1.125 2.625h1.5m-1.5 0A1.125 1.125 0 0118 7.875v1.5m1.125-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125M18 5.625v5.25M7.125 12h9.75m-9.75 0A1.125 1.125 0 016 10.875M7.125 12C6.504 12 6 12.504 6 13.125m0-2.25C6 11.496 5.496 12 4.875 12M18 10.875c0 .621-.504 1.125-1.125 1.125M18 10.875c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125M4.875 12H6m0 0v1.5m0-1.5C6 12.504 6.504 13.125 7.125 13.125m-3 0h1.5m-1.5 0C3.996 13.125 3.375 13.629 3.375 14.25v1.5c0 .621.504 1.125 1.125 1.125h1.5" />
+                    </svg>
+                    View Intake Data
                     <span className="ml-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-400/30 px-1.5 text-xs font-bold text-white">
                       {total_intake_rows}
                     </span>
-                  )}
-                </button>
+                  </Link>
+                ) : (
+                  <span
+                    className="inline-flex cursor-not-allowed items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-400 shadow-sm dark:border-gray-700 dark:bg-white/3"
+                    title="No intake data available"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h1.5C5.496 19.5 6 18.996 6 18.375m-3.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-1.5A1.125 1.125 0 0118 18.375M20.625 4.5H3.375m17.25 0c.621 0 1.125.504 1.125 1.125M20.625 4.5h-1.5C18.504 4.5 18 5.004 18 5.625m3.75 0v1.5c0 .621-.504 1.125-1.125 1.125M3.375 4.5c-.621 0-1.125.504-1.125 1.125M3.375 4.5h1.5C5.496 4.5 6 5.004 6 5.625m-3.75 0v1.5c0 .621.504 1.125 1.125 1.125m0 0h1.5m-1.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m1.5-3.75C5.496 8.25 6 8.754 6 9.375v1.5m0-5.25v5.25m0-5.25C6 5.004 6.504 4.5 7.125 4.5h9.75c.621 0 1.125.504 1.125 1.125m1.125 2.625h1.5m-1.5 0A1.125 1.125 0 0118 7.875v1.5m1.125-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125M18 5.625v5.25M7.125 12h9.75m-9.75 0A1.125 1.125 0 016 10.875M7.125 12C6.504 12 6 12.504 6 13.125m0-2.25C6 11.496 5.496 12 4.875 12M18 10.875c0 .621-.504 1.125-1.125 1.125M18 10.875c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125M4.875 12H6m0 0v1.5m0-1.5C6 12.504 6.504 13.125 7.125 13.125m-3 0h1.5m-1.5 0C3.996 13.125 3.375 13.629 3.375 14.25v1.5c0 .621.504 1.125 1.125 1.125h1.5" />
+                    </svg>
+                    View Intake Data
+                  </span>
+                )}
 
                 <Link
                   href={`/admin/orders/${order.id}`}
@@ -731,12 +398,12 @@ export default function AdminNewContentOrderDetailContent({ order_id }: AdminNew
                     {total_articles === 1 ? "article" : "articles"}.
                   </p>
                 </div>
-                <button
-                  onClick={() => setIntakeModalOpen(true)}
+                <Link
+                  href={`/admin/new-content/orders/${order_id}/intake`}
                   className="shrink-0 rounded-lg border border-blue-300 bg-white px-3.5 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-50 dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20"
                 >
                   View Intake Data →
-                </button>
+                </Link>
               </div>
             )}
 
@@ -826,12 +493,12 @@ export default function AdminNewContentOrderDetailContent({ order_id }: AdminNew
                       <InfoRow
                         label="Keywords Entered"
                         value={
-                          <button
-                            onClick={() => setIntakeModalOpen(true)}
+                          <Link
+                            href={`/admin/new-content/orders/${order_id}/intake`}
                             className="font-semibold text-blue-600 underline hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                           >
                             {total_intake_rows} entries →
-                          </button>
+                          </Link>
                         }
                       />
                     )}
@@ -879,12 +546,6 @@ export default function AdminNewContentOrderDetailContent({ order_id }: AdminNew
             </div>
           </>
         )}
-      </div>
-
-      {/* Intake data modal */}
-      {intake_modal_open && order && (
-        <IntakeDataModal order={order} on_close={() => setIntakeModalOpen(false)} />
-      )}
-    </>
+    </div>
   );
 }
