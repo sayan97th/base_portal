@@ -220,19 +220,6 @@ export default function AdminContentOptimizationIntakeDataContent({
     (item) => item.co_intake_rows && item.co_intake_rows.length > 0
   ) ?? [];
 
-  const total_rows = items_with_intake.reduce(
-    (sum, item) => sum + (item.co_intake_rows?.length ?? 0),
-    0
-  );
-
-  const total_filled = items_with_intake.reduce((sum, item) => {
-    return sum + (item.co_intake_rows ?? []).filter(
-      (r) => r.primary_keyword.trim() && r.content_page_url.trim()
-    ).length;
-  }, 0);
-
-  const completion_pct = total_rows > 0 ? Math.round((total_filled / total_rows) * 100) : 0;
-
   return (
     <div className="space-y-6">
       {/* Back link */}
@@ -257,7 +244,6 @@ export default function AdminContentOptimizationIntakeDataContent({
             </div>
             <SkeletonBlock className="h-10 w-32" />
           </div>
-          <SkeletonBlock className="h-14 w-full" />
           <div className="space-y-8">
             <SkeletonBlock className="h-48 w-full" />
             <SkeletonBlock className="h-48 w-full" />
@@ -310,43 +296,6 @@ export default function AdminContentOptimizationIntakeDataContent({
               </button>
             )}
           </div>
-
-          {/* Stats banner */}
-          {items_with_intake.length > 0 && (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {/* Total pages */}
-              <div className="rounded-xl border border-gray-200 bg-white px-4 py-3.5 dark:border-gray-800 dark:bg-white/3">
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Total Pages</p>
-                <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{total_rows}</p>
-              </div>
-
-              {/* Completed */}
-              <div className="rounded-xl border border-success-200 bg-success-50/60 px-4 py-3.5 dark:border-success-500/20 dark:bg-success-500/5">
-                <p className="text-xs font-medium uppercase tracking-wide text-success-600 dark:text-success-400">Complete</p>
-                <p className="mt-1 text-2xl font-bold text-success-700 dark:text-success-400">{total_filled}</p>
-              </div>
-
-              {/* Incomplete */}
-              <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3.5 dark:border-amber-500/20 dark:bg-amber-500/5">
-                <p className="text-xs font-medium uppercase tracking-wide text-amber-600 dark:text-amber-400">Incomplete</p>
-                <p className="mt-1 text-2xl font-bold text-amber-700 dark:text-amber-400">{total_rows - total_filled}</p>
-              </div>
-
-              {/* Completion rate */}
-              <div className="rounded-xl border border-violet-200 bg-violet-50/60 px-4 py-3.5 dark:border-violet-500/20 dark:bg-violet-500/5">
-                <p className="text-xs font-medium uppercase tracking-wide text-violet-600 dark:text-violet-400">Completion</p>
-                <div className="mt-1 flex items-end gap-2">
-                  <p className="text-2xl font-bold text-violet-700 dark:text-violet-400">{completion_pct}%</p>
-                </div>
-                <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-violet-200 dark:bg-violet-800/40">
-                  <div
-                    className="h-full rounded-full bg-violet-500 transition-all"
-                    style={{ width: `${completion_pct}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* No intake data state */}
           {items_with_intake.length === 0 && (
