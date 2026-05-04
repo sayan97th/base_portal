@@ -223,7 +223,9 @@ function groupAdminOrders(orders: AdminOrder[]): AdminOrderGroup[] {
     is_multi_order: g.orders.length > 1,
   }));
 
-  return [...session_groups, ...ungrouped];
+  return [...session_groups, ...ungrouped].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
 }
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
