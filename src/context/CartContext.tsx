@@ -18,6 +18,7 @@ import type {
   UnifiedCartPayload,
   CartKeywordRow,
   CartIntakeRow,
+  ContentOptimizationIntakeRow,
 } from "@/types/client/unified-cart";
 import { unifiedCartService } from "@/services/client/unified-cart.service";
 
@@ -99,6 +100,11 @@ export interface CartContextType {
     intake_data: CartIntakeRow[][]
   ) => void;
   getIntakeDataForTier: (tier_id: string) => CartIntakeRow[][];
+  updateContentOptimizationIntakeData: (
+    tier_id: string,
+    rows: ContentOptimizationIntakeRow[]
+  ) => void;
+  getContentOptimizationIntakeDataForTier: (tier_id: string) => ContentOptimizationIntakeRow[];
   clearCart: () => void;
   setAppliedCoupons: Dispatch<SetStateAction<CartAppliedCoupon[]>>;
   setCouponInputCode: Dispatch<SetStateAction<string>>;
@@ -291,6 +297,29 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     [items]
   );
 
+  const updateContentOptimizationIntakeData = useCallback(
+    (tier_id: string, rows: ContentOptimizationIntakeRow[]) => {
+      setItems((prev) =>
+        prev.map((item) =>
+          item.product_type === "content_optimization" && item.tier_id === tier_id
+            ? { ...item, co_intake_data: rows }
+            : item
+        )
+      );
+    },
+    []
+  );
+
+  const getContentOptimizationIntakeDataForTier = useCallback(
+    (tier_id: string): ContentOptimizationIntakeRow[] => {
+      const item = items.find(
+        (i) => i.product_type === "content_optimization" && i.tier_id === tier_id
+      );
+      return item?.co_intake_data ?? [];
+    },
+    [items]
+  );
+
   const clearCart = useCallback(() => {
     setItems([]);
     setAppliedCoupons([]);
@@ -378,6 +407,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         updateLinkBuildingKeywords,
         updateNewContentIntakeData,
         getIntakeDataForTier,
+        updateContentOptimizationIntakeData,
+        getContentOptimizationIntakeDataForTier,
         clearCart,
         setAppliedCoupons,
         setCouponInputCode,

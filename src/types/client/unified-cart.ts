@@ -16,6 +16,12 @@ export interface CartIntakeRow {
   notes: string;
 }
 
+export interface ContentOptimizationIntakeRow {
+  primary_keyword: string;
+  secondary_keywords: string;
+  content_page_url: string;
+}
+
 export interface CartItem {
   cart_item_id: string;
   product_type: CartProductType;
@@ -26,6 +32,8 @@ export interface CartItem {
   keyword_data?: CartKeywordRow[];
   /** One inner array per quantity unit; each inner array holds that instance's rows. */
   intake_data?: CartIntakeRow[][];
+  /** Flat list of intake rows for content_optimization items (one row per article to optimize). */
+  co_intake_data?: ContentOptimizationIntakeRow[];
 }
 
 export interface CartAppliedCoupon {
@@ -65,6 +73,13 @@ export interface UnifiedCheckoutGenericItem {
   unit_price: number;
 }
 
+export interface UnifiedCheckoutContentOptimizationItem {
+  tier_id: string;
+  quantity: number;
+  unit_price: number;
+  intake_rows?: ContentOptimizationIntakeRow[];
+}
+
 export interface UnifiedCheckoutNewContentItem {
   tier_id: string;
   quantity: number;
@@ -89,7 +104,7 @@ export interface UnifiedCheckoutPayload {
   order_title?: string | null;
   order_notes?: string | null;
   link_building_items?: UnifiedCheckoutLinkBuildingItem[];
-  content_optimization_items?: UnifiedCheckoutGenericItem[];
+  content_optimization_items?: UnifiedCheckoutContentOptimizationItem[];
   new_content_items?: UnifiedCheckoutNewContentItem[];
   content_brief_items?: UnifiedCheckoutGenericItem[];
 }
