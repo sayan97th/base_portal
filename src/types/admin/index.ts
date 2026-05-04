@@ -48,6 +48,7 @@ export type AdminOrderProductType =
   | "link_building"
   | "new_content"
   | "content_optimization"
+  | "content_refresh"
   | "content_brief";
 
 export type OrderSortField =
