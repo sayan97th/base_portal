@@ -172,9 +172,13 @@ function getReportLink(order: UnifiedOrder): string | null {
 }
 
 function getKeywordsLink(order: UnifiedOrder): string | null {
-  return order.product_type === "new_content"
-    ? `/new-content/orders/${order.id}/intake`
-    : null;
+  if (order.product_type === "new_content") {
+    return `/new-content/orders/${order.id}/intake`;
+  }
+  if (order.product_type === "content_optimization") {
+    return `/content-refresh/content-optimizations/orders/${order.id}/intake`;
+  }
+  return null;
 }
 
 function groupOrdersByPurchaseGroups(

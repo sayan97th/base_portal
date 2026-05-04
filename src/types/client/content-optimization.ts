@@ -59,6 +59,12 @@ export interface ContentOptimizationOrderSummary {
   items_count: number;
 }
 
+export interface ContentOptimizationIntakeRow {
+  primary_keyword: string;
+  secondary_keywords: string;
+  content_page_url: string;
+}
+
 export interface ContentOptimizationOrderItemDetail {
   id: string;
   tier_id: string;
@@ -66,10 +72,12 @@ export interface ContentOptimizationOrderItemDetail {
   unit_price: number;
   subtotal: number;
   tier: ContentOptimizationTier;
+  co_intake_rows?: ContentOptimizationIntakeRow[];
 }
 
 export interface ContentOptimizationOrderDetail {
   id: string;
+  order_title?: string | null;
   order_notes: string | null;
   total_amount: number;
   status: string;

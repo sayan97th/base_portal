@@ -350,6 +350,15 @@ const OrderDetailPage: React.FC<OrderDetailPageProps> = ({ order_id }) => {
                 View Keywords
               </Link>
             )}
+            {product_type === "content_optimization" && (
+              <Link
+                href={`/content-refresh/content-optimizations/orders/${order_id}/intake`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-500 hover:text-white dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-300 dark:hover:bg-violet-500 dark:hover:text-white transition-colors"
+              >
+                <KeywordsIcon />
+                View Keywords
+              </Link>
+            )}
             {product_type === "link_building" && detail?.status !== "cancelled" && (
               <Link
                 href={`/link-building/orders/${order_id}/tracking`}
