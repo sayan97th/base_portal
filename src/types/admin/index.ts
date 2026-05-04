@@ -144,6 +144,12 @@ export interface NewContentIntakeRow {
   notes: string;
 }
 
+export interface ContentOptimizationIntakeRow {
+  primary_keyword: string;
+  secondary_keywords: string;
+  content_page_url: string;
+}
+
 export interface OrderItem {
   id: number;
   dr_tier_id?: number | null;
@@ -154,6 +160,7 @@ export interface OrderItem {
   dr_tier?: OrderItemDrTier;
   placements?: OrderPlacementDetail[];
   intake_rows?: NewContentIntakeRow[];
+  co_intake_rows?: ContentOptimizationIntakeRow[];
 }
 
 export interface AdminOrder {

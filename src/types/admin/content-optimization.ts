@@ -1,3 +1,16 @@
+import type { OrderStatus } from "@/types/admin";
+
+export interface AdminContentOptimizationOrderFilters {
+  page?: number;
+  per_page?: number;
+  search?: string;
+  status?: OrderStatus | "";
+  sort_field?: "created_at" | "total_amount" | "status" | "order_title" | "customer";
+  sort_direction?: "asc" | "desc";
+  date_from?: string;
+  date_to?: string;
+}
+
 export interface AdminContentOptimizationTier {
   id: string;
   label: string;
