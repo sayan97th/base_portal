@@ -12,6 +12,7 @@ import type {
   CartProductType,
   UnifiedCheckoutBilling,
   UnifiedCheckoutContentOptimizationItem,
+  UnifiedCheckoutContentBriefItem,
 } from "@/types/client/unified-cart";
 
 const PRODUCT_TYPE_LABELS: Record<CartProductType, string> = {
@@ -212,10 +213,14 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
               : undefined,
           content_brief_items:
             cb_items.length > 0
-              ? cb_items.map((item) => ({
+              ? cb_items.map((item): UnifiedCheckoutContentBriefItem => ({
                   tier_id: item.tier_id,
                   quantity: item.quantity,
                   unit_price: item.unit_price,
+                  intake_rows:
+                    item.co_intake_data && item.co_intake_data.length > 0
+                      ? item.co_intake_data
+                      : undefined,
                 }))
               : undefined,
         });

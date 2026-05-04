@@ -105,6 +105,11 @@ export interface CartContextType {
     rows: ContentOptimizationIntakeRow[]
   ) => void;
   getContentOptimizationIntakeDataForTier: (tier_id: string) => ContentOptimizationIntakeRow[];
+  updateContentBriefIntakeData: (
+    tier_id: string,
+    rows: ContentOptimizationIntakeRow[]
+  ) => void;
+  getContentBriefIntakeDataForTier: (tier_id: string) => ContentOptimizationIntakeRow[];
   clearCart: () => void;
   setAppliedCoupons: Dispatch<SetStateAction<CartAppliedCoupon[]>>;
   setCouponInputCode: Dispatch<SetStateAction<string>>;
@@ -320,6 +325,29 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     [items]
   );
 
+  const updateContentBriefIntakeData = useCallback(
+    (tier_id: string, rows: ContentOptimizationIntakeRow[]) => {
+      setItems((prev) =>
+        prev.map((item) =>
+          item.product_type === "content_brief" && item.tier_id === tier_id
+            ? { ...item, co_intake_data: rows }
+            : item
+        )
+      );
+    },
+    []
+  );
+
+  const getContentBriefIntakeDataForTier = useCallback(
+    (tier_id: string): ContentOptimizationIntakeRow[] => {
+      const item = items.find(
+        (i) => i.product_type === "content_brief" && i.tier_id === tier_id
+      );
+      return item?.co_intake_data ?? [];
+    },
+    [items]
+  );
+
   const clearCart = useCallback(() => {
     setItems([]);
     setAppliedCoupons([]);
@@ -409,6 +437,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         getIntakeDataForTier,
         updateContentOptimizationIntakeData,
         getContentOptimizationIntakeDataForTier,
+        updateContentBriefIntakeData,
+        getContentBriefIntakeDataForTier,
         clearCart,
         setAppliedCoupons,
         setCouponInputCode,

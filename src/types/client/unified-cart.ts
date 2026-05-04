@@ -73,6 +73,13 @@ export interface UnifiedCheckoutGenericItem {
   unit_price: number;
 }
 
+export interface UnifiedCheckoutContentBriefItem {
+  tier_id: string;
+  quantity: number;
+  unit_price: number;
+  intake_rows?: ContentOptimizationIntakeRow[];
+}
+
 export interface UnifiedCheckoutContentOptimizationItem {
   tier_id: string;
   quantity: number;
@@ -106,7 +113,7 @@ export interface UnifiedCheckoutPayload {
   link_building_items?: UnifiedCheckoutLinkBuildingItem[];
   content_optimization_items?: UnifiedCheckoutContentOptimizationItem[];
   new_content_items?: UnifiedCheckoutNewContentItem[];
-  content_brief_items?: UnifiedCheckoutGenericItem[];
+  content_brief_items?: UnifiedCheckoutContentBriefItem[];
 }
 
 export interface UnifiedCheckoutCreatedOrder {
