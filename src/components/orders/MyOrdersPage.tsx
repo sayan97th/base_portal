@@ -178,6 +178,9 @@ function getKeywordsLink(order: UnifiedOrder): string | null {
   if (order.product_type === "content_optimization") {
     return `/content-refresh/content-optimizations/orders/${order.id}/intake`;
   }
+  if (order.product_type === "content_brief") {
+    return `/content-refresh/content-briefs/orders/${order.id}/intake`;
+  }
   return null;
 }
 
