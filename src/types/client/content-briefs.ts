@@ -57,6 +57,12 @@ export interface ContentBriefOrderSummary {
   items_count: number;
 }
 
+export interface ContentBriefIntakeRow {
+  primary_keyword: string;
+  secondary_keywords: string;
+  content_page_url: string;
+}
+
 export interface ContentBriefOrderItemDetail {
   id: string;
   tier_id: string;
@@ -64,10 +70,12 @@ export interface ContentBriefOrderItemDetail {
   unit_price: number;
   subtotal: number;
   tier: ContentBriefTier;
+  co_intake_rows?: ContentBriefIntakeRow[];
 }
 
 export interface ContentBriefOrderDetail {
   id: string;
+  order_title?: string | null;
   order_notes: string | null;
   total_amount: number;
   status: string;
