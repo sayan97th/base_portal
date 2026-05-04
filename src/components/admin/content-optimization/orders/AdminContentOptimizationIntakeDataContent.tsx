@@ -23,7 +23,7 @@ function formatDate(iso: string): string {
 
 function exportIntakeToCsv(order: AdminOrder) {
   const rows: string[][] = [
-    ["Item", "Tier", "#", "Target Keyword", "Secondary Keywords", "Content Page URL"],
+    ["Item", "Tier", "#", "Target Keyword", "Content Page URL"],
   ];
 
   order.items.forEach((item, item_index) => {
@@ -34,7 +34,6 @@ function exportIntakeToCsv(order: AdminOrder) {
         tier_label,
         String(row_index + 1),
         row.primary_keyword,
-        row.secondary_keywords,
         row.content_page_url,
       ]);
     });
@@ -116,8 +115,7 @@ function IntakeSection({ tier_name, tier_index, rows, total_tiers }: IntakeSecti
         <table className="w-full border-collapse text-sm">
           <colgroup>
             <col className="w-12" />
-            <col className="w-2/5" />
-            <col className="w-2/5" />
+            <col className="w-1/2" />
             <col />
           </colgroup>
           <thead>
@@ -127,9 +125,6 @@ function IntakeSection({ tier_name, tier_index, rows, total_tiers }: IntakeSecti
               </th>
               <th className="border-b border-r border-gray-200 px-4 py-2.5 text-left text-xs font-semibold text-gray-600 dark:border-gray-700 dark:text-gray-400">
                 Target Keyword
-              </th>
-              <th className="border-b border-r border-gray-200 px-4 py-2.5 text-left text-xs font-semibold text-gray-600 dark:border-gray-700 dark:text-gray-400">
-                Secondary Keywords
               </th>
               <th className="border-b border-gray-200 px-4 py-2.5 text-left text-xs font-semibold text-gray-600 dark:border-gray-700 dark:text-gray-400">
                 Content Page URL
@@ -161,17 +156,6 @@ function IntakeSection({ tier_name, tier_index, rows, total_tiers }: IntakeSecti
                     {has_keyword ? (
                       <span className="font-medium text-gray-800 dark:text-white/80">
                         {row.primary_keyword}
-                      </span>
-                    ) : (
-                      <span className="italic text-gray-300 dark:text-gray-600">—</span>
-                    )}
-                  </td>
-
-                  {/* Secondary keywords */}
-                  <td className="border-r border-gray-200 px-4 py-2 dark:border-gray-700">
-                    {row.secondary_keywords?.trim() ? (
-                      <span className="text-gray-600 dark:text-gray-400">
-                        {row.secondary_keywords}
                       </span>
                     ) : (
                       <span className="italic text-gray-300 dark:text-gray-600">—</span>
