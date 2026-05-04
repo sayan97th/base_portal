@@ -237,6 +237,8 @@ export default function AdminContentRefreshOrderDetailContent({
 
   const status_config = order ? getStatusConfig(order.status) : null;
   const total_articles = order?.items.reduce((sum, i) => sum + i.quantity, 0) ?? 0;
+  const has_intake_data = order?.items.some((i) => i.co_intake_rows && i.co_intake_rows.length > 0) ?? false;
+  const total_intake_rows = order?.items.reduce((sum, i) => sum + (i.co_intake_rows?.length ?? 0), 0) ?? 0;
 
   return (
     <div className="space-y-6">
@@ -328,6 +330,32 @@ export default function AdminContentRefreshOrderDetailContent({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              {/* View Intake Data button */}
+              {has_intake_data ? (
+                <Link
+                  href={`/admin/content-briefs/orders/${order_id}/intake`}
+                  className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-amber-500/25 transition hover:bg-amber-600"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h1.5C5.496 19.5 6 18.996 6 18.375m-3.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-1.5A1.125 1.125 0 0118 18.375M20.625 4.5H3.375m17.25 0c.621 0 1.125.504 1.125 1.125M20.625 4.5h-1.5C18.504 4.5 18 5.004 18 5.625m3.75 0v1.5c0 .621-.504 1.125-1.125 1.125M3.375 4.5c-.621 0-1.125.504-1.125 1.125M3.375 4.5h1.5C5.496 4.5 6 5.004 6 5.625m-3.75 0v1.5c0 .621.504 1.125 1.125 1.125m0 0h1.5m-1.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m1.5-3.75C5.496 8.25 6 8.754 6 9.375v1.5m0-5.25v5.25m0-5.25C6 5.004 6.504 4.5 7.125 4.5h9.75c.621 0 1.125.504 1.125 1.125m1.125 2.625h1.5m-1.5 0A1.125 1.125 0 0118 7.875v1.5m1.125-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125M18 5.625v5.25M7.125 12h9.75m-9.75 0A1.125 1.125 0 016 10.875M7.125 12C6.504 12 6 12.504 6 13.125m0-2.25C6 11.496 5.496 12 4.875 12M18 10.875c0 .621-.504 1.125-1.125 1.125M18 10.875c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125M4.875 12H6m0 0v1.5m0-1.5C6 12.504 6.504 13.125 7.125 13.125m-3 0h1.5m-1.5 0C3.996 13.125 3.375 13.629 3.375 14.25v1.5c0 .621.504 1.125 1.125 1.125h1.5" />
+                  </svg>
+                  View Intake Data
+                  <span className="ml-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400/30 px-1.5 text-xs font-bold text-white">
+                    {total_intake_rows}
+                  </span>
+                </Link>
+              ) : (
+                <span
+                  className="inline-flex cursor-not-allowed items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-400 shadow-sm dark:border-gray-700 dark:bg-white/3"
+                  title="No intake data available"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h1.5C5.496 19.5 6 18.996 6 18.375m-3.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-1.5A1.125 1.125 0 0118 18.375M20.625 4.5H3.375m17.25 0c.621 0 1.125.504 1.125 1.125M20.625 4.5h-1.5C18.504 4.5 18 5.004 18 5.625m3.75 0v1.5c0 .621-.504 1.125-1.125 1.125M3.375 4.5c-.621 0-1.125.504-1.125 1.125M3.375 4.5h1.5C5.496 4.5 6 5.004 6 5.625m-3.75 0v1.5c0 .621.504 1.125 1.125 1.125m0 0h1.5m-1.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m1.5-3.75C5.496 8.25 6 8.754 6 9.375v1.5m0-5.25v5.25m0-5.25C6 5.004 6.504 4.5 7.125 4.5h9.75c.621 0 1.125.504 1.125 1.125m1.125 2.625h1.5m-1.5 0A1.125 1.125 0 0118 7.875v1.5m1.125-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125M18 5.625v5.25M7.125 12h9.75m-9.75 0A1.125 1.125 0 016 10.875M7.125 12C6.504 12 6 12.504 6 13.125m0-2.25C6 11.496 5.496 12 4.875 12M18 10.875c0 .621-.504 1.125-1.125 1.125M18 10.875c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125M4.875 12H6m0 0v1.5m0-1.5C6 12.504 6.504 13.125 7.125 13.125m-3 0h1.5m-1.5 0C3.996 13.125 3.375 13.629 3.375 14.25v1.5c0 .621.504 1.125 1.125 1.125h1.5" />
+                  </svg>
+                  View Intake Data
+                </span>
+              )}
+
               <Link
                 href={`/admin/orders/${order.id}`}
                 className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 dark:border-gray-700 dark:bg-white/4 dark:text-gray-300 dark:hover:bg-white/[0.07]"
@@ -337,27 +365,6 @@ export default function AdminContentRefreshOrderDetailContent({
                 </svg>
                 Full Order
               </Link>
-            </div>
-          </div>
-
-          {/* Summary callout */}
-          <div className="flex items-center gap-4 rounded-xl border border-amber-200 bg-amber-50 px-5 py-3.5 dark:border-amber-500/25 dark:bg-amber-500/10">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white shadow-sm">
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-              </svg>
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">
-                Content Refresh Order
-              </p>
-              <p className="mt-0.5 text-xs text-amber-600/80 dark:text-amber-400/80">
-                This order includes{" "}
-                <span className="font-semibold">{total_articles}</span>{" "}
-                {total_articles === 1 ? "article" : "articles"} across{" "}
-                <span className="font-semibold">{order.items.length}</span>{" "}
-                {order.items.length === 1 ? "tier" : "tiers"}.
-              </p>
             </div>
           </div>
 
@@ -443,6 +450,19 @@ export default function AdminContentRefreshOrderDetailContent({
                       <span className="font-semibold text-amber-600 dark:text-amber-400">{total_articles}</span>
                     }
                   />
+                  {has_intake_data && (
+                    <InfoRow
+                      label="Intake Entries"
+                      value={
+                        <Link
+                          href={`/admin/content-briefs/orders/${order_id}/intake`}
+                          className="font-semibold text-amber-600 underline hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
+                        >
+                          {total_intake_rows} entries →
+                        </Link>
+                      }
+                    />
+                  )}
                   <InfoRow label="Placed" value={formatDate(order.created_at)} />
                   <InfoRow label="Last Updated" value={formatDate(order.updated_at)} />
                   <InfoRow
