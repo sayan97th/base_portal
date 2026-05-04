@@ -171,6 +171,12 @@ function getReportLink(order: UnifiedOrder): string | null {
     : null;
 }
 
+function getKeywordsLink(order: UnifiedOrder): string | null {
+  return order.product_type === "new_content"
+    ? `/new-content/orders/${order.id}/intake`
+    : null;
+}
+
 function groupOrdersByPurchaseGroups(
   orders: UnifiedOrder[],
   purchase_groups: PurchaseGroup[]
@@ -257,6 +263,12 @@ const EyeIcon = () => (
   </svg>
 );
 
+const KeywordsIcon = () => (
+  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.75a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" />
+  </svg>
+);
+
 const ChevronDownIcon = ({ expanded }: { expanded: boolean }) => (
   <svg
     className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
@@ -330,6 +342,7 @@ function OrderItemRow({ order, purchase_group_id, is_last, compact = false }: Or
   const type_config = PRODUCT_TYPE_CONFIG[order.product_type];
   const tracking_link = getTrackingLink(order);
   const report_link = getReportLink(order);
+  const keywords_link = getKeywordsLink(order);
   const detail_link = getDetailLink(order, purchase_group_id);
 
   return (
@@ -428,6 +441,15 @@ function OrderItemRow({ order, purchase_group_id, is_last, compact = false }: Or
             >
               <ReportIcon />
               Report
+            </Link>
+          )}
+          {keywords_link && (
+            <Link
+              href={keywords_link}
+              className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-500 hover:text-white dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500 dark:hover:text-white"
+            >
+              <KeywordsIcon />
+              Keywords
             </Link>
           )}
           <Link
