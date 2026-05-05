@@ -10,6 +10,18 @@ export interface CartKeywordRow {
   exact_match: boolean;
 }
 
+export interface CartIntakeRow {
+  keyword_phrase: string;
+  type_of_content: string;
+  notes: string;
+}
+
+export interface ContentOptimizationIntakeRow {
+  primary_keyword: string;
+  secondary_keywords: string;
+  content_page_url: string;
+}
+
 export interface CartItem {
   cart_item_id: string;
   product_type: CartProductType;
@@ -18,6 +30,10 @@ export interface CartItem {
   quantity: number;
   unit_price: number;
   keyword_data?: CartKeywordRow[];
+  /** One inner array per quantity unit; each inner array holds that instance's rows. */
+  intake_data?: CartIntakeRow[][];
+  /** Flat list of intake rows for content_optimization items (one row per article to optimize). */
+  co_intake_data?: ContentOptimizationIntakeRow[];
 }
 
 export interface CartAppliedCoupon {
@@ -57,6 +73,27 @@ export interface UnifiedCheckoutGenericItem {
   unit_price: number;
 }
 
+export interface UnifiedCheckoutContentBriefItem {
+  tier_id: string;
+  quantity: number;
+  unit_price: number;
+  intake_rows?: ContentOptimizationIntakeRow[];
+}
+
+export interface UnifiedCheckoutContentOptimizationItem {
+  tier_id: string;
+  quantity: number;
+  unit_price: number;
+  intake_rows?: ContentOptimizationIntakeRow[];
+}
+
+export interface UnifiedCheckoutNewContentItem {
+  tier_id: string;
+  quantity: number;
+  unit_price: number;
+  intake_rows?: CartIntakeRow[];
+}
+
 export interface UnifiedCheckoutBilling {
   company: string | null;
   address: string;
@@ -74,9 +111,9 @@ export interface UnifiedCheckoutPayload {
   order_title?: string | null;
   order_notes?: string | null;
   link_building_items?: UnifiedCheckoutLinkBuildingItem[];
-  content_optimization_items?: UnifiedCheckoutGenericItem[];
-  new_content_items?: UnifiedCheckoutGenericItem[];
-  content_brief_items?: UnifiedCheckoutGenericItem[];
+  content_optimization_items?: UnifiedCheckoutContentOptimizationItem[];
+  new_content_items?: UnifiedCheckoutNewContentItem[];
+  content_brief_items?: UnifiedCheckoutContentBriefItem[];
 }
 
 export interface UnifiedCheckoutCreatedOrder {

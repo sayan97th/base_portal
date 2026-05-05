@@ -48,6 +48,7 @@ export type AdminOrderProductType =
   | "link_building"
   | "new_content"
   | "content_optimization"
+  | "content_refresh"
   | "content_brief";
 
 export type OrderSortField =
@@ -138,6 +139,18 @@ export interface OrderPlacementDetail {
   exact_match: boolean;
 }
 
+export interface NewContentIntakeRow {
+  keyword_phrase: string;
+  type_of_content: string;
+  notes: string;
+}
+
+export interface ContentOptimizationIntakeRow {
+  primary_keyword: string;
+  secondary_keywords: string;
+  content_page_url: string;
+}
+
 export interface OrderItem {
   id: number;
   dr_tier_id?: number | null;
@@ -147,6 +160,8 @@ export interface OrderItem {
   item_name?: string | null;
   dr_tier?: OrderItemDrTier;
   placements?: OrderPlacementDetail[];
+  intake_rows?: NewContentIntakeRow[];
+  co_intake_rows?: ContentOptimizationIntakeRow[];
 }
 
 export interface AdminOrder {

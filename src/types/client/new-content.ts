@@ -62,6 +62,12 @@ export interface NewContentOrdersResponse {
   data: NewContentOrderSummary[];
 }
 
+export interface NewContentIntakeRow {
+  keyword_phrase: string;
+  type_of_content: string;
+  notes: string;
+}
+
 export interface NewContentOrderItemDetail {
   id: string;
   tier_id: string;
@@ -69,10 +75,12 @@ export interface NewContentOrderItemDetail {
   unit_price: number;
   subtotal: number;
   tier: NewContentTier;
+  intake_rows?: NewContentIntakeRow[];
 }
 
 export interface NewContentOrderDetail {
   id: string;
+  order_title?: string | null;
   order_notes: string | null;
   total_amount: number;
   status: string;

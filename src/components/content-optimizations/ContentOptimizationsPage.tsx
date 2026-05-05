@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Elements } from "@stripe/react-stripe-js";
 import ContentOptimizationHeader from "./ContentOptimizationHeader";
 import ContentOptimizationGrid from "./ContentOptimizationGrid";
+import ContentOptimizationIntakeFormStep from "./ContentOptimizationIntakeFormStep";
+import type { ContentOptimizationIntakeTierData } from "./ContentOptimizationIntakeFormStep";
 import KeywordEntryStep, {
   type KeywordData,
   type KeywordRow,
@@ -17,17 +19,24 @@ import CheckoutStep, {
 } from "@/components/shared/CheckoutStep";
 import { getStripe } from "@/lib/stripe";
 import type { ContentOptimizationTier } from "@/types/client/content-optimization";
+import type { ContentOptimizationIntakeRow } from "@/types/client/unified-cart";
 import { contentOptimizationService } from "@/services/client/content-optimization.service";
 import { useBillingAddress } from "@/hooks/useBillingAddress";
 import { useCart } from "@/context/CartContext";
 import { useUnifiedCheckout } from "@/hooks/useUnifiedCheckout";
 
-type Step = "selection" | "keywords" | "checkout";
+type Step = "selection" | "keywords" | "intake" | "checkout";
 
 const empty_keyword_row = (): KeywordRow => ({
   keyword: "",
   landing_page: "",
   exact_match: false,
+});
+
+const empty_co_intake_row = (): ContentOptimizationIntakeRow => ({
+  primary_keyword: "",
+  secondary_keywords: "",
+  content_page_url: "",
 });
 
 const ContentOptimizationsPage: React.FC = () => {
@@ -54,6 +63,7 @@ const ContentOptimizationsPage: React.FC = () => {
 
   const [current_step, setCurrentStep] = useState<Step>("selection");
   const [keyword_step_error, setKeywordStepError] = useState<string | null>(null);
+  const [intake_step_error, setIntakeStepError] = useState<string | null>(null);
   const [billing_address, setBillingAddress] = useState<BillingAddress>({
     address: "",
     city: "",
@@ -69,6 +79,8 @@ const ContentOptimizationsPage: React.FC = () => {
     setItemQuantity,
     updateLinkBuildingKeywords,
     getKeywordDataForTier,
+    updateContentOptimizationIntakeData,
+    getContentOptimizationIntakeDataForTier,
     item_count,
     total,
     order_title,
@@ -85,6 +97,7 @@ const ContentOptimizationsPage: React.FC = () => {
 
   const selected_quantities = getQuantitiesForProductType("content_optimization");
 
+  // Link-building items (may coexist in the unified cart)
   const lb_selected_items = useMemo<OrderSummaryItem[]>(
     () =>
       items
@@ -98,8 +111,24 @@ const ContentOptimizationsPage: React.FC = () => {
     [items]
   );
 
-  const has_lb_items = lb_selected_items.length > 0;
+  // Content-optimization items
+  const co_selected_items = useMemo<OrderSummaryItem[]>(
+    () =>
+      items
+        .filter((item) => item.product_type === "content_optimization")
+        .map((item) => ({
+          id: item.tier_id,
+          label: item.tier_name,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+        })),
+    [items]
+  );
 
+  const has_lb_items = lb_selected_items.length > 0;
+  const has_co_items = co_selected_items.length > 0;
+
+  // --- Link-building keyword rows ---
   const computed_keyword_rows = useMemo<KeywordData>(() => {
     const result: KeywordData = {};
     lb_selected_items.forEach(({ id, quantity }) => {
@@ -118,6 +147,34 @@ const ContentOptimizationsPage: React.FC = () => {
     return result;
   }, [lb_selected_items, getKeywordDataForTier]);
 
+  // --- Content-optimization intake rows ---
+  const computed_co_intake_rows = useMemo<Record<string, ContentOptimizationIntakeRow[]>>(() => {
+    const result: Record<string, ContentOptimizationIntakeRow[]> = {};
+    co_selected_items.forEach(({ id, quantity }) => {
+      const stored = getContentOptimizationIntakeDataForTier(id);
+      if (stored.length >= quantity) {
+        result[id] = stored;
+      } else {
+        result[id] = [
+          ...stored,
+          ...Array.from({ length: quantity - stored.length }, empty_co_intake_row),
+        ];
+      }
+    });
+    return result;
+  }, [co_selected_items, getContentOptimizationIntakeDataForTier]);
+
+  const co_intake_tier_data = useMemo<ContentOptimizationIntakeTierData[]>(
+    () =>
+      co_selected_items.map(({ id, label }) => ({
+        tier_id: id,
+        tier_name: label,
+        rows: computed_co_intake_rows[id] ?? [empty_co_intake_row()],
+      })),
+    [co_selected_items, computed_co_intake_rows]
+  );
+
+  // --- Validation ---
   const checkKeywordsComplete = useCallback((): boolean => {
     for (const rows of Object.values(computed_keyword_rows)) {
       for (const row of rows) {
@@ -127,6 +184,16 @@ const ContentOptimizationsPage: React.FC = () => {
     return true;
   }, [computed_keyword_rows]);
 
+  const checkCoIntakeComplete = useCallback((): boolean => {
+    for (const rows of Object.values(computed_co_intake_rows)) {
+      for (const row of rows) {
+        if (!row.primary_keyword.trim() || !row.content_page_url.trim()) return false;
+      }
+    }
+    return true;
+  }, [computed_co_intake_rows]);
+
+  // --- Handlers ---
   const handleQuantityChange = (tier_id: string, quantity: number) => {
     const tier = tiers.find((t) => t.id === tier_id);
     if (!tier) return;
@@ -153,6 +220,14 @@ const ContentOptimizationsPage: React.FC = () => {
     updateLinkBuildingKeywords(tier_id, base_rows);
   };
 
+  const handleCoIntakeRowsChange = useCallback(
+    (tier_id: string, rows: ContentOptimizationIntakeRow[]) => {
+      if (intake_step_error) setIntakeStepError(null);
+      updateContentOptimizationIntakeData(tier_id, rows);
+    },
+    [intake_step_error, updateContentOptimizationIntakeData]
+  );
+
   const handleBillingChange = (field: keyof BillingAddress, value: string) => {
     setBillingAddress((prev) => ({ ...prev, [field]: value }));
   };
@@ -173,6 +248,8 @@ const ContentOptimizationsPage: React.FC = () => {
     if (item_count === 0) return;
     if (has_lb_items) {
       setCurrentStep("keywords");
+    } else if (has_co_items) {
+      setCurrentStep("intake");
     } else {
       applyBillingIfEmpty();
       setCurrentStep("checkout");
@@ -189,16 +266,47 @@ const ContentOptimizationsPage: React.FC = () => {
       return;
     }
     setKeywordStepError(null);
+    if (has_co_items) {
+      setCurrentStep("intake");
+    } else {
+      applyBillingIfEmpty();
+      setCurrentStep("checkout");
+    }
+    scrollToTop();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkKeywordsComplete, has_co_items, has_saved_address, saved_billing_address, billing_address]);
+
+  const handleProceedFromIntake = useCallback(() => {
+    if (!checkCoIntakeComplete()) {
+      setIntakeStepError(
+        "Please fill in the primary keyword and content page URL for every row before continuing."
+      );
+      scrollToTop();
+      return;
+    }
+    setIntakeStepError(null);
     applyBillingIfEmpty();
     setCurrentStep("checkout");
     scrollToTop();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checkKeywordsComplete, has_saved_address, saved_billing_address, billing_address]);
+  }, [checkCoIntakeComplete, has_saved_address, saved_billing_address, billing_address]);
 
   const handlePrevious = () => {
-    if (current_step === "checkout" && has_lb_items) {
-      setCurrentStep("keywords");
-    } else {
+    if (current_step === "checkout") {
+      if (has_co_items) {
+        setCurrentStep("intake");
+      } else if (has_lb_items) {
+        setCurrentStep("keywords");
+      } else {
+        setCurrentStep("selection");
+      }
+    } else if (current_step === "intake") {
+      if (has_lb_items) {
+        setCurrentStep("keywords");
+      } else {
+        setCurrentStep("selection");
+      }
+    } else if (current_step === "keywords") {
       setCurrentStep("selection");
     }
     scrollToTop();
@@ -220,6 +328,12 @@ const ContentOptimizationsPage: React.FC = () => {
     },
     [executeCheckout, billing_address]
   );
+
+  const back_label_for_checkout = has_co_items
+    ? "Back to Intake Form"
+    : has_lb_items
+    ? "Back to Keywords"
+    : "Back to Selection";
 
   return (
     <div className="space-y-6">
@@ -273,7 +387,11 @@ const ContentOptimizationsPage: React.FC = () => {
             <div className="col-span-12 lg:col-span-4">
               <UnifiedCartSummary
                 action_label={
-                  has_lb_items ? "Continue to Keywords" : "Continue to Checkout"
+                  has_lb_items
+                    ? "Continue to Keywords"
+                    : has_co_items
+                    ? "Continue to Intake Form"
+                    : "Continue to Checkout"
                 }
                 onAction={handleNext}
                 is_action_disabled={item_count === 0}
@@ -282,7 +400,7 @@ const ContentOptimizationsPage: React.FC = () => {
           </div>
         )}
 
-        {/* Keywords step */}
+        {/* Keywords step (link-building items) */}
         {!is_loading_tiers && !tiers_error && current_step === "keywords" && (
           <div className="grid grid-cols-12 gap-6">
             <div className="col-span-12 space-y-6 lg:col-span-8">
@@ -298,11 +416,7 @@ const ContentOptimizationsPage: React.FC = () => {
                     strokeWidth={2}
                     stroke="currentColor"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M15.75 19.5L8.25 12l7.5-7.5"
-                    />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
                   </svg>
                   Back to Selection
                 </button>
@@ -351,9 +465,40 @@ const ContentOptimizationsPage: React.FC = () => {
 
             <div className="col-span-12 lg:col-span-4">
               <UnifiedCartSummary
-                action_label="Continue to Checkout"
+                action_label={has_co_items ? "Continue to Intake Form" : "Continue to Checkout"}
                 onAction={handleProceedFromKeywords}
                 is_action_disabled={lb_selected_items.length === 0}
+                show_coupon_field
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Intake step (content-optimization items) */}
+        {!is_loading_tiers && !tiers_error && current_step === "intake" && (
+          <div className="grid grid-cols-12 gap-6">
+            <div className="col-span-12 lg:col-span-8">
+              <ContentOptimizationIntakeFormStep
+                tier_data={co_intake_tier_data}
+                onRowsChange={handleCoIntakeRowsChange}
+                error={intake_step_error}
+                onBack={() => {
+                  if (has_lb_items) {
+                    setCurrentStep("keywords");
+                  } else {
+                    setCurrentStep("selection");
+                  }
+                  scrollToTop();
+                }}
+                onNext={handleProceedFromIntake}
+              />
+            </div>
+
+            <div className="col-span-12 lg:col-span-4">
+              <UnifiedCartSummary
+                action_label="Continue to Checkout"
+                onAction={handleProceedFromIntake}
+                is_action_disabled={co_selected_items.length === 0}
                 show_coupon_field
               />
             </div>
@@ -376,7 +521,7 @@ const ContentOptimizationsPage: React.FC = () => {
                   total_amount={total}
                   saved_billing_address={saved_billing_address}
                   onApplySavedAddress={handleApplySavedAddress}
-                  back_label={has_lb_items ? "Back to Keywords" : "Back to Selection"}
+                  back_label={back_label_for_checkout}
                   onProcessingChange={setCheckoutIsProcessing}
                 />
               </div>
