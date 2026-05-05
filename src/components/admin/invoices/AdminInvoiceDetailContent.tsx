@@ -73,6 +73,18 @@ const PRODUCT_TYPE_CONFIG: Record<AdminOrderProductType, ProductTypeConfig> = {
       </svg>
     ),
   },
+  content_refresh: {
+    label: "Content Refresh",
+    color: "text-teal-700 dark:text-teal-300",
+    bg: "bg-teal-50 dark:bg-teal-500/10",
+    border: "border-teal-200 dark:border-teal-500/30",
+    accent: "bg-teal-500",
+    icon: (
+      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+      </svg>
+    ),
+  },
   content_brief: {
     label: "Content Briefs",
     color: "text-amber-700 dark:text-amber-300",

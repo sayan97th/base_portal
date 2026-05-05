@@ -78,6 +78,13 @@ const PRODUCT_TYPE_CONFIG: Record<
     bg: "bg-emerald-50 dark:bg-emerald-500/10",
     border: "border-emerald-200 dark:border-emerald-500/30",
   },
+  content_refresh: {
+    label: "Content Refresh",
+    column_label: "Refresh Package",
+    color: "text-cyan-700 dark:text-cyan-300",
+    bg: "bg-cyan-50 dark:bg-cyan-500/10",
+    border: "border-cyan-200 dark:border-cyan-500/30",
+  },
   content_brief: {
     label: "Content Briefs",
     column_label: "Brief Package",
