@@ -22,6 +22,7 @@ const PRODUCT_TYPE_CONFIG: Record<
   link_building:        { label: "Link Building",        color: "text-violet-700 dark:text-violet-300", bg: "bg-violet-100 dark:bg-violet-500/20",  border: "border-violet-200 dark:border-violet-500/30" },
   new_content:          { label: "New Content",          color: "text-blue-700 dark:text-blue-300",    bg: "bg-blue-100 dark:bg-blue-500/20",      border: "border-blue-200 dark:border-blue-500/30" },
   content_optimization: { label: "Content Optimization", color: "text-emerald-700 dark:text-emerald-300", bg: "bg-emerald-100 dark:bg-emerald-500/20", border: "border-emerald-200 dark:border-emerald-500/30" },
+  content_refresh:      { label: "Content Refresh",      color: "text-cyan-700 dark:text-cyan-300",    bg: "bg-cyan-100 dark:bg-cyan-500/20",      border: "border-cyan-200 dark:border-cyan-500/30" },
   content_brief:        { label: "Content Briefs",       color: "text-amber-700 dark:text-amber-300",  bg: "bg-amber-100 dark:bg-amber-500/20",    border: "border-amber-200 dark:border-amber-500/30" },
 };
 
