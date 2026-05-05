@@ -12,7 +12,10 @@ import {
   SmeCollaborationTier,
 } from "@/services/client/sme-collaboration.service";
 
-const CALENDLY_URL = "https://calendly.com/abbyallan/sme-content";
+const CALENDLY_URL =
+  process.env.NEXT_PUBLIC_CALENDLY_URL_SME_COLLABORATION ||
+  process.env.NEXT_PUBLIC_CALENDLY_URL ||
+  "";
 
 type Step = "selection" | "schedule";
 

@@ -10,7 +10,10 @@ import { premiumMentionsService } from "@/services/client/premium-mentions.servi
 import { premium_mentions_plans as fallback_plans } from "./premiumMentionsData";
 import type { PremiumMentionsPlan } from "@/types/client/premium-mentions";
 
-const CALENDLY_URL = "https://calendly.com/ernesto-97thfloor/30min";
+const CALENDLY_URL =
+  process.env.NEXT_PUBLIC_CALENDLY_URL_PREMIUM_MENTIONS ||
+  process.env.NEXT_PUBLIC_CALENDLY_URL ||
+  "";
 
 type Step = "selection" | "schedule";
 
