@@ -10,7 +10,7 @@ import {
   ScheduledCallAppointment,
 } from "@/services/client/scheduled-call.service";
 
-const CALENDLY_URL = process.env.NEXT_PUBLIC_CALENDLY_URL;
+const CALENDLY_URL = process.env.NEXT_PUBLIC_CALENDLY_URL ?? "";
 
 interface BookCallViewProps {
   onBack: () => void;
