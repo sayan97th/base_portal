@@ -15,6 +15,7 @@ import type {
   AdminOrderProductType,
 } from "@/types/admin";
 import OrderTrackingPanel from "./OrderTrackingPanel";
+import AdminOrderComments from "./AdminOrderComments";
 
 interface AdminOrderDetailContentProps {
   order_id: string;
@@ -755,6 +756,17 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
                   <p className="text-sm text-gray-600 dark:text-gray-400">{order.order_notes}</p>
                 </div>
               )}
+
+              {/* Client Communication Panel */}
+              <AdminOrderComments order_id={order.id} session_id={order.session_id} />
+
+              {/* Order Tracking / Activity Panel */}
+              <OrderTrackingPanel
+                order_id={order.id}
+                current_status={effective_status}
+                onStatusChange={(new_status) => setCurrentStatus(new_status)}
+              />
+
             </div>
 
             {/* Right Column */}
@@ -925,12 +937,7 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
             </div>
           </div>
 
-          {/* Order Tracking / Activity Panel */}
-          <OrderTrackingPanel
-            order_id={order.id}
-            current_status={effective_status}
-            onStatusChange={(new_status) => setCurrentStatus(new_status)}
-          />
+          
         </>
       )}
     </div>
