@@ -21,6 +21,7 @@ import type { NewContentOrderDetail } from "@/types/client/new-content";
 import type { ContentOptimizationOrderDetail } from "@/types/client/content-optimization";
 import type { ContentBriefOrderDetail } from "@/types/client/content-briefs";
 import type { CartProductType } from "@/types/client/unified-cart";
+import OrderComments from "@/components/orders/OrderComments";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -442,6 +443,9 @@ const OrderDetailPage: React.FC<OrderDetailPageProps> = ({ order_id }) => {
           </div>
         )}
       </div>
+
+      {/* Comments */}
+      <OrderComments session_id={order_id} />
     </div>
   );
 };
