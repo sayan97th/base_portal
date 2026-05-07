@@ -6,11 +6,8 @@ import { Elements } from "@stripe/react-stripe-js";
 import LinkBuildingHeader from "./LinkBuildingHeader";
 import DrTierGrid from "./DrTierGrid";
 import ContentRefreshUpsell from "./ContentRefreshUpsell";
+import UnifiedIntakeStep from "@/components/shared/UnifiedIntakeStep";
 import UnifiedCartSummary from "@/components/shared/UnifiedCartSummary";
-import KeywordEntryStep, {
-  KeywordData,
-  KeywordRow,
-} from "./KeywordEntryStep";
 import CheckoutStep, {
   BillingAddress,
   type CheckoutStepHandle,
@@ -23,13 +20,7 @@ import { useUnifiedCheckout } from "@/hooks/useUnifiedCheckout";
 import { getStripe } from "@/lib/stripe";
 import type { DrTier } from "@/types/client/link-building";
 
-type Step = "selection" | "keywords" | "checkout";
-
-const empty_keyword_row = (): KeywordRow => ({
-  keyword: "",
-  landing_page: "",
-  exact_match: false,
-});
+type Step = "selection" | "intake" | "checkout";
 
 const LinkBuildingPage: React.FC = () => {
   const [dr_tiers, setDrTiers] = useState<DrTier[]>(fallback_dr_tiers);
@@ -37,7 +28,6 @@ const LinkBuildingPage: React.FC = () => {
   const [dr_tiers_error, setDrTiersError] = useState<string | null>(null);
 
   const [current_step, setCurrentStep] = useState<Step>("selection");
-  const [keyword_step_error, setKeywordStepError] = useState<string | null>(null);
   const [billing_address, setBillingAddress] = useState<BillingAddress>({
     address: "",
     city: "",
@@ -48,16 +38,11 @@ const LinkBuildingPage: React.FC = () => {
   });
 
   const {
+    items,
     getQuantitiesForProductType,
     setItemQuantity,
-    updateLinkBuildingKeywords,
-    getKeywordDataForTier,
     item_count,
     total,
-    order_title,
-    order_notes,
-    setOrderTitle,
-    setOrderNotes,
   } = useCart();
 
   const { saved_billing_address, has_saved_address } = useBillingAddress();
@@ -86,36 +71,17 @@ const LinkBuildingPage: React.FC = () => {
 
   const selected_quantities = getQuantitiesForProductType("link_building");
 
-  // Build keyword_data map from the cart items for the keyword entry step.
-  const keyword_data = useMemo<KeywordData>(() => {
-    const result: KeywordData = {};
-    dr_tiers.forEach((tier) => {
-      const rows = getKeywordDataForTier(tier.id);
-      if (rows.length > 0) result[tier.id] = rows as KeywordRow[];
-    });
-    return result;
-  }, [dr_tiers, getKeywordDataForTier]);
-
-  // Fill gaps so each tier always has exactly `quantity` rows.
-  const computed_keyword_rows = useMemo<KeywordData>(() => {
-    const result: KeywordData = {};
-    dr_tiers.forEach((tier) => {
-      const qty = selected_quantities[tier.id] ?? 0;
-      if (qty === 0) return;
-      const stored = keyword_data[tier.id] ?? [];
-      if (stored.length === qty) {
-        result[tier.id] = stored;
-      } else if (stored.length < qty) {
-        result[tier.id] = [
-          ...stored,
-          ...Array.from({ length: qty - stored.length }, empty_keyword_row),
-        ];
-      } else {
-        result[tier.id] = stored.slice(0, qty);
-      }
-    });
-    return result;
-  }, [selected_quantities, keyword_data, dr_tiers]);
+  const has_intake_items = useMemo(
+    () =>
+      items.some(
+        (i) =>
+          i.product_type === "link_building" ||
+          i.product_type === "new_content" ||
+          i.product_type === "content_optimization" ||
+          i.product_type === "content_brief"
+      ),
+    [items]
+  );
 
   const selected_items = useMemo(
     () =>
@@ -142,42 +108,39 @@ const LinkBuildingPage: React.FC = () => {
     );
   };
 
-  const checkKeywordsComplete = useCallback((): boolean => {
-    for (const rows of Object.values(computed_keyword_rows)) {
-      for (const row of rows) {
-        if (!row.keyword.trim() || !row.landing_page.trim()) return false;
-      }
-    }
-    return true;
-  }, [computed_keyword_rows]);
-
-  const handleKeywordChange = (
-    tier_id: string,
-    row_index: number,
-    field: keyof KeywordRow,
-    value: string | boolean
-  ) => {
-    if (keyword_step_error) setKeywordStepError(null);
-    const base_rows = (computed_keyword_rows[tier_id] ?? []).map((r) => ({
-      ...r,
-    }));
-    if (base_rows[row_index]) {
-      base_rows[row_index] = { ...base_rows[row_index], [field]: value };
-    }
-    updateLinkBuildingKeywords(tier_id, base_rows);
-  };
-
   const handleBillingChange = (field: keyof BillingAddress, value: string) => {
     setBillingAddress((prev) => ({ ...prev, [field]: value }));
   };
 
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
+  const applyBillingIfEmpty = () => {
+    if (has_saved_address && saved_billing_address) {
+      const is_billing_empty =
+        !billing_address.address &&
+        !billing_address.city &&
+        !billing_address.postal_code;
+      if (is_billing_empty) setBillingAddress(saved_billing_address);
+    }
+  };
+
   const handleContinue = () => {
     if (item_count === 0) return;
-    setCurrentStep("keywords");
+    if (has_intake_items) {
+      setCurrentStep("intake");
+    } else {
+      applyBillingIfEmpty();
+      setCurrentStep("checkout");
+    }
     scrollToTop();
   };
+
+  const handleProceedFromIntake = useCallback(() => {
+    applyBillingIfEmpty();
+    setCurrentStep("checkout");
+    scrollToTop();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [has_saved_address, saved_billing_address, billing_address]);
 
   const handleApplySavedAddress = useCallback(() => {
     if (saved_billing_address) {
@@ -185,30 +148,12 @@ const LinkBuildingPage: React.FC = () => {
     }
   }, [saved_billing_address]);
 
-  const handleReview = () => {
-    if (!checkKeywordsComplete()) {
-      setKeywordStepError(
-        "Please fill in the keyword and landing page for every row before continuing."
-      );
-      scrollToTop();
-      return;
-    }
-    setKeywordStepError(null);
-    if (has_saved_address && saved_billing_address) {
-      const is_billing_empty =
-        !billing_address.address &&
-        !billing_address.city &&
-        !billing_address.postal_code;
-      if (is_billing_empty) {
-        setBillingAddress(saved_billing_address);
-      }
-    }
-    setCurrentStep("checkout");
-    scrollToTop();
-  };
-
   const handlePrevious = () => {
-    setCurrentStep(current_step === "checkout" ? "keywords" : "selection");
+    if (current_step === "checkout" && has_intake_items) {
+      setCurrentStep("intake");
+    } else {
+      setCurrentStep("selection");
+    }
     scrollToTop();
   };
 
@@ -249,102 +194,63 @@ const LinkBuildingPage: React.FC = () => {
           </Link>
         </div>
 
-        {/* Selection & Keywords steps */}
-        {current_step !== "checkout" && (
+        {/* Selection step */}
+        {current_step === "selection" && (
           <div className="grid grid-cols-12 gap-6">
             <div className="col-span-12 space-y-6 lg:col-span-8">
-              {current_step === "selection" && (
-                <>
-                  <LinkBuildingHeader />
-                  {dr_tiers_error && (
-                    <p className="text-sm text-amber-600 dark:text-amber-400">
-                      {dr_tiers_error}
-                    </p>
-                  )}
-                  {dr_tiers_loading ? (
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <div
-                          key={i}
-                          className="h-36 animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-800"
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <DrTierGrid
-                      dr_tiers={dr_tiers}
-                      selected_quantities={selected_quantities}
-                      onQuantityChange={handleQuantityChange}
+              <LinkBuildingHeader />
+              {dr_tiers_error && (
+                <p className="text-sm text-amber-600 dark:text-amber-400">
+                  {dr_tiers_error}
+                </p>
+              )}
+              {dr_tiers_loading ? (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-36 animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-800"
                     />
-                  )}
-                </>
+                  ))}
+                </div>
+              ) : (
+                <DrTierGrid
+                  dr_tiers={dr_tiers}
+                  selected_quantities={selected_quantities}
+                  onQuantityChange={handleQuantityChange}
+                />
               )}
-
-              {current_step === "keywords" && (
-                <>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={handlePrevious}
-                      className="text-sm font-medium text-brand-500 transition-colors hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
-                    >
-                      &laquo; Back
-                    </button>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Enter your target keywords and landing pages for each
-                      placement.
-                    </p>
-                  </div>
-
-                  {keyword_step_error && (
-                    <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-500/30 dark:bg-amber-500/10">
-                      <svg
-                        className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"
-                        />
-                      </svg>
-                      <div>
-                        <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-                          Incomplete keyword data
-                        </p>
-                        <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">
-                          {keyword_step_error}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  <KeywordEntryStep
-                    selected_items={selected_items}
-                    keyword_data={computed_keyword_rows}
-                    order_title={order_title}
-                    order_notes={order_notes}
-                    onKeywordChange={handleKeywordChange}
-                    onOrderTitleChange={setOrderTitle}
-                    onOrderNotesChange={setOrderNotes}
-                  />
-                </>
-              )}
-
               {selected_items.length > 0 && <ContentRefreshUpsell />}
             </div>
 
             <div className="col-span-12 lg:col-span-4">
               <UnifiedCartSummary
                 action_label={
-                  current_step === "selection" ? "Continue" : "Review Order"
+                  has_intake_items ? "Continue to Intake Form" : "Continue to Checkout"
                 }
-                onAction={
-                  current_step === "selection" ? handleContinue : handleReview
-                }
+                onAction={handleContinue}
                 is_action_disabled={item_count === 0}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Intake form step */}
+        {current_step === "intake" && (
+          <div className="grid grid-cols-12 gap-6">
+            <div className="col-span-12 space-y-6 lg:col-span-8">
+              <UnifiedIntakeStep
+                onBack={() => { setCurrentStep("selection"); scrollToTop(); }}
+                onNext={handleProceedFromIntake}
+                back_label="Back to Selection"
+              />
+            </div>
+            <div className="col-span-12 lg:col-span-4">
+              <UnifiedCartSummary
+                action_label="Continue to Checkout"
+                onAction={handleProceedFromIntake}
+                is_action_disabled={!has_intake_items}
+                show_coupon_field
               />
             </div>
           </div>
@@ -366,6 +272,9 @@ const LinkBuildingPage: React.FC = () => {
                   total_amount={total}
                   saved_billing_address={saved_billing_address}
                   onApplySavedAddress={handleApplySavedAddress}
+                  back_label={
+                    has_intake_items ? "Back to Intake Form" : "Back to Selection"
+                  }
                   onProcessingChange={setCheckoutIsProcessing}
                 />
               </div>
