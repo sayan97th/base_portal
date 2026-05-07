@@ -758,7 +758,11 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
               )}
 
               {/* Client Communication Panel */}
-              <AdminOrderComments order_id={order.id} session_id={order.session_id} />
+              <AdminOrderComments
+                purchase_type={is_session_view ? "multi_purchase" : "single_order"}
+                order_id={order.id}
+                session_id={order.session_id}
+              />
 
               {/* Order Tracking / Activity Panel */}
               <OrderTrackingPanel

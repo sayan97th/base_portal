@@ -712,7 +712,7 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
       )}
 
       {/* ── Order Discussion ── */}
-      <OrderComments session_id={session_id} />
+      <OrderComments purchase_type="multi_purchase" session_id={session_id} />
     </div>
   );
 };

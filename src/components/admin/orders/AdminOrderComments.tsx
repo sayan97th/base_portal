@@ -643,11 +643,16 @@ function AdminCommentItem({
 // ─── Main component ────────────────────────────────────────────────────────────
 
 interface AdminOrderCommentsProps {
+  purchase_type: "multi_purchase" | "single_order";
   order_id: string;
   session_id?: string | null;
 }
 
-const AdminOrderComments: React.FC<AdminOrderCommentsProps> = ({ order_id, session_id }) => {
+const AdminOrderComments: React.FC<AdminOrderCommentsProps> = ({
+  purchase_type,
+  order_id,
+  session_id,
+}) => {
   const { user } = useAuth();
   const [comments, setComments] = useState<OrderComment[]>([]);
   const [is_loading, setIsLoading] = useState(true);
@@ -672,9 +677,12 @@ const AdminOrderComments: React.FC<AdminOrderCommentsProps> = ({ order_id, sessi
       setIsLoading(true);
       setLoadError(null);
       try {
-        const data = session_id
-          ? await adminOrderCommentsService.fetchComments(session_id)
-          : await adminOrderCommentsService.fetchCommentsByOrder(order_id);
+        let data: OrderComment[];
+        if (purchase_type === "multi_purchase" && session_id) {
+          data = await adminOrderCommentsService.fetchCommentsBySession(session_id);
+        } else {
+          data = await adminOrderCommentsService.fetchCommentsByOrder(order_id);
+        }
         setComments(data);
       } catch {
         setLoadError("Could not load the client conversation. Please try again.");
@@ -683,20 +691,23 @@ const AdminOrderComments: React.FC<AdminOrderCommentsProps> = ({ order_id, sessi
       }
     };
     void load();
-  }, [session_id, order_id]);
+  }, [purchase_type, session_id, order_id]);
 
   const handleSubmit = async () => {
     if (!new_content.trim() || is_submitting) return;
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      const comment = session_id
-        ? await adminOrderCommentsService.createComment(session_id, {
-            content: new_content.trim(),
-          })
-        : await adminOrderCommentsService.createCommentByOrder(order_id, {
-            content: new_content.trim(),
-          });
+      let comment: OrderComment;
+      if (purchase_type === "multi_purchase" && session_id) {
+        comment = await adminOrderCommentsService.createCommentBySession(session_id, {
+          content: new_content.trim(),
+        });
+      } else {
+        comment = await adminOrderCommentsService.createCommentByOrder(order_id, {
+          content: new_content.trim(),
+        });
+      }
       setComments((prev) => [...prev, comment]);
       setNewContent("");
     } catch {
@@ -715,12 +726,21 @@ const AdminOrderComments: React.FC<AdminOrderCommentsProps> = ({ order_id, sessi
 
   const handleReply = useCallback(
     async (parent_id: number, content: string) => {
-      const reply = session_id
-        ? await adminOrderCommentsService.createComment(session_id, { content, parent_id })
-        : await adminOrderCommentsService.createCommentByOrder(order_id, { content, parent_id });
+      let reply: OrderComment;
+      if (purchase_type === "multi_purchase" && session_id) {
+        reply = await adminOrderCommentsService.createCommentBySession(session_id, {
+          content,
+          parent_id,
+        });
+      } else {
+        reply = await adminOrderCommentsService.createCommentByOrder(order_id, {
+          content,
+          parent_id,
+        });
+      }
       setComments((prev) => appendReplyInTree(prev, parent_id, reply));
     },
-    [session_id, order_id]
+    [purchase_type, session_id, order_id]
   );
 
   const handleEdit = useCallback(async (comment_id: number, content: string) => {

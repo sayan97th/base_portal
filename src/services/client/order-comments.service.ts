@@ -14,7 +14,7 @@ interface CommentResponse {
 }
 
 export const orderCommentsService = {
-  async fetchComments(session_id: string): Promise<OrderComment[]> {
+  async fetchCommentsBySession(session_id: string): Promise<OrderComment[]> {
     const response = await apiClient.get<CommentsListResponse>(
       `/api/order-sessions/${session_id}/comments`
     );
@@ -28,7 +28,7 @@ export const orderCommentsService = {
     return response.data;
   },
 
-  async createComment(
+  async createCommentBySession(
     session_id: string,
     payload: CreateCommentPayload
   ): Promise<OrderComment> {

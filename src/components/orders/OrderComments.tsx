@@ -688,11 +688,16 @@ function CommentItem({
 // ─── Main component ────────────────────────────────────────────────────────────
 
 interface OrderCommentsProps {
+  purchase_type: "multi_purchase" | "single_order";
   session_id?: string;
   order_id?: string;
 }
 
-const OrderComments: React.FC<OrderCommentsProps> = ({ session_id, order_id }) => {
+const OrderComments: React.FC<OrderCommentsProps> = ({
+  purchase_type,
+  session_id,
+  order_id,
+}) => {
   const { user, isAdmin } = useAuth();
   const [comments, setComments] = useState<OrderComment[]>([]);
   const [is_loading, setIsLoading] = useState(true);
@@ -717,9 +722,9 @@ const OrderComments: React.FC<OrderCommentsProps> = ({ session_id, order_id }) =
       setLoadError(null);
       try {
         let data: OrderComment[];
-        if (session_id) {
-          data = await orderCommentsService.fetchComments(session_id);
-        } else if (order_id) {
+        if (purchase_type === "multi_purchase" && session_id) {
+          data = await orderCommentsService.fetchCommentsBySession(session_id);
+        } else if (purchase_type === "single_order" && order_id) {
           data = await orderCommentsService.fetchCommentsByOrder(order_id);
         } else {
           data = [];
@@ -732,7 +737,7 @@ const OrderComments: React.FC<OrderCommentsProps> = ({ session_id, order_id }) =
       }
     };
     void load();
-  }, [session_id, order_id]);
+  }, [purchase_type, session_id, order_id]);
 
   const handleSubmit = async () => {
     if (!new_content.trim() || is_submitting) return;
@@ -740,11 +745,11 @@ const OrderComments: React.FC<OrderCommentsProps> = ({ session_id, order_id }) =
     setSubmitError(null);
     try {
       let comment: OrderComment;
-      if (session_id) {
-        comment = await orderCommentsService.createComment(session_id, {
+      if (purchase_type === "multi_purchase" && session_id) {
+        comment = await orderCommentsService.createCommentBySession(session_id, {
           content: new_content.trim(),
         });
-      } else if (order_id) {
+      } else if (purchase_type === "single_order" && order_id) {
         comment = await orderCommentsService.createCommentByOrder(order_id, {
           content: new_content.trim(),
         });
@@ -770,12 +775,12 @@ const OrderComments: React.FC<OrderCommentsProps> = ({ session_id, order_id }) =
   const handleReply = useCallback(
     async (parent_id: number, content: string) => {
       let reply: OrderComment;
-      if (session_id) {
-        reply = await orderCommentsService.createComment(session_id, {
+      if (purchase_type === "multi_purchase" && session_id) {
+        reply = await orderCommentsService.createCommentBySession(session_id, {
           content,
           parent_id,
         });
-      } else if (order_id) {
+      } else if (purchase_type === "single_order" && order_id) {
         reply = await orderCommentsService.createCommentByOrder(order_id, {
           content,
           parent_id,
@@ -785,7 +790,7 @@ const OrderComments: React.FC<OrderCommentsProps> = ({ session_id, order_id }) =
       }
       setComments((prev) => appendReplyInTree(prev, parent_id, reply));
     },
-    [session_id, order_id]
+    [purchase_type, session_id, order_id]
   );
 
   const handleEdit = useCallback(

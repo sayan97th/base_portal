@@ -445,7 +445,7 @@ const OrderDetailPage: React.FC<OrderDetailPageProps> = ({ order_id }) => {
       </div>
 
       {/* Comments */}
-      <OrderComments order_id={order_id} />
+      <OrderComments purchase_type="single_order" order_id={order_id} />
     </div>
   );
 };
