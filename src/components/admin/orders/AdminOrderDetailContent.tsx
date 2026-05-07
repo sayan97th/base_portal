@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Badge from "@/components/ui/badge/Badge";
 import { getAdminOrder } from "@/services/admin/order.service";
 import { listAdminOrders } from "@/services/admin/order.service";
@@ -516,6 +517,7 @@ const InvoiceCard = ({ invoice }: InvoiceCardProps) => {
 };
 
 const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order_id, initial_session_id }) => {
+  const router = useRouter();
   const [order, setOrder] = useState<AdminOrder | null>(null);
   const [session_orders, setSessionOrders] = useState<AdminOrder[]>([]);
   const [current_status, setCurrentStatus] = useState<OrderStatus | null>(null);
@@ -558,7 +560,12 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
               const related = session_data.data.filter(
                 (o) => o.session_id === data.session_id
               );
-              setSessionOrders(related.length > 1 ? related : []);
+              if (related.length > 1) {
+                // Redirect to session URL so admin and client share the same session UUID
+                router.replace(`/admin/orders/session/${data.session_id}`);
+                return;
+              }
+              setSessionOrders([]);
             } catch {
               setSessionOrders([]);
             }
@@ -571,7 +578,7 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
       }
     }
     load();
-  }, [order_id, initial_session_id]);
+  }, [order_id, initial_session_id, router]);
 
   const effective_status = current_status ?? order?.status ?? "pending";
   const status_config = order ? getStatusConfig(effective_status) : null;

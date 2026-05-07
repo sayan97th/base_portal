@@ -489,7 +489,7 @@ function OrderRow({ order, is_last, compact = false }: OrderRowProps) {
             </Link>
           )}
           <Link
-            href={`/admin/orders/${order.id}`}
+            href={order.session_id ? `/admin/orders/session/${order.session_id}` : `/admin/orders/${order.id}`}
             className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
               type_config
                 ? `${type_config.border} ${type_config.bg} ${type_config.color} hover:opacity-80`
