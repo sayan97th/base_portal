@@ -232,32 +232,54 @@ function CommentAvatar({
   name,
   avatar_url,
   user_id,
+  is_admin,
   size = "md",
 }: {
   name: string;
   avatar_url: string | null;
   user_id: number;
+  is_admin?: boolean;
   size?: "sm" | "md";
 }) {
   const initials = getInitials(name);
-  const palette = getAvatarPalette(user_id);
+  const palette = is_admin
+    ? "bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300"
+    : getAvatarPalette(user_id);
   const size_class = size === "sm" ? "h-7 w-7 text-[10px]" : "h-8 w-8 text-xs";
 
   if (avatar_url) {
     return (
-      <img
-        src={avatar_url}
-        alt={name}
-        className={`${size_class} rounded-full object-cover shrink-0 ring-1 ring-gray-200 dark:ring-gray-700`}
-      />
+      <div className="relative shrink-0">
+        <img
+          src={avatar_url}
+          alt={name}
+          className={`${size_class} rounded-full object-cover ring-1 ring-gray-200 dark:ring-gray-700`}
+        />
+        {is_admin && (
+          <span className="absolute -bottom-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-violet-500 ring-1 ring-white dark:ring-gray-900">
+            <svg className="h-1.5 w-1.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M9.664 1.319a.75.75 0 01.672 0 41.059 41.059 0 018.198 5.424.75.75 0 01-.254 1.285 31.372 31.372 0 00-7.86 3.83.75.75 0 01-.84 0 31.508 31.508 0 00-2.08-1.287V9.394c0-.244.116-.463.315-.6a32.422 32.422 0 005.596-3.97.75.75 0 00-.175-1.065 38.49 38.49 0 00-7.198-4.41.75.75 0 00-.671 0A38.49 38.49 0 002.74 7.759a.75.75 0 00-.175 1.065 32.422 32.422 0 005.596 3.97c.199.137.315.356.315.6v.463a31.508 31.508 0 00-2.08 1.287.75.75 0 01-.84 0 31.372 31.372 0 00-7.86-3.83.75.75 0 01-.254-1.285A41.059 41.059 0 019.664 1.319z" clipRule="evenodd" />
+            </svg>
+          </span>
+        )}
+      </div>
     );
   }
 
   return (
-    <div
-      className={`${size_class} ${palette} rounded-full flex items-center justify-center font-semibold shrink-0 ring-2 ring-white dark:ring-gray-900`}
-    >
-      {initials}
+    <div className="relative shrink-0">
+      <div
+        className={`${size_class} ${palette} rounded-full flex items-center justify-center font-semibold ring-2 ring-white dark:ring-gray-900`}
+      >
+        {initials}
+      </div>
+      {is_admin && (
+        <span className="absolute -bottom-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-violet-500 ring-1 ring-white dark:ring-gray-900">
+          <svg className="h-1.5 w-1.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M9.664 1.319a.75.75 0 01.672 0 41.059 41.059 0 018.198 5.424.75.75 0 01-.254 1.285 31.372 31.372 0 00-7.86 3.83.75.75 0 01-.84 0 31.508 31.508 0 00-2.08-1.287V9.394c0-.244.116-.463.315-.6a32.422 32.422 0 005.596-3.97.75.75 0 00-.175-1.065 38.49 38.49 0 00-7.198-4.41.75.75 0 00-.671 0A38.49 38.49 0 002.74 7.759a.75.75 0 00-.175 1.065 32.422 32.422 0 005.596 3.97c.199.137.315.356.315.6v.463a31.508 31.508 0 00-2.08 1.287.75.75 0 01-.84 0 31.372 31.372 0 00-7.86-3.83.75.75 0 01-.254-1.285A41.059 41.059 0 019.664 1.319z" clipRule="evenodd" />
+          </svg>
+        </span>
+      )}
     </div>
   );
 }
@@ -527,11 +549,18 @@ function CommentItem({
 
   return (
     <div>
-      <div className="flex gap-3">
+      <div
+        className={`flex gap-3 ${
+          comment.is_admin_comment
+            ? "rounded-xl bg-violet-50/60 dark:bg-violet-500/5 px-3 py-2.5 border border-violet-100 dark:border-violet-500/15"
+            : ""
+        }`}
+      >
         <CommentAvatar
           name={comment.author_name}
           avatar_url={comment.author_avatar_url}
           user_id={comment.user_id}
+          is_admin={comment.is_admin_comment}
           size={is_reply ? "sm" : "md"}
         />
 
@@ -573,7 +602,7 @@ function CommentItem({
             />
           ) : (
             <p
-              className={`text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap break-words ${is_busy ? "opacity-40" : ""}`}
+              className={`text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap wrap-break-word ${is_busy ? "opacity-40" : ""}`}
             >
               {comment.content}
             </p>
@@ -659,10 +688,11 @@ function CommentItem({
 // ─── Main component ────────────────────────────────────────────────────────────
 
 interface OrderCommentsProps {
-  session_id: string;
+  session_id?: string;
+  order_id?: string;
 }
 
-const OrderComments: React.FC<OrderCommentsProps> = ({ session_id }) => {
+const OrderComments: React.FC<OrderCommentsProps> = ({ session_id, order_id }) => {
   const { user, isAdmin } = useAuth();
   const [comments, setComments] = useState<OrderComment[]>([]);
   const [is_loading, setIsLoading] = useState(true);
@@ -686,7 +716,14 @@ const OrderComments: React.FC<OrderCommentsProps> = ({ session_id }) => {
       setIsLoading(true);
       setLoadError(null);
       try {
-        const data = await orderCommentsService.fetchComments(session_id);
+        let data: OrderComment[];
+        if (session_id) {
+          data = await orderCommentsService.fetchComments(session_id);
+        } else if (order_id) {
+          data = await orderCommentsService.fetchCommentsByOrder(order_id);
+        } else {
+          data = [];
+        }
         setComments(data);
       } catch {
         setLoadError("Could not load comments. Please try again.");
@@ -695,16 +732,25 @@ const OrderComments: React.FC<OrderCommentsProps> = ({ session_id }) => {
       }
     };
     void load();
-  }, [session_id]);
+  }, [session_id, order_id]);
 
   const handleSubmit = async () => {
     if (!new_content.trim() || is_submitting) return;
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      const comment = await orderCommentsService.createComment(session_id, {
-        content: new_content.trim(),
-      });
+      let comment: OrderComment;
+      if (session_id) {
+        comment = await orderCommentsService.createComment(session_id, {
+          content: new_content.trim(),
+        });
+      } else if (order_id) {
+        comment = await orderCommentsService.createCommentByOrder(order_id, {
+          content: new_content.trim(),
+        });
+      } else {
+        return;
+      }
       setComments((prev) => [...prev, comment]);
       setNewContent("");
     } catch {
@@ -723,13 +769,23 @@ const OrderComments: React.FC<OrderCommentsProps> = ({ session_id }) => {
 
   const handleReply = useCallback(
     async (parent_id: number, content: string) => {
-      const reply = await orderCommentsService.createComment(session_id, {
-        content,
-        parent_id,
-      });
+      let reply: OrderComment;
+      if (session_id) {
+        reply = await orderCommentsService.createComment(session_id, {
+          content,
+          parent_id,
+        });
+      } else if (order_id) {
+        reply = await orderCommentsService.createCommentByOrder(order_id, {
+          content,
+          parent_id,
+        });
+      } else {
+        return;
+      }
       setComments((prev) => appendReplyInTree(prev, parent_id, reply));
     },
-    [session_id]
+    [session_id, order_id]
   );
 
   const handleEdit = useCallback(
@@ -770,7 +826,7 @@ const OrderComments: React.FC<OrderCommentsProps> = ({ session_id }) => {
         </div>
 
         {!is_loading && !load_error && total_count > 0 && (
-          <span className="inline-flex items-center justify-center h-6 min-w-[1.5rem] rounded-full bg-brand-50 dark:bg-brand-500/10 px-2 text-xs font-bold text-brand-600 dark:text-brand-400 border border-brand-100 dark:border-brand-500/20">
+          <span className="inline-flex items-center justify-center h-6 min-w-6 rounded-full bg-brand-50 dark:bg-brand-500/10 px-2 text-xs font-bold text-brand-600 dark:text-brand-400 border border-brand-100 dark:border-brand-500/20">
             {total_count}
           </span>
         )}

@@ -21,12 +21,30 @@ export const orderCommentsService = {
     return response.data;
   },
 
+  async fetchCommentsByOrder(order_id: string): Promise<OrderComment[]> {
+    const response = await apiClient.get<CommentsListResponse>(
+      `/api/orders/${order_id}/comments`
+    );
+    return response.data;
+  },
+
   async createComment(
     session_id: string,
     payload: CreateCommentPayload
   ): Promise<OrderComment> {
     const response = await apiClient.post<CommentResponse>(
       `/api/order-sessions/${session_id}/comments`,
+      payload
+    );
+    return response.data;
+  },
+
+  async createCommentByOrder(
+    order_id: string,
+    payload: CreateCommentPayload
+  ): Promise<OrderComment> {
+    const response = await apiClient.post<CommentResponse>(
+      `/api/orders/${order_id}/comments`,
       payload
     );
     return response.data;
