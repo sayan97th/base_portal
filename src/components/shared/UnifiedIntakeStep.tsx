@@ -5,6 +5,10 @@ import { useCart } from "@/context/CartContext";
 import IntakeFormTable from "@/components/new-content/IntakeFormTable";
 import ContentOptimizationIntakeTable from "@/components/content-optimizations/ContentOptimizationIntakeTable";
 import ContentBriefIntakeTable from "@/components/content-briefs/ContentBriefIntakeTable";
+import KeywordEntryStep, {
+  type KeywordRow,
+  type KeywordData,
+} from "@/components/link-building/KeywordEntryStep";
 import type { CartIntakeRow, ContentOptimizationIntakeRow } from "@/types/client/unified-cart";
 
 interface UnifiedIntakeStepProps {
@@ -25,6 +29,12 @@ const empty_co_row = (): ContentOptimizationIntakeRow => ({
   content_page_url: "",
 });
 
+const empty_keyword_row = (): KeywordRow => ({
+  keyword: "",
+  landing_page: "",
+  exact_match: false,
+});
+
 export default function UnifiedIntakeStep({
   onBack,
   onNext,
@@ -38,10 +48,22 @@ export default function UnifiedIntakeStep({
     updateContentOptimizationIntakeData,
     getContentBriefIntakeDataForTier,
     updateContentBriefIntakeData,
+    getKeywordDataForTier,
+    updateLinkBuildingKeywords,
+    order_title,
+    order_notes,
+    setOrderTitle,
+    setOrderNotes,
   } = useCart();
 
   const [error, setError] = useState<string | null>(null);
 
+  // ── Item groups ─────────────────────────────────────────────────────────────
+
+  const lb_items = useMemo(
+    () => items.filter((i) => i.product_type === "link_building"),
+    [items]
+  );
   const nc_items = useMemo(
     () => items.filter((i) => i.product_type === "new_content"),
     [items]
@@ -55,11 +77,47 @@ export default function UnifiedIntakeStep({
     [items]
   );
 
+  const has_lb = lb_items.length > 0;
   const has_nc = nc_items.length > 0;
   const has_co = co_items.length > 0;
   const has_cb = cb_items.length > 0;
 
-  // New Content intake — one virtual tier per quantity unit
+  // ── Link Building keyword rows ───────────────────────────────────────────────
+
+  const lb_selected_items = useMemo(
+    () =>
+      lb_items.map((item) => ({
+        id: item.tier_id,
+        label: item.tier_name,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+      })),
+    [lb_items]
+  );
+
+  const computed_keyword_rows = useMemo<KeywordData>(() => {
+    const result: KeywordData = {};
+    lb_items.forEach((item) => {
+      const stored = getKeywordDataForTier(item.tier_id) as KeywordRow[];
+      if (stored.length === item.quantity) {
+        result[item.tier_id] = stored;
+      } else if (stored.length < item.quantity) {
+        result[item.tier_id] = [
+          ...stored,
+          ...Array.from(
+            { length: item.quantity - stored.length },
+            empty_keyword_row
+          ),
+        ];
+      } else {
+        result[item.tier_id] = stored.slice(0, item.quantity);
+      }
+    });
+    return result;
+  }, [lb_items, getKeywordDataForTier]);
+
+  // ── New Content intake — one virtual tier per quantity unit ──────────────────
+
   const nc_intake_data = useMemo(() => {
     const result: Array<{ tier_id: string; tier_name: string; rows: CartIntakeRow[] }> = [];
     for (const item of nc_items) {
@@ -82,7 +140,8 @@ export default function UnifiedIntakeStep({
     return result;
   }, [nc_items, getIntakeDataForTier]);
 
-  // Content Optimization intake
+  // ── Content Optimization intake ──────────────────────────────────────────────
+
   const co_intake_data = useMemo(() => {
     return co_items.map((item) => {
       const stored = getContentOptimizationIntakeDataForTier(item.tier_id);
@@ -100,7 +159,8 @@ export default function UnifiedIntakeStep({
     });
   }, [co_items, getContentOptimizationIntakeDataForTier]);
 
-  // Content Brief intake
+  // ── Content Brief intake ─────────────────────────────────────────────────────
+
   const cb_intake_data = useMemo(() => {
     return cb_items.map((item) => {
       const stored = getContentBriefIntakeDataForTier(item.tier_id);
@@ -118,7 +178,24 @@ export default function UnifiedIntakeStep({
     });
   }, [cb_items, getContentBriefIntakeDataForTier]);
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
+  // ── Handlers ─────────────────────────────────────────────────────────────────
+
+  const handleKeywordChange = useCallback(
+    (
+      tier_id: string,
+      row_index: number,
+      field: keyof KeywordRow,
+      value: string | boolean
+    ) => {
+      if (error) setError(null);
+      const base_rows = (computed_keyword_rows[tier_id] ?? []).map((r) => ({ ...r }));
+      if (base_rows[row_index]) {
+        base_rows[row_index] = { ...base_rows[row_index], [field]: value };
+      }
+      updateLinkBuildingKeywords(tier_id, base_rows);
+    },
+    [error, computed_keyword_rows, updateLinkBuildingKeywords]
+  );
 
   const handleNcRowsChange = useCallback(
     (virtual_tier_id: string, rows: CartIntakeRow[]) => {
@@ -154,9 +231,23 @@ export default function UnifiedIntakeStep({
     [error, updateContentBriefIntakeData]
   );
 
-  // ── Validation & navigation ───────────────────────────────────────────────
+  // ── Validation & navigation ───────────────────────────────────────────────────
 
   const handleNext = useCallback(() => {
+    if (has_lb) {
+      for (const rows of Object.values(computed_keyword_rows)) {
+        for (const row of rows) {
+          if (!row.keyword.trim() || !row.landing_page.trim()) {
+            setError(
+              "Please fill in the keyword and landing page for every Link Building placement before continuing."
+            );
+            window.scrollTo({ top: 0, behavior: "smooth" });
+            return;
+          }
+        }
+      }
+    }
+
     if (has_nc) {
       const incomplete = nc_intake_data.some((tier) =>
         tier.rows.some((row) => !row.keyword_phrase.trim())
@@ -200,12 +291,28 @@ export default function UnifiedIntakeStep({
 
     setError(null);
     onNext();
-  }, [has_nc, has_co, has_cb, nc_intake_data, co_intake_data, cb_intake_data, onNext]);
+  }, [
+    has_lb,
+    has_nc,
+    has_co,
+    has_cb,
+    computed_keyword_rows,
+    nc_intake_data,
+    co_intake_data,
+    cb_intake_data,
+    onNext,
+  ]);
 
-  const section_count = (has_nc ? 1 : 0) + (has_co ? 1 : 0) + (has_cb ? 1 : 0);
+  const section_count =
+    (has_lb ? 1 : 0) +
+    (has_nc ? 1 : 0) +
+    (has_co ? 1 : 0) +
+    (has_cb ? 1 : 0);
+
+  // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <h2 className="text-xl font-bold text-gray-900 dark:text-white">
@@ -260,7 +367,44 @@ export default function UnifiedIntakeStep({
         </div>
       )}
 
-      {/* ── New Content section ───────────────────────────────────────────── */}
+      {/* ── Link Building section ─────────────────────────────────────────────── */}
+      {has_lb && (
+        <div className="space-y-4">
+          {section_count > 1 && (
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-coral-200 bg-coral-50 px-3 py-1 text-xs font-semibold text-coral-700 dark:border-coral-500/30 dark:bg-coral-500/10 dark:text-coral-300">
+                <svg
+                  className="h-3.5 w-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244"
+                  />
+                </svg>
+                Link Building
+              </span>
+              <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
+            </div>
+          )}
+
+          <KeywordEntryStep
+            selected_items={lb_selected_items}
+            keyword_data={computed_keyword_rows}
+            order_title={order_title}
+            order_notes={order_notes}
+            onKeywordChange={handleKeywordChange}
+            onOrderTitleChange={setOrderTitle}
+            onOrderNotesChange={setOrderNotes}
+          />
+        </div>
+      )}
+
+      {/* ── New Content section ───────────────────────────────────────────────── */}
       {has_nc && (
         <div className="space-y-6">
           {section_count > 1 && (
@@ -297,7 +441,7 @@ export default function UnifiedIntakeStep({
         </div>
       )}
 
-      {/* ── Content Optimization section ─────────────────────────────────── */}
+      {/* ── Content Optimization section ──────────────────────────────────────── */}
       {has_co && (
         <div className="space-y-4">
           {section_count > 1 && (
@@ -374,7 +518,7 @@ export default function UnifiedIntakeStep({
         </div>
       )}
 
-      {/* ── Content Briefs section ────────────────────────────────────────── */}
+      {/* ── Content Briefs section ────────────────────────────────────────────── */}
       {has_cb && (
         <div className="space-y-4">
           {section_count > 1 && (
