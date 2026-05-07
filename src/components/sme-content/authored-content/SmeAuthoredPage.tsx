@@ -12,7 +12,10 @@ import {
   SmeAuthoredTier,
 } from "@/services/client/sme-authored.service";
 
-const CALENDLY_URL = "https://calendly.com/ernesto-97thfloor/30min";
+const CALENDLY_URL =
+  process.env.NEXT_PUBLIC_CALENDLY_URL_SME_AUTHORED ||
+  process.env.NEXT_PUBLIC_CALENDLY_URL ||
+  "";
 
 type Step = "selection" | "schedule";
 

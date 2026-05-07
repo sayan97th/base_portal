@@ -12,7 +12,10 @@ import { seo_packages as fallback_packages } from "./seoPackageData";
 import { seoPackagesService } from "@/services/client/seo-packages.service";
 import type { SeoPackage, ActiveSeoSubscription } from "@/types/client/seo-packages";
 
-const CALENDLY_URL = "https://calendly.com/ernesto-97thfloor/30min";
+const CALENDLY_URL =
+  process.env.NEXT_PUBLIC_CALENDLY_URL_SEO_PACKAGES ||
+  process.env.NEXT_PUBLIC_CALENDLY_URL ||
+  "";
 
 type Step = "selection" | "schedule";
 
