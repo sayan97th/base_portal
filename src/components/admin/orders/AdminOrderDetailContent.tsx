@@ -18,7 +18,8 @@ import OrderTrackingPanel from "./OrderTrackingPanel";
 import AdminOrderComments from "./AdminOrderComments";
 
 interface AdminOrderDetailContentProps {
-  order_id: string;
+  order_id?: string;
+  initial_session_id?: string;
 }
 
 function formatDate(iso: string): string {
@@ -514,7 +515,7 @@ const InvoiceCard = ({ invoice }: InvoiceCardProps) => {
   );
 };
 
-const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order_id }) => {
+const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order_id, initial_session_id }) => {
   const [order, setOrder] = useState<AdminOrder | null>(null);
   const [session_orders, setSessionOrders] = useState<AdminOrder[]>([]);
   const [current_status, setCurrentStatus] = useState<OrderStatus | null>(null);
@@ -526,23 +527,41 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
       setIsLoading(true);
       setError(null);
       try {
-        const data = await getAdminOrder(order_id);
-        setOrder(data);
-        setCurrentStatus(data.status);
+        if (initial_session_id) {
+          // Load all orders for this session directly (multi-purchase session route)
+          const session_data = await listAdminOrders({
+            session_id: initial_session_id,
+            per_page: 50,
+          });
+          const related = session_data.data.filter(
+            (o) => o.session_id === initial_session_id
+          );
+          if (related.length === 0) {
+            setError("We couldn't load this session. Please try again.");
+            return;
+          }
+          setOrder(related[0]);
+          setCurrentStatus(related[0].status);
+          setSessionOrders(related.length > 1 ? related : []);
+        } else if (order_id) {
+          const data = await getAdminOrder(order_id);
+          setOrder(data);
+          setCurrentStatus(data.status);
 
-        if (data.session_id) {
-          try {
-            const session_data = await listAdminOrders({
-              session_id: data.session_id,
-              per_page: 50,
-            });
-            // Client-side guard: keep only orders that actually belong to this session
-            const related = session_data.data.filter(
-              (o) => o.session_id === data.session_id
-            );
-            setSessionOrders(related.length > 1 ? related : []);
-          } catch {
-            setSessionOrders([]);
+          if (data.session_id) {
+            try {
+              const session_data = await listAdminOrders({
+                session_id: data.session_id,
+                per_page: 50,
+              });
+              // Client-side guard: keep only orders that actually belong to this session
+              const related = session_data.data.filter(
+                (o) => o.session_id === data.session_id
+              );
+              setSessionOrders(related.length > 1 ? related : []);
+            } catch {
+              setSessionOrders([]);
+            }
           }
         }
       } catch {
@@ -552,7 +571,7 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
       }
     }
     load();
-  }, [order_id]);
+  }, [order_id, initial_session_id]);
 
   const effective_status = current_status ?? order?.status ?? "pending";
   const status_config = order ? getStatusConfig(effective_status) : null;

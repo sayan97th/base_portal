@@ -730,7 +730,7 @@ function SessionOrderCard({ group }: { group: AdminOrderGroup }) {
               {formatCurrency(group.total_amount)}
             </span>
             <Link
-              href={`/admin/orders/${group.orders[0].id}`}
+              href={`/admin/orders/session/${group.session_id}`}
               onClick={(e) => e.stopPropagation()}
               className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-600 transition-colors hover:bg-brand-50 dark:border-brand-500/30 dark:bg-white/3 dark:text-brand-400 dark:hover:bg-brand-500/10"
             >
