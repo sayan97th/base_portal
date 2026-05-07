@@ -11,11 +11,6 @@ const CONTENT_TYPES = [
   "Other",
 ];
 
-const empty_row = (): CartIntakeRow => ({
-  keyword_phrase: "",
-  type_of_content: "",
-  notes: "",
-});
 
 interface IntakeFormTableProps {
   tier_name: string;
@@ -42,14 +37,6 @@ export default function IntakeFormTable({
     },
     [rows, onChange]
   );
-
-  const addRow = useCallback(() => {
-    onChange([...rows, empty_row()]);
-  }, [rows, onChange]);
-
-  const addFiveRows = useCallback(() => {
-    onChange([...rows, ...Array.from({ length: 5 }, empty_row)]);
-  }, [rows, onChange]);
 
   const deleteRow = useCallback(
     (row_index: number) => {
@@ -169,25 +156,6 @@ export default function IntakeFormTable({
         </table>
       </div>
 
-      {/* Add row actions — outside the table border */}
-      {!hide_actions && (
-        <div className="flex items-center justify-center gap-3">
-          <button
-            type="button"
-            onClick={addFiveRows}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-4 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
-          >
-            + Add 5 rows
-          </button>
-          <button
-            type="button"
-            onClick={addRow}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-4 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
-          >
-            + Add row
-          </button>
-        </div>
-      )}
 
       {/* Help text — outside the table border */}
       <p className="text-xs leading-relaxed text-gray-500 dark:text-gray-400">
