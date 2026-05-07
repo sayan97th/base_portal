@@ -106,6 +106,7 @@ export interface UnifiedCheckoutBilling {
 export interface UnifiedCheckoutPayload {
   payment_method_id: string;
   total_amount: number;
+  session_id?: string;
   coupon_ids?: string[] | null;
   billing: UnifiedCheckoutBilling;
   order_title?: string | null;
@@ -124,4 +125,5 @@ export interface UnifiedCheckoutCreatedOrder {
 
 export interface UnifiedCheckoutResponse {
   orders: UnifiedCheckoutCreatedOrder[];
+  session_id?: string;
 }

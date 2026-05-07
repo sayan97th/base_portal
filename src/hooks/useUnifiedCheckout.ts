@@ -146,9 +146,12 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
             ? applied_coupons.map((c) => c.coupon_id)
             : undefined;
 
+        const purchase_group_id = crypto.randomUUID();
+
         const result = await unifiedCartService.checkout({
           payment_method_id: payment_intent_id,
           total_amount: total,
+          session_id: purchase_group_id,
           coupon_ids,
           billing,
           order_title: order_title || null,
@@ -225,9 +228,9 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
               : undefined,
         });
 
-        const purchase_group_id = crypto.randomUUID();
+        const confirmed_group_id = result.session_id ?? purchase_group_id;
         const purchase_group = {
-          purchase_group_id,
+          purchase_group_id: confirmed_group_id,
           created_at: new Date().toISOString(),
           order_title: order_title || null,
           total_amount: total,
@@ -255,13 +258,13 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
             type: "order",
             message: `Your ${label} order has been placed successfully.`,
             preview_text: `Order #${order.order_id} · $${formatted_amount}`,
-            link: `/orders/session/${purchase_group_id}`,
+            link: `/orders/session/${confirmed_group_id}`,
           });
         }
 
         clearCart();
 
-        router.push(`/orders/session/${purchase_group_id}`);
+        router.push(`/orders/session/${confirmed_group_id}`);
       } catch (err: unknown) {
         setSubmitError(extractApiErrorMessage(err));
       } finally {
