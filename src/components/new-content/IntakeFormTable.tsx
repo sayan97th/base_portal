@@ -92,7 +92,7 @@ export default function IntakeFormTable({
                 <td className="border-b border-r border-gray-200 p-1 dark:border-gray-700">
                   <input
                     type="text"
-                    value={row.keyword_phrase}
+                    value={row.keyword_phrase ?? ""}
                     onChange={(e) =>
                       handleRowChange(idx, "keyword_phrase", e.target.value)
                     }
@@ -101,7 +101,7 @@ export default function IntakeFormTable({
                 </td>
                 <td className="border-b border-r border-gray-200 p-1 dark:border-gray-700">
                   <select
-                    value={row.type_of_content}
+                    value={row.type_of_content ?? ""}
                     onChange={(e) =>
                       handleRowChange(idx, "type_of_content", e.target.value)
                     }
@@ -118,7 +118,7 @@ export default function IntakeFormTable({
                 <td className="border-b border-r border-gray-200 p-1 dark:border-gray-700">
                   <input
                     type="text"
-                    value={row.notes}
+                    value={row.notes ?? ""}
                     onChange={(e) =>
                       handleRowChange(idx, "notes", e.target.value)
                     }
