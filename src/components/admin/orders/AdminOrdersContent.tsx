@@ -115,6 +115,14 @@ const STATUS_DOT: Record<OrderStatus, string> = {
   payment_pending: "bg-amber-500",
 };
 
+const STATUS_LABEL: Record<OrderStatus, string> = {
+  pending:         "Pending",
+  processing:      "Processing",
+  completed:       "Completed",
+  cancelled:       "Cancelled",
+  payment_pending: "Payment Pending",
+};
+
 const PRODUCT_TYPE_CONFIG: Record<
   AdminOrderProductType,
   { label: string; color: string; bg: string; border: string }
@@ -176,7 +184,7 @@ function getItemLabel(item: OrderItem, _product_type?: AdminOrderProductType | n
 }
 
 function getGroupOverallStatus(orders: AdminOrder[]): OrderStatus {
-  const priority: OrderStatus[] = ["processing", "pending", "cancelled", "completed"];
+  const priority: OrderStatus[] = ["payment_pending", "processing", "pending", "cancelled", "completed"];
   for (const s of priority) {
     if (orders.some((o) => o.status === s)) return s;
   }
@@ -442,9 +450,9 @@ function OrderRow({ order, is_last, compact = false }: OrderRowProps) {
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[order.status]}`}>
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[order.status]}`}>
             <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[order.status]}`} />
-            {order.status}
+            {STATUS_LABEL[order.status]}
           </span>
           {order.product_type === "new_content" && (
             <Link
@@ -575,9 +583,9 @@ function SingleOrderCard({ group }: { group: AdminOrderGroup }) {
 
         {/* Right: status + total + action */}
         <div className="flex shrink-0 flex-wrap items-center gap-2 sm:flex-col sm:items-end sm:gap-2">
-          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[order.status]}`}>
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[order.status]}`}>
             <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[order.status]}`} />
-            {order.status}
+            {STATUS_LABEL[order.status]}
           </span>
           <span className="text-sm font-bold text-gray-800 dark:text-white/90">
             {formatCurrency(order.total_amount)}
@@ -684,9 +692,9 @@ function SessionOrderCard({ group }: { group: AdminOrderGroup }) {
                 <span className="truncate text-sm font-semibold text-gray-800 dark:text-white/90">
                   {group.session_title ?? "Multi-Product Purchase"}
                 </span>
-                <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[overall_status]}`}>
+                <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[overall_status]}`}>
                   <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[overall_status]}`} />
-                  {overall_status}
+                  {STATUS_LABEL[overall_status]}
                 </span>
               </div>
 

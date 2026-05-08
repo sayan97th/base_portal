@@ -15,7 +15,7 @@ import type { PurchaseGroup } from "@/types/client/purchase-groups";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-type OrderStatus = "pending" | "processing" | "completed" | "cancelled";
+type OrderStatus = "pending" | "processing" | "completed" | "cancelled" | "payment_pending";
 type FilterTab = "all" | CartProductType;
 
 interface UnifiedOrder {
@@ -136,13 +136,15 @@ function getStatusConfig(status: string): {
       return { color: "success", label: "Completed", dot: "bg-success-500" };
     case "cancelled":
       return { color: "error", label: "Cancelled", dot: "bg-error-500" };
+    case "payment_pending":
+      return { color: "warning", label: "Payment Pending", dot: "bg-amber-500" };
     default:
       return { color: "info", label: status, dot: "bg-gray-400" };
   }
 }
 
 function getGroupOverallStatus(orders: UnifiedOrder[]): string {
-  const priority: OrderStatus[] = ["processing", "pending", "cancelled", "completed"];
+  const priority: OrderStatus[] = ["payment_pending", "processing", "pending", "cancelled", "completed"];
   for (const s of priority) {
     if (orders.some((o) => o.status === s)) return s;
   }
