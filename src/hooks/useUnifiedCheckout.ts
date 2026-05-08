@@ -14,6 +14,7 @@ import type {
   UnifiedCheckoutContentOptimizationItem,
   UnifiedCheckoutContentBriefItem,
 } from "@/types/client/unified-cart";
+import type { UnifiedDeferredCheckoutPayload } from "@/types/client/unified-cart";
 
 const PRODUCT_TYPE_LABELS: Record<CartProductType, string> = {
   link_building: "Link Building",
@@ -74,6 +75,7 @@ export interface UseUnifiedCheckoutReturn {
     is_using_saved_method: boolean,
     billing_address: BillingAddress
   ) => Promise<void>;
+  handlePayLater: () => Promise<void>;
 }
 
 /**
@@ -274,5 +276,124 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
     [items, applied_coupons, total, order_title, order_notes, clearCart, addNotification, router]
   );
 
-  return { is_submitting, submit_error, setSubmitError, handleComplete };
+  const handlePayLater = useCallback(async () => {
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const lb_items = items.filter((i) => i.product_type === "link_building");
+      const co_items = items.filter((i) => i.product_type === "content_optimization");
+      const nc_items = items.filter((i) => i.product_type === "new_content");
+      const cb_items = items.filter((i) => i.product_type === "content_brief");
+
+      const coupon_ids =
+        applied_coupons.length > 0
+          ? applied_coupons.map((c) => c.coupon_id)
+          : undefined;
+
+      const purchase_group_id = crypto.randomUUID();
+
+      const payload: UnifiedDeferredCheckoutPayload = {
+        deferred_payment: true,
+        total_amount: total,
+        session_id: purchase_group_id,
+        coupon_ids,
+        order_title: order_title || null,
+        order_notes: order_notes || null,
+        link_building_items:
+          lb_items.length > 0
+            ? lb_items.map((item) => {
+                const keyword_rows = item.keyword_data ?? [];
+                const placements =
+                  keyword_rows.length > 0
+                    ? keyword_rows.map((row, idx) => ({
+                        row_index: idx,
+                        keyword: row.keyword || null,
+                        landing_page: row.landing_page || null,
+                        exact_match: row.exact_match,
+                      }))
+                    : [{ row_index: 0, keyword: null, landing_page: null, exact_match: false }];
+                return { dr_tier_id: item.tier_id, quantity: item.quantity, unit_price: item.unit_price, placements };
+              })
+            : undefined,
+        content_optimization_items:
+          co_items.length > 0
+            ? co_items.map((item): UnifiedCheckoutContentOptimizationItem => ({
+                tier_id: item.tier_id,
+                quantity: item.quantity,
+                unit_price: item.unit_price,
+                intake_rows:
+                  item.co_intake_data && item.co_intake_data.length > 0
+                    ? item.co_intake_data
+                    : undefined,
+              }))
+            : undefined,
+        new_content_items:
+          nc_items.length > 0
+            ? nc_items.map((item) => ({
+                tier_id: item.tier_id,
+                quantity: item.quantity,
+                unit_price: item.unit_price,
+                intake_rows:
+                  item.intake_data && item.intake_data.length > 0
+                    ? item.intake_data.flat()
+                    : undefined,
+              }))
+            : undefined,
+        content_brief_items:
+          cb_items.length > 0
+            ? cb_items.map((item): UnifiedCheckoutContentBriefItem => ({
+                tier_id: item.tier_id,
+                quantity: item.quantity,
+                unit_price: item.unit_price,
+                intake_rows:
+                  item.co_intake_data && item.co_intake_data.length > 0
+                    ? item.co_intake_data
+                    : undefined,
+              }))
+            : undefined,
+      };
+
+      const result = await unifiedCartService.checkoutDeferred(payload);
+
+      const confirmed_group_id = result.session_id ?? purchase_group_id;
+      const purchase_group = {
+        purchase_group_id: confirmed_group_id,
+        created_at: new Date().toISOString(),
+        order_title: order_title || null,
+        total_amount: total,
+        orders: result.orders.map((o) => ({
+          order_id: o.order_id,
+          product_type: o.product_type,
+          total_amount: o.total_amount,
+        })),
+      };
+
+      savePurchaseGroup(purchase_group);
+      purchaseGroupsService.createPurchaseGroup(purchase_group).catch(() => {});
+
+      for (const order of result.orders) {
+        const label = PRODUCT_TYPE_LABELS[order.product_type];
+        const formatted_amount = order.total_amount.toLocaleString("en-US", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+        await addNotification({
+          type: "order",
+          message: `Your ${label} order has been placed. Payment is pending.`,
+          preview_text: `Order #${order.order_id} · $${formatted_amount} · Payment pending`,
+          link: `/orders/session/${confirmed_group_id}`,
+        });
+      }
+
+      clearCart();
+      router.push(`/orders/session/${confirmed_group_id}`);
+    } catch (err: unknown) {
+      setSubmitError(extractApiErrorMessage(err));
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [items, applied_coupons, total, order_title, order_notes, clearCart, addNotification, router]);
+
+  return { is_submitting, submit_error, setSubmitError, handleComplete, handlePayLater };
 }

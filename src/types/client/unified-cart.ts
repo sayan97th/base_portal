@@ -127,3 +127,16 @@ export interface UnifiedCheckoutResponse {
   orders: UnifiedCheckoutCreatedOrder[];
   session_id?: string;
 }
+
+export interface UnifiedDeferredCheckoutPayload {
+  deferred_payment: true;
+  total_amount: number;
+  session_id?: string;
+  coupon_ids?: string[] | null;
+  order_title?: string | null;
+  order_notes?: string | null;
+  link_building_items?: UnifiedCheckoutLinkBuildingItem[];
+  content_optimization_items?: UnifiedCheckoutContentOptimizationItem[];
+  new_content_items?: UnifiedCheckoutNewContentItem[];
+  content_brief_items?: UnifiedCheckoutContentBriefItem[];
+}

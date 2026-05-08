@@ -82,6 +82,12 @@ const STATUS_CFG: Record<OrderStatus, { label: string; dot: string; badge: strin
     badge: "bg-error-50 text-error-700 ring-error-200 dark:bg-error-500/10 dark:text-error-400 dark:ring-error-500/20",
     border_l: "border-l-error-400",
   },
+  payment_pending: {
+    label: "Payment Pending",
+    dot: "bg-amber-500",
+    badge: "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
+    border_l: "border-l-amber-400",
+  },
 };
 
 const UPDATE_STATUS_OPTS: OrderStatus[] = ["pending", "processing", "completed", "cancelled"];

@@ -35,6 +35,8 @@ interface CheckoutStepProps {
   onBillingChange: (field: keyof BillingAddress, value: string) => void;
   onPrevious: () => void;
   onComplete: (payment_intent_id: string, is_using_saved_method: boolean) => void;
+  /** Called when the user chooses to place the order with payment deferred. */
+  onPayLater?: () => void;
   is_loading?: boolean;
   error_message?: string | null;
   total_amount: number;
@@ -221,6 +223,7 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
   onBillingChange,
   onPrevious,
   onComplete,
+  onPayLater,
   is_loading = false,
   error_message,
   total_amount,
@@ -248,7 +251,7 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
   // Saved payment profiles
   const [payment_profiles, setPaymentProfiles] = useState<PaymentProfile[]>([]);
   const [profiles_loading, setProfilesLoading] = useState(true);
-  const [selected_profile_id, setSelectedProfileId] = useState<string | "new">("new");
+  const [selected_profile_id, setSelectedProfileId] = useState<string | "new" | "pay_later">("new");
 
   useEffect(() => {
     async function loadProfiles() {
@@ -268,7 +271,8 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
     loadProfiles();
   }, []);
 
-  const is_using_saved = selected_profile_id !== "new";
+  const is_using_saved = selected_profile_id !== "new" && selected_profile_id !== "pay_later";
+  const is_pay_later = selected_profile_id === "pay_later";
 
   const handleElementChange = (
     field: keyof StripeElementErrors,
@@ -316,6 +320,11 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
   );
 
   const handleComplete = useCallback(async () => {
+    if (is_pay_later) {
+      onPayLater?.();
+      return;
+    }
+
     if (!stripe || !elements) return;
 
     if (!is_using_saved) {
@@ -411,8 +420,8 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
       onProcessingChange?.(false);
     }
   }, [
-    stripe, elements, is_using_saved, validateNewCardFields, total_amount,
-    payment_profiles, selected_profile_id, billing_address, save_for_future,
+    stripe, elements, is_pay_later, onPayLater, is_using_saved, validateNewCardFields,
+    total_amount, payment_profiles, selected_profile_id, billing_address, save_for_future,
     name_on_card, onComplete, onProcessingChange,
   ]);
 
@@ -544,11 +553,100 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
               );
             })}
 
+            {/* "Pay Later" option */}
+            {onPayLater && (
+              <div>
+                <label
+                  className={`flex cursor-pointer items-center gap-4 px-6 py-4 transition-colors ${
+                    is_pay_later
+                      ? "bg-amber-50/80 dark:bg-amber-500/5"
+                      : "hover:bg-gray-50 dark:hover:bg-white/2"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="payment_profile"
+                    value="pay_later"
+                    checked={is_pay_later}
+                    onChange={() => setSelectedProfileId("pay_later")}
+                    className="sr-only"
+                  />
+                  <div
+                    className={`relative h-4 w-4 shrink-0 rounded-full border-2 transition-colors ${
+                      is_pay_later ? "border-amber-500" : "border-gray-300 dark:border-gray-600"
+                    }`}
+                  >
+                    {is_pay_later && (
+                      <div className="absolute inset-[3px] rounded-full bg-amber-500" />
+                    )}
+                  </div>
+                  <div className="flex h-11 w-[68px] shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-amber-300 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-500/10">
+                    <svg className="h-5 w-5 text-amber-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                    </svg>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                        Pay Later
+                      </p>
+                      <span className="rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-400">
+                        No card required
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                      Place your order now and pay when it&apos;s convenient
+                    </p>
+                  </div>
+                  {is_pay_later && (
+                    <svg className="h-4 w-4 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                    </svg>
+                  )}
+                </label>
+
+                {/* Deferred payment info panel */}
+                {is_pay_later && (
+                  <div className="border-t border-amber-100 bg-amber-50/60 px-6 pb-6 pt-5 dark:border-amber-500/15 dark:bg-amber-500/5">
+                    <div className="rounded-xl border border-amber-200 bg-white p-4 shadow-sm dark:border-amber-500/20 dark:bg-gray-900/60">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-500/15">
+                          <svg className="h-4 w-4 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                          </svg>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                            How Pay Later works
+                          </p>
+                          <ul className="mt-2.5 space-y-2">
+                            {[
+                              { icon: "M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z", text: "Your order is created immediately and reserved for you." },
+                              { icon: "M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5z", text: "An invoice will be generated and available in My Invoices." },
+                              { icon: "M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008z", text: "Work begins only after payment is received." },
+                              { icon: "M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z", text: "Pay anytime from My Invoices before your order is delivered." },
+                            ].map(({ icon, text }, i) => (
+                              <li key={i} className="flex items-start gap-2.5">
+                                <svg className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d={icon} />
+                                </svg>
+                                <span className="text-xs text-gray-600 dark:text-gray-400">{text}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* "Add new card" option */}
             <div>
               <label
                 className={`flex cursor-pointer items-center gap-4 px-6 py-4 transition-colors ${
-                  !is_using_saved
+                  !is_using_saved && !is_pay_later
                     ? "bg-brand-50/70 dark:bg-brand-500/5"
                     : "hover:bg-gray-50 dark:hover:bg-white/2"
                 }`}
@@ -557,11 +655,11 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
                   type="radio"
                   name="payment_profile"
                   value="new"
-                  checked={!is_using_saved}
+                  checked={!is_using_saved && !is_pay_later}
                   onChange={() => setSelectedProfileId("new")}
                   className="sr-only"
                 />
-                <RadioDot checked={!is_using_saved} />
+                <RadioDot checked={!is_using_saved && !is_pay_later} />
                 <div className="flex h-11 w-[68px] shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600">
                   <svg
                     className="h-5 w-5 text-gray-400"
@@ -584,7 +682,7 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
               </label>
 
               {/* Inline card form — visible when "new" is selected */}
-              {!is_using_saved && (
+              {!is_using_saved && !is_pay_later && (
                 <div className="border-t border-gray-100 bg-gray-50/40 px-6 pb-6 pt-5 dark:border-gray-800 dark:bg-white/1">
                   <div className="space-y-4">
                     {/* Card number */}
@@ -727,7 +825,7 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
       </SectionCard>
 
       {/* ── Billing Address Section — only required for new card payments ── */}
-      {!is_using_saved && (
+      {!is_using_saved && !is_pay_later && (
         <SectionCard>
           <SectionHeader
             title="Billing Address"

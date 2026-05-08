@@ -3,6 +3,7 @@ import type {
   UnifiedCartPayload,
   UnifiedCheckoutPayload,
   UnifiedCheckoutResponse,
+  UnifiedDeferredCheckoutPayload,
 } from "@/types/client/unified-cart";
 
 interface FetchCartApiResponse {
@@ -49,6 +50,19 @@ export const unifiedCartService = {
   async checkout(payload: UnifiedCheckoutPayload): Promise<UnifiedCheckoutResponse> {
     const response = await apiClient.post<CheckoutApiResponse>(
       "/api/cart/checkout",
+      payload
+    );
+    return response.data;
+  },
+
+  /**
+   * POST /api/cart/checkout/deferred
+   * Creates orders without immediate payment. The backend creates orders with
+   * payment_pending status and generates an unpaid invoice for later payment.
+   */
+  async checkoutDeferred(payload: UnifiedDeferredCheckoutPayload): Promise<UnifiedCheckoutResponse> {
+    const response = await apiClient.post<CheckoutApiResponse>(
+      "/api/cart/checkout/deferred",
       payload
     );
     return response.data;

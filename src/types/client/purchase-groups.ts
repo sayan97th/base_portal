@@ -12,6 +12,8 @@ export interface PurchaseGroup {
   total_amount: number;
   created_at: string;
   orders: PurchaseGroupOrder[];
+  payment_status?: string | null;
+  invoice_unique_id?: string | null;
 }
 
 export interface CreatePurchaseGroupPayload {
@@ -20,4 +22,6 @@ export interface CreatePurchaseGroupPayload {
   total_amount: number;
   created_at: string;
   orders: PurchaseGroupOrder[];
+  payment_status?: string | null;
+  invoice_unique_id?: string | null;
 }

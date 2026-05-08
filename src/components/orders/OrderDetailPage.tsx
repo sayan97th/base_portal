@@ -25,7 +25,7 @@ import OrderComments from "@/components/orders/OrderComments";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type OrderStatus = "pending" | "processing" | "completed" | "cancelled";
+type OrderStatus = "pending" | "processing" | "completed" | "cancelled" | "payment_pending";
 
 interface NormalizedItem {
   id: string;
@@ -79,6 +79,8 @@ function getStatusConfig(status: string): {
       return { color: "success", label: "Completed", dot: "bg-success-500" };
     case "cancelled":
       return { color: "error", label: "Cancelled", dot: "bg-error-500" };
+    case "payment_pending":
+      return { color: "warning", label: "Payment Pending", dot: "bg-amber-500" };
     default:
       return { color: "info", label: status, dot: "bg-gray-400" };
   }
@@ -371,6 +373,34 @@ const OrderDetailPage: React.FC<OrderDetailPageProps> = ({ order_id }) => {
             )}
           </div>
         </div>
+
+        {/* Payment pending banner */}
+        {detail?.status === "payment_pending" && (
+          <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/25 dark:bg-amber-500/10">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-500/20">
+              <svg className="h-4 w-4 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+              </svg>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                Payment is pending for this order
+              </p>
+              <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">
+                Your order has been placed but payment has not been received yet. Work will begin once payment is completed. You can pay at any time from your invoices.
+              </p>
+              <Link
+                href="/invoices"
+                className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-500 hover:text-white dark:border-amber-500/40 dark:bg-transparent dark:text-amber-400 dark:hover:bg-amber-500 dark:hover:text-white"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5z" />
+                </svg>
+                Go to My Invoices
+              </Link>
+            </div>
+          </div>
+        )}
 
         {/* Error */}
         {error && (

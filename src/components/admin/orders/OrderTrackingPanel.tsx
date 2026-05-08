@@ -46,7 +46,8 @@ const STATUS_PILL: Record<OrderStatus, string> = {
   pending: "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400",
   processing: "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400",
   completed: "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400",
-  cancelled: "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400",
+  cancelled:       "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400",
+  payment_pending: "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400",
 };
 
 const PlusIcon = () => (

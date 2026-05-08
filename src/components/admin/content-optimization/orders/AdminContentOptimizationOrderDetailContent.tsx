@@ -44,6 +44,7 @@ function getStatusConfig(status: OrderStatus): {
     case "processing": return { color: "info", label: "Processing", dot: "bg-violet-500" };
     case "completed": return { color: "success", label: "Completed", dot: "bg-success-500" };
     case "cancelled": return { color: "error", label: "Cancelled", dot: "bg-error-500" };
+    case "payment_pending": return { color: "warning", label: "Payment Pending", dot: "bg-amber-500" };
   }
 }
 

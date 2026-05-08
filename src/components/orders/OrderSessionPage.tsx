@@ -20,7 +20,7 @@ import type { CartProductType } from "@/types/client/unified-cart";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type OrderStatus = "pending" | "processing" | "completed" | "cancelled";
+type OrderStatus = "pending" | "processing" | "completed" | "cancelled" | "payment_pending";
 
 interface ResolvedOrderSection {
   order_id: string;
@@ -75,6 +75,8 @@ function getStatusConfig(status: string): {
   switch (status as OrderStatus) {
     case "pending":
       return { color: "warning", label: "Pending", dot: "bg-warning-500" };
+    case "payment_pending":
+      return { color: "warning", label: "Payment Pending", dot: "bg-warning-500" };
     case "processing":
       return { color: "info", label: "Processing", dot: "bg-blue-light-500" };
     case "completed":
@@ -147,6 +149,18 @@ const BackIcon = () => (
 const CheckCircleIcon = ({ className }: { className?: string }) => (
   <svg className={className ?? "h-6 w-6"} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
+
+const ClockIcon = ({ className }: { className?: string }) => (
+  <svg className={className ?? "h-6 w-6"} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
+
+const CreditCardIcon = ({ className }: { className?: string }) => (
+  <svg className={className ?? "h-4 w-4"} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
   </svg>
 );
 
@@ -295,7 +309,7 @@ function ProductSectionCard({
           >
             {status_cfg.label}
           </Badge>
-          {track_href && section.status !== "cancelled" && (
+          {track_href && section.status !== "cancelled" && section.status !== "payment_pending" && (
             <Link
               href={track_href}
               className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600 transition-colors shadow-sm"
@@ -486,6 +500,14 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
   const session_short = session_id.slice(0, 8).toUpperCase();
   const lb_section = sections.find((s) => s.product_type === "link_building");
 
+  const is_payment_pending =
+    session?.payment_status === "payment_pending" ||
+    (!is_loading && sections.length > 0 && sections.every((s) => s.status === "payment_pending"));
+
+  const invoice_pay_href = session?.invoice_unique_id
+    ? `/invoices/${session.invoice_unique_id}/pay`
+    : "/invoices";
+
   const resolvedItems = (section: ResolvedOrderSection): NormalizedItem[] | undefined => {
     if (section.product_type === "link_building" && section.lb_detail) {
       return section.lb_detail.items.map((item) => ({
@@ -542,24 +564,41 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
       </button>
 
       {/* ── Confirmation Banner ── */}
-      <div className="relative overflow-hidden rounded-2xl border border-brand-100 dark:border-brand-500/20 bg-linear-to-br from-brand-50 via-white to-brand-25 dark:from-brand-500/10 dark:via-gray-900 dark:to-brand-500/5 px-6 py-6">
+      <div className={`relative overflow-hidden rounded-2xl border px-6 py-6 ${
+        is_payment_pending
+          ? "border-warning-100 dark:border-warning-500/20 bg-linear-to-br from-warning-50 via-white to-warning-25 dark:from-warning-500/10 dark:via-gray-900 dark:to-warning-500/5"
+          : "border-brand-100 dark:border-brand-500/20 bg-linear-to-br from-brand-50 via-white to-brand-25 dark:from-brand-500/10 dark:via-gray-900 dark:to-brand-500/5"
+      }`}>
         {/* Decorative ring */}
         <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full border border-brand-200/60 dark:border-brand-500/10" />
         <div className="pointer-events-none absolute -right-4 -top-4 h-24 w-24 rounded-full border border-brand-300/40 dark:border-brand-500/15" />
 
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-success-100 dark:bg-success-500/20 text-success-600 dark:text-success-400 shadow-sm">
-              <CheckCircleIcon className="h-6 w-6" />
+            <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full shadow-sm ${
+              is_payment_pending
+                ? "bg-warning-100 dark:bg-warning-500/20 text-warning-600 dark:text-warning-400"
+                : "bg-success-100 dark:bg-success-500/20 text-success-600 dark:text-success-400"
+            }`}>
+              {is_payment_pending
+                ? <ClockIcon className="h-6 w-6" />
+                : <CheckCircleIcon className="h-6 w-6" />
+              }
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-xl font-bold text-gray-900 dark:text-white">
                   Order Confirmed
                 </h1>
-                <span className="inline-flex items-center rounded-full border border-success-200 dark:border-success-500/30 bg-success-50 dark:bg-success-500/10 px-2 py-0.5 text-xs font-medium text-success-700 dark:text-success-400">
-                  Payment Successful
-                </span>
+                {is_payment_pending ? (
+                  <span className="inline-flex items-center rounded-full border border-warning-200 dark:border-warning-500/30 bg-warning-50 dark:bg-warning-500/10 px-2 py-0.5 text-xs font-medium text-warning-700 dark:text-warning-400">
+                    Payment Pending
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center rounded-full border border-success-200 dark:border-success-500/30 bg-success-50 dark:bg-success-500/10 px-2 py-0.5 text-xs font-medium text-success-700 dark:text-success-400">
+                    Payment Successful
+                  </span>
+                )}
               </div>
               {session?.order_title && (
                 <p className="mt-1 text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -595,16 +634,53 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
             >
               All Orders
             </Link>
-            <Link
-              href="/store"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 transition-colors shadow-sm"
-            >
-              <PlusIcon />
-              New Order
-            </Link>
+            {is_payment_pending ? (
+              <Link
+                href={invoice_pay_href}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-warning-500 px-4 py-2 text-sm font-semibold text-white hover:bg-warning-600 transition-colors shadow-sm"
+              >
+                <CreditCardIcon className="h-4 w-4" />
+                Pay Now
+              </Link>
+            ) : (
+              <Link
+                href="/store"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 transition-colors shadow-sm"
+              >
+                <PlusIcon />
+                New Order
+              </Link>
+            )}
           </div>
         </div>
       </div>
+
+      {/* ── Payment Pending Banner ── */}
+      {is_payment_pending && (
+        <div className="flex flex-col gap-4 rounded-xl border border-warning-200 bg-warning-50 p-5 dark:border-warning-500/30 dark:bg-warning-500/10 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-warning-100 dark:bg-warning-500/20">
+              <ClockIcon className="h-4 w-4 text-warning-600 dark:text-warning-400" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-warning-700 dark:text-warning-300">
+                Payment Pending
+              </p>
+              <p className="mt-0.5 text-xs text-warning-600 dark:text-warning-400">
+                Your order has been confirmed and is awaiting payment. Complete your payment to begin processing.
+                {session ? ` Amount due: ${formatCurrency(session.total_amount)}.` : ""}
+              </p>
+            </div>
+          </div>
+          <Link
+            href={invoice_pay_href}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-warning-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-warning-600 dark:bg-warning-500 dark:hover:bg-warning-600"
+          >
+            <CreditCardIcon className="h-4 w-4" />
+            Pay Invoice Now
+          </Link>
+        </div>
+      )}
 
       {/* ── Order Items Card ── */}
       <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-white/3 overflow-hidden">
@@ -620,7 +696,9 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
           </div>
           {!is_loading && session && (
             <div className="text-right">
-              <p className="text-xs text-gray-400 dark:text-gray-500">Total Charged</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">
+                {is_payment_pending ? "Total Due" : "Total Charged"}
+              </p>
               <p className="text-lg font-bold text-gray-900 dark:text-white mt-0.5">
                 {formatCurrency(session.total_amount)}
               </p>
@@ -667,11 +745,18 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
             )}
             <div className="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/40 px-4 py-3.5">
               <div className="flex items-center gap-2">
-                <div className="h-6 w-6 rounded-full bg-success-100 dark:bg-success-500/20 flex items-center justify-center">
-                  <CheckCircleIcon className="h-3.5 w-3.5 text-success-600 dark:text-success-400" />
+                <div className={`h-6 w-6 rounded-full flex items-center justify-center ${
+                  is_payment_pending
+                    ? "bg-warning-100 dark:bg-warning-500/20"
+                    : "bg-success-100 dark:bg-success-500/20"
+                }`}>
+                  {is_payment_pending
+                    ? <ClockIcon className="h-3.5 w-3.5 text-warning-600 dark:text-warning-400" />
+                    : <CheckCircleIcon className="h-3.5 w-3.5 text-success-600 dark:text-success-400" />
+                  }
                 </div>
                 <span className="text-sm font-semibold text-gray-800 dark:text-white/90">
-                  Total Paid
+                  {is_payment_pending ? "Total Due" : "Total Paid"}
                 </span>
               </div>
               <span className="text-xl font-bold text-gray-900 dark:text-white">
@@ -686,10 +771,21 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
       {!is_loading && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-white/2 px-5 py-4">
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            A confirmation has been recorded for order{" "}
-            <span className="font-mono font-semibold text-gray-700 dark:text-gray-300">
-              #{session_short}
-            </span>
+            {is_payment_pending ? (
+              <>
+                Invoice pending payment for order{" "}
+                <span className="font-mono font-semibold text-gray-700 dark:text-gray-300">
+                  #{session_short}
+                </span>
+              </>
+            ) : (
+              <>
+                A confirmation has been recorded for order{" "}
+                <span className="font-mono font-semibold text-gray-700 dark:text-gray-300">
+                  #{session_short}
+                </span>
+              </>
+            )}
           </p>
           <div className="flex flex-wrap items-center gap-2.5">
             <Link
@@ -698,7 +794,15 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
             >
               View All Orders
             </Link>
-            {lb_section && (
+            {is_payment_pending ? (
+              <Link
+                href={invoice_pay_href}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-warning-500 px-4 py-2 text-sm font-semibold text-white hover:bg-warning-600 transition-colors shadow-sm"
+              >
+                <CreditCardIcon className="h-4 w-4" />
+                Pay Invoice
+              </Link>
+            ) : lb_section ? (
               <Link
                 href={`/link-building/orders/${lb_section.order_id}/tracking`}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 transition-colors shadow-sm"
@@ -706,8 +810,32 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
                 <BoltIcon />
                 Track Link Building
               </Link>
-            )}
+            ) : null}
           </div>
+        </div>
+      )}
+
+      {/* ── Pay CTA (payment pending only) ── */}
+      {!is_loading && is_payment_pending && session && (
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-warning-200 bg-warning-50/60 p-6 text-center dark:border-warning-500/20 dark:bg-warning-500/5">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-warning-100 dark:bg-warning-500/20">
+            <CreditCardIcon className="h-5 w-5 text-warning-600 dark:text-warning-400" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-800 dark:text-white/90">
+              Ready to complete your order?
+            </p>
+            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+              Secure payment takes less than a minute. Your order will start processing immediately after payment.
+            </p>
+          </div>
+          <Link
+            href={invoice_pay_href}
+            className="inline-flex items-center gap-2 rounded-lg bg-warning-500 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-warning-600 dark:bg-warning-500 dark:hover:bg-warning-600"
+          >
+            <CreditCardIcon className="h-4 w-4" />
+            Pay Invoice — {formatCurrency(session.total_amount)}
+          </Link>
         </div>
       )}
 

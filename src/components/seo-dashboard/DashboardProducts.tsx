@@ -399,6 +399,7 @@ const DashboardProducts: React.FC = () => {
     is_submitting,
     submit_error,
     handleComplete: executeCheckout,
+    handlePayLater,
   } = useUnifiedCheckout();
 
   // ── Fetch all product tiers in parallel ─────────────────────────────────────
@@ -974,6 +975,7 @@ const DashboardProducts: React.FC = () => {
                 onBillingChange={handleBillingChange}
                 onPrevious={handleBack}
                 onComplete={handlePaymentComplete}
+                onPayLater={handlePayLater}
                 is_loading={is_submitting}
                 error_message={submit_error}
                 total_amount={total}

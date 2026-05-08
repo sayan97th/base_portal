@@ -53,6 +53,8 @@ function getStatusConfig(status: OrderStatus): {
       return { color: "success", label: "Completed", dot: "bg-success-500" };
     case "cancelled":
       return { color: "error", label: "Cancelled", dot: "bg-error-500" };
+    case "payment_pending":
+      return { color: "warning", label: "Payment Pending", dot: "bg-amber-500" };
   }
 }
 
@@ -635,6 +637,25 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
       {/* Main Content */}
       {!is_loading && order && status_config && (
         <>
+          {/* Payment pending banner */}
+          {order.status === "payment_pending" && (
+            <div className="mb-2 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/25 dark:bg-amber-500/10">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-500/20">
+                <svg className="h-4 w-4 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                </svg>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                  Payment pending — client has not paid yet
+                </p>
+                <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">
+                  This order was placed with deferred payment. Work should not begin until payment is confirmed. The client can pay from their invoices page.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Page Header */}
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>

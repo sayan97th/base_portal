@@ -58,6 +58,12 @@ const STATUS_CONFIG: Record<
     bg: "bg-error-50 dark:bg-error-500/10",
     text: "text-error-700 dark:text-error-400",
   },
+  payment_pending: {
+    label: "Payment Pending",
+    dot: "bg-amber-500",
+    bg: "bg-amber-50 dark:bg-amber-500/10",
+    text: "text-amber-700 dark:text-amber-400",
+  },
 };
 
 const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [

@@ -42,7 +42,7 @@ const ContentBriefsPage: React.FC = () => {
     total,
   } = useCart();
   const { saved_billing_address, has_saved_address } = useBillingAddress();
-  const { is_submitting, submit_error, handleComplete: executeCheckout } =
+  const { is_submitting, submit_error, handleComplete: executeCheckout, handlePayLater } =
     useUnifiedCheckout();
 
   const checkout_ref = useRef<CheckoutStepHandle>(null);
@@ -212,6 +212,7 @@ const ContentBriefsPage: React.FC = () => {
                 onBillingChange={handleBillingChange}
                 onPrevious={handlePrevious}
                 onComplete={handleComplete}
+                onPayLater={handlePayLater}
                 is_loading={is_submitting}
                 error_message={submit_error}
                 total_amount={total}
