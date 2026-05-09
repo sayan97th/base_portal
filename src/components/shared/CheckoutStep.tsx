@@ -26,7 +26,6 @@ export interface BillingAddress {
   company: string;
 }
 
-/** Imperative handle exposed via forwardRef so parents can trigger submit. */
 export type CheckoutStepHandle = {
   triggerSubmit: () => void;
 };
@@ -36,19 +35,14 @@ interface CheckoutStepProps {
   onBillingChange: (field: keyof BillingAddress, value: string) => void;
   onPrevious: () => void;
   onComplete: (payment_intent_id: string, is_using_saved_method: boolean) => void;
-  /** Called when the user chooses to place the order with payment deferred. */
   onPayLater?: () => void;
-  /** Called when the user successfully pays using account credits. */
   onPayWithCredits?: () => void;
   is_loading?: boolean;
   error_message?: string | null;
   total_amount: number;
   saved_billing_address?: BillingAddress | null;
   onApplySavedAddress?: () => void;
-  /** Label for the back navigation button. Defaults to "Back to Keywords". */
   back_label?: string;
-  /** Called whenever the internal processing state changes so the parent can
-   *  reflect it on an external submit button (e.g. in the order summary). */
   onProcessingChange?: (is_processing: boolean) => void;
 }
 
@@ -86,7 +80,6 @@ const countries = [
   "Japan", "South Korea", "India", "Singapore",
 ];
 
-/** Maps full country names to ISO 3166-1 alpha-2 codes required by Stripe. */
 const country_code_map: Record<string, string> = {
   "United States": "US", "Canada": "CA", "United Kingdom": "GB",
   "Australia": "AU", "Germany": "DE", "France": "FR", "Spain": "ES",
@@ -156,35 +149,20 @@ function MiniCard({ brand, last_four }: { brand: string; last_four: string }) {
       className="relative flex h-11 w-[68px] shrink-0 flex-col justify-between overflow-hidden rounded-lg p-1.5 shadow-md"
       style={{ backgroundImage: gradient }}
     >
-      <div
-        className="pointer-events-none absolute inset-0 rounded-lg"
-        style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0) 60%)" }}
-      />
-      <div
-        className="pointer-events-none absolute -bottom-3 -right-3 h-10 w-10 rounded-full opacity-20"
-        style={{ background: "rgba(255,255,255,0.6)" }}
-      />
-      <div
-        className="relative h-2 w-3.5 rounded-[2px]"
-        style={{ background: "linear-gradient(135deg, #d4a846 0%, #f5d278 50%, #c9952a 100%)" }}
-      />
-      <p className="relative font-mono text-[8px] font-semibold tracking-wider text-white/90">
-        •••• {last_four}
-      </p>
+      <div className="pointer-events-none absolute inset-0 rounded-lg" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0) 60%)" }} />
+      <div className="pointer-events-none absolute -bottom-3 -right-3 h-10 w-10 rounded-full opacity-20" style={{ background: "rgba(255,255,255,0.6)" }} />
+      <div className="relative h-2 w-3.5 rounded-[2px]" style={{ background: "linear-gradient(135deg, #d4a846 0%, #f5d278 50%, #c9952a 100%)" }} />
+      <p className="relative font-mono text-[8px] font-semibold tracking-wider text-white/90">•••• {last_four}</p>
     </div>
   );
 }
 
-function RadioDot({ checked }: { checked: boolean }) {
+function RadioDot({ checked, color = "brand" }: { checked: boolean; color?: "brand" | "amber" }) {
+  const active = color === "amber" ? "border-amber-500" : "border-brand-500";
+  const dot_bg = color === "amber" ? "bg-amber-500" : "bg-brand-500";
   return (
-    <div
-      className={`relative h-4 w-4 shrink-0 rounded-full border-2 transition-colors ${
-        checked ? "border-brand-500" : "border-gray-300 dark:border-gray-600"
-      }`}
-    >
-      {checked && (
-        <div className="absolute inset-[3px] rounded-full bg-brand-500" />
-      )}
+    <div className={`relative h-4 w-4 shrink-0 rounded-full border-2 transition-colors ${checked ? active : "border-gray-300 dark:border-gray-600"}`}>
+      {checked && <div className={`absolute inset-[3px] rounded-full ${dot_bg}`} />}
     </div>
   );
 }
@@ -197,25 +175,250 @@ function SectionCard({ children }: { children: React.ReactNode }) {
   );
 }
 
-function SectionHeader({
-  title,
-  subtitle,
-  action,
-}: {
-  title: string;
-  subtitle?: string;
-  action?: React.ReactNode;
-}) {
+function SectionHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: React.ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-4 dark:border-gray-800">
       <div>
         <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h2>
-        {subtitle && (
-          <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{subtitle}</p>
-        )}
+        {subtitle && <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{subtitle}</p>}
       </div>
       {action}
     </div>
+  );
+}
+
+// ─── Credits Apply Panel ──────────────────────────────────────────────────────
+
+interface CreditsApplyPanelProps {
+  credit_balance: number;
+  total_amount: number;
+  is_applying: boolean;
+  credits_to_apply: number;
+  credits_input: string;
+  onToggle: (enabled: boolean) => void;
+  onSliderChange: (value: number) => void;
+  onInputChange: (raw: string) => void;
+  onInputBlur: () => void;
+  onApplyMax: () => void;
+}
+
+function CreditsApplyPanel({
+  credit_balance,
+  total_amount,
+  is_applying,
+  credits_to_apply,
+  credits_input,
+  onToggle,
+  onSliderChange,
+  onInputChange,
+  onInputBlur,
+  onApplyMax,
+}: CreditsApplyPanelProps) {
+  const max_credits = Math.min(credit_balance, Math.ceil(total_amount));
+  const amount_after = Math.max(0, total_amount - credits_to_apply);
+  const is_fully_covered = is_applying && amount_after <= 0;
+  const savings_pct = total_amount > 0 ? Math.round((credits_to_apply / total_amount) * 100) : 0;
+
+  return (
+    <SectionCard>
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-4 dark:border-gray-800">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-500/15">
+            <svg className="h-5 w-5 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Account Credits</h2>
+            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+              {credit_balance.toLocaleString()} credits available · ${credit_balance.toLocaleString()} value · 1 credit = $1.00
+            </p>
+          </div>
+        </div>
+        {/* Balance badge */}
+        <div className="shrink-0 rounded-full bg-emerald-100 px-3 py-1 dark:bg-emerald-500/15">
+          <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
+            ${credit_balance.toLocaleString()}
+          </span>
+        </div>
+      </div>
+
+      <div className="px-6 py-5 space-y-4">
+        {/* Toggle row */}
+        <div
+          className={`flex cursor-pointer items-center justify-between gap-4 rounded-xl border p-4 transition-all ${
+            is_applying
+              ? "border-emerald-200 bg-emerald-50/70 dark:border-emerald-500/30 dark:bg-emerald-500/8"
+              : "border-gray-200 bg-gray-50/60 hover:bg-gray-50 dark:border-gray-700 dark:bg-white/2 dark:hover:bg-white/4"
+          }`}
+          onClick={() => onToggle(!is_applying)}
+        >
+          <div className="flex items-center gap-3">
+            <div className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${is_applying ? "bg-emerald-100 dark:bg-emerald-500/20" : "bg-gray-100 dark:bg-gray-800"}`}>
+              <svg
+                className={`h-4 w-4 transition-colors ${is_applying ? "text-emerald-600 dark:text-emerald-400" : "text-gray-400 dark:text-gray-500"}`}
+                fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 14.25l6-6m4.5-3.493V21.75l-3.75-1.5-3.75 1.5-3.75-1.5-3.75 1.5V4.757c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0c1.1.128 1.907 1.077 1.907 2.185Z" />
+              </svg>
+            </div>
+            <div>
+              <p className={`text-sm font-semibold transition-colors ${is_applying ? "text-emerald-800 dark:text-emerald-300" : "text-gray-800 dark:text-gray-200"}`}>
+                Apply credits to this order
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Use your balance as a discount · no expiry
+              </p>
+            </div>
+          </div>
+
+          {/* Toggle switch */}
+          <div
+            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200 ${is_applying ? "bg-emerald-500" : "bg-gray-200 dark:bg-gray-700"}`}
+          >
+            <span
+              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${is_applying ? "translate-x-5" : "translate-x-0.5"}`}
+            />
+          </div>
+        </div>
+
+        {/* Amount editor — visible when toggled */}
+        {is_applying && (
+          <div className="space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+            {/* Slider card */}
+            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/60">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Credits to apply</span>
+                <button
+                  type="button"
+                  onClick={onApplyMax}
+                  className="text-xs font-semibold text-emerald-600 transition-colors hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
+                >
+                  Apply maximum →
+                </button>
+              </div>
+
+              {/* Range slider */}
+              <input
+                type="range"
+                min={0}
+                max={max_credits}
+                step={1}
+                value={credits_to_apply}
+                onChange={(e) => onSliderChange(Number(e.target.value))}
+                className="h-2 w-full cursor-pointer appearance-none rounded-full bg-gray-200 accent-emerald-500 dark:bg-gray-700"
+                style={{
+                  background: max_credits > 0
+                    ? `linear-gradient(to right, #10b981 0%, #10b981 ${(credits_to_apply / max_credits) * 100}%, #e5e7eb ${(credits_to_apply / max_credits) * 100}%, #e5e7eb 100%)`
+                    : undefined,
+                }}
+              />
+
+              <div className="mt-1 flex justify-between text-[10px] text-gray-400">
+                <span>0 credits</span>
+                <span>{max_credits.toLocaleString()} credits</span>
+              </div>
+
+              {/* Number input row */}
+              <div className="mt-3 flex items-center gap-3">
+                <div className="relative flex-1">
+                  <input
+                    type="number"
+                    min={0}
+                    max={max_credits}
+                    value={credits_input}
+                    onChange={(e) => onInputChange(e.target.value)}
+                    onBlur={onInputBlur}
+                    className="h-10 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 pr-16 text-sm font-semibold text-gray-900 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  />
+                  <span className="pointer-events-none absolute right-3 top-2.5 text-xs text-gray-400">credits</span>
+                </div>
+                <svg className="h-4 w-4 shrink-0 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                </svg>
+                <div className="shrink-0 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-500/30 dark:bg-emerald-500/10">
+                  <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400">
+                    -${credits_to_apply.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Breakdown summary — only shown when credits > 0 */}
+            {credits_to_apply > 0 && (
+              <div className={`overflow-hidden rounded-xl border transition-all ${
+                is_fully_covered
+                  ? "border-emerald-300 bg-emerald-50 dark:border-emerald-500/40 dark:bg-emerald-500/10"
+                  : "border-gray-200 bg-gray-50/80 dark:border-gray-700 dark:bg-white/2"
+              }`}>
+                <div className="px-4 py-3">
+                  <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                    Payment Breakdown
+                  </p>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-500 dark:text-gray-400">Order total</span>
+                      <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">${total_amount.toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M18 12H6" />
+                        </svg>
+                        Credits applied ({credits_to_apply.toLocaleString()})
+                        {savings_pct > 0 && (
+                          <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">
+                            -{savings_pct}%
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                        -${credits_to_apply.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="border-t border-dashed border-gray-200 pt-2 dark:border-gray-700">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                          {is_fully_covered ? "Total due" : "Charge to card"}
+                        </span>
+                        <span className={`text-sm font-bold ${is_fully_covered ? "text-emerald-600 dark:text-emerald-400" : "text-gray-900 dark:text-white"}`}>
+                          ${amount_after.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Fully covered callout */}
+                {is_fully_covered && (
+                  <div className="flex items-center gap-2.5 border-t border-emerald-200 bg-emerald-100/70 px-4 py-3 dark:border-emerald-500/30 dark:bg-emerald-500/15">
+                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500">
+                      <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                      </svg>
+                    </div>
+                    <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+                      Your credits fully cover this order — no card needed!
+                    </p>
+                  </div>
+                )}
+
+                {/* Remaining credits after this order */}
+                {!is_fully_covered && credit_balance - credits_to_apply >= 0 && (
+                  <div className="flex items-center justify-between border-t border-gray-100 px-4 py-2 dark:border-gray-700">
+                    <span className="text-[10px] text-gray-400 dark:text-gray-500">Remaining credit balance</span>
+                    <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400">
+                      {(credit_balance - credits_to_apply).toLocaleString()} credits
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </SectionCard>
   );
 }
 
@@ -255,11 +458,25 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
   // Saved payment profiles
   const [payment_profiles, setPaymentProfiles] = useState<PaymentProfile[]>([]);
   const [profiles_loading, setProfilesLoading] = useState(true);
-  const [selected_profile_id, setSelectedProfileId] = useState<string | "new" | "pay_later" | "credits">("new");
+  const [selected_profile_id, setSelectedProfileId] = useState<string | "new" | "pay_later">("new");
 
   // Account credits
   const [credit_balance, setCreditBalance] = useState(0);
   const [credits_loading, setCreditsLoading] = useState(true);
+
+  // Credits apply state
+  const [is_applying_credits, setIsApplyingCredits] = useState(false);
+  const [credits_to_apply, setCreditsToApply] = useState(0);
+  const [credits_input, setCreditsInput] = useState("0");
+
+  // ── Derived values ────────────────────────────────────────────
+  const max_credits_to_apply = Math.min(credit_balance, Math.ceil(total_amount));
+  const effective_credits = is_applying_credits ? credits_to_apply : 0;
+  const amount_after_credits = Math.max(0, total_amount - effective_credits);
+  const is_fully_paid_by_credits = is_applying_credits && amount_after_credits <= 0;
+
+  const is_pay_later = selected_profile_id === "pay_later";
+  const is_using_saved = selected_profile_id !== "new" && !is_pay_later;
 
   useEffect(() => {
     async function loadProfiles() {
@@ -267,9 +484,7 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
         const profiles = await paymentProfileService.fetchPaymentProfiles();
         setPaymentProfiles(profiles);
         const default_profile = profiles.find((p) => p.is_default) ?? profiles[0];
-        if (default_profile) {
-          setSelectedProfileId(default_profile.id);
-        }
+        if (default_profile) setSelectedProfileId(default_profile.id);
       } catch {
         // Silently fail — user can still enter a new card
       } finally {
@@ -285,7 +500,7 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
         const { balance } = await creditsService.fetchCreditBalance();
         setCreditBalance(balance);
       } catch {
-        // Silently fail — credits option will simply be hidden
+        // Silently fail — credits panel hidden
       } finally {
         setCreditsLoading(false);
       }
@@ -293,14 +508,43 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
     loadCredits();
   }, []);
 
-  const is_using_credits = selected_profile_id === "credits";
-  const is_pay_later = selected_profile_id === "pay_later";
-  const is_using_saved = selected_profile_id !== "new" && !is_pay_later && !is_using_credits;
+  // ── Credits handlers ──────────────────────────────────────────
 
-  const handleElementChange = (
-    field: keyof StripeElementErrors,
-    event: StripeElementChangeEvent
-  ) => {
+  const handleCreditsToggle = useCallback((enabled: boolean) => {
+    setIsApplyingCredits(enabled);
+    if (enabled) {
+      const max = Math.min(credit_balance, Math.ceil(total_amount));
+      setCreditsToApply(max);
+      setCreditsInput(String(max));
+    }
+  }, [credit_balance, total_amount]);
+
+  const handleCreditsSliderChange = useCallback((value: number) => {
+    const clamped = Math.min(Math.max(0, Math.round(value)), max_credits_to_apply);
+    setCreditsToApply(clamped);
+    setCreditsInput(String(clamped));
+  }, [max_credits_to_apply]);
+
+  const handleCreditsInputChange = useCallback((raw: string) => {
+    setCreditsInput(raw);
+    const parsed = parseInt(raw, 10);
+    if (!isNaN(parsed)) {
+      setCreditsToApply(Math.min(Math.max(0, parsed), max_credits_to_apply));
+    }
+  }, [max_credits_to_apply]);
+
+  const handleCreditsInputBlur = useCallback(() => {
+    setCreditsInput(String(credits_to_apply));
+  }, [credits_to_apply]);
+
+  const handleCreditsApplyMax = useCallback(() => {
+    setCreditsToApply(max_credits_to_apply);
+    setCreditsInput(String(max_credits_to_apply));
+  }, [max_credits_to_apply]);
+
+  // ── Stripe element change ─────────────────────────────────────
+
+  const handleElementChange = (field: keyof StripeElementErrors, event: StripeElementChangeEvent) => {
     setStripeErrors((prev) => ({
       ...prev,
       [field]: event.error ? event.error.message : undefined,
@@ -342,31 +586,82 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
     [onBillingChange, billing_errors]
   );
 
-  const has_insufficient_credits = is_using_credits && credit_balance < total_amount;
+  // ── Shared Stripe charge helper ───────────────────────────────
+
+  const chargeCard = useCallback(async (amount_cents: number) => {
+    if (!stripe || !elements) throw new Error("Stripe not loaded.");
+
+    if (is_using_saved) {
+      const profile = payment_profiles.find((p) => p.id === selected_profile_id);
+      if (!profile) throw new Error("Selected payment method not found.");
+      const { client_secret } = await createPaymentIntent({
+        amount_cents,
+        stripe_payment_method_id: profile.stripe_payment_method_id,
+      });
+      return stripe.confirmCardPayment(client_secret, {
+        payment_method: profile.stripe_payment_method_id,
+      });
+    }
+
+    const { client_secret } = await createPaymentIntent({ amount_cents });
+    const card_element = elements.getElement(CardNumberElement)!;
+    const country_code = country_code_map[billing_address.country] ?? "US";
+    return stripe.confirmCardPayment(client_secret, {
+      payment_method: {
+        card: card_element,
+        billing_details: {
+          name: name_on_card,
+          address: {
+            line1: billing_address.address,
+            city: billing_address.city,
+            state: billing_address.state,
+            postal_code: billing_address.postal_code,
+            country: country_code,
+          },
+        },
+      },
+    });
+  }, [stripe, elements, is_using_saved, payment_profiles, selected_profile_id, billing_address, name_on_card]);
+
+  const trySaveCard = useCallback(async (payment_method_id: string | { id: string }) => {
+    try {
+      const pm_id = typeof payment_method_id === "string" ? payment_method_id : payment_method_id.id;
+      await paymentProfileService.createPaymentProfile({
+        stripe_payment_method_id: pm_id,
+        cardholder_name: name_on_card.trim() || null,
+        is_default: payment_profiles.length === 0,
+      });
+    } catch {
+      // Don't block the order if card saving fails
+    }
+  }, [name_on_card, payment_profiles.length]);
+
+  // ── Main submit handler ───────────────────────────────────────
 
   const handleComplete = useCallback(async () => {
+    // ── Pay Later ──
     if (is_pay_later) {
       onPayLater?.();
       return;
     }
 
-    if (is_using_credits) {
-      if (has_insufficient_credits) {
-        setStripeError("Your credit balance is insufficient for this order. Please choose another payment method.");
-        return;
-      }
+    // ── Full credits payment ──
+    if (is_fully_paid_by_credits) {
       setIsProcessing(true);
       onProcessingChange?.(true);
       setStripeError(null);
       try {
-        await creditsService.payWithCredits({
-          amount: total_amount,
-          description: "Order payment",
+        const result = await creditsService.payWithCredits({
+          amount: credits_to_apply,
+          description: "Order payment via account credits",
         });
-        onPayWithCredits?.();
+        if (onPayWithCredits) {
+          onPayWithCredits();
+        } else {
+          onComplete(`credits_${result.transaction_id}`, false);
+        }
       } catch (err: unknown) {
-        const message =
-          err instanceof Error ? err.message : "Failed to process credit payment. Please try again.";
+        const message = err instanceof Error ? err.message : "Failed to process credit payment. Please try again.";
         setStripeError(message);
         setIsProcessing(false);
         onProcessingChange?.(false);
@@ -374,11 +669,60 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
       return;
     }
 
-    if (!stripe || !elements) return;
+    // ── Hybrid: partial credits + card ──
+    if (is_applying_credits && credits_to_apply > 0) {
+      if (!stripe || !elements) return;
+      if (!is_using_saved && !validateNewCardFields()) return;
 
+      setIsProcessing(true);
+      onProcessingChange?.(true);
+      setStripeError(null);
+
+      try {
+        const amount_cents = Math.round(amount_after_credits * 100);
+        const { error, paymentIntent } = await chargeCard(amount_cents);
+
+        if (error) {
+          setStripeError(error.message ?? "Payment failed. Please try again.");
+          setIsProcessing(false);
+          onProcessingChange?.(false);
+          return;
+        }
+
+        if (paymentIntent?.status === "succeeded" || paymentIntent?.status === "requires_capture") {
+          if (!is_using_saved && save_for_future && paymentIntent.payment_method) {
+            await trySaveCard(paymentIntent.payment_method as string | { id: string });
+          }
+          // Deduct credits after successful card charge
+          try {
+            await creditsService.applyCreditsDiscount({
+              amount: credits_to_apply,
+              payment_intent_id: paymentIntent.id,
+              description: `Credit discount applied at checkout`,
+            });
+          } catch {
+            // Backend reconciliation will handle this if it fails
+          }
+          onComplete(paymentIntent.id, is_using_saved);
+        } else {
+          setStripeError("Payment could not be completed. Please try again.");
+          setIsProcessing(false);
+          onProcessingChange?.(false);
+        }
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "An unexpected error occurred.";
+        setStripeError(message);
+        setIsProcessing(false);
+        onProcessingChange?.(false);
+      }
+      return;
+    }
+
+    // ── Pure card payment ──
+    if (!stripe || !elements) return;
     if (!is_using_saved) {
-      const card_number_element = elements.getElement(CardNumberElement);
-      if (!card_number_element) return;
+      const card_element = elements.getElement(CardNumberElement);
+      if (!card_element) return;
       if (!validateNewCardFields()) return;
     }
 
@@ -388,45 +732,7 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
 
     try {
       const amount_cents = Math.round(total_amount * 100);
-
-      let confirm_result;
-
-      if (is_using_saved) {
-        const profile = payment_profiles.find((p) => p.id === selected_profile_id);
-        if (!profile) throw new Error("Selected payment method not found.");
-
-        // Pass the PM id so the server can attach the Stripe Customer to the
-        // PaymentIntent — Stripe requires this for customer-attached cards.
-        const { client_secret } = await createPaymentIntent({
-          amount_cents,
-          stripe_payment_method_id: profile.stripe_payment_method_id,
-        });
-
-        confirm_result = await stripe.confirmCardPayment(client_secret, {
-          payment_method: profile.stripe_payment_method_id,
-        });
-      } else {
-        const { client_secret } = await createPaymentIntent({ amount_cents });
-        const card_number_element = elements.getElement(CardNumberElement)!;
-        const country_code = country_code_map[billing_address.country] ?? "US";
-        confirm_result = await stripe.confirmCardPayment(client_secret, {
-          payment_method: {
-            card: card_number_element,
-            billing_details: {
-              name: name_on_card,
-              address: {
-                line1: billing_address.address,
-                city: billing_address.city,
-                state: billing_address.state,
-                postal_code: billing_address.postal_code,
-                country: country_code,
-              },
-            },
-          },
-        });
-      }
-
-      const { error, paymentIntent } = confirm_result;
+      const { error, paymentIntent } = await chargeCard(amount_cents);
 
       if (error) {
         setStripeError(error.message ?? "Payment failed. Please try again.");
@@ -435,25 +741,9 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
         return;
       }
 
-      if (
-        paymentIntent?.status === "succeeded" ||
-        paymentIntent?.status === "requires_capture"
-      ) {
-        // Optionally save the new card for future use
+      if (paymentIntent?.status === "succeeded" || paymentIntent?.status === "requires_capture") {
         if (!is_using_saved && save_for_future && paymentIntent.payment_method) {
-          try {
-            const pm_id =
-              typeof paymentIntent.payment_method === "string"
-                ? paymentIntent.payment_method
-                : paymentIntent.payment_method.id;
-            await paymentProfileService.createPaymentProfile({
-              stripe_payment_method_id: pm_id,
-              cardholder_name: name_on_card.trim() || null,
-              is_default: payment_profiles.length === 0,
-            });
-          } catch {
-            // Don't block the order if card saving fails
-          }
+          await trySaveCard(paymentIntent.payment_method as string | { id: string });
         }
         onComplete(paymentIntent.id, is_using_saved);
       } else {
@@ -462,22 +752,25 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
         onProcessingChange?.(false);
       }
     } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "An unexpected error occurred.";
+      const message = err instanceof Error ? err.message : "An unexpected error occurred.";
       setStripeError(message);
       setIsProcessing(false);
       onProcessingChange?.(false);
     }
   }, [
-    stripe, elements, is_pay_later, onPayLater, is_using_credits, has_insufficient_credits,
-    onPayWithCredits, is_using_saved, validateNewCardFields, total_amount, payment_profiles,
-    selected_profile_id, billing_address, save_for_future, name_on_card, onComplete,
-    onProcessingChange,
+    is_pay_later, onPayLater,
+    is_fully_paid_by_credits, credits_to_apply, onPayWithCredits, onComplete,
+    is_applying_credits, amount_after_credits, stripe, elements, is_using_saved,
+    validateNewCardFields, chargeCard, save_for_future, trySaveCard,
+    total_amount, onProcessingChange,
   ]);
 
   useImperativeHandle(ref, () => ({ triggerSubmit: handleComplete }), [handleComplete]);
 
   const is_busy = is_processing || is_loading;
+
+  // Show billing address form when user enters a new card and isn't fully paying with credits
+  const needs_billing_address = !is_using_saved && !is_pay_later && !is_fully_paid_by_credits;
 
   return (
     <div className="space-y-5">
@@ -493,69 +786,206 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
         {back_label}
       </button>
 
-      {/* ── Payment Method Section ── */}
-      <SectionCard>
-        <SectionHeader
-          title="Payment Method"
-          subtitle={
-            profiles_loading
-              ? "Loading your saved cards…"
-              : payment_profiles.length > 0
-              ? "Select a saved card or add a new one"
-              : "Enter your card details to complete the purchase"
-          }
-          action={
-            <div className="hidden items-center gap-1 sm:flex">
-              {[
-                { bg: "#1a1f71", label: "VISA",  italic: true  },
-                { bg: "#eb001b", label: "MC",     italic: false },
-                { bg: "#006fcf", label: "AMEX",   italic: false },
-                { bg: "#ff6000", label: "DISC",   italic: false },
-              ].map(({ bg, label, italic }) => (
-                <span
-                  key={label}
-                  className="flex h-5 items-center rounded px-1.5"
-                  style={{ background: bg }}
-                >
-                  <span
-                    className={`text-[8px] font-bold text-white ${italic ? "italic" : ""}`}
-                  >
-                    {label}
+      {/* ── Account Credits Section ── */}
+      {!credits_loading && credit_balance > 0 && (
+        <CreditsApplyPanel
+          credit_balance={credit_balance}
+          total_amount={total_amount}
+          is_applying={is_applying_credits}
+          credits_to_apply={credits_to_apply}
+          credits_input={credits_input}
+          onToggle={handleCreditsToggle}
+          onSliderChange={handleCreditsSliderChange}
+          onInputChange={handleCreditsInputChange}
+          onInputBlur={handleCreditsInputBlur}
+          onApplyMax={handleCreditsApplyMax}
+        />
+      )}
+
+      {/* Credits skeleton while loading */}
+      {credits_loading && (
+        <div className="animate-pulse overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900/60">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-gray-200 dark:bg-gray-700" />
+            <div className="space-y-1.5">
+              <div className="h-3.5 w-36 rounded bg-gray-200 dark:bg-gray-700" />
+              <div className="h-3 w-52 rounded bg-gray-200 dark:bg-gray-700" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Payment Method Section — hidden when credits fully cover order ── */}
+      {!is_fully_paid_by_credits && (
+        <SectionCard>
+          <SectionHeader
+            title="Payment Method"
+            subtitle={
+              profiles_loading
+                ? "Loading your saved cards…"
+                : is_applying_credits && credits_to_apply > 0
+                ? `Card charged: $${amount_after_credits.toFixed(2)} after $${credits_to_apply.toFixed(2)} credit discount`
+                : payment_profiles.length > 0
+                ? "Select a saved card or add a new one"
+                : "Enter your card details to complete the purchase"
+            }
+            action={
+              <div className="hidden items-center gap-1 sm:flex">
+                {[
+                  { bg: "#1a1f71", label: "VISA",  italic: true  },
+                  { bg: "#eb001b", label: "MC",     italic: false },
+                  { bg: "#006fcf", label: "AMEX",   italic: false },
+                  { bg: "#ff6000", label: "DISC",   italic: false },
+                ].map(({ bg, label, italic }) => (
+                  <span key={label} className="flex h-5 items-center rounded px-1.5" style={{ background: bg }}>
+                    <span className={`text-[8px] font-bold text-white ${italic ? "italic" : ""}`}>{label}</span>
                   </span>
-                </span>
+                ))}
+              </div>
+            }
+          />
+
+          {/* Loading skeleton */}
+          {profiles_loading && (
+            <div className="animate-pulse divide-y divide-gray-100 dark:divide-gray-800">
+              {[0, 1].map((i) => (
+                <div key={i} className="flex items-center gap-4 px-6 py-4">
+                  <div className="h-4 w-4 rounded-full bg-gray-200 dark:bg-gray-700" />
+                  <div className="h-11 w-[68px] rounded-lg bg-gray-200 dark:bg-gray-700" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3.5 w-36 rounded bg-gray-200 dark:bg-gray-700" />
+                    <div className="h-3 w-20 rounded bg-gray-200 dark:bg-gray-700" />
+                  </div>
+                </div>
               ))}
             </div>
-          }
-        />
+          )}
 
-        {/* Loading skeleton */}
-        {profiles_loading && (
-          <div className="animate-pulse divide-y divide-gray-100 dark:divide-gray-800">
-            {[0, 1].map((i) => (
-              <div key={i} className="flex items-center gap-4 px-6 py-4">
-                <div className="h-4 w-4 rounded-full bg-gray-200 dark:bg-gray-700" />
-                <div className="h-11 w-[68px] rounded-lg bg-gray-200 dark:bg-gray-700" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-3.5 w-36 rounded bg-gray-200 dark:bg-gray-700" />
-                  <div className="h-3 w-20 rounded bg-gray-200 dark:bg-gray-700" />
+          {!profiles_loading && (
+            <div className="divide-y divide-gray-100 dark:divide-gray-800">
+              {/* Saved profiles */}
+              {payment_profiles.map((profile) => {
+                const is_selected = selected_profile_id === profile.id;
+                const brand_label = brand_labels[profile.card_brand] ?? profile.card_brand;
+                return (
+                  <label
+                    key={profile.id}
+                    className={`flex cursor-pointer items-center gap-4 px-6 py-4 transition-colors ${
+                      is_selected ? "bg-brand-50/70 dark:bg-brand-500/5" : "hover:bg-gray-50 dark:hover:bg-white/2"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="payment_profile"
+                      value={profile.id}
+                      checked={is_selected}
+                      onChange={() => setSelectedProfileId(profile.id)}
+                      className="sr-only"
+                    />
+                    <RadioDot checked={is_selected} />
+                    <MiniCard brand={profile.card_brand} last_four={profile.last_four} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-sm font-semibold text-gray-900 dark:text-white">{brand_label}</span>
+                        <span className="font-mono text-sm text-gray-500 dark:text-gray-400">•••• {profile.last_four}</span>
+                        {profile.is_default && (
+                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
+                            Default
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                        Expires {profile.expiry_month} / {profile.expiry_year}
+                      </p>
+                    </div>
+                    {is_selected && (
+                      <svg className="h-4 w-4 shrink-0 text-brand-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                      </svg>
+                    )}
+                  </label>
+                );
+              })}
+
+              {/* Pay Later option */}
+              {onPayLater && (
+                <div>
+                  <label
+                    className={`flex cursor-pointer items-center gap-4 px-6 py-4 transition-colors ${
+                      is_pay_later ? "bg-amber-50/80 dark:bg-amber-500/5" : "hover:bg-gray-50 dark:hover:bg-white/2"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="payment_profile"
+                      value="pay_later"
+                      checked={is_pay_later}
+                      onChange={() => setSelectedProfileId("pay_later")}
+                      className="sr-only"
+                    />
+                    <RadioDot checked={is_pay_later} color="amber" />
+                    <div className="flex h-11 w-[68px] shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-amber-300 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-500/10">
+                      <svg className="h-5 w-5 text-amber-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                      </svg>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white">Pay Later</p>
+                        <span className="rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-400">
+                          No card required
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                        Place your order now and pay when it&apos;s convenient
+                      </p>
+                    </div>
+                    {is_pay_later && (
+                      <svg className="h-4 w-4 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                      </svg>
+                    )}
+                  </label>
+
+                  {is_pay_later && (
+                    <div className="border-t border-amber-100 bg-amber-50/60 px-6 pb-6 pt-5 dark:border-amber-500/15 dark:bg-amber-500/5">
+                      <div className="rounded-xl border border-amber-200 bg-white p-4 shadow-sm dark:border-amber-500/20 dark:bg-gray-900/60">
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-500/15">
+                            <svg className="h-4 w-4 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                            </svg>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-gray-900 dark:text-white">How Pay Later works</p>
+                            <ul className="mt-2.5 space-y-2">
+                              {[
+                                { icon: "M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z", text: "Your order is created immediately and reserved for you." },
+                                { icon: "M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5z", text: "An invoice will be generated and available in My Invoices." },
+                                { icon: "M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008z", text: "Work begins only after payment is received." },
+                                { icon: "M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z", text: "Pay anytime from My Invoices before your order is delivered." },
+                              ].map(({ icon, text }, i) => (
+                                <li key={i} className="flex items-start gap-2.5">
+                                  <svg className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d={icon} />
+                                  </svg>
+                                  <span className="text-xs text-gray-600 dark:text-gray-400">{text}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+              )}
 
-        {/* Payment options list */}
-        {!profiles_loading && (
-          <div className="divide-y divide-gray-100 dark:divide-gray-800">
-            {/* Saved profiles */}
-            {payment_profiles.map((profile) => {
-              const is_selected = selected_profile_id === profile.id;
-              const brand_label = brand_labels[profile.card_brand] ?? profile.card_brand;
-              return (
+              {/* Add new card option */}
+              <div>
                 <label
-                  key={profile.id}
                   className={`flex cursor-pointer items-center gap-4 px-6 py-4 transition-colors ${
-                    is_selected
+                    selected_profile_id === "new"
                       ? "bg-brand-50/70 dark:bg-brand-500/5"
                       : "hover:bg-gray-50 dark:hover:bg-white/2"
                   }`}
@@ -563,435 +993,138 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
                   <input
                     type="radio"
                     name="payment_profile"
-                    value={profile.id}
-                    checked={is_selected}
-                    onChange={() => setSelectedProfileId(profile.id)}
+                    value="new"
+                    checked={selected_profile_id === "new"}
+                    onChange={() => setSelectedProfileId("new")}
                     className="sr-only"
                   />
-                  <RadioDot checked={is_selected} />
-                  <MiniCard brand={profile.card_brand} last_four={profile.last_four} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                        {brand_label}
-                      </span>
-                      <span className="font-mono text-sm text-gray-500 dark:text-gray-400">
-                        •••• {profile.last_four}
-                      </span>
-                      {profile.is_default && (
-                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
-                          Default
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                      Expires {profile.expiry_month} / {profile.expiry_year}
+                  <RadioDot checked={selected_profile_id === "new"} />
+                  <div className="flex h-11 w-[68px] shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600">
+                    <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                      {payment_profiles.length > 0 ? "Use a different card" : "Add a new card"}
                     </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Enter your card details below</p>
                   </div>
-                  {is_selected && (
-                    <svg
-                      className="h-4 w-4 shrink-0 text-brand-500"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      strokeWidth={2.5}
-                      stroke="currentColor"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                    </svg>
-                  )}
-                </label>
-              );
-            })}
-
-            {/* "Pay with Credits" option */}
-            {onPayWithCredits && !credits_loading && credit_balance > 0 && (
-              <div>
-                <label
-                  className={`flex cursor-pointer items-center gap-4 px-6 py-4 transition-colors ${
-                    is_using_credits
-                      ? "bg-emerald-50/80 dark:bg-emerald-500/5"
-                      : "hover:bg-gray-50 dark:hover:bg-white/2"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="payment_profile"
-                    value="credits"
-                    checked={is_using_credits}
-                    onChange={() => setSelectedProfileId("credits")}
-                    className="sr-only"
-                  />
-                  <div
-                    className={`relative h-4 w-4 shrink-0 rounded-full border-2 transition-colors ${
-                      is_using_credits ? "border-emerald-500" : "border-gray-300 dark:border-gray-600"
-                    }`}
-                  >
-                    {is_using_credits && (
-                      <div className="absolute inset-[3px] rounded-full bg-emerald-500" />
-                    )}
-                  </div>
-                  <div className="flex h-11 w-[68px] shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-emerald-300 bg-emerald-50 dark:border-emerald-500/40 dark:bg-emerald-500/10">
-                    <svg className="h-5 w-5 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                    </svg>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                        Pay with Credits
-                      </p>
-                      <span className="rounded-full border border-emerald-200 bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-400">
-                        {credit_balance.toLocaleString()} available
-                      </span>
-                      {credit_balance < total_amount && (
-                        <span className="rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-400">
-                          Insufficient
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                      ${credit_balance.toLocaleString()} value · 1 credit = $1.00
-                    </p>
-                  </div>
-                  {is_using_credits && (
-                    <svg className="h-4 w-4 shrink-0 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                    </svg>
-                  )}
                 </label>
 
-                {/* Credits info panel */}
-                {is_using_credits && (
-                  <div className="border-t border-emerald-100 bg-emerald-50/60 px-6 pb-6 pt-5 dark:border-emerald-500/15 dark:bg-emerald-500/5">
-                    <div className="rounded-xl border border-emerald-200 bg-white p-4 shadow-sm dark:border-emerald-500/20 dark:bg-gray-900/60">
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-500/15">
-                          <svg className="h-4 w-4 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                          </svg>
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                            Account credits summary
-                          </p>
-                          <div className="mt-2.5 space-y-1.5">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="text-gray-500 dark:text-gray-400">Available balance</span>
-                              <span className="font-semibold text-gray-800 dark:text-white">
-                                {credit_balance.toLocaleString()} credits
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="text-gray-500 dark:text-gray-400">Order total</span>
-                              <span className="font-semibold text-gray-800 dark:text-white">
-                                {total_amount.toLocaleString()} credits
-                              </span>
-                            </div>
-                            <div className="my-1.5 border-t border-gray-100 dark:border-gray-800" />
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="font-medium text-gray-700 dark:text-gray-300">
-                                Remaining after payment
-                              </span>
-                              <span
-                                className={`font-bold ${
-                                  credit_balance - total_amount >= 0
-                                    ? "text-emerald-600 dark:text-emerald-400"
-                                    : "text-red-500 dark:text-red-400"
-                                }`}
-                              >
-                                {Math.max(0, credit_balance - total_amount).toLocaleString()} credits
-                              </span>
-                            </div>
-                          </div>
-                          {credit_balance < total_amount && (
-                            <p className="mt-3 flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
-                              <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008z" />
-                              </svg>
-                              Your balance is insufficient for this order. Please choose another payment method.
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* "Pay Later" option */}
-            {onPayLater && (
-              <div>
-                <label
-                  className={`flex cursor-pointer items-center gap-4 px-6 py-4 transition-colors ${
-                    is_pay_later
-                      ? "bg-amber-50/80 dark:bg-amber-500/5"
-                      : "hover:bg-gray-50 dark:hover:bg-white/2"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="payment_profile"
-                    value="pay_later"
-                    checked={is_pay_later}
-                    onChange={() => setSelectedProfileId("pay_later")}
-                    className="sr-only"
-                  />
-                  <div
-                    className={`relative h-4 w-4 shrink-0 rounded-full border-2 transition-colors ${
-                      is_pay_later ? "border-amber-500" : "border-gray-300 dark:border-gray-600"
-                    }`}
-                  >
-                    {is_pay_later && (
-                      <div className="absolute inset-[3px] rounded-full bg-amber-500" />
-                    )}
-                  </div>
-                  <div className="flex h-11 w-[68px] shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-amber-300 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-500/10">
-                    <svg className="h-5 w-5 text-amber-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                    </svg>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                        Pay Later
-                      </p>
-                      <span className="rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-400">
-                        No card required
-                      </span>
-                    </div>
-                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                      Place your order now and pay when it&apos;s convenient
-                    </p>
-                  </div>
-                  {is_pay_later && (
-                    <svg className="h-4 w-4 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                    </svg>
-                  )}
-                </label>
-
-                {/* Deferred payment info panel */}
-                {is_pay_later && (
-                  <div className="border-t border-amber-100 bg-amber-50/60 px-6 pb-6 pt-5 dark:border-amber-500/15 dark:bg-amber-500/5">
-                    <div className="rounded-xl border border-amber-200 bg-white p-4 shadow-sm dark:border-amber-500/20 dark:bg-gray-900/60">
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-500/15">
-                          <svg className="h-4 w-4 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                          </svg>
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                            How Pay Later works
-                          </p>
-                          <ul className="mt-2.5 space-y-2">
-                            {[
-                              { icon: "M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z", text: "Your order is created immediately and reserved for you." },
-                              { icon: "M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5z", text: "An invoice will be generated and available in My Invoices." },
-                              { icon: "M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008z", text: "Work begins only after payment is received." },
-                              { icon: "M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z", text: "Pay anytime from My Invoices before your order is delivered." },
-                            ].map(({ icon, text }, i) => (
-                              <li key={i} className="flex items-start gap-2.5">
-                                <svg className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d={icon} />
-                                </svg>
-                                <span className="text-xs text-gray-600 dark:text-gray-400">{text}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* "Add new card" option */}
-            <div>
-              <label
-                className={`flex cursor-pointer items-center gap-4 px-6 py-4 transition-colors ${
-                  !is_using_saved && !is_pay_later
-                    ? "bg-brand-50/70 dark:bg-brand-500/5"
-                    : "hover:bg-gray-50 dark:hover:bg-white/2"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="payment_profile"
-                  value="new"
-                  checked={!is_using_saved && !is_pay_later}
-                  onChange={() => setSelectedProfileId("new")}
-                  className="sr-only"
-                />
-                <RadioDot checked={!is_using_saved && !is_pay_later} />
-                <div className="flex h-11 w-[68px] shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600">
-                  <svg
-                    className="h-5 w-5 text-gray-400"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth={1.5}
-                    stroke="currentColor"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                    {payment_profiles.length > 0 ? "Use a different card" : "Add a new card"}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Enter your card details below
-                  </p>
-                </div>
-              </label>
-
-              {/* Inline card form — visible when "new" is selected */}
-              {!is_using_saved && !is_pay_later && (
-                <div className="border-t border-gray-100 bg-gray-50/40 px-6 pb-6 pt-5 dark:border-gray-800 dark:bg-white/1">
-                  <div className="space-y-4">
-                    {/* Card number */}
-                    <div>
-                      <label className={label_class}>Card Number</label>
-                      <div
-                        className={`flex h-11 items-center overflow-hidden rounded-lg border bg-white px-4 shadow-sm transition-all focus-within:ring-2 dark:bg-gray-900 ${
+                {/* Inline card form */}
+                {selected_profile_id === "new" && (
+                  <div className="border-t border-gray-100 bg-gray-50/40 px-6 pb-6 pt-5 dark:border-gray-800 dark:bg-white/1">
+                    <div className="space-y-4">
+                      {/* Card number */}
+                      <div>
+                        <label className={label_class}>Card Number</label>
+                        <div className={`flex h-11 items-center overflow-hidden rounded-lg border bg-white px-4 shadow-sm transition-all focus-within:ring-2 dark:bg-gray-900 ${
                           stripe_errors.card_number
                             ? "border-red-400 focus-within:border-red-400 focus-within:ring-red-400/20"
                             : "border-gray-200 focus-within:border-brand-400 focus-within:ring-brand-500/20 dark:border-gray-700 dark:focus-within:border-brand-400"
-                        }`}
-                      >
-                        <CardNumberElement
-                          options={{ ...stripe_element_style, showIcon: true }}
-                          className="w-full"
-                          onChange={(e) => handleElementChange("card_number", e)}
-                        />
+                        }`}>
+                          <CardNumberElement
+                            options={{ ...stripe_element_style, showIcon: true }}
+                            className="w-full"
+                            onChange={(e) => handleElementChange("card_number", e)}
+                          />
+                        </div>
+                        {stripe_errors.card_number && (
+                          <p className="mt-1 text-xs text-red-500">{stripe_errors.card_number}</p>
+                        )}
                       </div>
-                      {stripe_errors.card_number && (
-                        <p className="mt-1 text-xs text-red-500">{stripe_errors.card_number}</p>
-                      )}
-                    </div>
 
-                    {/* Expiry + CVC */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className={label_class}>Expiration Date</label>
-                        <div
-                          className={`flex h-11 items-center overflow-hidden rounded-lg border bg-white px-4 shadow-sm transition-all focus-within:ring-2 dark:bg-gray-900 ${
+                      {/* Expiry + CVC */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className={label_class}>Expiration Date</label>
+                          <div className={`flex h-11 items-center overflow-hidden rounded-lg border bg-white px-4 shadow-sm transition-all focus-within:ring-2 dark:bg-gray-900 ${
                             stripe_errors.card_expiry
                               ? "border-red-400 focus-within:border-red-400 focus-within:ring-red-400/20"
                               : "border-gray-200 focus-within:border-brand-400 focus-within:ring-brand-500/20 dark:border-gray-700 dark:focus-within:border-brand-400"
-                          }`}
-                        >
-                          <CardExpiryElement
-                            options={stripe_element_style}
-                            className="w-full"
-                            onChange={(e) => handleElementChange("card_expiry", e)}
-                          />
+                          }`}>
+                            <CardExpiryElement options={stripe_element_style} className="w-full" onChange={(e) => handleElementChange("card_expiry", e)} />
+                          </div>
+                          {stripe_errors.card_expiry && (
+                            <p className="mt-1 text-xs text-red-500">{stripe_errors.card_expiry}</p>
+                          )}
                         </div>
-                        {stripe_errors.card_expiry && (
-                          <p className="mt-1 text-xs text-red-500">{stripe_errors.card_expiry}</p>
-                        )}
-                      </div>
-                      <div>
-                        <label className={label_class}>Security Code (CVC)</label>
-                        <div
-                          className={`flex h-11 items-center overflow-hidden rounded-lg border bg-white px-4 shadow-sm transition-all focus-within:ring-2 dark:bg-gray-900 ${
+                        <div>
+                          <label className={label_class}>Security Code (CVC)</label>
+                          <div className={`flex h-11 items-center overflow-hidden rounded-lg border bg-white px-4 shadow-sm transition-all focus-within:ring-2 dark:bg-gray-900 ${
                             stripe_errors.card_cvc
                               ? "border-red-400 focus-within:border-red-400 focus-within:ring-red-400/20"
                               : "border-gray-200 focus-within:border-brand-400 focus-within:ring-brand-500/20 dark:border-gray-700 dark:focus-within:border-brand-400"
-                          }`}
-                        >
-                          <CardCvcElement
-                            options={stripe_element_style}
-                            className="w-full"
-                            onChange={(e) => handleElementChange("card_cvc", e)}
-                          />
+                          }`}>
+                            <CardCvcElement options={stripe_element_style} className="w-full" onChange={(e) => handleElementChange("card_cvc", e)} />
+                          </div>
+                          {stripe_errors.card_cvc && (
+                            <p className="mt-1 text-xs text-red-500">{stripe_errors.card_cvc}</p>
+                          )}
                         </div>
-                        {stripe_errors.card_cvc && (
-                          <p className="mt-1 text-xs text-red-500">{stripe_errors.card_cvc}</p>
-                        )}
                       </div>
-                    </div>
 
-                    {/* Name on card */}
-                    <div>
-                      <label className={label_class} htmlFor="checkout_name_on_card">
-                        Name on Card
-                      </label>
-                      <input
-                        id="checkout_name_on_card"
-                        type="text"
-                        value={name_on_card}
-                        onChange={(e) => {
-                          setNameOnCard(e.target.value);
-                          if (e.target.value.trim()) setNameOnCardError(undefined);
-                        }}
-                        placeholder="Full name as it appears on card"
-                        className={getInputClass(!!name_on_card_error)}
-                      />
-                      <FieldError message={name_on_card_error} />
-                    </div>
-
-                    {/* Save for future purchases */}
-                    <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-brand-100 bg-brand-50/60 p-3.5 transition-colors hover:bg-brand-50 dark:border-brand-500/20 dark:bg-brand-500/5 dark:hover:bg-brand-500/10">
-                      <input
-                        type="checkbox"
-                        checked={save_for_future}
-                        onChange={(e) => setSaveForFuture(e.target.checked)}
-                        className="mt-0.5 h-4 w-4 cursor-pointer rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-700"
-                      />
+                      {/* Name on card */}
                       <div>
-                        <span className="text-sm font-semibold text-gray-800 dark:text-white">
-                          Save this card for future purchases
-                        </span>
-                        <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                          Your card is securely stored by Stripe for faster checkouts.
-                        </p>
+                        <label className={label_class} htmlFor="checkout_name_on_card">Name on Card</label>
+                        <input
+                          id="checkout_name_on_card"
+                          type="text"
+                          value={name_on_card}
+                          onChange={(e) => {
+                            setNameOnCard(e.target.value);
+                            if (e.target.value.trim()) setNameOnCardError(undefined);
+                          }}
+                          placeholder="Full name as it appears on card"
+                          className={getInputClass(!!name_on_card_error)}
+                        />
+                        <FieldError message={name_on_card_error} />
                       </div>
-                    </label>
+
+                      {/* Save for future */}
+                      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-brand-100 bg-brand-50/60 p-3.5 transition-colors hover:bg-brand-50 dark:border-brand-500/20 dark:bg-brand-500/5 dark:hover:bg-brand-500/10">
+                        <input
+                          type="checkbox"
+                          checked={save_for_future}
+                          onChange={(e) => setSaveForFuture(e.target.checked)}
+                          className="mt-0.5 h-4 w-4 cursor-pointer rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-700"
+                        />
+                        <div>
+                          <span className="text-sm font-semibold text-gray-800 dark:text-white">Save this card for future purchases</span>
+                          <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                            Your card is securely stored by Stripe for faster checkouts.
+                          </p>
+                        </div>
+                      </label>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Security footer */}
+          <div className="flex items-center justify-between border-t border-gray-100 px-6 py-3 dark:border-gray-800">
+            <div className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500">
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+              </svg>
+              256-bit SSL encryption · Secured by Stripe
+            </div>
+            <div className="flex items-center gap-1 text-[10px] font-semibold text-gray-400 dark:text-gray-500">
+              <svg className="h-3 w-3" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true">
+                <path d="M0 0h32v32H0z" fill="none" />
+                <path d="M16 3C8.268 3 2 9.268 2 17c0 5.4 2.952 10.13 7.333 12.666V22h-2v-5h2v-3.8C9.333 9.72 11.887 7 15.36 7H20v5h-2.667c-1.474 0-1.666.933-1.666 1.867V17H20l-.667 5h-3.666v7.666C19.948 28.73 24 23.33 24 17c0-7.732-6.268-14-8-14z" />
+              </svg>
+              Powered by Stripe
             </div>
           </div>
-        )}
+        </SectionCard>
+      )}
 
-        {/* Section footer: security notice */}
-        <div className="flex items-center justify-between border-t border-gray-100 px-6 py-3 dark:border-gray-800">
-          <div className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500">
-            <svg
-              className="h-3.5 w-3.5"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"
-              />
-            </svg>
-            256-bit SSL encryption · Secured by Stripe
-          </div>
-          <div className="flex items-center gap-1 text-[10px] font-semibold text-gray-400 dark:text-gray-500">
-            <svg
-              className="h-3 w-3"
-              viewBox="0 0 32 32"
-              fill="currentColor"
-              aria-hidden="true"
-            >
-              <path d="M0 0h32v32H0z" fill="none" />
-              <path d="M16 3C8.268 3 2 9.268 2 17c0 5.4 2.952 10.13 7.333 12.666V22h-2v-5h2v-3.8C9.333 9.72 11.887 7 15.36 7H20v5h-2.667c-1.474 0-1.666.933-1.666 1.867V17H20l-.667 5h-3.666v7.666C19.948 28.73 24 23.33 24 17c0-7.732-6.268-14-8-14z" />
-            </svg>
-            Powered by Stripe
-          </div>
-        </div>
-      </SectionCard>
-
-      {/* ── Billing Address Section — only required for new card payments ── */}
-      {!is_using_saved && !is_pay_later && (
+      {/* ── Billing Address ── only needed for new card payments ── */}
+      {needs_billing_address && (
         <SectionCard>
           <SectionHeader
             title="Billing Address"
@@ -1013,7 +1146,6 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
           />
 
           <div className="px-6 py-5">
-            {/* Saved address info banner */}
             {saved_billing_address && (
               <div className="mb-5 flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50/60 p-3.5 dark:border-blue-500/20 dark:bg-blue-500/5">
                 <svg className="mt-0.5 h-4 w-4 shrink-0 text-blue-500 dark:text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
@@ -1023,27 +1155,16 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
                 <div className="min-w-0">
                   <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">Saved address on file</p>
                   <p className="mt-0.5 truncate text-xs text-blue-600 dark:text-blue-400">
-                    {[
-                      saved_billing_address.address,
-                      saved_billing_address.city,
-                      saved_billing_address.state,
-                      saved_billing_address.postal_code,
-                      saved_billing_address.country,
-                    ]
-                      .filter(Boolean)
-                      .join(", ")}
+                    {[saved_billing_address.address, saved_billing_address.city, saved_billing_address.state, saved_billing_address.postal_code, saved_billing_address.country].filter(Boolean).join(", ")}
                   </p>
                 </div>
               </div>
             )}
 
             <div className="space-y-4">
-              {/* Address + City */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className={label_class}>
-                    Street Address <span className="text-red-400">*</span>
-                  </label>
+                  <label className={label_class}>Street Address <span className="text-red-400">*</span></label>
                   <input
                     type="text"
                     value={billing_address.address}
@@ -1054,9 +1175,7 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
                   <FieldError message={billing_errors.address} />
                 </div>
                 <div>
-                  <label className={label_class}>
-                    City <span className="text-red-400">*</span>
-                  </label>
+                  <label className={label_class}>City <span className="text-red-400">*</span></label>
                   <input
                     type="text"
                     value={billing_address.city}
@@ -1068,7 +1187,6 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
                 </div>
               </div>
 
-              {/* Country + State + Postal */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div>
                   <label className={label_class}>Country</label>
@@ -1078,9 +1196,7 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
                       onChange={(e) => handleBillingFieldChange("country", e.target.value)}
                       className={`${getInputClass()} cursor-pointer appearance-none pr-10`}
                     >
-                      {countries.map((c) => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
+                      {countries.map((c) => <option key={c} value={c}>{c}</option>)}
                     </select>
                     <div className="pointer-events-none absolute right-3 top-3.5">
                       <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -1089,11 +1205,8 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
                     </div>
                   </div>
                 </div>
-
                 <div>
-                  <label className={label_class}>
-                    State / Province <span className="text-red-400">*</span>
-                  </label>
+                  <label className={label_class}>State / Province <span className="text-red-400">*</span></label>
                   <SearchableSelect
                     value={billing_address.state}
                     options={us_states}
@@ -1102,11 +1215,8 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
                   />
                   <FieldError message={billing_errors.state} />
                 </div>
-
                 <div>
-                  <label className={label_class}>
-                    Postal / ZIP Code <span className="text-red-400">*</span>
-                  </label>
+                  <label className={label_class}>Postal / ZIP Code <span className="text-red-400">*</span></label>
                   <input
                     type="text"
                     value={billing_address.postal_code}
@@ -1118,12 +1228,8 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
                 </div>
               </div>
 
-              {/* Company */}
               <div className="max-w-xs">
-                <label className={label_class}>
-                  Company{" "}
-                  <span className="font-normal text-gray-400">(optional)</span>
-                </label>
+                <label className={label_class}>Company <span className="font-normal text-gray-400">(optional)</span></label>
                 <input
                   type="text"
                   value={billing_address.company}
@@ -1140,9 +1246,7 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
       {/* ── Helper note ── */}
       <p className="text-xs text-gray-400 dark:text-gray-500">
         Need to change your selection? Click{" "}
-        <span className="font-medium text-gray-500 dark:text-gray-400">
-          &quot;{back_label}&quot;
-        </span>{" "}
+        <span className="font-medium text-gray-500 dark:text-gray-400">&quot;{back_label}&quot;</span>{" "}
         above — all entered information will be preserved.
       </p>
 
@@ -1152,25 +1256,13 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
         const lines = active_message.split("\n").filter(Boolean);
         return (
           <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-500/20 dark:bg-red-500/10">
-            <svg
-              className="mt-0.5 h-4 w-4 shrink-0 text-red-500"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008z"
-              />
+            <svg className="mt-0.5 h-4 w-4 shrink-0 text-red-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008z" />
             </svg>
             <div className="text-sm text-red-700 dark:text-red-400">
               {lines.length > 1 ? (
                 <ul className="list-disc list-inside space-y-1">
-                  {lines.map((line, i) => (
-                    <li key={i}>{line}</li>
-                  ))}
+                  {lines.map((line, i) => <li key={i}>{line}</li>)}
                 </ul>
               ) : (
                 <p>{active_message}</p>
@@ -1179,7 +1271,6 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
           </div>
         );
       })()}
-
     </div>
   );
 });

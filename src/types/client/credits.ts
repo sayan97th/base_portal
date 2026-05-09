@@ -27,3 +27,22 @@ export interface PayWithCreditsResponse {
   remaining_balance: number;
   transaction_id: number;
 }
+
+export interface ApplyCreditsDiscountPayload {
+  amount: number;
+  payment_intent_id?: string;
+  description?: string;
+}
+
+export interface ApplyCreditsDiscountResponse {
+  success: boolean;
+  credits_applied: number;
+  remaining_balance: number;
+  transaction_id: number;
+}
+
+export interface CreditBalanceSummary {
+  balance: number;
+  dollar_value: number;
+  recent_transactions: CreditTransaction[];
+}
