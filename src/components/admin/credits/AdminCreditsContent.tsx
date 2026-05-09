@@ -115,36 +115,64 @@ function ClientSearchSelect({
   onSelect: (client: AdminCreditUser | null) => void;
 }) {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<AdminCreditUser[]>([]);
+  const [all_clients, setAllClients] = useState<AdminCreditUser[]>([]);
+  const [search_results, setSearchResults] = useState<AdminCreditUser[]>([]);
   const [is_open, setIsOpen] = useState(false);
   const [is_loading, setIsLoading] = useState(false);
+  const [all_loaded, setAllLoaded] = useState(false);
   const container_ref = useRef<HTMLDivElement>(null);
   const input_ref = useRef<HTMLInputElement>(null);
   const debounce_ref = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const search = useCallback(async (term: string) => {
-    if (!term.trim()) {
-      setResults([]);
-      return;
+  // Shown list: filtered locally when query exists, otherwise all clients
+  const displayed = query.trim() ? search_results : all_clients;
+
+  const loadAll = useCallback(async () => {
+    if (all_loaded) return;
+    setIsLoading(true);
+    try {
+      const data = await adminCreditsService.searchClients("");
+      setAllClients(data);
+      setAllLoaded(true);
+    } catch {
+      setAllClients([]);
+    } finally {
+      setIsLoading(false);
     }
+  }, [all_loaded]);
+
+  const searchByQuery = useCallback(async (term: string) => {
+    if (!term.trim()) return;
     setIsLoading(true);
     try {
       const data = await adminCreditsService.searchClients(term);
-      setResults(data);
+      setSearchResults(data);
     } catch {
-      setResults([]);
+      setSearchResults([]);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
+  // Load all clients the first time the dropdown opens
+  useEffect(() => {
+    if (is_open && !all_loaded) {
+      loadAll();
+    }
+  }, [is_open, all_loaded, loadAll]);
+
+  // Debounce server search while typing; clear results when query is cleared
   useEffect(() => {
     if (debounce_ref.current) clearTimeout(debounce_ref.current);
-    debounce_ref.current = setTimeout(() => search(query), 320);
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    debounce_ref.current = setTimeout(() => searchByQuery(query), 320);
     return () => {
       if (debounce_ref.current) clearTimeout(debounce_ref.current);
     };
-  }, [query, search]);
+  }, [query, searchByQuery]);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -160,14 +188,19 @@ function ClientSearchSelect({
     onSelect(client);
     setIsOpen(false);
     setQuery("");
-    setResults([]);
+    setSearchResults([]);
   };
 
   const handleClear = () => {
     onSelect(null);
     setQuery("");
-    setResults([]);
+    setSearchResults([]);
     setTimeout(() => input_ref.current?.focus(), 0);
+  };
+
+  const handleOpen = () => {
+    setIsOpen(true);
+    if (!all_loaded) loadAll();
   };
 
   return (
@@ -223,22 +256,52 @@ function ClientSearchSelect({
               setQuery(e.target.value);
               setIsOpen(true);
             }}
-            onFocus={() => setIsOpen(true)}
-            placeholder="Search by name or email…"
+            onFocus={handleOpen}
+            placeholder="Select or search a client…"
             className="h-full w-full bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none dark:text-white dark:placeholder:text-gray-500"
           />
-          {is_loading && (
+          {is_loading ? (
             <svg className="h-4 w-4 shrink-0 animate-spin text-brand-500" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setIsOpen((prev) => !prev)}
+              tabIndex={-1}
+              className="shrink-0 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
+              aria-label="Toggle client list"
+            >
+              <svg
+                className={`h-4 w-4 transition-transform ${is_open ? "rotate-180" : ""}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+              </svg>
+            </button>
           )}
         </div>
       )}
 
       {is_open && !selected_client && (
         <div className="absolute left-0 right-0 top-full z-50 mt-1.5 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
-          {results.length === 0 && !is_loading && query.trim() && (
+          {/* Search hint when list is populated */}
+          {all_clients.length > 0 && (
+            <div className="border-b border-gray-100 px-3 py-2 dark:border-gray-800">
+              <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                {query.trim()
+                  ? `${displayed.length} result${displayed.length !== 1 ? "s" : ""} for "${query}"`
+                  : `${all_clients.length} client${all_clients.length !== 1 ? "s" : ""} — type to filter`}
+              </p>
+            </div>
+          )}
+
+          {/* No results state */}
+          {displayed.length === 0 && !is_loading && query.trim() && (
             <div className="px-4 py-5 text-center">
               <svg className="mx-auto h-8 w-8 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 15.75l-2.489-2.489m0 0a3.375 3.375 0 1 0-4.773-4.773 3.375 3.375 0 0 0 4.774 4.774ZM21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
@@ -246,14 +309,22 @@ function ClientSearchSelect({
               <p className="mt-2 text-sm text-gray-400 dark:text-gray-500">No clients found</p>
             </div>
           )}
-          {results.length === 0 && !is_loading && !query.trim() && (
-            <div className="px-4 py-4 text-sm text-gray-400 dark:text-gray-500">
-              Start typing to search clients…
+
+          {/* Loading state */}
+          {is_loading && displayed.length === 0 && (
+            <div className="flex items-center justify-center gap-2 px-4 py-5">
+              <svg className="h-4 w-4 animate-spin text-brand-500" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              <p className="text-sm text-gray-400 dark:text-gray-500">Loading clients…</p>
             </div>
           )}
-          {results.length > 0 && (
-            <ul className="max-h-60 overflow-y-auto py-1">
-              {results.map((client) => (
+
+          {/* Client list */}
+          {displayed.length > 0 && (
+            <ul className="max-h-72 overflow-y-auto py-1">
+              {displayed.map((client) => (
                 <li key={client.id}>
                   <button
                     type="button"
