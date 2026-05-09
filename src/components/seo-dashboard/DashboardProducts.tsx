@@ -376,6 +376,8 @@ const DashboardProducts: React.FC = () => {
   });
 
   const [checkout_is_processing, setCheckoutIsProcessing] = useState(false);
+  const [credits_to_apply, setCreditsToApply] = useState(0);
+  const [is_applying_credits, setIsApplyingCredits] = useState(false);
   const [keyword_step_error, setKeywordStepError] = useState<string | null>(
     null
   );
@@ -628,6 +630,8 @@ const DashboardProducts: React.FC = () => {
   const handleBack = () => {
     if (current_step === "checkout") {
       setCurrentStep(has_lb_items ? "keywords" : "products");
+      setIsApplyingCredits(false);
+      setCreditsToApply(0);
     } else {
       setCurrentStep("products");
     }
@@ -652,6 +656,14 @@ const DashboardProducts: React.FC = () => {
   const handleTriggerCheckout = useCallback(() => {
     checkout_ref.current?.triggerSubmit();
   }, []);
+
+  const handleCreditsChange = useCallback(
+    (is_applying: boolean, amount: number) => {
+      setIsApplyingCredits(is_applying);
+      setCreditsToApply(amount);
+    },
+    []
+  );
 
   // ── Derived labels ────────────────────────────────────────────────────────────
 
@@ -985,6 +997,7 @@ const DashboardProducts: React.FC = () => {
                   has_lb_items ? "Back to Keywords" : "Back to Products"
                 }
                 onProcessingChange={setCheckoutIsProcessing}
+                onCreditsChange={handleCreditsChange}
               />
             </Elements>
           )}
@@ -1017,6 +1030,8 @@ const DashboardProducts: React.FC = () => {
                   is_processing: is_checkout_busy,
                   onSubmit: handleTriggerCheckout,
                 }}
+                is_applying_credits={is_applying_credits}
+                credits_to_apply={credits_to_apply}
               />
             )}
           </div>

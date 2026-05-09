@@ -44,6 +44,7 @@ interface CheckoutStepProps {
   onApplySavedAddress?: () => void;
   back_label?: string;
   onProcessingChange?: (is_processing: boolean) => void;
+  onCreditsChange?: (is_applying: boolean, credits_to_apply: number) => void;
 }
 
 interface StripeElementErrors {
@@ -438,6 +439,7 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
   onApplySavedAddress,
   back_label = "Back to Keywords",
   onProcessingChange,
+  onCreditsChange,
 }, ref) {
   const stripe = useStripe();
   const elements = useElements();
@@ -507,6 +509,10 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
     }
     loadCredits();
   }, []);
+
+  useEffect(() => {
+    onCreditsChange?.(is_applying_credits, is_applying_credits ? credits_to_apply : 0);
+  }, [is_applying_credits, credits_to_apply, onCreditsChange]);
 
   // ── Credits handlers ──────────────────────────────────────────
 

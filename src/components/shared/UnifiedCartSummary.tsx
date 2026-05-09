@@ -34,6 +34,8 @@ interface UnifiedCartSummaryProps {
   is_action_disabled?: boolean;
   show_coupon_field?: boolean;
   checkout_action?: CheckoutAction;
+  credits_to_apply?: number;
+  is_applying_credits?: boolean;
 }
 
 const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
@@ -42,6 +44,8 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
   is_action_disabled = false,
   show_coupon_field = false,
   checkout_action,
+  credits_to_apply = 0,
+  is_applying_credits = false,
 }) => {
   const {
     items,
@@ -61,8 +65,10 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
   const [coupon_error, setCouponError] = useState<string | null>(null);
   const [coupon_is_applying, setCouponIsApplying] = useState(false);
 
-  const has_any_discount = bulk_discount_amount > 0 || total_discount > 0;
+  const effective_credits = is_applying_credits ? credits_to_apply : 0;
+  const has_any_discount = bulk_discount_amount > 0 || total_discount > 0 || effective_credits > 0;
   const raw_subtotal = subtotal;
+  const total_after_credits = Math.max(0, total - effective_credits);
 
   const links_to_discount =
     total_links < BULK_DISCOUNT_THRESHOLD
@@ -606,21 +612,72 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
                 </p>
               </div>
             )}
+
+            {effective_credits > 0 && (
+              <div className="flex items-center justify-between">
+                <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                  <svg
+                    className="h-3 w-3 shrink-0"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2}
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+                    />
+                  </svg>
+                  Credits Applied ({effective_credits.toLocaleString()} credits)
+                </p>
+                <p className="text-sm font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                  &minus;$
+                  {effective_credits.toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </p>
+              </div>
+            )}
           </>
         )}
 
         <div className="flex items-center justify-between">
           <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
-            Total
+            {effective_credits > 0 ? "Total Due" : "Total"}
           </p>
           <p className="text-xl font-bold text-gray-800 dark:text-white/90">
             $
-            {total.toLocaleString("en-US", {
+            {total_after_credits.toLocaleString("en-US", {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
             })}
           </p>
         </div>
+
+        {effective_credits > 0 && total_after_credits <= 0 && (
+          <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2.5 dark:border-emerald-500/30 dark:bg-emerald-500/10">
+            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20">
+              <svg
+                className="h-3 w-3 text-emerald-600 dark:text-emerald-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4.5 12.75l6 6 9-13.5"
+                />
+              </svg>
+            </div>
+            <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+              Your credits fully cover this order — no card needed!
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Action button */}
