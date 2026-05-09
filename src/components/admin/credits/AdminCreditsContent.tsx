@@ -580,13 +580,13 @@ export default function AdminCreditsContent() {
                       </p>
                     </div>
                   </div>
-                  {lastAssignedBalance !== null && (
+                  {last_assigned_balance !== null && (
                     <div className="mt-3 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-500/20 dark:bg-emerald-500/10">
                       <svg className="h-3.5 w-3.5 shrink-0 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                       </svg>
                       <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                        Credits updated. New balance: <strong>{formatCredits(lastAssignedBalance)}</strong>
+                        Credits updated. New balance: <strong>{formatCredits(last_assigned_balance)}</strong>
                       </p>
                     </div>
                   )}
