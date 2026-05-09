@@ -12,6 +12,7 @@ import { StripeElementChangeEvent } from "@stripe/stripe-js";
 import SearchableSelect from "./SearchableSelect";
 import { createPaymentIntent } from "@/services/client/stripe.service";
 import { paymentProfileService } from "@/services/client/payment-profile.service";
+import { creditsService } from "@/services/client/credits.service";
 import type { PaymentProfile } from "@/types/client/payment-profile";
 
 // ─── Public interface ─────────────────────────────────────────────────────────
@@ -37,6 +38,8 @@ interface CheckoutStepProps {
   onComplete: (payment_intent_id: string, is_using_saved_method: boolean) => void;
   /** Called when the user chooses to place the order with payment deferred. */
   onPayLater?: () => void;
+  /** Called when the user successfully pays using account credits. */
+  onPayWithCredits?: () => void;
   is_loading?: boolean;
   error_message?: string | null;
   total_amount: number;
@@ -224,6 +227,7 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
   onPrevious,
   onComplete,
   onPayLater,
+  onPayWithCredits,
   is_loading = false,
   error_message,
   total_amount,
@@ -251,7 +255,11 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
   // Saved payment profiles
   const [payment_profiles, setPaymentProfiles] = useState<PaymentProfile[]>([]);
   const [profiles_loading, setProfilesLoading] = useState(true);
-  const [selected_profile_id, setSelectedProfileId] = useState<string | "new" | "pay_later">("new");
+  const [selected_profile_id, setSelectedProfileId] = useState<string | "new" | "pay_later" | "credits">("new");
+
+  // Account credits
+  const [credit_balance, setCreditBalance] = useState(0);
+  const [credits_loading, setCreditsLoading] = useState(true);
 
   useEffect(() => {
     async function loadProfiles() {
@@ -271,8 +279,23 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
     loadProfiles();
   }, []);
 
-  const is_using_saved = selected_profile_id !== "new" && selected_profile_id !== "pay_later";
+  useEffect(() => {
+    async function loadCredits() {
+      try {
+        const { balance } = await creditsService.fetchCreditBalance();
+        setCreditBalance(balance);
+      } catch {
+        // Silently fail — credits option will simply be hidden
+      } finally {
+        setCreditsLoading(false);
+      }
+    }
+    loadCredits();
+  }, []);
+
+  const is_using_credits = selected_profile_id === "credits";
   const is_pay_later = selected_profile_id === "pay_later";
+  const is_using_saved = selected_profile_id !== "new" && !is_pay_later && !is_using_credits;
 
   const handleElementChange = (
     field: keyof StripeElementErrors,
@@ -319,9 +342,35 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
     [onBillingChange, billing_errors]
   );
 
+  const has_insufficient_credits = is_using_credits && credit_balance < total_amount;
+
   const handleComplete = useCallback(async () => {
     if (is_pay_later) {
       onPayLater?.();
+      return;
+    }
+
+    if (is_using_credits) {
+      if (has_insufficient_credits) {
+        setStripeError("Your credit balance is insufficient for this order. Please choose another payment method.");
+        return;
+      }
+      setIsProcessing(true);
+      onProcessingChange?.(true);
+      setStripeError(null);
+      try {
+        await creditsService.payWithCredits({
+          amount: total_amount,
+          description: "Order payment",
+        });
+        onPayWithCredits?.();
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error ? err.message : "Failed to process credit payment. Please try again.";
+        setStripeError(message);
+        setIsProcessing(false);
+        onProcessingChange?.(false);
+      }
       return;
     }
 
@@ -420,9 +469,10 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
       onProcessingChange?.(false);
     }
   }, [
-    stripe, elements, is_pay_later, onPayLater, is_using_saved, validateNewCardFields,
-    total_amount, payment_profiles, selected_profile_id, billing_address, save_for_future,
-    name_on_card, onComplete, onProcessingChange,
+    stripe, elements, is_pay_later, onPayLater, is_using_credits, has_insufficient_credits,
+    onPayWithCredits, is_using_saved, validateNewCardFields, total_amount, payment_profiles,
+    selected_profile_id, billing_address, save_for_future, name_on_card, onComplete,
+    onProcessingChange,
   ]);
 
   useImperativeHandle(ref, () => ({ triggerSubmit: handleComplete }), [handleComplete]);
@@ -552,6 +602,122 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
                 </label>
               );
             })}
+
+            {/* "Pay with Credits" option */}
+            {onPayWithCredits && !credits_loading && credit_balance > 0 && (
+              <div>
+                <label
+                  className={`flex cursor-pointer items-center gap-4 px-6 py-4 transition-colors ${
+                    is_using_credits
+                      ? "bg-emerald-50/80 dark:bg-emerald-500/5"
+                      : "hover:bg-gray-50 dark:hover:bg-white/2"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="payment_profile"
+                    value="credits"
+                    checked={is_using_credits}
+                    onChange={() => setSelectedProfileId("credits")}
+                    className="sr-only"
+                  />
+                  <div
+                    className={`relative h-4 w-4 shrink-0 rounded-full border-2 transition-colors ${
+                      is_using_credits ? "border-emerald-500" : "border-gray-300 dark:border-gray-600"
+                    }`}
+                  >
+                    {is_using_credits && (
+                      <div className="absolute inset-[3px] rounded-full bg-emerald-500" />
+                    )}
+                  </div>
+                  <div className="flex h-11 w-[68px] shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-emerald-300 bg-emerald-50 dark:border-emerald-500/40 dark:bg-emerald-500/10">
+                    <svg className="h-5 w-5 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                    </svg>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                        Pay with Credits
+                      </p>
+                      <span className="rounded-full border border-emerald-200 bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-400">
+                        {credit_balance.toLocaleString()} available
+                      </span>
+                      {credit_balance < total_amount && (
+                        <span className="rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-400">
+                          Insufficient
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                      ${credit_balance.toLocaleString()} value · 1 credit = $1.00
+                    </p>
+                  </div>
+                  {is_using_credits && (
+                    <svg className="h-4 w-4 shrink-0 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                    </svg>
+                  )}
+                </label>
+
+                {/* Credits info panel */}
+                {is_using_credits && (
+                  <div className="border-t border-emerald-100 bg-emerald-50/60 px-6 pb-6 pt-5 dark:border-emerald-500/15 dark:bg-emerald-500/5">
+                    <div className="rounded-xl border border-emerald-200 bg-white p-4 shadow-sm dark:border-emerald-500/20 dark:bg-gray-900/60">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-500/15">
+                          <svg className="h-4 w-4 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                          </svg>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                            Account credits summary
+                          </p>
+                          <div className="mt-2.5 space-y-1.5">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-gray-500 dark:text-gray-400">Available balance</span>
+                              <span className="font-semibold text-gray-800 dark:text-white">
+                                {credit_balance.toLocaleString()} credits
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-gray-500 dark:text-gray-400">Order total</span>
+                              <span className="font-semibold text-gray-800 dark:text-white">
+                                {total_amount.toLocaleString()} credits
+                              </span>
+                            </div>
+                            <div className="my-1.5 border-t border-gray-100 dark:border-gray-800" />
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-medium text-gray-700 dark:text-gray-300">
+                                Remaining after payment
+                              </span>
+                              <span
+                                className={`font-bold ${
+                                  credit_balance - total_amount >= 0
+                                    ? "text-emerald-600 dark:text-emerald-400"
+                                    : "text-red-500 dark:text-red-400"
+                                }`}
+                              >
+                                {Math.max(0, credit_balance - total_amount).toLocaleString()} credits
+                              </span>
+                            </div>
+                          </div>
+                          {credit_balance < total_amount && (
+                            <p className="mt-3 flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                              <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008z" />
+                              </svg>
+                              Your balance is insufficient for this order. Please choose another payment method.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* "Pay Later" option */}
             {onPayLater && (
