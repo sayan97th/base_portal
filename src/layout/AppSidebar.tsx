@@ -21,6 +21,7 @@ import {
   ChevronDownIcon,
   CalenderIcon,
   ListIcon,
+  BoltIcon,
 } from "../icons/index";
 import SidebarWidget from "./SidebarWidget";
 
@@ -100,6 +101,7 @@ const sidebar_sections: SidebarSection[] = [
       { name: "Team", icon: <GroupIcon />, path: "/team" },
       { name: "Billing", icon: <CreditCardIcon />, path: "/billing" },
       { name: "Invoices", icon: <DollarLineIcon />, path: "/invoices" },
+      { name: "Credits", icon: <BoltIcon />, path: "/credits" },
       { name: "Support", icon: <ChatIcon />, path: "/support" },
       { name: "Schedule a Call", icon: <CalenderIcon />, path: "/schedule-a-call" },
     ],
