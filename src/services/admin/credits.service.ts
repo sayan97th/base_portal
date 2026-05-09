@@ -16,6 +16,7 @@ import type {
   AssignCreditsResponse,
   AdminCreditsStats,
   AdminCreditsTransactionFilters,
+  AdminCreditsClientFilters,
 } from "@/types/admin/credits";
 import type { PaginatedResponse } from "@/types/admin";
 
@@ -34,6 +35,19 @@ export const adminCreditsService = {
 
   async assignCredits(payload: AssignCreditsPayload): Promise<AssignCreditsResponse> {
     return apiClient.post<AssignCreditsResponse>("/api/admin/credits/assign", payload);
+  },
+
+  async fetchClientsList(
+    filters: AdminCreditsClientFilters = {}
+  ): Promise<PaginatedResponse<AdminCreditUser>> {
+    const params = new URLSearchParams({ type: "client" });
+    if (filters.page) params.set("page", String(filters.page));
+    if (filters.search) params.set("search", filters.search);
+    if (filters.sort_by) params.set("sort_by", filters.sort_by);
+    if (filters.sort_dir) params.set("sort_dir", filters.sort_dir);
+    return apiClient.get<PaginatedResponse<AdminCreditUser>>(
+      `/api/admin/credits/users?${params.toString()}`
+    );
   },
 
   async fetchTransactions(

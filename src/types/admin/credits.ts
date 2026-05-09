@@ -46,3 +46,10 @@ export interface AdminCreditsTransactionFilters {
   user_id?: number;
   type?: "credit" | "debit" | "";
 }
+
+export interface AdminCreditsClientFilters {
+  page?: number;
+  search?: string;
+  sort_by?: "first_name" | "credit_balance";
+  sort_dir?: "asc" | "desc";
+}
