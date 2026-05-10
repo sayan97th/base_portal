@@ -56,16 +56,16 @@ function buildPageButtons(current: number, last: number): (number | "...")[] {
 
 function BalanceHeroSkeleton() {
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 to-brand-800 p-8 shadow-xl">
-      <div className="relative z-10 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-        <div className="space-y-3">
-          <div className="h-4 w-32 animate-pulse rounded-full bg-white/20" />
-          <div className="h-14 w-52 animate-pulse rounded-xl bg-white/20" />
-          <div className="h-4 w-40 animate-pulse rounded-full bg-white/20" />
+    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-600 to-brand-800 p-5 shadow-lg">
+      <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-2">
+          <div className="h-3.5 w-28 animate-pulse rounded-full bg-white/20" />
+          <div className="h-10 w-40 animate-pulse rounded-lg bg-white/20" />
+          <div className="h-3.5 w-36 animate-pulse rounded-full bg-white/20" />
         </div>
-        <div className="flex gap-4">
+        <div className="flex gap-3">
           {[0, 1].map((i) => (
-            <div key={i} className="h-20 w-32 animate-pulse rounded-2xl bg-white/10" />
+            <div key={i} className="h-16 w-28 animate-pulse rounded-xl bg-white/10" />
           ))}
         </div>
       </div>
@@ -80,37 +80,36 @@ function BalanceHeroCard({ summary }: { summary: CreditBalanceSummary }) {
       : 0;
 
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900 p-8 shadow-xl">
+    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900 p-5 shadow-lg">
       {/* Decorative circles */}
-      <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/5" />
-      <div className="pointer-events-none absolute -bottom-24 -left-8 h-56 w-56 rounded-full bg-white/5" />
-      <div className="pointer-events-none absolute right-24 bottom-0 h-32 w-32 rounded-full bg-white/5" />
+      <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/5" />
+      <div className="pointer-events-none absolute -bottom-14 -left-5 h-36 w-36 rounded-full bg-white/5" />
 
-      <div className="relative z-10 flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+      <div className="relative z-10 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
         {/* Main balance */}
         <div>
-          <div className="mb-1 flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white/20">
-              <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+          <div className="mb-1 flex items-center gap-1.5">
+            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20">
+              <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
               </svg>
             </div>
-            <p className="text-sm font-medium tracking-wide text-white/70">Available Credits</p>
+            <p className="text-xs font-medium tracking-wide text-white/70">Available Credits</p>
           </div>
 
-          <div className="flex items-end gap-3">
-            <p className="text-6xl font-extrabold tabular-nums text-white leading-none">
+          <div className="flex items-end gap-2">
+            <p className="text-4xl font-extrabold tabular-nums text-white leading-none">
               {formatCredits(summary.balance)}
             </p>
-            <p className="mb-1 text-lg font-semibold text-white/60">CR</p>
+            <p className="mb-0.5 text-sm font-semibold text-white/60">CR</p>
           </div>
 
-          <div className="mt-3 flex items-center gap-2">
-            <div className="flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1">
-              <svg className="h-3.5 w-3.5 text-emerald-300" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+          <div className="mt-2 flex items-center gap-2">
+            <div className="flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-0.5">
+              <svg className="h-3 w-3 text-emerald-300" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
               </svg>
-              <p className="text-sm font-semibold text-white/90">
+              <p className="text-xs font-semibold text-white/90">
                 {formatUSD(summary.dollar_value)} USD equivalent
               </p>
             </div>
@@ -118,21 +117,21 @@ function BalanceHeroCard({ summary }: { summary: CreditBalanceSummary }) {
         </div>
 
         {/* Side stats */}
-        <div className="flex flex-wrap gap-3 lg:flex-col lg:items-end">
-          <div className="flex flex-col items-start rounded-2xl bg-white/10 px-5 py-4 backdrop-blur-sm lg:items-end lg:min-w-36">
-            <p className="text-xs font-medium text-white/60 uppercase tracking-wider">Conversion Rate</p>
-            <p className="mt-1 text-xl font-bold text-white">1 CR = $1.00</p>
-            <p className="text-xs text-white/50">1:1 USD parity</p>
+        <div className="flex flex-wrap gap-2.5 lg:flex-col lg:items-end">
+          <div className="flex flex-col items-start rounded-xl bg-white/10 px-3.5 py-2.5 backdrop-blur-sm lg:items-end">
+            <p className="text-[10px] font-medium text-white/60 uppercase tracking-wider">Conversion Rate</p>
+            <p className="mt-0.5 text-sm font-bold text-white">1 CR = $1.00</p>
+            <p className="text-[10px] text-white/50">1:1 USD parity</p>
           </div>
-          <div className="flex flex-col items-start rounded-2xl bg-white/10 px-5 py-4 backdrop-blur-sm lg:items-end lg:min-w-36">
-            <p className="text-xs font-medium text-white/60 uppercase tracking-wider">Status</p>
-            <div className="mt-1 flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_2px_rgba(52,211,153,0.4)]" />
-              <p className="text-xl font-bold text-white">
+          <div className="flex flex-col items-start rounded-xl bg-white/10 px-3.5 py-2.5 backdrop-blur-sm lg:items-end">
+            <p className="text-[10px] font-medium text-white/60 uppercase tracking-wider">Status</p>
+            <div className="mt-0.5 flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_2px_rgba(52,211,153,0.4)]" />
+              <p className="text-sm font-bold text-white">
                 {summary.balance > 0 ? "Active" : "Empty"}
               </p>
             </div>
-            <p className="text-xs text-white/50">
+            <p className="text-[10px] text-white/50">
               {summary.balance > 0 ? "Ready to use" : "Contact support"}
             </p>
           </div>
@@ -141,12 +140,12 @@ function BalanceHeroCard({ summary }: { summary: CreditBalanceSummary }) {
 
       {/* Thin usage progress bar at bottom */}
       {summary.balance > 0 && (
-        <div className="relative z-10 mt-6">
-          <div className="flex items-center justify-between text-xs text-white/50 mb-1.5">
+        <div className="relative z-10 mt-4">
+          <div className="flex items-center justify-between text-[10px] text-white/50 mb-1">
             <span>Balance overview</span>
             <span>{formatCredits(summary.balance)} credits available</span>
           </div>
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+          <div className="h-1 w-full overflow-hidden rounded-full bg-white/10">
             <div
               className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-300 transition-all duration-700"
               style={{ width: `${Math.max(pct_used, 8)}%` }}
