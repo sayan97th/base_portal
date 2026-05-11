@@ -100,7 +100,9 @@ export default function UnifiedIntakeStep({
   const computed_keyword_rows = useMemo<KeywordData>(() => {
     const result: KeywordData = {};
     lb_items.forEach((item) => {
-      const stored = getKeywordDataForTier(item.tier_id) as KeywordRow[];
+      const stored = (getKeywordDataForTier(item.tier_id) as KeywordRow[]).map(
+        (r) => ({ ...r, keyword: r.keyword ?? "", landing_page: r.landing_page ?? "" })
+      );
       if (stored.length === item.quantity) {
         result[item.tier_id] = stored;
       } else if (stored.length < item.quantity) {
