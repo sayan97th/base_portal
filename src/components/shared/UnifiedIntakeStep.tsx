@@ -562,9 +562,10 @@ export default function UnifiedIntakeStep({
               />
             </svg>
             <p className="text-sm text-blue-700 dark:text-blue-300">
-              Fill in the primary target keyword, secondary keywords, and the
-              current live URL for each page you&apos;d like a content brief
-              created for.
+              Fill in the primary keyword, secondary keywords, and the current
+              live URL for each page you&apos;d like a content brief created
+              for. Use the Notes field to share any specific requirements,
+              target audience details, or context for your brief.
             </p>
           </div>
 
