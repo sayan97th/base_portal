@@ -16,8 +16,16 @@ function formatRate(discount: Discount): string {
   return `${discount.discount_rate}% off`;
 }
 
+const APPLIES_TO_OPTIONS: { value: DiscountAppliesTo; label: string; description: string }[] = [
+  { value: "link_building",      label: "Link Building",         description: "Link building orders only" },
+  { value: "new_content",        label: "New Content",           description: "New content orders only" },
+  { value: "content_optimization", label: "Content Optimization", description: "Content optimization orders only" },
+  { value: "content_brief",      label: "Content Briefs",        description: "Content brief orders only" },
+  { value: "all",                label: "All Products",          description: "Every product in the cart" },
+];
+
 function getAppliesToLabel(applies_to: DiscountAppliesTo): string {
-  return applies_to === "all" ? "All Products" : "Link Building";
+  return APPLIES_TO_OPTIONS.find((o) => o.value === applies_to)?.label ?? applies_to;
 }
 
 function formatDate(date_str: string): string {
@@ -286,19 +294,30 @@ function DiscountFormModal({ editing, onSave, onClose, is_loading }: DiscountFor
             <label className="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">
               Applies To
             </label>
-            <div className="flex gap-3">
-              {(["link_building", "all"] as DiscountAppliesTo[]).map((opt) => (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {APPLIES_TO_OPTIONS.map((opt) => (
                 <button
-                  key={opt}
+                  key={opt.value}
                   type="button"
-                  onClick={() => field("applies_to", opt)}
-                  className={`flex-1 rounded-xl border px-3 py-2.5 text-xs font-medium transition-colors ${
-                    form.applies_to === opt
-                      ? "border-brand-400 bg-brand-50 text-brand-700 dark:border-brand-500 dark:bg-brand-500/10 dark:text-brand-300"
-                      : "border-gray-200 text-gray-500 hover:border-gray-300 dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-600"
+                  onClick={() => field("applies_to", opt.value)}
+                  className={`flex flex-col items-start rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                    form.applies_to === opt.value
+                      ? "border-brand-400 bg-brand-50 dark:border-brand-500 dark:bg-brand-500/10"
+                      : "border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600"
                   }`}
                 >
-                  {getAppliesToLabel(opt)}
+                  <span
+                    className={`text-xs font-semibold ${
+                      form.applies_to === opt.value
+                        ? "text-brand-700 dark:text-brand-300"
+                        : "text-gray-700 dark:text-gray-300"
+                    }`}
+                  >
+                    {opt.label}
+                  </span>
+                  <span className="mt-0.5 text-[10px] leading-tight text-gray-400 dark:text-gray-500">
+                    {opt.description}
+                  </span>
                 </button>
               ))}
             </div>
@@ -314,10 +333,11 @@ function DiscountFormModal({ editing, onSave, onClose, is_loading }: DiscountFor
               <p className="text-xs font-medium text-violet-700 dark:text-violet-300">
                 Preview: customers ordering{" "}
                 <span className="font-bold">{form.min_quantity}+</span>{" "}
-                {getAppliesToLabel(form.applies_to).toLowerCase()} links will
-                receive{" "}
+                {APPLIES_TO_OPTIONS.find((o) => o.value === form.applies_to)?.label.toLowerCase() ?? form.applies_to}{" "}
+                items will receive{" "}
                 <span className="font-bold">{form.discount_rate}% off</span>{" "}
-                their link building subtotal.
+                their{" "}
+                {form.applies_to === "all" ? "entire cart subtotal" : `${APPLIES_TO_OPTIONS.find((o) => o.value === form.applies_to)?.label.toLowerCase()} subtotal`}.
               </p>
             </div>
           )}

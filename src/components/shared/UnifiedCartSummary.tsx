@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useCart } from "@/context/CartContext";
 import { validateCoupon } from "@/services/client/coupons.service";
 import type { CartProductType } from "@/types/client/unified-cart";
+import type { DiscountAppliesTo } from "@/types/admin/discounts";
 
 const MINIMUM_CART_FOR_COUPON = 500;
 
@@ -20,6 +21,46 @@ const PRODUCT_TYPE_ORDER: CartProductType[] = [
   "new_content",
   "content_brief",
 ];
+
+function getDiscountItemLabel(applies_to: DiscountAppliesTo, qty: number): string {
+  const singular: Record<DiscountAppliesTo, string> = {
+    link_building: "link",
+    new_content: "content piece",
+    content_optimization: "optimization",
+    content_brief: "content brief",
+    all: "item",
+  };
+  const plural: Record<DiscountAppliesTo, string> = {
+    link_building: "links",
+    new_content: "content pieces",
+    content_optimization: "optimizations",
+    content_brief: "content briefs",
+    all: "items",
+  };
+  return qty === 1 ? singular[applies_to] : plural[applies_to];
+}
+
+function getDiscountServicesLabel(applies_to: DiscountAppliesTo): string {
+  const labels: Record<DiscountAppliesTo, string> = {
+    link_building: "link building services",
+    new_content: "new content orders",
+    content_optimization: "content optimization orders",
+    content_brief: "content brief orders",
+    all: "all your services",
+  };
+  return labels[applies_to];
+}
+
+function getDiscountShortLabel(applies_to: DiscountAppliesTo): string {
+  const labels: Record<DiscountAppliesTo, string> = {
+    link_building: "links",
+    new_content: "content",
+    content_optimization: "optimization",
+    content_brief: "briefs",
+    all: "all products",
+  };
+  return labels[applies_to];
+}
 
 export interface CheckoutAction {
   total: number;
@@ -51,16 +92,14 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
     applied_coupons,
     coupon_input_code,
     subtotal,
-    total_links,
     bulk_discount_amount,
+    bulk_discount_details,
     subtotal_after_bulk,
     total_discount,
     total,
     setItemQuantity,
     setAppliedCoupons,
     setCouponInputCode,
-    bulk_discount_threshold,
-    bulk_discount_rate,
   } = useCart();
 
   const [coupon_error, setCouponError] = useState<string | null>(null);
@@ -72,16 +111,15 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
   const total_after_credits = Math.max(0, total - effective_credits);
   const credits_savings_pct = total > 0 ? Math.round((effective_credits / total) * 100) : 0;
 
-  const links_to_discount =
-    total_links < bulk_discount_threshold
-      ? bulk_discount_threshold - total_links
-      : 0;
-  const lb_items = items.filter((i) => i.product_type === "link_building");
-  const show_bulk_teaser =
-    links_to_discount > 0 && lb_items.length > 0 && items.length > 0;
-  const show_bulk_applied_badge =
-    total_links >= bulk_discount_threshold && bulk_discount_amount > 0;
-  const bulk_discount_pct = Math.round(bulk_discount_rate * 100);
+  // Teasers: configs where threshold is not yet met but the relevant product type has items
+  const teaser_details = bulk_discount_details.filter((d) => {
+    if (d.is_applied) return false;
+    if (d.config.applies_to === "all") return items.length > 0;
+    return items.some((i) => i.product_type === d.config.applies_to);
+  });
+
+  // Applied badges + price breakdown rows
+  const applied_details = bulk_discount_details.filter((d) => d.is_applied);
 
   const cart_below_minimum =
     subtotal_after_bulk < MINIMUM_CART_FOR_COUPON &&
@@ -190,59 +228,73 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
         Order Summary
       </h2>
 
-      {/* Bulk discount progress teaser */}
-      {show_bulk_teaser && (
-        <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-violet-100 bg-violet-50/70 px-3 py-2.5 dark:border-violet-500/20 dark:bg-violet-500/10">
-          <svg
-            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-violet-500 dark:text-violet-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
+      {/* Bulk discount progress teasers — one per eligible config */}
+      {teaser_details.map((detail) => {
+        const pct = Math.round(detail.config.discount_rate);
+        return (
+          <div
+            key={detail.config.id}
+            className="mb-3 flex items-start gap-2.5 rounded-xl border border-violet-100 bg-violet-50/70 px-3 py-2.5 dark:border-violet-500/20 dark:bg-violet-500/10"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"
-            />
-          </svg>
-          <p className="text-xs font-medium text-violet-700 dark:text-violet-300">
-            Add{" "}
-            <span className="font-bold">
-              {links_to_discount} more link
-              {links_to_discount !== 1 ? "s" : ""}
-            </span>{" "}
-            to unlock{" "}
-            <span className="font-bold">{bulk_discount_pct}% off</span> your
-            link building services.
-          </p>
-        </div>
-      )}
-
-      {/* Bulk discount applied badge */}
-      {show_bulk_applied_badge && (
-        <div className="mb-4 flex items-center gap-2 rounded-xl border border-violet-100 bg-violet-50/70 px-3 py-2.5 dark:border-violet-500/20 dark:bg-violet-500/10">
-          <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-500/20">
             <svg
-              className="h-3 w-3 text-violet-600 dark:text-violet-400"
+              className="mt-0.5 h-3.5 w-3.5 shrink-0 text-violet-500 dark:text-violet-400"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
-              strokeWidth={2.5}
+              strokeWidth={2}
             >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                d="M4.5 12.75l6 6 9-13.5"
+                d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"
               />
             </svg>
+            <p className="text-xs font-medium text-violet-700 dark:text-violet-300">
+              Add{" "}
+              <span className="font-bold">
+                {detail.quantity_needed}{" "}
+                {getDiscountItemLabel(detail.config.applies_to, detail.quantity_needed)}
+              </span>{" "}
+              to unlock{" "}
+              <span className="font-bold">{pct}% off</span>{" "}
+              {getDiscountServicesLabel(detail.config.applies_to)}.
+            </p>
           </div>
-          <p className="text-xs font-semibold text-violet-700 dark:text-violet-300">
-            {bulk_discount_pct}% bulk discount applied —{" "}
-            {bulk_discount_threshold}+ links ordered!
-          </p>
-        </div>
-      )}
+        );
+      })}
+
+      {/* Bulk discount applied badges — one per applied config */}
+      {applied_details.map((detail) => {
+        const pct = Math.round(detail.config.discount_rate);
+        return (
+          <div
+            key={detail.config.id}
+            className="mb-3 flex items-center gap-2 rounded-xl border border-violet-100 bg-violet-50/70 px-3 py-2.5 dark:border-violet-500/20 dark:bg-violet-500/10"
+          >
+            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-500/20">
+              <svg
+                className="h-3 w-3 text-violet-600 dark:text-violet-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4.5 12.75l6 6 9-13.5"
+                />
+              </svg>
+            </div>
+            <p className="text-xs font-semibold text-violet-700 dark:text-violet-300">
+              {pct}% bulk discount applied —{" "}
+              {detail.config.min_quantity}+{" "}
+              {getDiscountItemLabel(detail.config.applies_to, detail.config.min_quantity)}{" "}
+              ordered!
+            </p>
+          </div>
+        );
+      })}
 
       {/* Items grouped by product type */}
       {grouped_items.length > 0 ? (
@@ -555,20 +607,21 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
               </p>
             </div>
 
-            {bulk_discount_amount > 0 && (
-              <div className="flex items-center justify-between">
+            {applied_details.map((detail) => (
+              <div key={detail.config.id} className="flex items-center justify-between">
                 <p className="text-xs font-medium text-violet-600 dark:text-violet-400">
-                  Bulk Discount ({bulk_discount_pct}% off links)
+                  Bulk Discount ({Math.round(detail.config.discount_rate)}% off{" "}
+                  {getDiscountShortLabel(detail.config.applies_to)})
                 </p>
                 <p className="text-sm font-semibold text-violet-600 dark:text-violet-400 tabular-nums">
                   &minus;$
-                  {bulk_discount_amount.toLocaleString("en-US", {
+                  {detail.discount_amount.toLocaleString("en-US", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}
                 </p>
               </div>
-            )}
+            ))}
 
             {applied_coupons.length > 1
               ? applied_coupons.map((applied) => (

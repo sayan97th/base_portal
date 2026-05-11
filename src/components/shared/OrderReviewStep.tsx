@@ -305,6 +305,7 @@ export default function OrderReviewStep({
     order_notes,
     subtotal,
     bulk_discount_amount,
+    bulk_discount_details,
     total_discount,
     total,
     applied_coupons,
@@ -313,6 +314,8 @@ export default function OrderReviewStep({
     getContentOptimizationIntakeDataForTier,
     getContentBriefIntakeDataForTier,
   } = useCart();
+
+  const applied_bulk_details = bulk_discount_details.filter((d) => d.is_applied);
 
   const lb_items = useMemo(() => items.filter((i) => i.product_type === "link_building"), [items]);
   const nc_items = useMemo(() => items.filter((i) => i.product_type === "new_content"), [items]);
@@ -463,16 +466,25 @@ export default function OrderReviewStep({
             </div>
           )}
 
-          {bulk_discount_amount > 0 && (
-            <div className="flex items-center justify-between">
+          {applied_bulk_details.map((detail) => (
+            <div key={detail.config.id} className="flex items-center justify-between">
               <span className="text-xs font-medium text-violet-600 dark:text-violet-400">
-                Bulk Discount (10% off links)
+                Bulk Discount ({Math.round(detail.config.discount_rate)}% off{" "}
+                {detail.config.applies_to === "all"
+                  ? "all products"
+                  : detail.config.applies_to === "link_building"
+                  ? "links"
+                  : detail.config.applies_to === "new_content"
+                  ? "content"
+                  : detail.config.applies_to === "content_optimization"
+                  ? "optimization"
+                  : "briefs"})
               </span>
               <span className="text-sm font-semibold tabular-nums text-violet-600 dark:text-violet-400">
-                &minus;${formatCurrency(bulk_discount_amount)}
+                &minus;${formatCurrency(detail.discount_amount)}
               </span>
             </div>
-          )}
+          ))}
 
           {applied_coupons.length > 0 && applied_coupons.map((c) => (
             <div key={c.code} className="flex items-center justify-between">

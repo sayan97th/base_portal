@@ -1,5 +1,10 @@
 export type DiscountType = "bulk";
-export type DiscountAppliesTo = "link_building" | "all";
+export type DiscountAppliesTo =
+  | "link_building"
+  | "new_content"
+  | "content_optimization"
+  | "content_brief"
+  | "all";
 
 export interface Discount {
   id: string;
@@ -12,6 +17,15 @@ export interface Discount {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface BulkDiscountDetail {
+  config: Discount;
+  is_applied: boolean;
+  discount_amount: number;
+  current_quantity: number;
+  quantity_needed: number;
+  product_subtotal: number;
 }
 
 export interface CreateDiscountPayload {
