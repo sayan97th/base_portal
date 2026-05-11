@@ -177,6 +177,7 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
         0
       );
 
+      const lb_items = items.filter((i) => i.product_type === "link_building");
       const lb_tier_ids = lb_items.map((i) => i.tier_id);
       const lb_tier_amounts: Record<string, number> = {};
       lb_items.forEach((i) => {
