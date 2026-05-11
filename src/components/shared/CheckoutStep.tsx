@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from "react";
+import React, { useState, useEffect, useRef, useCallback, useImperativeHandle, forwardRef } from "react";
 import {
   useStripe,
   useElements,
@@ -194,6 +194,7 @@ interface CreditsApplyPanelProps {
   credit_balance: number;
   total_amount: number;
   is_applying: boolean;
+  is_credits_sufficient: boolean;
   credits_to_apply: number;
   credits_input: string;
   onToggle: (enabled: boolean) => void;
@@ -207,6 +208,7 @@ function CreditsApplyPanel({
   credit_balance,
   total_amount,
   is_applying,
+  is_credits_sufficient,
   credits_to_apply,
   credits_input,
   onToggle,
@@ -216,6 +218,7 @@ function CreditsApplyPanel({
   onApplyMax,
 }: CreditsApplyPanelProps) {
   const max_credits = Math.min(credit_balance, Math.ceil(total_amount));
+  const remaining_after_order = Math.max(0, credit_balance - credits_to_apply);
 
   return (
     <SectionCard>
@@ -234,7 +237,6 @@ function CreditsApplyPanel({
             </p>
           </div>
         </div>
-        {/* Balance badge */}
         <div className="shrink-0 rounded-full bg-emerald-100 px-3 py-1 dark:bg-emerald-500/15">
           <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
             ${credit_balance.toLocaleString()}
@@ -243,107 +245,144 @@ function CreditsApplyPanel({
       </div>
 
       <div className="px-6 py-5 space-y-4">
-        {/* Toggle row */}
-        <div
-          className={`flex cursor-pointer items-center justify-between gap-4 rounded-xl border p-4 transition-all ${
-            is_applying
-              ? "border-emerald-200 bg-emerald-50/70 dark:border-emerald-500/30 dark:bg-emerald-500/8"
-              : "border-gray-200 bg-gray-50/60 hover:bg-gray-50 dark:border-gray-700 dark:bg-white/2 dark:hover:bg-white/4"
-          }`}
-          onClick={() => onToggle(!is_applying)}
-        >
-          <div className="flex items-center gap-3">
-            <div className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${is_applying ? "bg-emerald-100 dark:bg-emerald-500/20" : "bg-gray-100 dark:bg-gray-800"}`}>
-              <svg
-                className={`h-4 w-4 transition-colors ${is_applying ? "text-emerald-600 dark:text-emerald-400" : "text-gray-400 dark:text-gray-500"}`}
-                fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"
+
+        {/* ── Sufficient credits + currently applying: full-coverage confirmation ── */}
+        {is_credits_sufficient && is_applying ? (
+          <div className="space-y-3 animate-in fade-in duration-200">
+            <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-500/25 dark:bg-emerald-500/8">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500/20">
+                <svg className="h-4 w-4 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+                  Your credits fully cover this order
+                </p>
+                <p className="mt-1 text-xs text-emerald-700/80 dark:text-emerald-400/80">
+                  {credits_to_apply} credits will be used · ${remaining_after_order.toLocaleString()} will remain in your balance
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 dark:bg-white/3">
+              <span className="text-xs text-gray-500 dark:text-gray-400">No card or additional payment required</span>
+              <button
+                type="button"
+                onClick={() => onToggle(false)}
+                className="text-xs font-medium text-gray-400 transition-colors hover:text-gray-700 dark:hover:text-gray-200"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 14.25l6-6m4.5-3.493V21.75l-3.75-1.5-3.75 1.5-3.75-1.5-3.75 1.5V4.757c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0c1.1.128 1.907 1.077 1.907 2.185Z" />
-              </svg>
-            </div>
-            <div>
-              <p className={`text-sm font-semibold transition-colors ${is_applying ? "text-emerald-800 dark:text-emerald-300" : "text-gray-800 dark:text-gray-200"}`}>
-                Apply credits to this order
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Use your balance as a discount · no expiry
-              </p>
+                Pay with card instead →
+              </button>
             </div>
           </div>
-
-          {/* Toggle switch */}
-          <div
-            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200 ${is_applying ? "bg-emerald-500" : "bg-gray-200 dark:bg-gray-700"}`}
-          >
-            <span
-              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${is_applying ? "translate-x-5" : "translate-x-0.5"}`}
-            />
-          </div>
-        </div>
-
-        {/* Amount editor — visible when toggled */}
-        {is_applying && (
-          <div className="space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
-            {/* Slider card */}
-            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/60">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Credits to apply</span>
-                <button
-                  type="button"
-                  onClick={onApplyMax}
-                  className="text-xs font-semibold text-emerald-600 transition-colors hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
-                >
-                  Apply maximum →
-                </button>
+        ) : (
+          <>
+            {/* ── Toggle row ── */}
+            <div
+              className={`flex cursor-pointer items-center justify-between gap-4 rounded-xl border p-4 transition-all ${
+                is_applying
+                  ? "border-emerald-200 bg-emerald-50/70 dark:border-emerald-500/30 dark:bg-emerald-500/8"
+                  : "border-gray-200 bg-gray-50/60 hover:bg-gray-50 dark:border-gray-700 dark:bg-white/2 dark:hover:bg-white/4"
+              }`}
+              onClick={() => onToggle(!is_applying)}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${is_applying ? "bg-emerald-100 dark:bg-emerald-500/20" : "bg-gray-100 dark:bg-gray-800"}`}>
+                  <svg
+                    className={`h-4 w-4 transition-colors ${is_applying ? "text-emerald-600 dark:text-emerald-400" : "text-gray-400 dark:text-gray-500"}`}
+                    fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 14.25l6-6m4.5-3.493V21.75l-3.75-1.5-3.75 1.5-3.75-1.5-3.75 1.5V4.757c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0c1.1.128 1.907 1.077 1.907 2.185Z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className={`text-sm font-semibold transition-colors ${is_applying ? "text-emerald-800 dark:text-emerald-300" : "text-gray-800 dark:text-gray-200"}`}>
+                    Apply credits to this order
+                  </p>
+                  {is_credits_sufficient && !is_applying ? (
+                    <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                      Your balance is enough to cover this order — no card required
+                    </p>
+                  ) : (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Use your balance as a discount · no expiry
+                    </p>
+                  )}
+                </div>
               </div>
 
-              {/* Range slider */}
-              <input
-                type="range"
-                min={0}
-                max={max_credits}
-                step={1}
-                value={credits_to_apply}
-                onChange={(e) => onSliderChange(Number(e.target.value))}
-                className="h-2 w-full cursor-pointer appearance-none rounded-full bg-gray-200 accent-emerald-500 dark:bg-gray-700"
-                style={{
-                  background: max_credits > 0
-                    ? `linear-gradient(to right, #10b981 0%, #10b981 ${(credits_to_apply / max_credits) * 100}%, #e5e7eb ${(credits_to_apply / max_credits) * 100}%, #e5e7eb 100%)`
-                    : undefined,
-                }}
-              />
-
-              <div className="mt-1 flex justify-between text-[10px] text-gray-400">
-                <span>0 credits</span>
-                <span>{max_credits.toLocaleString()} credits</span>
+              {/* Toggle switch */}
+              <div
+                className={`relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200 ${is_applying ? "bg-emerald-500" : "bg-gray-200 dark:bg-gray-700"}`}
+              >
+                <span
+                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${is_applying ? "translate-x-5" : "translate-x-0.5"}`}
+                />
               </div>
+            </div>
 
-              {/* Number input row */}
-              <div className="mt-3 flex items-center gap-3">
-                <div className="relative flex-1">
+            {/* ── Partial-credits slider: only when applying and credits do NOT fully cover ── */}
+            {is_applying && !is_credits_sufficient && (
+              <div className="space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/60">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Credits to apply</span>
+                    <button
+                      type="button"
+                      onClick={onApplyMax}
+                      className="text-xs font-semibold text-emerald-600 transition-colors hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
+                    >
+                      Apply maximum →
+                    </button>
+                  </div>
+
                   <input
-                    type="number"
+                    type="range"
                     min={0}
                     max={max_credits}
-                    value={credits_input}
-                    onChange={(e) => onInputChange(e.target.value)}
-                    onBlur={onInputBlur}
-                    className="h-10 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 pr-16 text-sm font-semibold text-gray-900 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    step={1}
+                    value={credits_to_apply}
+                    onChange={(e) => onSliderChange(Number(e.target.value))}
+                    className="h-2 w-full cursor-pointer appearance-none rounded-full bg-gray-200 accent-emerald-500 dark:bg-gray-700"
+                    style={{
+                      background: max_credits > 0
+                        ? `linear-gradient(to right, #10b981 0%, #10b981 ${(credits_to_apply / max_credits) * 100}%, #e5e7eb ${(credits_to_apply / max_credits) * 100}%, #e5e7eb 100%)`
+                        : undefined,
+                    }}
                   />
-                  <span className="pointer-events-none absolute right-3 top-2.5 text-xs text-gray-400">credits</span>
-                </div>
-                <svg className="h-4 w-4 shrink-0 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
-                </svg>
-                <div className="shrink-0 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-500/30 dark:bg-emerald-500/10">
-                  <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400">
-                    -${credits_to_apply.toFixed(2)}
-                  </span>
+
+                  <div className="mt-1 flex justify-between text-[10px] text-gray-400">
+                    <span>0 credits</span>
+                    <span>{max_credits.toLocaleString()} credits</span>
+                  </div>
+
+                  <div className="mt-3 flex items-center gap-3">
+                    <div className="relative flex-1">
+                      <input
+                        type="number"
+                        min={0}
+                        max={max_credits}
+                        value={credits_input}
+                        onChange={(e) => onInputChange(e.target.value)}
+                        onBlur={onInputBlur}
+                        className="h-10 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 pr-16 text-sm font-semibold text-gray-900 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                      />
+                      <span className="pointer-events-none absolute right-3 top-2.5 text-xs text-gray-400">credits</span>
+                    </div>
+                    <svg className="h-4 w-4 shrink-0 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                    </svg>
+                    <div className="shrink-0 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-500/30 dark:bg-emerald-500/10">
+                      <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400">
+                        -${credits_to_apply.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-
-          </div>
+            )}
+          </>
         )}
       </div>
     </SectionCard>
@@ -398,11 +437,18 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
   const [credits_to_apply, setCreditsToApply] = useState(0);
   const [credits_input, setCreditsInput] = useState("0");
 
+  // Tracks whether auto-apply has already fired (runs once after credits load)
+  const has_auto_applied = useRef(false);
+
   // ── Derived values ────────────────────────────────────────────
   const max_credits_to_apply = Math.min(credit_balance, Math.ceil(total_amount));
   const effective_credits = is_applying_credits ? credits_to_apply : 0;
   const amount_after_credits = Math.max(0, total_amount - effective_credits);
   const is_fully_paid_by_credits = is_applying_credits && amount_after_credits <= 0;
+
+  // True when the credit balance alone is enough to pay the entire order
+  const has_credits_sufficient =
+    !credits_loading && credit_balance > 0 && credit_balance >= total_amount && total_amount > 0;
 
   const is_pay_later = selected_profile_id === "pay_later";
   const is_using_saved = selected_profile_id !== "new" && !is_pay_later;
@@ -437,6 +483,20 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
     loadCredits();
   }, []);
 
+  // Auto-apply credits when the balance is sufficient to cover the full order.
+  // This runs exactly once after the credits balance is loaded.
+  useEffect(() => {
+    if (credits_loading || has_auto_applied.current) return;
+    has_auto_applied.current = true;
+
+    if (credit_balance >= total_amount && total_amount > 0) {
+      const credits_needed = Math.ceil(total_amount);
+      setIsApplyingCredits(true);
+      setCreditsToApply(credits_needed);
+      setCreditsInput(String(credits_needed));
+    }
+  }, [credits_loading, credit_balance, total_amount]);
+
   useEffect(() => {
     onCreditsChange?.(is_applying_credits, is_applying_credits ? credits_to_apply : 0);
   }, [is_applying_credits, credits_to_apply, onCreditsChange]);
@@ -449,6 +509,9 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
       const max = Math.min(credit_balance, Math.ceil(total_amount));
       setCreditsToApply(max);
       setCreditsInput(String(max));
+    } else {
+      setCreditsToApply(0);
+      setCreditsInput("0");
     }
   }, [credit_balance, total_amount]);
 
@@ -725,6 +788,7 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
           credit_balance={credit_balance}
           total_amount={total_amount}
           is_applying={is_applying_credits}
+          is_credits_sufficient={has_credits_sufficient}
           credits_to_apply={credits_to_apply}
           credits_input={credits_input}
           onToggle={handleCreditsToggle}
