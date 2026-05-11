@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api-client";
-import type { AdminUser, AdminUserFilters, AdminClientFilters, AdminUserOrderSummary, PaginatedResponse } from "@/types/admin";
+import type { AdminUser, AdminUserFilters, AdminClientFilters, AdminUserOrderSummary, PaginatedResponse, CreateClientPayload, CreateClientResponse } from "@/types/admin";
 
 export interface BanUserResponse {
   message: string;
@@ -79,6 +79,17 @@ export async function banUser(
  */
 export async function unbanUser(user_id: number): Promise<BanUserResponse> {
   return apiClient.patch<BanUserResponse>(`/api/admin/users/${user_id}/unban`);
+}
+
+/**
+ * Create a new client account. Optionally set a temporary password
+ * and/or trigger a welcome email with account access instructions.
+ * Roles allowed: super_admin, admin.
+ */
+export async function createAdminClient(
+  data: CreateClientPayload
+): Promise<CreateClientResponse> {
+  return apiClient.post<CreateClientResponse>(`/api/admin/clients`, data);
 }
 
 /**

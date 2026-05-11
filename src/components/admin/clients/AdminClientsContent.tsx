@@ -8,6 +8,7 @@ import type { ApiError } from "@/types/auth";
 import { useDebounce } from "@/hooks/useDebounce";
 import BanUserModal from "@/components/admin/users/BanUserModal";
 import ClientFiltersBar from "@/components/admin/clients/ClientFiltersBar";
+import AddClientModal from "@/components/admin/clients/AddClientModal";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -155,6 +156,10 @@ export default function AdminClientsContent() {
 
   const debounced_search = useDebounce(search_input, 450);
 
+  // ── Add client modal state ───────────────────────────────────────────────
+  const [show_add_modal, setShowAddModal] = useState(false);
+  const [refresh_counter, setRefreshCounter] = useState(0);
+
   // ── Ban modal state ──────────────────────────────────────────────────────
   const [ban_target, setBanTarget] = useState<AdminUser | null>(null);
   const [ban_mode, setBanMode] = useState<"ban" | "unban">("ban");
@@ -199,7 +204,7 @@ export default function AdminClientsContent() {
     return () => {
       cancelled = true;
     };
-  }, [page, debounced_search, sort_field, sort_direction, email_status, account_status, date_from, date_to]);
+  }, [page, debounced_search, sort_field, sort_direction, email_status, account_status, date_from, date_to, refresh_counter]);
 
   // ── Handlers ─────────────────────────────────────────────────────────────
 
@@ -279,6 +284,15 @@ export default function AdminClientsContent() {
               : `${total} registered client${total !== 1 ? "s" : ""} on the platform`}
           </p>
         </div>
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="inline-flex items-center gap-2 rounded-xl bg-teal-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-teal-700 dark:bg-teal-500 dark:hover:bg-teal-600"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+          Add Client
+        </button>
       </div>
 
       {/* ── Filters bar ── */}
@@ -538,6 +552,17 @@ export default function AdminClientsContent() {
           onClose={closeBanModal}
         />
       )}
+
+      {/* ── Add client modal ── */}
+      <AddClientModal
+        is_open={show_add_modal}
+        onClose={() => setShowAddModal(false)}
+        onSuccess={() => {
+          setShowAddModal(false);
+          setPage(1);
+          setRefreshCounter((c) => c + 1);
+        }}
+      />
     </div>
   );
 }

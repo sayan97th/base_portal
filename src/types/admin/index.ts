@@ -78,6 +78,19 @@ export interface AdminUserFilters {
 
 // ── Clients ───────────────────────────────────────────────────────────────────
 
+export interface CreateClientPayload {
+  first_name: string;
+  last_name: string;
+  email: string;
+  password?: string;
+  send_welcome_email: boolean;
+}
+
+export interface CreateClientResponse {
+  message: string;
+  user: AdminUser;
+}
+
 export type ClientSortField = "first_name" | "email" | "organization" | "created_at";
 
 export type ClientEmailStatusFilter = "verified" | "unverified" | "";
