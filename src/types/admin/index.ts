@@ -371,6 +371,65 @@ export interface InvoiceHistoryEntry {
   created_at: string;
 }
 
+// ── Client Invitations ────────────────────────────────────────────────────────
+
+export type ClientInvitationStatus = "pending" | "expired" | "accepted";
+
+export type ClientInvitationSortField = "email" | "status" | "expires_at" | "created_at";
+
+export interface ClientInvitationFilters {
+  page?: number;
+  search?: string;
+  status?: ClientInvitationStatus | "";
+  sort_field?: ClientInvitationSortField;
+  sort_direction?: SortDirection;
+  date_from?: string;
+  date_to?: string;
+}
+
+export interface ClientInvitation {
+  id: number;
+  email: string;
+  role: "client";
+  token: string;
+  invited_by: number;
+  accepted_at: string | null;
+  expires_at: string;
+  created_at: string;
+  updated_at: string;
+  status: ClientInvitationStatus;
+  inviter: InvitationInviter | null;
+}
+
+export interface SendClientInvitationData {
+  email: string;
+}
+
+export interface ResendClientInvitationResponse {
+  message: string;
+  invitation: ClientInvitation;
+}
+
+export interface ClientInvitationValidation {
+  valid: boolean;
+  invitation: ClientInvitation;
+}
+
+export interface AcceptClientInvitationData {
+  invitation_token: string;
+  first_name: string;
+  last_name: string;
+  password: string;
+  password_confirmation: string;
+}
+
+export interface AcceptClientInvitationResponse {
+  access_token: string;
+  token_type: "bearer";
+  expires_in: number;
+  user: AdminUser;
+}
+
 // ── Invitations ───────────────────────────────────────────────────────────────
 
 export type InvitationRole = "admin" | "staff";
