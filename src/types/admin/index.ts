@@ -154,6 +154,7 @@ export interface OrderPlacementDetail {
 
 export interface NewContentIntakeRow {
   keyword_phrase: string;
+  secondary_keywords: string;
   type_of_content: string;
   notes: string;
 }
@@ -162,6 +163,7 @@ export interface ContentOptimizationIntakeRow {
   primary_keyword: string;
   secondary_keywords: string;
   content_page_url: string;
+  notes: string;
 }
 
 export interface OrderItem {
