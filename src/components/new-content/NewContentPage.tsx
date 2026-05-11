@@ -5,8 +5,11 @@ import Link from "next/link";
 import { Elements } from "@stripe/react-stripe-js";
 import NewContentHeader from "./NewContentHeader";
 import ArticleGrid from "./NewContentGrid";
-import UnifiedIntakeStep from "@/components/shared/UnifiedIntakeStep";
+import UnifiedIntakeStep, {
+  type UnifiedIntakeStepHandle,
+} from "@/components/shared/UnifiedIntakeStep";
 import UnifiedCartSummary from "@/components/shared/UnifiedCartSummary";
+import OrderReviewStep from "@/components/shared/OrderReviewStep";
 import CheckoutStep, {
   BillingAddress,
   type CheckoutStepHandle,
@@ -19,7 +22,7 @@ import { useUnifiedCheckout } from "@/hooks/useUnifiedCheckout";
 import { getStripe } from "@/lib/stripe";
 import type { NewContentTier } from "@/types/client/new-content";
 
-type Step = "selection" | "intake" | "checkout";
+type Step = "selection" | "intake" | "review" | "checkout";
 
 const NewContentPage: React.FC = () => {
   const [new_content_tiers, setNewContentTiers] = useState<NewContentTier[]>([
@@ -52,6 +55,7 @@ const NewContentPage: React.FC = () => {
     useUnifiedCheckout();
 
   const checkout_ref = useRef<CheckoutStepHandle>(null);
+  const intake_step_ref = useRef<UnifiedIntakeStepHandle>(null);
   const [checkout_is_processing, setCheckoutIsProcessing] = useState(false);
   const [credits_to_apply, setCreditsToApply] = useState(0);
   const [is_applying_credits, setIsApplyingCredits] = useState(false);
@@ -127,7 +131,13 @@ const NewContentPage: React.FC = () => {
     scrollToTop();
   };
 
-  const handleProceedFromIntake = useCallback(() => {
+  const handleProceedToReview = useCallback(() => {
+    setCurrentStep("review");
+    scrollToTop();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleProceedFromReview = useCallback(() => {
     applyBillingIfEmpty();
     setCurrentStep("checkout");
     scrollToTop();
@@ -135,7 +145,9 @@ const NewContentPage: React.FC = () => {
   }, [has_saved_address, saved_billing_address, billing_address]);
 
   const handlePrevious = () => {
-    if (current_step === "checkout" && has_intake_items) {
+    if (current_step === "checkout") {
+      setCurrentStep("review");
+    } else if (current_step === "review") {
       setCurrentStep("intake");
     } else {
       setCurrentStep("selection");
@@ -221,16 +233,37 @@ const NewContentPage: React.FC = () => {
           <div className="grid grid-cols-12 gap-6">
             <div className="col-span-12 space-y-6 lg:col-span-8">
               <UnifiedIntakeStep
+                ref={intake_step_ref}
                 onBack={() => { setCurrentStep("selection"); scrollToTop(); }}
-                onNext={handleProceedFromIntake}
+                onNext={handleProceedToReview}
                 back_label="Back to Selection"
               />
             </div>
             <div className="col-span-12 lg:col-span-4">
               <UnifiedCartSummary
-                action_label="Continue to Checkout"
-                onAction={handleProceedFromIntake}
+                action_label="Review Order"
+                onAction={() => intake_step_ref.current?.triggerNext()}
                 is_action_disabled={!has_intake_items}
+                show_coupon_field
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Order review step */}
+        {current_step === "review" && (
+          <div className="grid grid-cols-12 gap-6">
+            <div className="col-span-12 space-y-6 lg:col-span-8">
+              <OrderReviewStep
+                onBack={() => { setCurrentStep("intake"); scrollToTop(); }}
+                onNext={handleProceedFromReview}
+                back_label="Back to Intake Form"
+              />
+            </div>
+            <div className="col-span-12 lg:col-span-4">
+              <UnifiedCartSummary
+                action_label="Proceed to Checkout"
+                onAction={handleProceedFromReview}
                 show_coupon_field
               />
             </div>
@@ -255,7 +288,7 @@ const NewContentPage: React.FC = () => {
                   saved_billing_address={saved_billing_address}
                   onApplySavedAddress={handleApplySavedAddress}
                   back_label={
-                    has_intake_items ? "Back to Intake Form" : "Back to Selection"
+                    has_intake_items ? "Back to Order Review" : "Back to Selection"
                   }
                   onProcessingChange={setCheckoutIsProcessing}
                   onCreditsChange={handleCreditsChange}

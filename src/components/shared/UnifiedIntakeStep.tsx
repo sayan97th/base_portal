@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, forwardRef, useImperativeHandle } from "react";
 import { useCart } from "@/context/CartContext";
 import IntakeFormTable from "@/components/new-content/IntakeFormTable";
 import ContentOptimizationIntakeTable from "@/components/content-optimizations/ContentOptimizationIntakeTable";
@@ -10,6 +10,10 @@ import KeywordEntryStep, {
   type KeywordData,
 } from "@/components/link-building/KeywordEntryStep";
 import type { CartIntakeRow, ContentOptimizationIntakeRow } from "@/types/client/unified-cart";
+
+export interface UnifiedIntakeStepHandle {
+  triggerNext: () => void;
+}
 
 interface UnifiedIntakeStepProps {
   onBack: () => void;
@@ -37,11 +41,11 @@ const empty_keyword_row = (): KeywordRow => ({
   exact_match: false,
 });
 
-export default function UnifiedIntakeStep({
-  onBack,
-  onNext,
-  back_label = "Back to Selection",
-}: UnifiedIntakeStepProps) {
+const UnifiedIntakeStep = forwardRef<UnifiedIntakeStepHandle, UnifiedIntakeStepProps>(
+  function UnifiedIntakeStep(
+    { onBack, onNext, back_label = "Back to Selection" }: UnifiedIntakeStepProps,
+    ref
+  ) {
   const {
     items,
     getIntakeDataForTier,
@@ -306,6 +310,8 @@ export default function UnifiedIntakeStep({
     cb_intake_data,
     onNext,
   ]);
+
+  useImperativeHandle(ref, () => ({ triggerNext: handleNext }));
 
   const section_count =
     (has_lb ? 1 : 0) +
@@ -621,4 +627,6 @@ export default function UnifiedIntakeStep({
       </div>
     </div>
   );
-}
+});
+
+export default UnifiedIntakeStep;
