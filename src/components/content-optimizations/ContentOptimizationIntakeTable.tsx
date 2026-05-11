@@ -148,7 +148,7 @@ export default function ContentOptimizationIntakeTable({
                 <td className="border-b border-r border-gray-200 p-1 dark:border-gray-700">
                   <input
                     type="text"
-                    value={row.secondary_keywords}
+                    value={row.secondary_keywords ?? ""}
                     onChange={(e) => handleRowChange(idx, "secondary_keywords", e.target.value)}
                     placeholder="e.g. content marketing, on-page seo"
                     className="h-8 w-full rounded border-0 bg-transparent px-2.5 text-sm text-gray-700 placeholder:text-gray-300 focus:bg-blue-50/40 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-200 dark:text-white/80 dark:placeholder:text-white/20 dark:focus:bg-blue-950/20 dark:focus:ring-blue-900"
