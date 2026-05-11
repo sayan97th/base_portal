@@ -216,9 +216,6 @@ function CreditsApplyPanel({
   onApplyMax,
 }: CreditsApplyPanelProps) {
   const max_credits = Math.min(credit_balance, Math.ceil(total_amount));
-  const amount_after = Math.max(0, total_amount - credits_to_apply);
-  const is_fully_covered = is_applying && amount_after <= 0;
-  const savings_pct = total_amount > 0 ? Math.round((credits_to_apply / total_amount) * 100) : 0;
 
   return (
     <SectionCard>
@@ -346,76 +343,6 @@ function CreditsApplyPanel({
               </div>
             </div>
 
-            {/* Breakdown summary — only shown when credits > 0 */}
-            {credits_to_apply > 0 && (
-              <div className={`overflow-hidden rounded-xl border transition-all ${
-                is_fully_covered
-                  ? "border-emerald-300 bg-emerald-50 dark:border-emerald-500/40 dark:bg-emerald-500/10"
-                  : "border-gray-200 bg-gray-50/80 dark:border-gray-700 dark:bg-white/2"
-              }`}>
-                <div className="px-4 py-3">
-                  <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">
-                    Payment Breakdown
-                  </p>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-500 dark:text-gray-400">Order total</span>
-                      <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">${total_amount.toFixed(2)}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
-                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M18 12H6" />
-                        </svg>
-                        Credits applied ({credits_to_apply.toLocaleString()})
-                        {savings_pct > 0 && (
-                          <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">
-                            -{savings_pct}%
-                          </span>
-                        )}
-                      </span>
-                      <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                        -${credits_to_apply.toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="border-t border-dashed border-gray-200 pt-2 dark:border-gray-700">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                          {is_fully_covered ? "Total due" : "Charge to card"}
-                        </span>
-                        <span className={`text-sm font-bold ${is_fully_covered ? "text-emerald-600 dark:text-emerald-400" : "text-gray-900 dark:text-white"}`}>
-                          ${amount_after.toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Fully covered callout */}
-                {is_fully_covered && (
-                  <div className="flex items-center gap-2.5 border-t border-emerald-200 bg-emerald-100/70 px-4 py-3 dark:border-emerald-500/30 dark:bg-emerald-500/15">
-                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500">
-                      <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                      </svg>
-                    </div>
-                    <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">
-                      Your credits fully cover this order — no card needed!
-                    </p>
-                  </div>
-                )}
-
-                {/* Remaining credits after this order */}
-                {!is_fully_covered && credit_balance - credits_to_apply >= 0 && (
-                  <div className="flex items-center justify-between border-t border-gray-100 px-4 py-2 dark:border-gray-700">
-                    <span className="text-[10px] text-gray-400 dark:text-gray-500">Remaining credit balance</span>
-                    <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400">
-                      {(credit_balance - credits_to_apply).toLocaleString()} credits
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         )}
       </div>

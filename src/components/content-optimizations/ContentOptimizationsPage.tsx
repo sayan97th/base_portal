@@ -65,6 +65,13 @@ const ContentOptimizationsPage: React.FC = () => {
 
   const checkout_ref = useRef<CheckoutStepHandle>(null);
   const [checkout_is_processing, setCheckoutIsProcessing] = useState(false);
+  const [credits_to_apply, setCreditsToApply] = useState(0);
+  const [is_applying_credits, setIsApplyingCredits] = useState(false);
+
+  const handleCreditsChange = useCallback((is_applying: boolean, credits: number) => {
+    setIsApplyingCredits(is_applying);
+    setCreditsToApply(credits);
+  }, []);
 
   const selected_quantities = getQuantitiesForProductType("content_optimization");
 
@@ -256,6 +263,7 @@ const ContentOptimizationsPage: React.FC = () => {
                   onApplySavedAddress={handleApplySavedAddress}
                   back_label={back_label_for_checkout}
                   onProcessingChange={setCheckoutIsProcessing}
+                  onCreditsChange={handleCreditsChange}
                 />
               </div>
 
@@ -267,6 +275,8 @@ const ContentOptimizationsPage: React.FC = () => {
                     is_processing: checkout_is_processing || is_submitting,
                     onSubmit: () => checkout_ref.current?.triggerSubmit(),
                   }}
+                  is_applying_credits={is_applying_credits}
+                  credits_to_apply={credits_to_apply}
                 />
               </div>
             </div>

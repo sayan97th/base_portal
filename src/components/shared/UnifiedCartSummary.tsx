@@ -69,6 +69,7 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
   const has_any_discount = bulk_discount_amount > 0 || total_discount > 0 || effective_credits > 0;
   const raw_subtotal = subtotal;
   const total_after_credits = Math.max(0, total - effective_credits);
+  const credits_savings_pct = total > 0 ? Math.round((effective_credits / total) * 100) : 0;
 
   const links_to_discount =
     total_links < BULK_DISCOUNT_THRESHOLD
@@ -614,8 +615,8 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
             )}
 
             {effective_credits > 0 && (
-              <div className="flex items-center justify-between">
-                <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+              <div className="flex items-center justify-between rounded-lg bg-emerald-50/70 px-2.5 py-2 dark:bg-emerald-500/8">
+                <p className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
                   <svg
                     className="h-3 w-3 shrink-0"
                     fill="none"
@@ -629,7 +630,12 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
                       d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
                     />
                   </svg>
-                  Credits Applied ({effective_credits.toLocaleString()} credits)
+                  Credits Applied ({effective_credits.toLocaleString()})
+                  {credits_savings_pct > 0 && (
+                    <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">
+                      -{credits_savings_pct}%
+                    </span>
+                  )}
                 </p>
                 <p className="text-sm font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
                   &minus;$
