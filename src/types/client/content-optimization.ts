@@ -63,6 +63,7 @@ export interface ContentOptimizationIntakeRow {
   primary_keyword: string;
   secondary_keywords: string;
   content_page_url: string;
+  notes: string;
 }
 
 export interface ContentOptimizationOrderItemDetail {

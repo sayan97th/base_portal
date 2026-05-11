@@ -19,6 +19,7 @@ interface UnifiedIntakeStepProps {
 
 const empty_nc_row = (): CartIntakeRow => ({
   keyword_phrase: "",
+  secondary_keywords: "",
   type_of_content: "",
   notes: "",
 });
@@ -27,6 +28,7 @@ const empty_co_row = (): ContentOptimizationIntakeRow => ({
   primary_keyword: "",
   secondary_keywords: "",
   content_page_url: "",
+  notes: "",
 });
 
 const empty_keyword_row = (): KeywordRow => ({
