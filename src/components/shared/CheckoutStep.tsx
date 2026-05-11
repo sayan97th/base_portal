@@ -426,7 +426,10 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
   // Saved payment profiles
   const [payment_profiles, setPaymentProfiles] = useState<PaymentProfile[]>([]);
   const [profiles_loading, setProfilesLoading] = useState(true);
-  const [selected_profile_id, setSelectedProfileId] = useState<string | "new" | "pay_later">("new");
+  const [selected_profile_id, setSelectedProfileId] = useState<string | "new" | "pay_later" | null>(null);
+
+  // Payment method validation error (shown when user submits without selecting a method)
+  const [payment_required_error, setPaymentRequiredError] = useState<string | null>(null);
 
   // Account credits
   const [credit_balance, setCreditBalance] = useState(0);
@@ -451,7 +454,8 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
     !credits_loading && credit_balance > 0 && credit_balance >= total_amount && total_amount > 0;
 
   const is_pay_later = selected_profile_id === "pay_later";
-  const is_using_saved = selected_profile_id !== "new" && !is_pay_later;
+  const is_using_saved = selected_profile_id !== null && selected_profile_id !== "new" && !is_pay_later;
+  const no_payment_method_selected = selected_profile_id === null;
 
   useEffect(() => {
     async function loadProfiles() {
@@ -459,9 +463,13 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
         const profiles = await paymentProfileService.fetchPaymentProfiles();
         setPaymentProfiles(profiles);
         const default_profile = profiles.find((p) => p.is_default) ?? profiles[0];
-        if (default_profile) setSelectedProfileId(default_profile.id);
+        if (default_profile) {
+          setSelectedProfileId(default_profile.id);
+        } else {
+          setSelectedProfileId("new");
+        }
       } catch {
-        // Silently fail — user can still enter a new card
+        setSelectedProfileId("new");
       } finally {
         setProfilesLoading(false);
       }
@@ -635,6 +643,18 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
   // ── Main submit handler ───────────────────────────────────────
 
   const handleComplete = useCallback(async () => {
+    setPaymentRequiredError(null);
+
+    // ── Validate payment method selection ──
+    if (!is_fully_paid_by_credits && !is_pay_later && no_payment_method_selected) {
+      const error =
+        is_applying_credits && credits_to_apply > 0
+          ? `A payment method is required. Your credits cover $${credits_to_apply.toFixed(2)} but the remaining $${amount_after_credits.toFixed(2)} must be paid with a card. Please select a payment method above.`
+          : "Please select a payment method to complete your purchase.";
+      setPaymentRequiredError(error);
+      return;
+    }
+
     // ── Pay Later ──
     if (is_pay_later) {
       onPayLater?.();
@@ -759,14 +779,15 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
     is_applying_credits, amount_after_credits, stripe, elements, is_using_saved,
     validateNewCardFields, chargeCard, save_for_future, trySaveCard,
     total_amount, onProcessingChange,
+    no_payment_method_selected,
   ]);
 
   useImperativeHandle(ref, () => ({ triggerSubmit: handleComplete }), [handleComplete]);
 
   const is_busy = is_processing || is_loading;
 
-  // Show billing address form when user enters a new card and isn't fully paying with credits
-  const needs_billing_address = !is_using_saved && !is_pay_later && !is_fully_paid_by_credits;
+  // Show billing address form only when the new card option is explicitly selected
+  const needs_billing_address = selected_profile_id === "new" && !is_fully_paid_by_credits;
 
   return (
     <div className="space-y-5">
@@ -821,9 +842,9 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
               profiles_loading
                 ? "Loading your saved cards…"
                 : is_applying_credits && credits_to_apply > 0
-                ? `Card charged: $${amount_after_credits.toFixed(2)} after $${credits_to_apply.toFixed(2)} credit discount`
+                ? `$${amount_after_credits.toFixed(2)} remaining after $${credits_to_apply.toFixed(2)} in credits — select a payment method`
                 : payment_profiles.length > 0
-                ? "Select a saved card or add a new one"
+                ? "Select a saved card or add a new one — click a selected method to deselect it"
                 : "Enter your card details to complete the purchase"
             }
             action={
@@ -867,6 +888,11 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
                 return (
                   <label
                     key={profile.id}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setPaymentRequiredError(null);
+                      setSelectedProfileId(is_selected ? null : profile.id);
+                    }}
                     className={`flex cursor-pointer items-center gap-4 px-6 py-4 transition-colors ${
                       is_selected ? "bg-brand-50/70 dark:bg-brand-500/5" : "hover:bg-gray-50 dark:hover:bg-white/2"
                     }`}
@@ -876,7 +902,7 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
                       name="payment_profile"
                       value={profile.id}
                       checked={is_selected}
-                      onChange={() => setSelectedProfileId(profile.id)}
+                      onChange={() => {}}
                       className="sr-only"
                     />
                     <RadioDot checked={is_selected} />
@@ -908,6 +934,11 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
               {onPayLater && (
                 <div>
                   <label
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setPaymentRequiredError(null);
+                      setSelectedProfileId(is_pay_later ? null : "pay_later");
+                    }}
                     className={`flex cursor-pointer items-center gap-4 px-6 py-4 transition-colors ${
                       is_pay_later ? "bg-amber-50/80 dark:bg-amber-500/5" : "hover:bg-gray-50 dark:hover:bg-white/2"
                     }`}
@@ -917,7 +948,7 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
                       name="payment_profile"
                       value="pay_later"
                       checked={is_pay_later}
-                      onChange={() => setSelectedProfileId("pay_later")}
+                      onChange={() => {}}
                       className="sr-only"
                     />
                     <RadioDot checked={is_pay_later} color="amber" />
@@ -981,6 +1012,11 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
               {/* Add new card option */}
               <div>
                 <label
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setPaymentRequiredError(null);
+                    setSelectedProfileId(selected_profile_id === "new" ? null : "new");
+                  }}
                   className={`flex cursor-pointer items-center gap-4 px-6 py-4 transition-colors ${
                     selected_profile_id === "new"
                       ? "bg-brand-50/70 dark:bg-brand-500/5"
@@ -992,7 +1028,7 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
                     name="payment_profile"
                     value="new"
                     checked={selected_profile_id === "new"}
-                    onChange={() => setSelectedProfileId("new")}
+                    onChange={() => {}}
                     className="sr-only"
                   />
                   <RadioDot checked={selected_profile_id === "new"} />
@@ -1098,6 +1134,29 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Inline warning: partial credits applied but no payment method selected */}
+          {!profiles_loading && is_applying_credits && !is_fully_paid_by_credits && no_payment_method_selected && credits_to_apply > 0 && (
+            <div className="border-t border-amber-100 bg-amber-50/60 px-6 py-4 dark:border-amber-500/15 dark:bg-amber-500/5">
+              <div className="flex items-start gap-2.5">
+                <svg className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008z" />
+                </svg>
+                <p className="text-xs text-amber-700 dark:text-amber-400">
+                  Your credits cover <strong>${credits_to_apply.toFixed(2)}</strong> of your order. A payment method is required to pay the remaining <strong>${amount_after_credits.toFixed(2)}</strong> — please select an option above.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* No payment method selected and no credits covering the order */}
+          {!profiles_loading && no_payment_method_selected && (!is_applying_credits || credits_to_apply === 0) && (
+            <div className="border-t border-gray-100 bg-gray-50/40 px-6 py-3 dark:border-gray-800 dark:bg-white/1">
+              <p className="text-xs text-gray-400 dark:text-gray-500">
+                No payment method selected. Select an option above or apply your account credits to cover the order.
+              </p>
             </div>
           )}
 
@@ -1246,6 +1305,16 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
         <span className="font-medium text-gray-500 dark:text-gray-400">&quot;{back_label}&quot;</span>{" "}
         above — all entered information will be preserved.
       </p>
+
+      {/* ── Payment method required error ── */}
+      {payment_required_error && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/20 dark:bg-amber-500/10">
+          <svg className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008z" />
+          </svg>
+          <p className="text-sm text-amber-700 dark:text-amber-400">{payment_required_error}</p>
+        </div>
+      )}
 
       {/* ── Error messages ── */}
       {(stripe_error || error_message) && (() => {
