@@ -6,7 +6,6 @@ import { validateCoupon } from "@/services/client/coupons.service";
 import type { CartProductType } from "@/types/client/unified-cart";
 
 const MINIMUM_CART_FOR_COUPON = 500;
-const BULK_DISCOUNT_THRESHOLD = 10;
 
 const PRODUCT_TYPE_LABELS: Record<CartProductType, string> = {
   link_building: "Link Building",
@@ -60,6 +59,8 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
     setItemQuantity,
     setAppliedCoupons,
     setCouponInputCode,
+    bulk_discount_threshold,
+    bulk_discount_rate,
   } = useCart();
 
   const [coupon_error, setCouponError] = useState<string | null>(null);
@@ -72,14 +73,15 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
   const credits_savings_pct = total > 0 ? Math.round((effective_credits / total) * 100) : 0;
 
   const links_to_discount =
-    total_links < BULK_DISCOUNT_THRESHOLD
-      ? BULK_DISCOUNT_THRESHOLD - total_links
+    total_links < bulk_discount_threshold
+      ? bulk_discount_threshold - total_links
       : 0;
   const lb_items = items.filter((i) => i.product_type === "link_building");
   const show_bulk_teaser =
     links_to_discount > 0 && lb_items.length > 0 && items.length > 0;
   const show_bulk_applied_badge =
-    total_links >= BULK_DISCOUNT_THRESHOLD && bulk_discount_amount > 0;
+    total_links >= bulk_discount_threshold && bulk_discount_amount > 0;
+  const bulk_discount_pct = Math.round(bulk_discount_rate * 100);
 
   const cart_below_minimum =
     subtotal_after_bulk < MINIMUM_CART_FOR_COUPON &&
@@ -210,8 +212,9 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
               {links_to_discount} more link
               {links_to_discount !== 1 ? "s" : ""}
             </span>{" "}
-            to unlock <span className="font-bold">10% off</span> your link
-            building services.
+            to unlock{" "}
+            <span className="font-bold">{bulk_discount_pct}% off</span> your
+            link building services.
           </p>
         </div>
       )}
@@ -235,7 +238,8 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
             </svg>
           </div>
           <p className="text-xs font-semibold text-violet-700 dark:text-violet-300">
-            10% bulk discount applied — {total_links}+ links ordered!
+            {bulk_discount_pct}% bulk discount applied —{" "}
+            {bulk_discount_threshold}+ links ordered!
           </p>
         </div>
       )}
@@ -554,7 +558,7 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
             {bulk_discount_amount > 0 && (
               <div className="flex items-center justify-between">
                 <p className="text-xs font-medium text-violet-600 dark:text-violet-400">
-                  Bulk Discount (10% off links)
+                  Bulk Discount ({bulk_discount_pct}% off links)
                 </p>
                 <p className="text-sm font-semibold text-violet-600 dark:text-violet-400 tabular-nums">
                   &minus;$

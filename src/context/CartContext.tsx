@@ -21,12 +21,14 @@ import type {
   ContentOptimizationIntakeRow,
 } from "@/types/client/unified-cart";
 import { unifiedCartService } from "@/services/client/unified-cart.service";
+import { getActiveBulkDiscount } from "@/services/client/discounts.service";
+import type { Discount } from "@/types/admin/discounts";
 
 const CART_STORAGE_KEY = "unified_cart_v1";
 const CART_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
 const SERVER_SYNC_DEBOUNCE_MS = 1500;
-const BULK_DISCOUNT_THRESHOLD = 10;
-const BULK_DISCOUNT_RATE = 0.1;
+const DEFAULT_BULK_DISCOUNT_THRESHOLD = 12;
+const DEFAULT_BULK_DISCOUNT_RATE = 0.1;
 
 interface CartSnapshot extends UnifiedCartPayload {
   version: 1;
@@ -129,6 +131,10 @@ export interface CartContextType {
   total_discount: number;
   total: number;
   item_count: number;
+
+  bulk_discount_config: Discount | null;
+  bulk_discount_threshold: number;
+  bulk_discount_rate: number;
 }
 
 const CartContext = createContext<CartContextType | null>(null);
@@ -140,6 +146,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [order_title, setOrderTitle] = useState("");
   const [order_notes, setOrderNotes] = useState("");
   const [is_cart_ready, setIsCartReady] = useState(false);
+  const [bulk_discount_config, setBulkDiscountConfig] = useState<Discount | null>(null);
 
   const save_timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -184,6 +191,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
       setIsCartReady(true);
     })();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    getActiveBulkDiscount()
+      .then((config) => { if (config) setBulkDiscountConfig(config); })
+      .catch(() => {});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -403,12 +416,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     [items]
   );
 
+  const bulk_discount_threshold = bulk_discount_config?.min_quantity ?? DEFAULT_BULK_DISCOUNT_THRESHOLD;
+  const bulk_discount_rate = bulk_discount_config ? bulk_discount_config.discount_rate / 100 : DEFAULT_BULK_DISCOUNT_RATE;
+
   const bulk_discount_amount = useMemo(
     () =>
-      total_links >= BULK_DISCOUNT_THRESHOLD
-        ? Math.round(link_building_subtotal * BULK_DISCOUNT_RATE * 100) / 100
+      total_links >= bulk_discount_threshold
+        ? Math.round(link_building_subtotal * bulk_discount_rate * 100) / 100
         : 0,
-    [total_links, link_building_subtotal]
+    [total_links, link_building_subtotal, bulk_discount_threshold, bulk_discount_rate]
   );
 
   const subtotal_after_bulk = Math.max(0, subtotal - bulk_discount_amount);
@@ -454,6 +470,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         total_discount,
         total,
         item_count,
+        bulk_discount_config,
+        bulk_discount_threshold,
+        bulk_discount_rate,
       }}
     >
       {children}

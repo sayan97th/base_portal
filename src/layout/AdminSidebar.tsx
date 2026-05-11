@@ -237,6 +237,18 @@ const admin_sidebar_sections: SidebarSection[] = [
         permission: "orders.view",
       },
       {
+        name: "Discounts",
+        icon: (
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 14.25l6-6m4.5-3.493V21.75l-3.75-1.5-3.75 1.5-3.75-1.5-3.75 1.5V4.757c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0c1.1.128 1.907 1.077 1.907 2.185z" />
+            <circle cx="9.75" cy="9" r="0.375" fill="currentColor" />
+            <circle cx="14.25" cy="13.5" r="0.375" fill="currentColor" />
+          </svg>
+        ),
+        path: "/admin/discounts",
+        permission: "orders.view",
+      },
+      {
         name: "News & Promos",
         icon: (
           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
