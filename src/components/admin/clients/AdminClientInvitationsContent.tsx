@@ -16,6 +16,7 @@ import type {
 import type { ApiError } from "@/types/auth";
 import { useDebounce } from "@/hooks/useDebounce";
 import SendClientInvitationModal from "@/components/admin/clients/SendClientInvitationModal";
+import FilterDatePicker from "@/components/admin/users/FilterDatePicker";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -448,20 +449,22 @@ export default function AdminClientInvitationsContent() {
           {/* Date from */}
           <div className="flex items-center gap-2">
             <label className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">From</label>
-            <input
-              type="date"
+            <FilterDatePicker
+              id="invitations-date-from"
+              placeholder="Start date"
               value={date_from}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:border-teal-400 focus:outline-none focus:ring-2 focus:ring-teal-200 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:focus:border-teal-500 dark:focus:ring-teal-500/20"
+              max_date={date_to || undefined}
+              on_change={setDateFrom}
             />
           </div>
           <div className="flex items-center gap-2">
             <label className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">To</label>
-            <input
-              type="date"
+            <FilterDatePicker
+              id="invitations-date-to"
+              placeholder="End date"
               value={date_to}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:border-teal-400 focus:outline-none focus:ring-2 focus:ring-teal-200 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:focus:border-teal-500 dark:focus:ring-teal-500/20"
+              min_date={date_from || undefined}
+              on_change={setDateTo}
             />
           </div>
 
