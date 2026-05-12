@@ -21,12 +21,12 @@ import type {
   ContentOptimizationIntakeRow,
 } from "@/types/client/unified-cart";
 import { unifiedCartService } from "@/services/client/unified-cart.service";
+import { getActiveDiscounts } from "@/services/client/discounts.service";
+import type { Discount, BulkDiscountDetail } from "@/types/admin/discounts";
 
 const CART_STORAGE_KEY = "unified_cart_v1";
 const CART_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
 const SERVER_SYNC_DEBOUNCE_MS = 1500;
-const BULK_DISCOUNT_THRESHOLD = 10;
-const BULK_DISCOUNT_RATE = 0.1;
 
 interface CartSnapshot extends UnifiedCartPayload {
   version: 1;
@@ -125,10 +125,13 @@ export interface CartContextType {
   link_building_subtotal: number;
   total_links: number;
   bulk_discount_amount: number;
+  bulk_discount_details: BulkDiscountDetail[];
   subtotal_after_bulk: number;
   total_discount: number;
   total: number;
   item_count: number;
+
+  bulk_discount_configs: Discount[];
 }
 
 const CartContext = createContext<CartContextType | null>(null);
@@ -140,6 +143,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [order_title, setOrderTitle] = useState("");
   const [order_notes, setOrderNotes] = useState("");
   const [is_cart_ready, setIsCartReady] = useState(false);
+  const [bulk_discount_configs, setBulkDiscountConfigs] = useState<Discount[]>([]);
 
   const save_timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -184,6 +188,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
       setIsCartReady(true);
     })();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    getActiveDiscounts()
+      .then((discounts) => {
+        setBulkDiscountConfigs(discounts.filter((d) => d.discount_type === "bulk"));
+      })
+      .catch(() => {});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -403,12 +415,43 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     [items]
   );
 
+  const bulk_discount_details = useMemo<BulkDiscountDetail[]>(() => {
+    return bulk_discount_configs.map((config) => {
+      let current_quantity = 0;
+      let product_subtotal = 0;
+
+      if (config.applies_to === "all") {
+        current_quantity = items.reduce((sum, item) => sum + item.quantity, 0);
+        product_subtotal = subtotal;
+      } else {
+        const product_items = items.filter((i) => i.product_type === config.applies_to);
+        current_quantity = product_items.reduce((sum, item) => sum + item.quantity, 0);
+        product_subtotal = product_items.reduce(
+          (sum, item) => sum + item.quantity * item.unit_price,
+          0
+        );
+      }
+
+      const is_applied = current_quantity >= config.min_quantity;
+      const rate = config.discount_rate / 100;
+      const discount_amount = is_applied
+        ? Math.round(product_subtotal * rate * 100) / 100
+        : 0;
+
+      return {
+        config,
+        is_applied,
+        discount_amount,
+        current_quantity,
+        quantity_needed: Math.max(0, config.min_quantity - current_quantity),
+        product_subtotal,
+      };
+    });
+  }, [bulk_discount_configs, items, subtotal]);
+
   const bulk_discount_amount = useMemo(
-    () =>
-      total_links >= BULK_DISCOUNT_THRESHOLD
-        ? Math.round(link_building_subtotal * BULK_DISCOUNT_RATE * 100) / 100
-        : 0,
-    [total_links, link_building_subtotal]
+    () => bulk_discount_details.reduce((sum, d) => sum + d.discount_amount, 0),
+    [bulk_discount_details]
   );
 
   const subtotal_after_bulk = Math.max(0, subtotal - bulk_discount_amount);
@@ -450,10 +493,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         link_building_subtotal,
         total_links,
         bulk_discount_amount,
+        bulk_discount_details,
         subtotal_after_bulk,
         total_discount,
         total,
         item_count,
+        bulk_discount_configs,
       }}
     >
       {children}

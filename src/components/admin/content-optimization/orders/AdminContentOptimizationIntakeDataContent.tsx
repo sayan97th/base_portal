@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getAdminContentOptimizationOrder } from "@/services/admin/content-optimization.service";
 import type { AdminOrder, ContentOptimizationIntakeRow } from "@/types/admin";
@@ -19,11 +19,74 @@ function formatDate(iso: string): string {
   });
 }
 
+// ── Secondary keyword chips ────────────────────────────────────────────────────
+
+function parseKeywords(raw: string): string[] {
+  if (!raw?.trim()) return [];
+  return raw
+    .split(/,|;/)
+    .map((kw) => kw.trim())
+    .filter(Boolean);
+}
+
+function SecondaryKeywordChips({ keywords }: { keywords: string }) {
+  const chips = parseKeywords(keywords);
+  if (chips.length === 0) {
+    return <span className="italic text-gray-300 dark:text-gray-600">—</span>;
+  }
+  return (
+    <div className="flex flex-wrap gap-1">
+      {chips.map((chip, i) => (
+        <span
+          key={i}
+          className="inline-flex items-center rounded-md border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400"
+        >
+          {chip}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// ── Notes cell ─────────────────────────────────────────────────────────────────
+
+function NotesCell({ notes }: { notes: string }) {
+  const has_notes = notes && notes.trim() && notes.trim().toLowerCase() !== "none";
+  if (!has_notes) {
+    return <span className="italic text-gray-300 dark:text-gray-600">—</span>;
+  }
+  return (
+    <div className="flex items-start gap-1.5">
+      <svg
+        className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400"
+        fill="none"
+        viewBox="0 0 24 24"
+        strokeWidth={1.8}
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"
+        />
+      </svg>
+      <span className="text-gray-600 dark:text-gray-400">{notes}</span>
+    </div>
+  );
+}
+
+// ── URL display helper ─────────────────────────────────────────────────────────
+
+function truncateUrl(url: string, max_length = 45): string {
+  if (url.length <= max_length) return url;
+  return url.slice(0, max_length) + "…";
+}
+
 // ── CSV export ─────────────────────────────────────────────────────────────────
 
 function exportIntakeToCsv(order: AdminOrder) {
   const rows: string[][] = [
-    ["Item", "Tier", "#", "Target Keyword", "Content Page URL"],
+    ["Item", "Tier", "#", "Primary Keyword", "Secondary Keywords", "Notes", "Content Page URL"],
   ];
 
   order.items.forEach((item, item_index) => {
@@ -34,15 +97,15 @@ function exportIntakeToCsv(order: AdminOrder) {
         tier_label,
         String(row_index + 1),
         row.primary_keyword,
+        row.secondary_keywords ?? "",
+        row.notes ?? "",
         row.content_page_url,
       ]);
     });
   });
 
   const csv_content = rows
-    .map((row) =>
-      row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")
-    )
+    .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
     .join("\n");
 
   const blob = new Blob([csv_content], { type: "text/csv;charset=utf-8;" });
@@ -54,20 +117,47 @@ function exportIntakeToCsv(order: AdminOrder) {
   URL.revokeObjectURL(url);
 }
 
-// ── URL display helper ─────────────────────────────────────────────────────────
-
-function truncateUrl(url: string, max_length = 50): string {
-  if (url.length <= max_length) return url;
-  return url.slice(0, max_length) + "…";
-}
-
 // ── Skeleton ───────────────────────────────────────────────────────────────────
 
 const SkeletonBlock = ({ className }: { className?: string }) => (
   <div className={`animate-pulse rounded bg-gray-100 dark:bg-gray-800 ${className}`} />
 );
 
-// ── Intake row card (for mobile-friendly alternate view) ───────────────────────
+// ── Intake section stats ───────────────────────────────────────────────────────
+
+function IntakeSectionStats({ rows }: { rows: ContentOptimizationIntakeRow[] }) {
+  const with_secondary = rows.filter((r) => r.secondary_keywords?.trim()).length;
+  const with_notes = rows.filter(
+    (r) => r.notes?.trim() && r.notes.trim().toLowerCase() !== "none"
+  ).length;
+  const with_url = rows.filter((r) => r.content_page_url?.trim()).length;
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400 dark:text-gray-500">
+      <span>{rows.length} {rows.length === 1 ? "page" : "pages"}</span>
+      {with_secondary > 0 && (
+        <>
+          <span className="opacity-40">·</span>
+          <span>{with_secondary} with secondary keywords</span>
+        </>
+      )}
+      {with_notes > 0 && (
+        <>
+          <span className="opacity-40">·</span>
+          <span>{with_notes} with notes</span>
+        </>
+      )}
+      {with_url > 0 && (
+        <>
+          <span className="opacity-40">·</span>
+          <span>{with_url} with live URL</span>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Intake section ─────────────────────────────────────────────────────────────
 
 interface IntakeSectionProps {
   tier_name: string;
@@ -83,30 +173,33 @@ function IntakeSection({ tier_name, tier_index, rows, total_tiers }: IntakeSecti
   return (
     <div className="space-y-4">
       {/* Section header */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-start gap-3">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-sm font-bold text-violet-700 dark:bg-violet-500/20 dark:text-violet-300">
           {tier_index + 1}
         </div>
-        <div className="flex flex-1 flex-wrap items-center gap-3">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-            {tier_name}
-          </h2>
-          <span className="inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-2.5 py-0.5 text-xs font-medium text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-300">
-            {rows.length} {rows.length === 1 ? "page" : "pages"}
-          </span>
-          {empty_count > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400">
-              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-              </svg>
-              {empty_count} incomplete
+        <div className="flex flex-1 flex-col gap-1.5">
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+              {tier_name}
+            </h2>
+            <span className="inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-2.5 py-0.5 text-xs font-medium text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-300">
+              {rows.length} {rows.length === 1 ? "page" : "pages"}
             </span>
-          )}
-          {total_tiers > 1 && (
-            <span className="text-xs text-gray-400 dark:text-gray-500">
-              Form {tier_index + 1} of {total_tiers}
-            </span>
-          )}
+            {empty_count > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400">
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                </svg>
+                {empty_count} incomplete
+              </span>
+            )}
+            {total_tiers > 1 && (
+              <span className="text-xs text-gray-400 dark:text-gray-500">
+                Form {tier_index + 1} of {total_tiers}
+              </span>
+            )}
+          </div>
+          <IntakeSectionStats rows={rows} />
         </div>
       </div>
 
@@ -114,8 +207,10 @@ function IntakeSection({ tier_name, tier_index, rows, total_tiers }: IntakeSecti
       <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
         <table className="w-full border-collapse text-sm">
           <colgroup>
-            <col className="w-12" />
-            <col className="w-1/2" />
+            <col className="w-10" />
+            <col className="w-[22%]" />
+            <col className="w-[20%]" />
+            <col className="w-[20%]" />
             <col />
           </colgroup>
           <thead>
@@ -124,10 +219,39 @@ function IntakeSection({ tier_name, tier_index, rows, total_tiers }: IntakeSecti
                 #
               </th>
               <th className="border-b border-r border-gray-200 px-4 py-2.5 text-left text-xs font-semibold text-gray-600 dark:border-gray-700 dark:text-gray-400">
-                Target Keyword
+                <div className="flex items-center gap-1.5">
+                  <svg className="h-3.5 w-3.5 text-violet-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 15.75l-2.489-2.489m0 0a3.375 3.375 0 10-4.773-4.773 3.375 3.375 0 004.773 4.773zM21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Primary Keyword
+                </div>
+              </th>
+              <th className="border-b border-r border-gray-200 px-4 py-2.5 text-left text-xs font-semibold text-gray-600 dark:border-gray-700 dark:text-gray-400">
+                <div className="flex items-center gap-1.5">
+                  <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" />
+                  </svg>
+                  Secondary Keywords
+                </div>
+              </th>
+              
+              
+                <th className="border-b border-r border-gray-200 px-4 py-2.5 text-left text-xs font-semibold text-gray-600 dark:border-gray-700 dark:text-gray-400">
+                <div className="flex items-center gap-1.5">
+                  <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+                  </svg>
+                  Content Page URL
+                </div>
               </th>
               <th className="border-b border-gray-200 px-4 py-2.5 text-left text-xs font-semibold text-gray-600 dark:border-gray-700 dark:text-gray-400">
-                Content Page URL
+                <div className="flex items-center gap-1.5">
+                  <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
+                  </svg>
+                  Notes
+                </div>
               </th>
             </tr>
           </thead>
@@ -147,12 +271,12 @@ function IntakeSection({ tier_name, tier_index, rows, total_tiers }: IntakeSecti
                   }`}
                 >
                   {/* Row number */}
-                  <td className="border-r border-gray-200 py-2 text-center text-xs font-medium text-gray-400 dark:border-gray-700 dark:text-gray-500">
+                  <td className="border-r border-gray-200 py-3 text-center text-xs font-medium text-gray-400 dark:border-gray-700 dark:text-gray-500">
                     {row_index + 1}
                   </td>
 
-                  {/* Target keyword */}
-                  <td className="border-r border-gray-200 px-4 py-2 dark:border-gray-700">
+                  {/* Primary keyword */}
+                  <td className="border-r border-gray-200 px-4 py-3 dark:border-gray-700">
                     {has_keyword ? (
                       <span className="font-medium text-gray-800 dark:text-white/80">
                         {row.primary_keyword}
@@ -162,8 +286,14 @@ function IntakeSection({ tier_name, tier_index, rows, total_tiers }: IntakeSecti
                     )}
                   </td>
 
+                  {/* Secondary keywords */}
+                  <td className="border-r border-gray-200 px-4 py-3 dark:border-gray-700">
+                    <SecondaryKeywordChips keywords={row.secondary_keywords ?? ""} />
+                  </td>
+
                   {/* Content page URL */}
-                  <td className="px-4 py-2">
+                  <td className="border-r border-gray-200 px-4 py-3 dark:border-gray-700">
+                  
                     {has_url ? (
                       <a
                         href={row.content_page_url}
@@ -180,6 +310,11 @@ function IntakeSection({ tier_name, tier_index, rows, total_tiers }: IntakeSecti
                     ) : (
                       <span className="italic text-gray-300 dark:text-gray-600">—</span>
                     )}
+                  </td>
+
+                  {/* Notes */}
+                  <td className="px-4 py-3">
+                    <NotesCell notes={row.notes ?? ""} />
                   </td>
                 </tr>
               );
@@ -216,9 +351,8 @@ export default function AdminContentOptimizationIntakeDataContent({
     load();
   }, [order_id]);
 
-  const items_with_intake = order?.items.filter(
-    (item) => item.co_intake_rows && item.co_intake_rows.length > 0
-  ) ?? [];
+  const items_with_intake =
+    order?.items.filter((item) => item.co_intake_rows && item.co_intake_rows.length > 0) ?? [];
 
   return (
     <div className="space-y-6">
@@ -245,8 +379,8 @@ export default function AdminContentOptimizationIntakeDataContent({
             <SkeletonBlock className="h-10 w-32" />
           </div>
           <div className="space-y-8">
-            <SkeletonBlock className="h-48 w-full" />
-            <SkeletonBlock className="h-48 w-full" />
+            <SkeletonBlock className="h-64 w-full" />
+            <SkeletonBlock className="h-64 w-full" />
           </div>
         </div>
       )}

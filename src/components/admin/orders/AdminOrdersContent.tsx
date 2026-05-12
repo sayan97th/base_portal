@@ -456,7 +456,7 @@ function OrderRow({ order, is_last, compact = false }: OrderRowProps) {
           </span>
           {order.product_type === "new_content" && (
             <Link
-              href={`/admin/new-content/orders/${order.id}`}
+              href={`/admin/new-content/orders/${order.id}/intake`}
               className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20"
             >
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -467,7 +467,7 @@ function OrderRow({ order, is_last, compact = false }: OrderRowProps) {
           )}
           {order.product_type === "content_optimization" && (
             <Link
-              href={`/admin/content-optimization/orders/${order.id}`}
+              href={`/admin/content-optimization/orders/${order.id}/intake`}
               className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20"
             >
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -478,7 +478,7 @@ function OrderRow({ order, is_last, compact = false }: OrderRowProps) {
           )}
           {order.product_type === "content_brief" && (
             <Link
-              href={`/admin/content-refresh/orders/${order.id}`}
+              href={`/admin/content-briefs/orders/${order.id}/intake`}
               className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:bg-amber-500/20"
             >
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -499,7 +499,7 @@ function OrderRow({ order, is_last, compact = false }: OrderRowProps) {
             </Link>
           )}
           <Link
-            href={order.session_id ? `/admin/orders/session/${order.session_id}` : `/admin/orders/${order.id}`}
+            href={`/admin/orders/${order.id}`}
             className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
               type_config
                 ? `${type_config.border} ${type_config.bg} ${type_config.color} hover:opacity-80`
@@ -592,7 +592,7 @@ function SingleOrderCard({ group }: { group: AdminOrderGroup }) {
           </span>
           {order.product_type === "new_content" && (
             <Link
-              href={`/admin/new-content/orders/${order.id}`}
+              href={`/admin/new-content/orders/${order.id}/intake`}
               className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20"
             >
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -603,7 +603,7 @@ function SingleOrderCard({ group }: { group: AdminOrderGroup }) {
           )}
           {order.product_type === "content_optimization" && (
             <Link
-              href={`/admin/content-optimization/orders/${order.id}`}
+              href={`/admin/content-optimization/orders/${order.id}/intake`}
               className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20"
             >
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -614,7 +614,7 @@ function SingleOrderCard({ group }: { group: AdminOrderGroup }) {
           )}
           {order.product_type === "content_brief" && (
             <Link
-              href={`/admin/content-refresh/orders/${order.id}`}
+              href={`/admin/content-briefs/orders/${order.id}/intake`}
               className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:bg-amber-500/20"
             >
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">

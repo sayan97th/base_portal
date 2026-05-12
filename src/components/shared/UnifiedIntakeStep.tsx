@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, forwardRef, useImperativeHandle } from "react";
 import { useCart } from "@/context/CartContext";
 import IntakeFormTable from "@/components/new-content/IntakeFormTable";
 import ContentOptimizationIntakeTable from "@/components/content-optimizations/ContentOptimizationIntakeTable";
@@ -11,6 +11,10 @@ import KeywordEntryStep, {
 } from "@/components/link-building/KeywordEntryStep";
 import type { CartIntakeRow, ContentOptimizationIntakeRow } from "@/types/client/unified-cart";
 
+export interface UnifiedIntakeStepHandle {
+  triggerNext: () => void;
+}
+
 interface UnifiedIntakeStepProps {
   onBack: () => void;
   onNext: () => void;
@@ -19,6 +23,7 @@ interface UnifiedIntakeStepProps {
 
 const empty_nc_row = (): CartIntakeRow => ({
   keyword_phrase: "",
+  secondary_keywords: "",
   type_of_content: "",
   notes: "",
 });
@@ -27,6 +32,7 @@ const empty_co_row = (): ContentOptimizationIntakeRow => ({
   primary_keyword: "",
   secondary_keywords: "",
   content_page_url: "",
+  notes: "",
 });
 
 const empty_keyword_row = (): KeywordRow => ({
@@ -35,11 +41,11 @@ const empty_keyword_row = (): KeywordRow => ({
   exact_match: false,
 });
 
-export default function UnifiedIntakeStep({
-  onBack,
-  onNext,
-  back_label = "Back to Selection",
-}: UnifiedIntakeStepProps) {
+const UnifiedIntakeStep = forwardRef<UnifiedIntakeStepHandle, UnifiedIntakeStepProps>(
+  function UnifiedIntakeStep(
+    { onBack, onNext, back_label = "Back to Selection" }: UnifiedIntakeStepProps,
+    ref
+  ) {
   const {
     items,
     getIntakeDataForTier,
@@ -98,7 +104,9 @@ export default function UnifiedIntakeStep({
   const computed_keyword_rows = useMemo<KeywordData>(() => {
     const result: KeywordData = {};
     lb_items.forEach((item) => {
-      const stored = getKeywordDataForTier(item.tier_id) as KeywordRow[];
+      const stored = (getKeywordDataForTier(item.tier_id) as KeywordRow[]).map(
+        (r) => ({ ...r, keyword: r.keyword ?? "", landing_page: r.landing_page ?? "" })
+      );
       if (stored.length === item.quantity) {
         result[item.tier_id] = stored;
       } else if (stored.length < item.quantity) {
@@ -302,6 +310,8 @@ export default function UnifiedIntakeStep({
     cb_intake_data,
     onNext,
   ]);
+
+  useImperativeHandle(ref, () => ({ triggerNext: handleNext }));
 
   const section_count =
     (has_lb ? 1 : 0) +
@@ -558,9 +568,10 @@ export default function UnifiedIntakeStep({
               />
             </svg>
             <p className="text-sm text-blue-700 dark:text-blue-300">
-              Fill in the primary target keyword, secondary keywords, and the
-              current live URL for each page you&apos;d like a content brief
-              created for.
+              Fill in the primary keyword, secondary keywords, and the current
+              live URL for each page you&apos;d like a content brief created
+              for. Use the Notes field to share any specific requirements,
+              target audience details, or context for your brief.
             </p>
           </div>
 
@@ -616,4 +627,6 @@ export default function UnifiedIntakeStep({
       </div>
     </div>
   );
-}
+});
+
+export default UnifiedIntakeStep;

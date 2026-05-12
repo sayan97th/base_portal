@@ -23,6 +23,37 @@ function validateEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+function generatePassword(): string {
+  const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const lower = "abcdefghijklmnopqrstuvwxyz";
+  const digits = "0123456789";
+  const symbols = "!@#%^&*";
+  const all = upper + lower + digits + symbols;
+
+  const random = new Uint32Array(12);
+  crypto.getRandomValues(random);
+
+  const chars: string[] = [
+    upper[random[0] % upper.length],
+    lower[random[1] % lower.length],
+    digits[random[2] % digits.length],
+    symbols[random[3] % symbols.length],
+  ];
+  for (let i = 4; i < 12; i++) {
+    chars.push(all[random[i] % all.length]);
+  }
+
+  // Fisher-Yates shuffle
+  const shuffle = new Uint32Array(chars.length);
+  crypto.getRandomValues(shuffle);
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = shuffle[i] % (i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+
+  return chars.join("");
+}
+
 function Toggle({
   checked,
   onChange,
@@ -363,7 +394,7 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ is_open, onClose, onSuc
                     </p>
 
                     {set_password && (
-                      <div className="mt-3">
+                      <div className="mt-3 space-y-2">
                         <FieldInput
                           type={show_password ? "text" : "password"}
                           value={password}
@@ -382,6 +413,24 @@ const AddClientModal: React.FC<AddClientModalProps> = ({ is_open, onClose, onSuc
                             </button>
                           }
                         />
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            disabled={is_loading}
+                            onClick={() => {
+                              const generated = generatePassword();
+                              setPassword(generated);
+                              setShowPassword(true);
+                              setErrors((p) => ({ ...p, password: undefined }));
+                            }}
+                            className="inline-flex items-center gap-1.5 text-xs font-medium text-teal-600 transition-colors hover:text-teal-700 disabled:opacity-40 dark:text-teal-400 dark:hover:text-teal-300"
+                          >
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                            </svg>
+                            Generate password
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>

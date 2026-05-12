@@ -151,26 +151,20 @@ function getGroupOverallStatus(orders: UnifiedOrder[]): string {
   return orders[0]?.status ?? "pending";
 }
 
-function getDetailLink(order: UnifiedOrder, purchase_group_id: string | null): string {
-  if (purchase_group_id) return `/orders/session/${purchase_group_id}`;
-  switch (order.product_type) {
-    case "link_building":
-      return `/link-building/orders/${order.id}`;
-    default:
-      return `/orders/${order.id}?type=${order.product_type}`;
-  }
+function getDetailLink(order: UnifiedOrder): string {
+  return `/orders/${order.id}`;
 }
 
-function getTrackingLink(order: UnifiedOrder): string | null {
-  return order.product_type === "link_building"
-    ? `/link-building/orders/${order.id}/tracking`
-    : null;
+function getMultiPurchaseLink(purchase_group_id: string): string {
+  return `/orders/session/${purchase_group_id}`;
 }
 
-function getReportLink(order: UnifiedOrder): string | null {
-  return order.product_type === "link_building"
-    ? `/link-building/orders/${order.id}/report`
-    : null;
+function getTrackingLink(order: UnifiedOrder): string {
+  return `/orders/${order.id}/tracking`;
+}
+
+function getReportLink(order: UnifiedOrder): string {
+  return `/orders/${order.id}/report`;
 }
 
 function getKeywordsLink(order: UnifiedOrder): string | null {
@@ -339,12 +333,11 @@ function GroupSkeleton() {
 
 interface OrderItemRowProps {
   order: UnifiedOrder;
-  purchase_group_id: string | null;
   is_last: boolean;
   compact?: boolean;
 }
 
-function OrderItemRow({ order, purchase_group_id, is_last, compact = false }: OrderItemRowProps) {
+function OrderItemRow({ order, is_last, compact = false }: OrderItemRowProps) {
   const status_config = getStatusConfig(order.status);
   const is_active = order.status === "pending" || order.status === "processing";
   const has_updates = (order.updates_count ?? 0) > 0;
@@ -352,7 +345,7 @@ function OrderItemRow({ order, purchase_group_id, is_last, compact = false }: Or
   const tracking_link = getTrackingLink(order);
   const report_link = getReportLink(order);
   const keywords_link = getKeywordsLink(order);
-  const detail_link = getDetailLink(order, purchase_group_id);
+  const detail_link = getDetailLink(order);
 
   return (
     <div
@@ -430,7 +423,7 @@ function OrderItemRow({ order, purchase_group_id, is_last, compact = false }: Or
         </Badge>
 
         <div className="flex items-center gap-1.5">
-          {tracking_link && order.status !== "cancelled" && (
+          {order.status !== "cancelled" && (
             <Link
               href={tracking_link}
               className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors ${
@@ -443,15 +436,13 @@ function OrderItemRow({ order, purchase_group_id, is_last, compact = false }: Or
               Track
             </Link>
           )}
-          {report_link && (
-            <Link
-              href={report_link}
-              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-transparent dark:text-gray-400 dark:hover:bg-gray-800"
-            >
-              <ReportIcon />
-              Report
-            </Link>
-          )}
+          <Link
+            href={report_link}
+            className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-transparent dark:text-gray-400 dark:hover:bg-gray-800"
+          >
+            <ReportIcon />
+            Report
+          </Link>
           {keywords_link && (
             <Link
               href={keywords_link}
@@ -466,7 +457,7 @@ function OrderItemRow({ order, purchase_group_id, is_last, compact = false }: Or
             className="inline-flex items-center gap-1 rounded-lg border border-coral-200 bg-coral-50 px-2.5 py-1 text-xs font-medium text-coral-600 transition-colors hover:bg-coral-500 hover:text-white dark:border-coral-500/30 dark:bg-coral-500/10 dark:text-coral-400 dark:hover:bg-coral-500 dark:hover:text-white"
           >
             <EyeIcon />
-            View
+            View Details
           </Link>
         </div>
       </div>
@@ -497,7 +488,6 @@ function OrderGroupCard({ group }: { group: OrderGroup }) {
         </div>
         <OrderItemRow
           order={order}
-          purchase_group_id={null}
           is_last={true}
           compact={false}
         />
@@ -513,14 +503,14 @@ function OrderGroupCard({ group }: { group: OrderGroup }) {
 
   return (
     <div className="overflow-hidden rounded-2xl border border-brand-200 bg-white shadow-sm dark:border-brand-500/25 dark:bg-white/3">
-      {/* Group header — clickable to expand/collapse */}
-      <button
-        onClick={() => setIsExpanded((v) => !v)}
-        className="w-full bg-linear-to-r from-brand-50 via-brand-50/60 to-transparent px-4 py-3.5 text-left transition-colors hover:from-brand-100 dark:from-brand-500/10 dark:via-brand-500/5 dark:to-transparent dark:hover:from-brand-500/15"
-      >
-        <div className="flex items-center justify-between gap-4">
-          {/* Left: icon + meta */}
-          <div className="flex min-w-0 items-center gap-3">
+      {/* Group header */}
+      <div className="bg-linear-to-r from-brand-50 via-brand-50/60 to-transparent dark:from-brand-500/10 dark:via-brand-500/5 dark:to-transparent">
+        <div className="flex items-center justify-between gap-4 px-4 py-3.5">
+          {/* Left: icon + meta — clickable to expand/collapse */}
+          <button
+            onClick={() => setIsExpanded((v) => !v)}
+            className="flex min-w-0 flex-1 items-center gap-3 text-left"
+          >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-500 text-white shadow-sm">
               <CartIcon />
             </div>
@@ -572,17 +562,28 @@ function OrderGroupCard({ group }: { group: OrderGroup }) {
                 </div>
               </div>
             </div>
-          </div>
+          </button>
 
-          {/* Right: total + chevron */}
+          {/* Right: total + view all details + chevron */}
           <div className="flex shrink-0 items-center gap-3">
             <span className="text-sm font-bold text-gray-800 dark:text-white/90">
               {formatCurrency(group.total_amount)}
             </span>
-            <ChevronDownIcon expanded={is_expanded} />
+            {group.purchase_group_id && (
+              <Link
+                href={getMultiPurchaseLink(group.purchase_group_id)}
+                className="inline-flex items-center gap-1 rounded-lg border border-brand-200 bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-600 transition-colors hover:bg-brand-500 hover:text-white dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400 dark:hover:bg-brand-500 dark:hover:text-white"
+              >
+                <CartIcon />
+                View All Details
+              </Link>
+            )}
+            <button onClick={() => setIsExpanded((v) => !v)}>
+              <ChevronDownIcon expanded={is_expanded} />
+            </button>
           </div>
         </div>
-      </button>
+      </div>
 
       {/* Order items — collapsible */}
       {is_expanded && (
@@ -591,7 +592,6 @@ function OrderGroupCard({ group }: { group: OrderGroup }) {
             <OrderItemRow
               key={`${order.product_type}-${order.id}`}
               order={order}
-              purchase_group_id={group.purchase_group_id}
               is_last={idx === group.orders.length - 1}
               compact
             />

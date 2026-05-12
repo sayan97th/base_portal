@@ -18,6 +18,7 @@ import type {
   OrderStatus,
 } from "@/types/client/link-building";
 import OrderProgressTimeline from "@/components/orders/OrderProgressTimeline";
+import OrderComments from "@/components/orders/OrderComments";
 
 interface LinkBuildingOrderDetailPageProps {
   order_id: string;
@@ -131,11 +132,11 @@ const OrderItemCard: React.FC<OrderItemCardProps> = ({ item, index }) => {
   const empty_placements = item.quantity - filled_placements.length;
 
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
       {/* Item Header */}
       <button
         onClick={() => setIsExpanded((prev) => !prev)}
-        className="flex w-full items-center justify-between px-5 py-4 text-left transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+        className="flex w-full items-center justify-between px-5 py-4 text-left transition-colors hover:bg-gray-50 dark:hover:bg-white/2"
       >
         <div className="flex items-center gap-3">
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-50 text-xs font-bold text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
@@ -174,7 +175,7 @@ const OrderItemCard: React.FC<OrderItemCardProps> = ({ item, index }) => {
       </button>
 
       {/* Tier Meta Row */}
-      <div className="grid grid-cols-2 gap-0 border-t border-gray-100 bg-gray-50/50 dark:border-gray-800 dark:bg-white/[0.01] sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-0 border-t border-gray-100 bg-gray-50/50 dark:border-gray-800 dark:bg-white/1 sm:grid-cols-4">
         {[
           { label: "DR Tier", value: item.dr_tier.label },
           { label: "Traffic Range", value: item.dr_tier.traffic_range },
@@ -235,7 +236,7 @@ const OrderItemCard: React.FC<OrderItemCardProps> = ({ item, index }) => {
                     .map((placement) => (
                       <TableRow
                         key={placement.id ?? placement.row_index}
-                        className="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+                        className="transition-colors hover:bg-gray-50 dark:hover:bg-white/2"
                       >
                         <TableCell className="px-4 py-3 text-center text-xs text-gray-400 dark:text-gray-500">
                           {placement.row_index + 1}
@@ -492,7 +493,7 @@ const LinkBuildingOrderDetailPage: React.FC<
 
               {/* Notes */}
               {order.order_notes && (
-                <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3">
                   <h3 className="mb-2 text-sm font-medium text-gray-700 dark:text-white/80">
                     Order Notes
                   </h3>
@@ -512,7 +513,7 @@ const LinkBuildingOrderDetailPage: React.FC<
             {/* Right — Summary & Billing */}
             <div className="col-span-12 space-y-4 lg:col-span-4">
               {/* Order Summary Card */}
-              <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+              <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3">
                 <h3 className="mb-4 text-sm font-semibold text-gray-800 dark:text-white/90">
                   Order Summary
                 </h3>
@@ -619,7 +620,7 @@ const LinkBuildingOrderDetailPage: React.FC<
               </div>
 
               {/* Billing Card */}
-              <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+              <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3">
                 <h3 className="mb-4 text-sm font-semibold text-gray-800 dark:text-white/90">
                   Billing Address
                 </h3>
@@ -639,7 +640,7 @@ const LinkBuildingOrderDetailPage: React.FC<
               </div>
 
               {/* Order Meta Card */}
-              <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+              <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3">
                 <h3 className="mb-4 text-sm font-semibold text-gray-800 dark:text-white/90">
                   Order Details
                 </h3>
@@ -678,7 +679,7 @@ const LinkBuildingOrderDetailPage: React.FC<
               {/* View Report CTA */}
               <Link
                 href={`/link-building/orders/${order.id}/report`}
-                className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]"
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-white/3 dark:text-gray-300 dark:hover:bg-white/5"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
@@ -689,12 +690,15 @@ const LinkBuildingOrderDetailPage: React.FC<
               {/* New order CTA */}
               <Link
                 href="/link-building"
-                className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]"
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-white/3 dark:text-gray-300 dark:hover:bg-white/5"
               >
                 Place Another Order
               </Link>
             </div>
           </div>
+
+          {/* Order Discussion */}
+          <OrderComments purchase_type="single_order" order_id={order.id} />
         </>
       )}
     </div>

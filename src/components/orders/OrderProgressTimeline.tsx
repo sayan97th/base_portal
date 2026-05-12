@@ -2,11 +2,22 @@
 
 import React, { useEffect, useState } from "react";
 import type { OrderUpdateEntry, OrderStatus } from "@/types/client/link-building";
-import { fetchOrderUpdates } from "@/services/client/order-tracking.service";
+import { fetchOrderUpdatesByType } from "@/services/client/order-tracking.service";
+import type { CartProductType } from "@/types/client/unified-cart";
+
+const VALID_STATUSES: OrderStatus[] = ["pending", "processing", "completed", "cancelled"];
+
+function resolveStatus(status: string): OrderStatus {
+  if (status === "payment_pending") return "pending";
+  return VALID_STATUSES.includes(status as OrderStatus)
+    ? (status as OrderStatus)
+    : "pending";
+}
 
 interface OrderProgressTimelineProps {
   order_id: string;
-  current_status: OrderStatus;
+  current_status: string;
+  product_type?: CartProductType;
 }
 
 function formatDate(iso: string): string {
@@ -182,7 +193,7 @@ const TimelineEntry: React.FC<TimelineEntryProps> = ({ entry, is_last }) => {
 
       {/* Content card */}
       <div className={`flex-1 ${is_last ? "" : "pb-6"}`}>
-        <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
+        <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-white/3">
           <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
             <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
               {entry.title}
@@ -213,6 +224,7 @@ const TimelineEntry: React.FC<TimelineEntryProps> = ({ entry, is_last }) => {
 const OrderProgressTimeline: React.FC<OrderProgressTimelineProps> = ({
   order_id,
   current_status,
+  product_type = "link_building",
 }) => {
   const [updates, setUpdates] = useState<OrderUpdateEntry[]>([]);
   const [is_loading, setIsLoading] = useState(true);
@@ -223,7 +235,7 @@ const OrderProgressTimeline: React.FC<OrderProgressTimelineProps> = ({
       setIsLoading(true);
       setError(null);
       try {
-        const res = await fetchOrderUpdates(order_id);
+        const res = await fetchOrderUpdatesByType(order_id, product_type);
         setUpdates(res.data);
       } catch {
         setError("Unable to load order updates.");
@@ -232,13 +244,14 @@ const OrderProgressTimeline: React.FC<OrderProgressTimelineProps> = ({
       }
     }
     load();
-  }, [order_id]);
+  }, [order_id, product_type]);
 
-  const progress = getStageProgress(current_status);
-  const is_cancelled = current_status === "cancelled";
+  const resolved = resolveStatus(current_status);
+  const progress = getStageProgress(resolved);
+  const is_cancelled = resolved === "cancelled";
 
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
       {/* Header */}
       <div className="border-b border-gray-100 px-5 py-4 dark:border-gray-800">
         <h3 className="text-sm font-semibold text-gray-800 dark:text-white/90">
