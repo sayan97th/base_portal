@@ -96,11 +96,6 @@ export default function ClientActionsDropdown({ client }: ClientActionsDropdownP
             <span>
               {is_sending ? "Sending…" : "Resend Welcome Email"}
             </span>
-            {!can_resend && (
-              <span className="ml-auto rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-400 dark:bg-gray-800 dark:text-gray-600">
-                Logged in
-              </span>
-            )}
           </button>
 
           {/* Inline feedback */}
