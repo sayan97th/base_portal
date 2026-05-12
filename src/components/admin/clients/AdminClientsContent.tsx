@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { listAdminClients, banUser, unbanUser } from "@/services/admin/user.service";
 import type { AdminUser, ClientSortField, ClientEmailStatusFilter, ClientAccountStatusFilter, SortDirection } from "@/types/admin";
 import type { ApiError } from "@/types/auth";
@@ -138,36 +137,7 @@ function SkeletonRows() {
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
-const NAV_TABS = [
-  { href: "/admin/clients", label: "Clients" },
-  { href: "/admin/clients/invitations", label: "Invitations" },
-];
-
-function ClientsNavTabs({ pathname }: { pathname: string }) {
-  return (
-    <div className="flex items-center gap-1 rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-900">
-      {NAV_TABS.map(({ href, label }) => {
-        const is_active = pathname === href;
-        return (
-          <Link
-            key={href}
-            href={href}
-            className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
-              is_active
-                ? "bg-teal-600 text-white dark:bg-teal-500"
-                : "text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
-            }`}
-          >
-            {label}
-          </Link>
-        );
-      })}
-    </div>
-  );
-}
-
 export default function AdminClientsContent() {
-  const pathname = usePathname();
   const [clients, setClients] = useState<AdminUser[]>([]);
   const [page, setPage] = useState(1);
   const [last_page, setLastPage] = useState(1);
@@ -315,7 +285,15 @@ export default function AdminClientsContent() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <ClientsNavTabs pathname={pathname} />
+          <Link
+            href="/admin/clients/invitations"
+            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+            </svg>
+            View Invitations
+          </Link>
           <button
             onClick={() => setShowAddModal(true)}
             className="inline-flex items-center gap-2 rounded-xl bg-teal-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-teal-700 dark:bg-teal-500 dark:hover:bg-teal-600"
