@@ -235,20 +235,22 @@ function IntakeSection({ tier_name, tier_index, rows, total_tiers }: IntakeSecti
                   Secondary Keywords
                 </div>
               </th>
-              <th className="border-b border-r border-gray-200 px-4 py-2.5 text-left text-xs font-semibold text-gray-600 dark:border-gray-700 dark:text-gray-400">
-                <div className="flex items-center gap-1.5">
-                  <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
-                  </svg>
-                  Notes
-                </div>
-              </th>
-              <th className="border-b border-gray-200 px-4 py-2.5 text-left text-xs font-semibold text-gray-600 dark:border-gray-700 dark:text-gray-400">
+              
+              
+                <th className="border-b border-r border-gray-200 px-4 py-2.5 text-left text-xs font-semibold text-gray-600 dark:border-gray-700 dark:text-gray-400">
                 <div className="flex items-center gap-1.5">
                   <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
                   </svg>
                   Content Page URL
+                </div>
+              </th>
+              <th className="border-b border-gray-200 px-4 py-2.5 text-left text-xs font-semibold text-gray-600 dark:border-gray-700 dark:text-gray-400">
+                <div className="flex items-center gap-1.5">
+                  <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
+                  </svg>
+                  Notes
                 </div>
               </th>
             </tr>
@@ -289,13 +291,9 @@ function IntakeSection({ tier_name, tier_index, rows, total_tiers }: IntakeSecti
                     <SecondaryKeywordChips keywords={row.secondary_keywords ?? ""} />
                   </td>
 
-                  {/* Notes */}
-                  <td className="border-r border-gray-200 px-4 py-3 dark:border-gray-700">
-                    <NotesCell notes={row.notes ?? ""} />
-                  </td>
-
                   {/* Content page URL */}
-                  <td className="px-4 py-3">
+                  <td className="border-r border-gray-200 px-4 py-3 dark:border-gray-700">
+                  
                     {has_url ? (
                       <a
                         href={row.content_page_url}
@@ -312,6 +310,11 @@ function IntakeSection({ tier_name, tier_index, rows, total_tiers }: IntakeSecti
                     ) : (
                       <span className="italic text-gray-300 dark:text-gray-600">—</span>
                     )}
+                  </td>
+
+                  {/* Notes */}
+                  <td className="px-4 py-3">
+                    <NotesCell notes={row.notes ?? ""} />
                   </td>
                 </tr>
               );
