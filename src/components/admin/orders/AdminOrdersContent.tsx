@@ -541,9 +541,9 @@ function SingleOrderCard({ group }: { group: AdminOrderGroup }) {
         </div>
       )}
 
-      <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         {/* Left: title + meta */}
-        <div className="min-w-0 flex-1 space-y-1.5">
+        <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             {(order.status === "processing" || order.status === "pending") && (
               <span className="relative flex h-2 w-2 shrink-0">
@@ -558,9 +558,9 @@ function SingleOrderCard({ group }: { group: AdminOrderGroup }) {
             </p>
           </div>
 
-          <CustomerInfo user={order.user} />
-
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <CustomerInfo user={order.user} />
+            <span className="text-gray-200 dark:text-gray-700">·</span>
             <span className="font-mono text-xs text-gray-400 dark:text-gray-500">
               #{order.id.slice(0, 8).toUpperCase()}
             </span>
@@ -578,17 +578,18 @@ function SingleOrderCard({ group }: { group: AdminOrderGroup }) {
                 <span className="text-xs text-gray-400 dark:text-gray-500">{formatDate(order.created_at)}</span>
               </>
             )}
+            <span className="text-gray-200 dark:text-gray-700">·</span>
+            <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+              {formatCurrency(order.total_amount)}
+            </span>
           </div>
         </div>
 
-        {/* Right: status + total + action */}
-        <div className="flex shrink-0 flex-wrap items-center gap-2 sm:flex-col sm:items-end sm:gap-2">
+        {/* Right: status + action buttons — always horizontal */}
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[order.status]}`}>
             <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[order.status]}`} />
             {STATUS_LABEL[order.status]}
-          </span>
-          <span className="text-sm font-bold text-gray-800 dark:text-white/90">
-            {formatCurrency(order.total_amount)}
           </span>
           {order.product_type === "new_content" && (
             <Link
