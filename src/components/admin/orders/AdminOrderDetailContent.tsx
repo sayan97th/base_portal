@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import Badge from "@/components/ui/badge/Badge";
 import { getAdminOrder } from "@/services/admin/order.service";
 import { listAdminOrders } from "@/services/admin/order.service";
@@ -524,10 +523,16 @@ const InvoiceCard = ({ invoice }: InvoiceCardProps) => {
   );
 };
 
+interface SessionContext {
+  session_id: string;
+  session_title: string | null;
+  orders_count: number;
+}
+
 const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order_id, initial_session_id }) => {
-  const router = useRouter();
   const [order, setOrder] = useState<AdminOrder | null>(null);
   const [session_orders, setSessionOrders] = useState<AdminOrder[]>([]);
+  const [session_context, setSessionContext] = useState<SessionContext | null>(null);
   const [current_status, setCurrentStatus] = useState<OrderStatus | null>(null);
   const [is_loading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -536,9 +541,9 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
     async function load() {
       setIsLoading(true);
       setError(null);
+      setSessionContext(null);
       try {
         if (initial_session_id) {
-          // Load all orders for this session directly (multi-purchase session route)
           const session_data = await listAdminOrders({
             session_id: initial_session_id,
             per_page: 50,
@@ -564,14 +569,15 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
                 session_id: data.session_id,
                 per_page: 50,
               });
-              // Client-side guard: keep only orders that actually belong to this session
               const related = session_data.data.filter(
                 (o) => o.session_id === data.session_id
               );
               if (related.length > 1) {
-                // Redirect to session URL so admin and client share the same session UUID
-                router.replace(`/admin/orders/session/${data.session_id}`);
-                return;
+                setSessionContext({
+                  session_id: data.session_id,
+                  session_title: data.session_title ?? null,
+                  orders_count: related.length,
+                });
               }
               setSessionOrders([]);
             } catch {
@@ -586,7 +592,7 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
       }
     }
     load();
-  }, [order_id, initial_session_id, router]);
+  }, [order_id, initial_session_id]);
 
   const effective_status = current_status ?? order?.status ?? "pending";
   const status_config = order ? getStatusConfig(effective_status) : null;
@@ -665,30 +671,48 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
           {/* Page Header */}
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              {/* Product type indicator banner (single order) or session indicator */}
-              {is_session_view ? (
-                <div className="mb-2 inline-flex items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 dark:border-brand-500/30 dark:bg-brand-500/10">
-                  <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
-                  <span className="text-xs font-semibold uppercase tracking-wide text-brand-700 dark:text-brand-300">
-                    Multi-Product Purchase
-                  </span>
-                  <span className="text-xs text-brand-600/70 dark:text-brand-400/70">
-                    · {session_orders.length} services
-                  </span>
-                </div>
-              ) : product_type_cfg ? (
-                <div className={`mb-2 inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 ${product_type_cfg.bg} ${product_type_cfg.border}`}>
-                  <span className={`h-1.5 w-1.5 rounded-full ${
-                    order.product_type === "link_building" ? "bg-violet-500" :
-                    order.product_type === "new_content" ? "bg-blue-500" :
-                    order.product_type === "content_optimization" ? "bg-emerald-500" :
-                    "bg-amber-500"
-                  }`} />
-                  <span className={`text-xs font-semibold uppercase tracking-wide ${product_type_cfg.color}`}>
-                    {product_type_cfg.label}
-                  </span>
-                </div>
-              ) : null}
+              {/* Category + session context indicators */}
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                {is_session_view ? (
+                  <div className="inline-flex items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 dark:border-brand-500/30 dark:bg-brand-500/10">
+                    <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
+                    <span className="text-xs font-semibold uppercase tracking-wide text-brand-700 dark:text-brand-300">
+                      Multi-Product Purchase
+                    </span>
+                    <span className="text-xs text-brand-600/70 dark:text-brand-400/70">
+                      · {session_orders.length} services
+                    </span>
+                  </div>
+                ) : product_type_cfg ? (
+                  <div className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 ${product_type_cfg.bg} ${product_type_cfg.border}`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${
+                      order.product_type === "link_building" ? "bg-violet-500" :
+                      order.product_type === "new_content" ? "bg-blue-500" :
+                      order.product_type === "content_optimization" ? "bg-emerald-500" :
+                      "bg-amber-500"
+                    }`} />
+                    <span className={`text-xs font-semibold uppercase tracking-wide ${product_type_cfg.color}`}>
+                      {product_type_cfg.label}
+                    </span>
+                  </div>
+                ) : null}
+
+                {/* Multi-purchase session context — shown when viewing an individual order from a session */}
+                {!is_session_view && session_context && (
+                  <Link
+                    href={`/admin/orders/session/${session_context.session_id}`}
+                    className="inline-flex items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-700 transition-colors hover:bg-brand-100 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300 dark:hover:bg-brand-500/15"
+                  >
+                    <CartIcon />
+                    <span>
+                      Part of Multi-Purchase · {session_context.orders_count} services
+                    </span>
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                    </svg>
+                  </Link>
+                )}
+              </div>
 
               <div className="flex flex-wrap items-center gap-3">
                 <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
