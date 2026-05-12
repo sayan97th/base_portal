@@ -697,6 +697,16 @@ const OrderDetailPage: React.FC<OrderDetailPageProps> = ({ order_id }) => {
                 {created_at && ` · Placed on ${formatDate(created_at)}`}
               </p>
             </div>
+            {/* Keywords shortcut for content product types */}
+            {keywords_link && (
+              <Link
+                href={keywords_link}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3.5 py-2 text-sm font-semibold text-brand-700 transition-colors hover:bg-brand-500 hover:text-white dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300 dark:hover:bg-brand-500 dark:hover:text-white"
+              >
+                <KeywordsIcon />
+                View Keywords &amp; Intake
+              </Link>
+            )}
           </div>
 
           {/* Main Grid */}
@@ -727,12 +737,11 @@ const OrderDetailPage: React.FC<OrderDetailPageProps> = ({ order_id }) => {
                 </div>
               )}
 
-              {is_lb && (
-                <OrderProgressTimeline
-                  order_id={order_id}
-                  current_status={lb_data!.status}
-                />
-              )}
+              <OrderProgressTimeline
+                order_id={order_id}
+                current_status={status}
+                product_type={product_type}
+              />
             </div>
 
             {/* Right — Summary + Billing + Metadata + CTAs */}
@@ -912,39 +921,30 @@ const OrderDetailPage: React.FC<OrderDetailPageProps> = ({ order_id }) => {
                 </dl>
               </div>
 
-              {/* CTAs */}
-              {is_lb ? (
-                <>
-                  <Link
-                    href={`/link-building/orders/${order_id}/tracking`}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-brand-500/20 transition-colors hover:bg-brand-600"
-                  >
-                    <BoltIcon />
-                    Track Order Progress
-                  </Link>
-                  <Link
-                    href={`/link-building/orders/${order_id}/report`}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-white/3 dark:text-gray-300 dark:hover:bg-white/5"
-                  >
-                    <ReportIcon />
-                    View Delivery Report
-                  </Link>
-                  <Link
-                    href="/link-building"
-                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-white/3 dark:text-gray-300 dark:hover:bg-white/5"
-                  >
-                    Place Another Order
-                  </Link>
-                </>
-              ) : keywords_link ? (
+              {/* CTAs — same for all product types */}
+              <Link
+                href={`/orders/${order_id}/tracking`}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-brand-500/20 transition-colors hover:bg-brand-600"
+              >
+                <BoltIcon />
+                Track Order Progress
+              </Link>
+              <Link
+                href={`/orders/${order_id}/report`}
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-white/3 dark:text-gray-300 dark:hover:bg-white/5"
+              >
+                <ReportIcon />
+                View Delivery Report
+              </Link>
+              {keywords_link && (
                 <Link
                   href={keywords_link}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-brand-500/20 transition-colors hover:bg-brand-600"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-white/3 dark:text-gray-300 dark:hover:bg-white/5"
                 >
                   <KeywordsIcon />
                   View Keywords &amp; Intake
                 </Link>
-              ) : null}
+              )}
             </div>
           </div>
 
