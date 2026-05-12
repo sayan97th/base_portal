@@ -37,6 +37,7 @@ export interface User {
   profile_photo_url: string | null;
   organization_id: number | null;
   email_verified_at: string | null;
+  last_login_at: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

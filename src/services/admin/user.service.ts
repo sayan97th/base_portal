@@ -81,6 +81,23 @@ export async function unbanUser(user_id: number): Promise<BanUserResponse> {
   return apiClient.patch<BanUserResponse>(`/api/admin/users/${user_id}/unban`);
 }
 
+export interface ResendWelcomeEmailResponse {
+  message: string;
+}
+
+/**
+ * Resend the welcome email to a client who has not yet logged in.
+ * Returns an error if the client has already accessed the system.
+ * Roles allowed: super_admin, admin.
+ */
+export async function resendClientWelcomeEmail(
+  user_id: number
+): Promise<ResendWelcomeEmailResponse> {
+  return apiClient.post<ResendWelcomeEmailResponse>(
+    `/api/admin/clients/${user_id}/resend-welcome-email`
+  );
+}
+
 /**
  * Create a new client account. Optionally set a temporary password
  * and/or trigger a welcome email with account access instructions.

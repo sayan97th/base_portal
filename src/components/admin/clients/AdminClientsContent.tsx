@@ -9,6 +9,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 import BanUserModal from "@/components/admin/users/BanUserModal";
 import ClientFiltersBar from "@/components/admin/clients/ClientFiltersBar";
 import AddClientModal from "@/components/admin/clients/AddClientModal";
+import ClientActionsDropdown from "@/components/admin/clients/ClientActionsDropdown";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -513,6 +514,7 @@ export default function AdminClientsContent() {
                             </>
                           )}
                         </button>
+                        <ClientActionsDropdown client={client} />
                       </div>
                     </td>
                   </tr>
