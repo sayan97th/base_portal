@@ -153,12 +153,7 @@ function getGroupOverallStatus(orders: UnifiedOrder[]): string {
 
 function getDetailLink(order: UnifiedOrder, purchase_group_id: string | null): string {
   if (purchase_group_id) return `/orders/session/${purchase_group_id}`;
-  switch (order.product_type) {
-    case "link_building":
-      return `/link-building/orders/${order.id}`;
-    default:
-      return `/orders/${order.id}?type=${order.product_type}`;
-  }
+  return `/orders/${order.id}`;
 }
 
 function getTrackingLink(order: UnifiedOrder): string | null {
