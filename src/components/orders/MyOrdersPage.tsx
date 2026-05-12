@@ -160,29 +160,11 @@ function getMultiPurchaseLink(purchase_group_id: string): string {
 }
 
 function getTrackingLink(order: UnifiedOrder): string {
-  switch (order.product_type) {
-    case "link_building":
-      return `/link-building/orders/${order.id}/tracking`;
-    case "new_content":
-      return `/new-content/orders/${order.id}/tracking`;
-    case "content_optimization":
-      return `/content-refresh/content-optimizations/orders/${order.id}/tracking`;
-    case "content_brief":
-      return `/content-refresh/content-briefs/orders/${order.id}/tracking`;
-  }
+  return `/orders/${order.id}/tracking`;
 }
 
 function getReportLink(order: UnifiedOrder): string {
-  switch (order.product_type) {
-    case "link_building":
-      return `/link-building/orders/${order.id}/report`;
-    case "new_content":
-      return `/new-content/orders/${order.id}/report`;
-    case "content_optimization":
-      return `/content-refresh/content-optimizations/orders/${order.id}/report`;
-    case "content_brief":
-      return `/content-refresh/content-briefs/orders/${order.id}/report`;
-  }
+  return `/orders/${order.id}/report`;
 }
 
 function getKeywordsLink(order: UnifiedOrder): string | null {
