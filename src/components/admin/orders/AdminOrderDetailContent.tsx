@@ -58,6 +58,12 @@ function getStatusConfig(status: OrderStatus): {
   }
 }
 
+const PRODUCT_TYPE_INTAKE_PATH: Partial<Record<AdminOrderProductType, string>> = {
+  new_content: "new-content",
+  content_optimization: "content-optimization",
+  content_brief: "content-briefs",
+};
+
 const PRODUCT_TYPE_CONFIG: Record<
   AdminOrderProductType,
   { label: string; column_label: string; color: string; bg: string; border: string }
@@ -183,10 +189,10 @@ const OrderItemsTable = ({ items, coupons, total_amount, product_type, order_tit
           <span className={`text-xs ${type_cfg.color} opacity-70 ml-auto`}>
             {items.length} {items.length === 1 ? "item" : "items"}
           </span>
-          {product_type === "new_content" && order_id && (
+          {product_type && PRODUCT_TYPE_INTAKE_PATH[product_type] && order_id && (
             <Link
-              href={`/admin/new-content/orders/${order_id}`}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-blue-300 bg-white px-2.5 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-50 dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20"
+              href={`/admin/${PRODUCT_TYPE_INTAKE_PATH[product_type]}/orders/${order_id}/intake`}
+              className={`inline-flex items-center gap-1.5 rounded-lg border bg-white px-2.5 py-1 text-xs font-semibold transition dark:bg-transparent ${type_cfg?.color ?? ""} ${type_cfg?.border ?? ""} hover:opacity-80`}
             >
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
@@ -710,10 +716,10 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
               </p>
             </div>
             <div className="flex items-center gap-2">
-              {!is_session_view && order.product_type === "new_content" && (
+              {!is_session_view && order.product_type && PRODUCT_TYPE_INTAKE_PATH[order.product_type] && (
                 <Link
-                  href={`/admin/new-content/orders/${order.id}`}
-                  className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 shadow-sm transition hover:bg-blue-100 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20"
+                  href={`/admin/${PRODUCT_TYPE_INTAKE_PATH[order.product_type]}/orders/${order.id}/intake`}
+                  className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold shadow-sm transition ${product_type_cfg?.bg ?? "bg-gray-50"} ${product_type_cfg?.border ?? "border-gray-200"} ${product_type_cfg?.color ?? "text-gray-700"} hover:opacity-80`}
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
