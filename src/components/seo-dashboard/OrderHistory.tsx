@@ -25,7 +25,7 @@ export default function OrderHistory({ orders, is_loading }: Props) {
   const monthly_data = getMonthlyBreakdown(orders, 3);
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white px-5 pb-5 pt-5 dark:border-gray-800 dark:bg-white/3 sm:px-6 sm:pt-6">
+    <div className="flex h-full flex-col rounded-2xl border border-gray-200 bg-white px-5 pb-5 pt-5 dark:border-gray-800 dark:bg-white/3 sm:px-6 sm:pt-6">
       {/* Header */}
       <div className="mb-5 flex items-center justify-between">
         <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
