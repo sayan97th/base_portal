@@ -17,6 +17,10 @@ import type {
   PayWithCreditsResponse,
   ApplyCreditsDiscountPayload,
   ApplyCreditsDiscountResponse,
+  CreditPackage,
+  CreditPurchaseListResponse,
+  PurchaseCreditsPayload,
+  PurchaseCreditsResponse,
 } from "@/types/client/credits";
 
 export const creditsService = {
@@ -46,5 +50,32 @@ export const creditsService = {
    */
   async applyCreditsDiscount(payload: ApplyCreditsDiscountPayload): Promise<ApplyCreditsDiscountResponse> {
     return apiClient.post<ApplyCreditsDiscountResponse>("/api/credits/apply-discount", payload);
+  },
+
+  /**
+   * Fetch available credit packages for purchase.
+   * Required Laravel endpoint: GET /api/credits/packages
+   */
+  async fetchCreditPackages(): Promise<CreditPackage[]> {
+    return apiClient.get<CreditPackage[]>("/api/credits/packages");
+  },
+
+  /**
+   * Record a completed credit purchase, add credits to the user's account,
+   * and trigger the purchase confirmation email.
+   * Required Laravel endpoint: POST /api/credits/purchase
+   */
+  async purchaseCredits(payload: PurchaseCreditsPayload): Promise<PurchaseCreditsResponse> {
+    return apiClient.post<PurchaseCreditsResponse>("/api/credits/purchase", payload);
+  },
+
+  /**
+   * Paginated list of all credit purchases made by the authenticated user.
+   * Required Laravel endpoint: GET /api/credits/purchases?page={page}
+   */
+  async fetchPurchaseHistory(page: number = 1): Promise<CreditPurchaseListResponse> {
+    return apiClient.get<CreditPurchaseListResponse>(
+      `/api/credits/purchases?page=${page}`
+    );
   },
 };

@@ -46,3 +46,46 @@ export interface CreditBalanceSummary {
   dollar_value: number;
   recent_transactions: CreditTransaction[];
 }
+
+export interface CreditPackage {
+  id: string;
+  name: string;
+  credits: number;
+  price: number;
+  original_price: number;
+  discount_pct: number;
+  description: string;
+  is_popular?: boolean;
+}
+
+export interface CreditPurchase {
+  id: number;
+  package_id: string;
+  package_name: string;
+  credits_amount: number;
+  amount_paid: number;
+  payment_intent_id: string | null;
+  status: "completed" | "pending" | "failed" | "refunded";
+  created_at: string;
+}
+
+export interface CreditPurchaseListResponse {
+  data: CreditPurchase[];
+  current_page: number;
+  last_page: number;
+  total: number;
+}
+
+export interface PurchaseCreditsPayload {
+  package_id: string;
+  credits_amount: number;
+  amount_paid: number;
+  payment_intent_id: string;
+}
+
+export interface PurchaseCreditsResponse {
+  success: boolean;
+  new_balance: number;
+  purchase_id: number;
+  message: string;
+}
