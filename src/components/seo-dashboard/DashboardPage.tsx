@@ -135,6 +135,19 @@ export default function DashboardPage() {
       {/* Stats Cards */}
       <DashboardStatsCards orders={orders} is_loading={is_loading_summary} />
 
+      {/* Full-Width Order Status Table (server-side paginated) */}
+      <OrderStatusTable
+        rows={table_rows}
+        is_loading={is_loading_table}
+        current_page={table_page}
+        last_page={table_last_page}
+        total={table_total}
+        per_page={TABLE_PER_PAGE}
+        search_term={table_search}
+        onSearchChange={handleSearchChange}
+        onPageChange={setTablePage}
+      />
+
       {/* Mid Row: Order History + News + Resources */}
       <div className="grid grid-cols-12 gap-4 md:gap-6">
         <div className="col-span-12 lg:col-span-5">
@@ -148,21 +161,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* SME Content Services Widget */}
-      <SmeContentWidget />
-
-      {/* Full-Width Order Status Table (server-side paginated) */}
-      <OrderStatusTable
-        rows={table_rows}
-        is_loading={is_loading_table}
-        current_page={table_page}
-        last_page={table_last_page}
-        total={table_total}
-        per_page={TABLE_PER_PAGE}
-        search_term={table_search}
-        onSearchChange={handleSearchChange}
-        onPageChange={setTablePage}
-      />
+      
         </>
       )}
     </div>
