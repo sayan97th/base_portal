@@ -338,7 +338,7 @@ function StatCards({ transactions }: { transactions: CreditTransaction[] }) {
 
   const stats = [
     {
-      label: "Total Received",
+      label: "Total Purchased",
       value: `+${formatCredits(total_received)} CR`,
       sub: formatUSD(total_received),
       color: "emerald" as const,
