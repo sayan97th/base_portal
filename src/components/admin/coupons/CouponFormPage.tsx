@@ -338,6 +338,100 @@ function DrTierMultiSelect({ dr_tiers, selected_ids, onChange, has_error }: DrTi
   );
 }
 
+// ── Product Type Selector ─────────────────────────────────────────────────────
+
+interface ProductTypeSelectorProps {
+  selected_types: ProductType[];
+  onChange: (types: ProductType[]) => void;
+}
+
+function ProductTypeSelector({ selected_types, onChange }: ProductTypeSelectorProps) {
+  const toggleType = (type: ProductType) => {
+    if (selected_types.includes(type)) {
+      onChange(selected_types.filter((t) => t !== type));
+    } else {
+      onChange([...selected_types, type]);
+    }
+  };
+
+  const toggleAll = () => {
+    if (selected_types.length === PRODUCT_TYPE_OPTIONS.length) {
+      onChange([]);
+    } else {
+      onChange(PRODUCT_TYPE_OPTIONS.map((o) => o.value));
+    }
+  };
+
+  const all_selected = selected_types.length === PRODUCT_TYPE_OPTIONS.length;
+  const none_selected = selected_types.length === 0;
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          {none_selected
+            ? "Applies to all products"
+            : `Applies to ${selected_types.length} product type${selected_types.length > 1 ? "s" : ""}`}
+        </p>
+        <button
+          type="button"
+          onClick={toggleAll}
+          className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+        >
+          {all_selected ? "Deselect all" : "Select all"}
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {PRODUCT_TYPE_OPTIONS.map((opt) => {
+          const is_selected = selected_types.includes(opt.value);
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => toggleType(opt.value)}
+              className={`flex items-center gap-2.5 rounded-xl border px-3 py-3 text-left transition-all ${
+                is_selected
+                  ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10 dark:border-brand-500"
+                  : "border-gray-200 bg-white hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-gray-600"
+              }`}
+            >
+              <span
+                className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
+                  is_selected
+                    ? "border-brand-500 bg-brand-500"
+                    : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"
+                }`}
+              >
+                {is_selected && (
+                  <svg className="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </span>
+              <span
+                className={`text-xs font-medium leading-tight ${
+                  is_selected
+                    ? "text-brand-700 dark:text-brand-400"
+                    : "text-gray-700 dark:text-gray-300"
+                }`}
+              >
+                {opt.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {none_selected && (
+        <p className="mt-2 text-[11px] text-gray-400 dark:text-gray-500">
+          No product selected — this coupon applies to all product types.
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ── Live Preview Card ──────────────────────────────────────────────────────────
 
 interface PreviewCardProps {
@@ -355,6 +449,13 @@ function PreviewCard({ form, dr_tiers, toggles }: PreviewCardProps) {
 
   const selected_tiers = dr_tiers.filter((t) => form.dr_tier_ids.includes(t.id));
 
+  const product_type_label =
+    form.product_types.length > 0 && form.product_types.length < PRODUCT_TYPE_OPTIONS.length
+      ? form.product_types
+          .map((pt) => PRODUCT_TYPE_OPTIONS.find((o) => o.value === pt)?.label ?? pt)
+          .join(", ")
+      : null;
+
   const applies_label =
     form.applies_to === "specific_product" && selected_tiers.length > 0
       ? selected_tiers.length === 1
@@ -362,7 +463,9 @@ function PreviewCard({ form, dr_tiers, toggles }: PreviewCardProps) {
         : `On ${selected_tiers.length} DR tiers`
       : form.applies_to === "minimum_purchase" && form.minimum_purchase_amount
         ? `Orders over $${parseFloat(form.minimum_purchase_amount).toLocaleString("en-US", { minimumFractionDigits: 0 })}`
-        : "On all products";
+        : product_type_label
+          ? `On ${product_type_label}`
+          : "On all products";
 
   const expiry_label =
     toggles.has_expiry_date && form.expires_at
@@ -650,6 +753,7 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
         discount_type: form.discount_type,
         discount_value: parseFloat(form.discount_value),
         applies_to: form.applies_to,
+        product_types: form.product_types.length > 0 ? form.product_types : [],
         dr_tier_ids: form.applies_to === "specific_product" ? form.dr_tier_ids : [],
         minimum_purchase_amount:
           form.applies_to === "minimum_purchase"
@@ -933,8 +1037,29 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
             {/* Applies To */}
             <FormSection
               title="Coupon Restrictions"
-              description="Define what this coupon applies to and any purchase requirements."
+              description="Define which products this coupon applies to and any purchase requirements."
             >
+              {/* Applicable Products */}
+              <div className="mb-5">
+                <div className="mb-3">
+                  <FieldLabel>Applicable Products</FieldLabel>
+                  <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                    Select which product types can use this coupon. Leave all unchecked to allow all products.
+                  </p>
+                </div>
+                <ProductTypeSelector
+                  selected_types={form.product_types}
+                  onChange={(types) => updateField("product_types", types)}
+                />
+              </div>
+
+              <div className="border-t border-gray-100 dark:border-gray-800 pt-5 mb-5">
+                <FieldLabel>Discount Scope</FieldLabel>
+                <p className="mt-0.5 mb-3 text-xs text-gray-500 dark:text-gray-400">
+                  Define how the discount amount is calculated.
+                </p>
+              </div>
+
               {/* Applies to selector */}
               <div className="grid grid-cols-3 gap-3">
                 {(
@@ -1256,12 +1381,12 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
                       text: "Use the Auto button to generate a random, unique coupon code.",
                     },
                     {
-                      icon: "🎯",
-                      text: "DR Tiers discounts apply only to order items from any of the selected tiers.",
+                      icon: "🏷️",
+                      text: "Select specific Applicable Products to restrict the coupon to Link Building, New Content, Content Optimizations, or Content Briefs. Leave all unchecked to allow all products.",
                     },
                     {
-                      icon: "✅",
-                      text: "You can select multiple DR tiers — the discount activates if the order contains items from any of them.",
+                      icon: "🎯",
+                      text: "DR Tiers scope applies the discount only to order items from the selected link building tiers.",
                     },
                     {
                       icon: "💰",

@@ -185,9 +185,19 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
           Math.round(i.unit_price * i.quantity * 100) / 100;
       });
 
+      const cart_product_types = [...new Set(items.map((i) => i.product_type))];
+      const product_type_amounts: Record<string, number> = {};
+      items.forEach((i) => {
+        const item_total = Math.round(i.unit_price * i.quantity * 100) / 100;
+        product_type_amounts[i.product_type] =
+          (product_type_amounts[i.product_type] ?? 0) + item_total;
+      });
+
       const response = await validateCoupon({
         code: trimmed_code,
         order_amount: Math.max(0, subtotal_after_bulk - applied_discount),
+        cart_product_types,
+        product_type_amounts,
         ...(lb_tier_ids.length > 0 && {
           dr_tier_ids: lb_tier_ids,
           dr_tier_amounts: lb_tier_amounts,
