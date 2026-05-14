@@ -17,6 +17,8 @@ import type {
   AdminCreditsStats,
   AdminCreditsTransactionFilters,
   AdminCreditsClientFilters,
+  AdminCreditPurchase,
+  AdminCreditPurchaseFilters,
 } from "@/types/admin/credits";
 import type { PaginatedResponse } from "@/types/admin";
 
@@ -58,6 +60,19 @@ export const adminCreditsService = {
     if (filters.type) params.set("type", filters.type);
     return apiClient.get<PaginatedResponse<AdminCreditTransaction>>(
       `/api/admin/credits/transactions?${params.toString()}`
+    );
+  },
+
+  async fetchAllPurchases(
+    filters: AdminCreditPurchaseFilters = {}
+  ): Promise<PaginatedResponse<AdminCreditPurchase>> {
+    const params = new URLSearchParams({ page: String(filters.page ?? 1) });
+    if (filters.search) params.set("search", filters.search);
+    if (filters.status) params.set("status", filters.status);
+    if (filters.date_from) params.set("date_from", filters.date_from);
+    if (filters.date_to) params.set("date_to", filters.date_to);
+    return apiClient.get<PaginatedResponse<AdminCreditPurchase>>(
+      `/api/admin/credits/purchases?${params.toString()}`
     );
   },
 };

@@ -298,10 +298,10 @@ function ProductsPanel({ items, product_type, compact = false }: ProductsPanelPr
           return (
             <div
               key={item.id}
-              className="group flex items-center gap-2.5 rounded-lg bg-gray-50 px-2.5 py-2 dark:bg-white/[0.03]"
+              className="group flex items-center gap-2.5 rounded-lg bg-gray-50 px-2.5 py-2 dark:bg-white/3"
             >
               {/* Quantity badge */}
-              <span className="flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded-md bg-gray-200/80 px-1.5 text-[10px] font-bold tabular-nums text-gray-500 dark:bg-gray-700/60 dark:text-gray-400">
+              <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-md bg-gray-200/80 px-1.5 text-[10px] font-bold tabular-nums text-gray-500 dark:bg-gray-700/60 dark:text-gray-400">
                 {item.quantity}×
               </span>
 
@@ -845,11 +845,25 @@ export default function AdminOrdersContent() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Orders</h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Manage and track all platform orders
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Orders</h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Manage and track all platform orders
+          </p>
+        </div>
+        <Link
+          href="/admin/orders/credit-purchases"
+          className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-700 shadow-sm transition-all hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500/15"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+          </svg>
+          Credit Purchases
+          <svg className="h-3.5 w-3.5 opacity-60" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+          </svg>
+        </Link>
       </div>
 
       {/* Filters bar */}

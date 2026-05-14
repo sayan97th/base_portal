@@ -53,3 +53,30 @@ export interface AdminCreditsClientFilters {
   sort_by?: "first_name" | "credit_balance";
   sort_dir?: "asc" | "desc";
 }
+
+export type CreditPurchaseStatus = "completed" | "pending" | "failed" | "refunded";
+
+export interface AdminCreditPurchase {
+  id: number;
+  package_id: string;
+  package_name: string;
+  credits_amount: number;
+  amount_paid: number;
+  payment_intent_id: string | null;
+  status: CreditPurchaseStatus;
+  created_at: string;
+  user: {
+    id: number;
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
+}
+
+export interface AdminCreditPurchaseFilters {
+  page?: number;
+  search?: string;
+  status?: CreditPurchaseStatus | "";
+  date_from?: string;
+  date_to?: string;
+}
