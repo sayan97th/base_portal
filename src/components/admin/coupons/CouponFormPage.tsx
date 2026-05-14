@@ -388,7 +388,7 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
   const [form, setForm] = useState<FormData>(getEmptyForm());
   const [toggles, setToggles] = useState<Toggles>({
     has_start_date: false,
-    has_expiry_date: true,
+    has_expiry_date: false,
     has_usage_limit: false,
     has_per_user_limit: false,
   });
