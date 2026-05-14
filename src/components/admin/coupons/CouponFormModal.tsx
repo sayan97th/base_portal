@@ -19,7 +19,7 @@ const empty_form = (): CreateCouponPayload => ({
   discount_type: "percentage",
   discount_value: 10,
   applies_to: "all",
-  dr_tier_id: null,
+  dr_tier_ids: undefined,
   minimum_purchase_amount: null,
   starts_at: null,
   expires_at: "",
@@ -57,7 +57,7 @@ export default function CouponFormModal({
         discount_type: editing_coupon.discount_type,
         discount_value: editing_coupon.discount_value,
         applies_to: editing_coupon.applies_to,
-        dr_tier_id: editing_coupon.dr_tier_id,
+        dr_tier_ids: editing_coupon.dr_tier_ids,
         minimum_purchase_amount: editing_coupon.minimum_purchase_amount,
         starts_at: editing_coupon.starts_at ?? null,
         expires_at: editing_coupon.expires_at ? editing_coupon.expires_at.slice(0, 10) : "",
@@ -97,8 +97,8 @@ export default function CouponFormModal({
     if (form_data.discount_type === "percentage" && form_data.discount_value > 100)
       new_errors.discount_value = "Percentage cannot exceed 100.";
     if (!form_data.expires_at) new_errors.expires_at = "Expiry date is required.";
-    if (form_data.applies_to === "specific_product" && !form_data.dr_tier_id)
-      new_errors.dr_tier_id = "Please select a DR tier.";
+    if (form_data.applies_to === "specific_product" && !form_data.dr_tier_ids?.length)
+      new_errors.dr_tier_ids = "Please select a DR tier.";
     if (
       form_data.applies_to === "minimum_purchase" &&
       (!form_data.minimum_purchase_amount || form_data.minimum_purchase_amount <= 0)
@@ -119,7 +119,7 @@ export default function CouponFormModal({
         starts_at: has_start_date ? form_data.starts_at : null,
         usage_limit: has_usage_limit ? form_data.usage_limit : null,
         usage_per_user: has_per_user_limit ? form_data.usage_per_user : null,
-        dr_tier_id: form_data.applies_to === "specific_product" ? form_data.dr_tier_id : null,
+        dr_tier_ids: form_data.applies_to === "specific_product" ? form_data.dr_tier_ids : undefined,
         minimum_purchase_amount:
           form_data.applies_to === "minimum_purchase"
             ? form_data.minimum_purchase_amount
@@ -358,10 +358,10 @@ export default function CouponFormModal({
                   Select DR Tier <span className="text-red-500">*</span>
                 </label>
                 <select
-                  value={form_data.dr_tier_id ?? ""}
-                  onChange={(e) => updateField("dr_tier_id", e.target.value || null)}
+                  value={form_data.dr_tier_ids?.[0] ?? ""}
+                  onChange={(e) => updateField("dr_tier_ids", e.target.value ? [e.target.value] : undefined)}
                   className={`w-full rounded-lg border px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors ${
-                    errors.dr_tier_id
+                    errors.dr_tier_ids
                       ? "border-red-400 dark:border-red-500"
                       : "border-gray-200 dark:border-gray-700"
                   }`}
@@ -373,8 +373,8 @@ export default function CouponFormModal({
                     </option>
                   ))}
                 </select>
-                {errors.dr_tier_id && (
-                  <p className="mt-1 text-xs text-red-500">{errors.dr_tier_id}</p>
+                {errors.dr_tier_ids && (
+                  <p className="mt-1 text-xs text-red-500">{errors.dr_tier_ids}</p>
                 )}
               </div>
             )}
