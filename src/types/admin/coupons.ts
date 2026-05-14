@@ -1,6 +1,13 @@
 export type DiscountType = "percentage" | "fixed_amount";
 export type AppliesTo = "all" | "specific_product" | "minimum_purchase";
 
+export interface CouponDrTier {
+  id: string;
+  label: string;
+  price_per_link: number;
+  is_active: boolean;
+}
+
 export interface Coupon {
   id: string;
   code: string;
@@ -9,8 +16,8 @@ export interface Coupon {
   discount_type: DiscountType;
   discount_value: number;
   applies_to: AppliesTo;
-  dr_tier_id: string | null;
-  dr_tier_label: string | null;
+  dr_tier_ids: string[];
+  dr_tiers: CouponDrTier[];
   minimum_purchase_amount: number | null;
   starts_at: string | null;
   expires_at: string | null;
@@ -29,7 +36,7 @@ export interface CreateCouponPayload {
   discount_type: DiscountType;
   discount_value: number;
   applies_to: AppliesTo;
-  dr_tier_id?: string | null;
+  dr_tier_ids?: string[];
   minimum_purchase_amount?: number | null;
   starts_at?: string | null;
   expires_at: string | null;

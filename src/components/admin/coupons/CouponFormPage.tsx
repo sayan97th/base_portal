@@ -28,7 +28,7 @@ interface FormData {
   discount_type: DiscountType;
   discount_value: string;
   applies_to: AppliesTo;
-  dr_tier_id: string;
+  dr_tier_ids: string[];
   minimum_purchase_amount: string;
   starts_at: string;
   expires_at: string;
@@ -59,7 +59,7 @@ function getEmptyForm(): FormData {
     discount_type: "percentage",
     discount_value: "10",
     applies_to: "all",
-    dr_tier_id: "",
+    dr_tier_ids: [],
     minimum_purchase_amount: "",
     starts_at: "",
     expires_at: "",
@@ -77,7 +77,7 @@ function couponFromRecord(coupon: Coupon): FormData {
     discount_type: coupon.discount_type,
     discount_value: String(coupon.discount_value),
     applies_to: coupon.applies_to,
-    dr_tier_id: coupon.dr_tier_id ?? "",
+    dr_tier_ids: coupon.dr_tier_ids ?? [],
     minimum_purchase_amount: coupon.minimum_purchase_amount
       ? String(coupon.minimum_purchase_amount)
       : "",
@@ -114,12 +114,10 @@ function CouponDatePicker({
   const fp_ref = useRef<flatpickr.Instance | null>(null);
   const onChange_ref = useRef(onChange);
 
-  // Keep callback ref always current to avoid stale closures
   useEffect(() => {
     onChange_ref.current = onChange;
   });
 
-  // Initialize / reinitialize when disabled or min_date changes
   useEffect(() => {
     if (!input_ref.current) return;
 
@@ -154,7 +152,6 @@ function CouponDatePicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [disabled, min_date]);
 
-  // Sync external value (edit mode — fires after instance is ready)
   useEffect(() => {
     if (fp_ref.current) {
       fp_ref.current.setDate(value || "", false);
@@ -195,6 +192,148 @@ function CouponDatePicker({
   );
 }
 
+// ── DR Tier Multi-Select ───────────────────────────────────────────────────────
+
+interface DrTierMultiSelectProps {
+  dr_tiers: AdminDrTier[];
+  selected_ids: string[];
+  onChange: (ids: string[]) => void;
+  has_error?: boolean;
+}
+
+function DrTierMultiSelect({ dr_tiers, selected_ids, onChange, has_error }: DrTierMultiSelectProps) {
+  const [search, setSearch] = useState("");
+
+  const filtered_tiers = dr_tiers.filter((t) =>
+    t.label.toLowerCase().includes(search.toLowerCase()) ||
+    t.traffic_range.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const toggleTier = (id: string) => {
+    if (selected_ids.includes(id)) {
+      onChange(selected_ids.filter((s) => s !== id));
+    } else {
+      onChange([...selected_ids, id]);
+    }
+  };
+
+  const toggleAll = () => {
+    if (selected_ids.length === dr_tiers.length) {
+      onChange([]);
+    } else {
+      onChange(dr_tiers.map((t) => t.id));
+    }
+  };
+
+  const selected_tiers = dr_tiers.filter((t) => selected_ids.includes(t.id));
+  const all_selected = dr_tiers.length > 0 && selected_ids.length === dr_tiers.length;
+
+  return (
+    <div>
+      {/* Selected tier chips */}
+      {selected_tiers.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {selected_tiers.map((tier) => (
+            <span
+              key={tier.id}
+              className="inline-flex items-center gap-1.5 rounded-full bg-brand-100 dark:bg-brand-500/20 px-2.5 py-1 text-xs font-medium text-brand-700 dark:text-brand-300"
+            >
+              {tier.label}
+              <button
+                type="button"
+                onClick={() => toggleTier(tier.id)}
+                className="flex h-3.5 w-3.5 items-center justify-center rounded-full text-brand-500 hover:bg-brand-200 dark:hover:bg-brand-500/40 transition-colors"
+                aria-label={`Remove ${tier.label}`}
+              >
+                <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Search + select-all row */}
+      <div className="mb-2 flex items-center gap-2">
+        <div className="relative flex-1">
+          <svg className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search tiers..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-2 pl-8 pr-3 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={toggleAll}
+          className="shrink-0 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+        >
+          {all_selected ? "Deselect all" : "Select all"}
+        </button>
+      </div>
+
+      {/* Count indicator */}
+      <p className="mb-2 text-xs text-gray-400 dark:text-gray-500">
+        {selected_ids.length} of {dr_tiers.length} tier{dr_tiers.length !== 1 ? "s" : ""} selected
+      </p>
+
+      {/* Tier list */}
+      <div
+        className={`max-h-60 overflow-y-auto rounded-xl border divide-y divide-gray-100 dark:divide-gray-700/50 ${
+          has_error
+            ? "border-red-400 dark:border-red-500"
+            : "border-gray-200 dark:border-gray-700"
+        }`}
+      >
+        {filtered_tiers.length === 0 ? (
+          <p className="px-4 py-6 text-center text-xs text-gray-400 dark:text-gray-500">
+            No tiers match your search
+          </p>
+        ) : (
+          filtered_tiers.map((tier) => {
+            const is_selected = selected_ids.includes(tier.id);
+            return (
+              <label
+                key={tier.id}
+                className={`flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors ${
+                  is_selected
+                    ? "bg-brand-50 dark:bg-brand-500/10"
+                    : "bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={is_selected}
+                  onChange={() => toggleTier(tier.id)}
+                  className="h-4 w-4 shrink-0 rounded border-gray-300 dark:border-gray-600 text-brand-500 focus:ring-brand-500"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className={`text-sm font-medium truncate ${is_selected ? "text-brand-700 dark:text-brand-300" : "text-gray-900 dark:text-white"}`}>
+                    {tier.label}
+                  </p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">
+                    {tier.traffic_range} &middot; ${tier.price_per_link.toLocaleString("en-US")} / link
+                  </p>
+                </div>
+                {is_selected && (
+                  <svg className="h-4 w-4 shrink-0 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </label>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Live Preview Card ──────────────────────────────────────────────────────────
 
 interface PreviewCardProps {
@@ -210,11 +349,13 @@ function PreviewCard({ form, dr_tiers, toggles }: PreviewCardProps) {
       ? `${value}%`
       : `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-  const selected_tier = dr_tiers.find((t) => t.id === form.dr_tier_id);
+  const selected_tiers = dr_tiers.filter((t) => form.dr_tier_ids.includes(t.id));
 
   const applies_label =
-    form.applies_to === "specific_product" && selected_tier
-      ? `On ${selected_tier.label}`
+    form.applies_to === "specific_product" && selected_tiers.length > 0
+      ? selected_tiers.length === 1
+        ? `On ${selected_tiers[0].label}`
+        : `On ${selected_tiers.length} DR tiers`
       : form.applies_to === "minimum_purchase" && form.minimum_purchase_amount
         ? `Orders over $${parseFloat(form.minimum_purchase_amount).toLocaleString("en-US", { minimumFractionDigits: 0 })}`
         : "On all products";
@@ -260,6 +401,22 @@ function PreviewCard({ form, dr_tiers, toggles }: PreviewCardProps) {
       </div>
 
       <p className="mb-6 text-sm text-brand-200">{applies_label}</p>
+
+      {/* Selected tiers preview */}
+      {form.applies_to === "specific_product" && selected_tiers.length > 1 && (
+        <div className="mb-4 flex flex-wrap gap-1">
+          {selected_tiers.slice(0, 3).map((t) => (
+            <span key={t.id} className="rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-medium text-white">
+              {t.label}
+            </span>
+          ))}
+          {selected_tiers.length > 3 && (
+            <span className="rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-medium text-white">
+              +{selected_tiers.length - 3} more
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Dashed divider */}
       <div className="relative mb-5">
@@ -452,8 +609,8 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
     if (form.discount_type === "percentage" && val > 100)
       e.discount_value = "Percentage cannot exceed 100.";
     if (toggles.has_expiry_date && !form.expires_at) e.expires_at = "Expiry date is required.";
-    if (form.applies_to === "specific_product" && !form.dr_tier_id)
-      e.dr_tier_id = "Please select a DR tier.";
+    if (form.applies_to === "specific_product" && form.dr_tier_ids.length === 0)
+      e.dr_tier_ids = "Select at least one DR tier.";
     if (form.applies_to === "minimum_purchase") {
       const min = parseFloat(form.minimum_purchase_amount);
       if (!form.minimum_purchase_amount || isNaN(min) || min <= 0)
@@ -489,7 +646,7 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
         discount_type: form.discount_type,
         discount_value: parseFloat(form.discount_value),
         applies_to: form.applies_to,
-        dr_tier_id: form.applies_to === "specific_product" ? form.dr_tier_id || null : null,
+        dr_tier_ids: form.applies_to === "specific_product" ? form.dr_tier_ids : [],
         minimum_purchase_amount:
           form.applies_to === "minimum_purchase"
             ? parseFloat(form.minimum_purchase_amount) || null
@@ -790,8 +947,8 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
                     },
                     {
                       value: "specific_product" as AppliesTo,
-                      label: "Specific Tier",
-                      description: "One DR tier only",
+                      label: "DR Tiers",
+                      description: "Select one or more tiers",
                       icon: (
                         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -847,23 +1004,27 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
                 ))}
               </div>
 
-              {/* Conditional: Specific Product */}
+              {/* Conditional: DR Tiers multi-select */}
               {form.applies_to === "specific_product" && (
-                <div className="mt-4">
-                  <FieldLabel required>DR Tier</FieldLabel>
-                  <select
-                    value={form.dr_tier_id}
-                    onChange={(e) => updateField("dr_tier_id", e.target.value)}
-                    className={errors.dr_tier_id ? input_error : input_normal}
-                  >
-                    <option value="">— Select a DR tier —</option>
-                    {dr_tiers.map((tier) => (
-                      <option key={tier.id} value={tier.id}>
-                        {tier.label} — {tier.traffic_range} · ${tier.price_per_link.toLocaleString("en-US")} / link
-                      </option>
-                    ))}
-                  </select>
-                  <FieldError message={errors.dr_tier_id} />
+                <div className="mt-5">
+                  <div className="mb-3 flex items-center justify-between">
+                    <FieldLabel required>DR Tiers</FieldLabel>
+                    {form.dr_tier_ids.length > 0 && (
+                      <span className="rounded-full bg-brand-100 dark:bg-brand-500/20 px-2.5 py-0.5 text-xs font-semibold text-brand-700 dark:text-brand-300">
+                        {form.dr_tier_ids.length} selected
+                      </span>
+                    )}
+                  </div>
+                  <DrTierMultiSelect
+                    dr_tiers={dr_tiers}
+                    selected_ids={form.dr_tier_ids}
+                    onChange={(ids) => updateField("dr_tier_ids", ids)}
+                    has_error={!!errors.dr_tier_ids}
+                  />
+                  <FieldError message={errors.dr_tier_ids} />
+                  <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
+                    The discount will apply to any order item that belongs to one of the selected tiers.
+                  </p>
                 </div>
               )}
 
@@ -1092,7 +1253,11 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
                     },
                     {
                       icon: "🎯",
-                      text: "Specific Tier discounts apply only to items from the chosen DR tier.",
+                      text: "DR Tiers discounts apply only to order items from any of the selected tiers.",
+                    },
+                    {
+                      icon: "✅",
+                      text: "You can select multiple DR tiers — the discount activates if the order contains items from any of them.",
                     },
                     {
                       icon: "💰",

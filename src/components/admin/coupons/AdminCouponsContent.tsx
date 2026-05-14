@@ -32,7 +32,10 @@ function getCouponStatus(coupon: Coupon): "active" | "expired" | "disabled" | "s
 
 function getAppliesToLabel(coupon: Coupon): string {
   if (coupon.applies_to === "specific_product") {
-    return coupon.dr_tier_label ? `Tier: ${coupon.dr_tier_label}` : "Specific Tier";
+    const tiers = coupon.dr_tiers ?? [];
+    if (tiers.length === 0) return "Specific Tier";
+    if (tiers.length === 1) return `Tier: ${tiers[0].label}`;
+    return `${tiers.length} DR Tiers`;
   }
   if (coupon.applies_to === "minimum_purchase") {
     const amount = coupon.minimum_purchase_amount?.toLocaleString("en-US", {
