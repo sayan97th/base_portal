@@ -60,7 +60,7 @@ export default function CouponFormModal({
         dr_tier_id: editing_coupon.dr_tier_id,
         minimum_purchase_amount: editing_coupon.minimum_purchase_amount,
         starts_at: editing_coupon.starts_at ?? null,
-        expires_at: editing_coupon.expires_at.slice(0, 10),
+        expires_at: editing_coupon.expires_at ? editing_coupon.expires_at.slice(0, 10) : "",
         usage_limit: editing_coupon.usage_limit,
         usage_per_user: editing_coupon.usage_per_user,
         is_active: editing_coupon.is_active,
@@ -447,7 +447,7 @@ export default function CouponFormModal({
               </label>
               <input
                 type="date"
-                value={form_data.expires_at}
+                value={form_data.expires_at ?? ""}
                 onChange={(e) => updateField("expires_at", e.target.value)}
                 className={`w-full rounded-lg border px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors ${
                   errors.expires_at

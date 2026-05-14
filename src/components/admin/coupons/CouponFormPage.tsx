@@ -39,6 +39,7 @@ interface FormData {
 
 interface Toggles {
   has_start_date: boolean;
+  has_expiry_date: boolean;
   has_usage_limit: boolean;
   has_per_user_limit: boolean;
 }
@@ -81,7 +82,7 @@ function couponFromRecord(coupon: Coupon): FormData {
       ? String(coupon.minimum_purchase_amount)
       : "",
     starts_at: coupon.starts_at ? coupon.starts_at.slice(0, 10) : "",
-    expires_at: coupon.expires_at.slice(0, 10),
+    expires_at: coupon.expires_at ? coupon.expires_at.slice(0, 10) : "",
     usage_limit: coupon.usage_limit ? String(coupon.usage_limit) : "100",
     usage_per_user: coupon.usage_per_user ? String(coupon.usage_per_user) : "1",
     is_active: coupon.is_active,
@@ -218,13 +219,14 @@ function PreviewCard({ form, dr_tiers, toggles }: PreviewCardProps) {
         ? `Orders over $${parseFloat(form.minimum_purchase_amount).toLocaleString("en-US", { minimumFractionDigits: 0 })}`
         : "On all products";
 
-  const expiry_label = form.expires_at
-    ? new Date(form.expires_at).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      })
-    : "No expiry set";
+  const expiry_label =
+    toggles.has_expiry_date && form.expires_at
+      ? new Date(form.expires_at).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })
+      : "Never expires";
 
   return (
     <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-600 to-brand-800 p-6 text-white shadow-xl">
@@ -386,6 +388,7 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
   const [form, setForm] = useState<FormData>(getEmptyForm());
   const [toggles, setToggles] = useState<Toggles>({
     has_start_date: false,
+    has_expiry_date: true,
     has_usage_limit: false,
     has_per_user_limit: false,
   });
@@ -406,6 +409,7 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
         setForm(couponFromRecord(coupon));
         setToggles({
           has_start_date: coupon.starts_at !== null,
+          has_expiry_date: coupon.expires_at !== null,
           has_usage_limit: coupon.usage_limit !== null,
           has_per_user_limit: coupon.usage_per_user !== null,
         });
@@ -447,7 +451,7 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
       e.discount_value = "Value must be greater than 0.";
     if (form.discount_type === "percentage" && val > 100)
       e.discount_value = "Percentage cannot exceed 100.";
-    if (!form.expires_at) e.expires_at = "Expiry date is required.";
+    if (toggles.has_expiry_date && !form.expires_at) e.expires_at = "Expiry date is required.";
     if (form.applies_to === "specific_product" && !form.dr_tier_id)
       e.dr_tier_id = "Please select a DR tier.";
     if (form.applies_to === "minimum_purchase") {
@@ -491,7 +495,7 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
             ? parseFloat(form.minimum_purchase_amount) || null
             : null,
         starts_at: toggles.has_start_date && form.starts_at ? form.starts_at : null,
-        expires_at: form.expires_at,
+        expires_at: toggles.has_expiry_date && form.expires_at ? form.expires_at : null,
         usage_limit: toggles.has_usage_limit ? parseInt(form.usage_limit) || null : null,
         usage_per_user: toggles.has_per_user_limit
           ? parseInt(form.usage_per_user) || null
@@ -919,18 +923,28 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
 
                 {/* Expiry Date */}
                 <div>
-                  <FieldLabel required>Expiry Date</FieldLabel>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <FieldLabel>Expiry Date</FieldLabel>
+                    <Toggle
+                      enabled={toggles.has_expiry_date}
+                      onChange={(v) => {
+                        setToggles((prev) => ({ ...prev, has_expiry_date: v }));
+                        if (!v) updateField("expires_at", "");
+                      }}
+                    />
+                  </div>
                   <CouponDatePicker
                     id="coupon_expiry_date"
                     value={form.expires_at}
-                    onChange={(date_str) => {
-                      updateField("expires_at", date_str);
-                    }}
+                    onChange={(date_str) => updateField("expires_at", date_str)}
+                    disabled={!toggles.has_expiry_date}
                     placeholder="Pick an expiry date"
                     has_error={!!errors.expires_at}
                   />
                   <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
-                    The coupon will be invalid after this date.
+                    {toggles.has_expiry_date
+                      ? "The coupon will be invalid after this date."
+                      : "No expiry — coupon is valid indefinitely."}
                   </p>
                   <FieldError message={errors.expires_at} />
                 </div>

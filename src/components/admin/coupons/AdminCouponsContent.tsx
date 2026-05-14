@@ -19,8 +19,10 @@ function formatDiscount(coupon: Coupon): string {
 function getCouponStatus(coupon: Coupon): "active" | "expired" | "disabled" | "scheduled" {
   if (!coupon.is_active) return "disabled";
   const now = new Date();
-  const expires = new Date(coupon.expires_at);
-  if (expires < now) return "expired";
+  if (coupon.expires_at) {
+    const expires = new Date(coupon.expires_at);
+    if (expires < now) return "expired";
+  }
   if (coupon.starts_at) {
     const starts = new Date(coupon.starts_at);
     if (starts > now) return "scheduled";
@@ -51,7 +53,8 @@ function formatDate(date_str: string): string {
   });
 }
 
-function daysUntilExpiry(date_str: string): number {
+function daysUntilExpiry(date_str: string | null): number | null {
+  if (!date_str) return null;
   const now = new Date();
   const expires = new Date(date_str);
   return Math.ceil((expires.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
@@ -567,9 +570,9 @@ export default function AdminCouponsContent() {
                   {/* Expires */}
                   <div>
                     <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                      {formatDate(coupon.expires_at)}
+                      {coupon.expires_at ? formatDate(coupon.expires_at) : "No expiry"}
                     </p>
-                    {status !== "expired" && status !== "disabled" && (
+                    {coupon.expires_at && status !== "expired" && status !== "disabled" && days_left !== null && (
                       <p
                         className={`mt-0.5 text-[11px] ${
                           days_left <= 7

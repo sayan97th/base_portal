@@ -13,7 +13,7 @@ export interface Coupon {
   dr_tier_label: string | null;
   minimum_purchase_amount: number | null;
   starts_at: string | null;
-  expires_at: string;
+  expires_at: string | null;
   usage_limit: number | null;
   usage_per_user: number | null;
   times_used: number;
@@ -32,7 +32,7 @@ export interface CreateCouponPayload {
   dr_tier_id?: string | null;
   minimum_purchase_amount?: number | null;
   starts_at?: string | null;
-  expires_at: string;
+  expires_at: string | null;
   usage_limit?: number | null;
   usage_per_user?: number | null;
   is_active: boolean;
