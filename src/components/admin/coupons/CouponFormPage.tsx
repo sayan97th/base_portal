@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import flatpickr from "flatpickr";
 import "flatpickr/dist/flatpickr.css";
-import type { Coupon, CreateCouponPayload, DiscountType, AppliesTo } from "@/types/admin/coupons";
+import type { Coupon, CreateCouponPayload, DiscountType, AppliesTo, ProductType } from "@/types/admin/coupons";
+import { PRODUCT_TYPE_OPTIONS } from "@/types/admin/coupons";
 import type { AdminDrTier } from "@/types/admin/link-building";
 import {
   createAdminCoupon,
@@ -28,6 +29,7 @@ interface FormData {
   discount_type: DiscountType;
   discount_value: string;
   applies_to: AppliesTo;
+  product_types: ProductType[];
   dr_tier_ids: string[];
   minimum_purchase_amount: string;
   starts_at: string;
@@ -59,6 +61,7 @@ function getEmptyForm(): FormData {
     discount_type: "percentage",
     discount_value: "10",
     applies_to: "all",
+    product_types: [],
     dr_tier_ids: [],
     minimum_purchase_amount: "",
     starts_at: "",
@@ -77,6 +80,7 @@ function couponFromRecord(coupon: Coupon): FormData {
     discount_type: coupon.discount_type,
     discount_value: String(coupon.discount_value),
     applies_to: coupon.applies_to,
+    product_types: coupon.product_types ?? [],
     dr_tier_ids: coupon.dr_tier_ids ?? [],
     minimum_purchase_amount: coupon.minimum_purchase_amount
       ? String(coupon.minimum_purchase_amount)
