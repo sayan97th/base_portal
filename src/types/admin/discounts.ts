@@ -6,6 +6,13 @@ export type DiscountAppliesTo =
   | "content_brief"
   | "all";
 
+export interface DiscountDrTier {
+  id: string;
+  label: string;
+  price_per_link: number;
+  is_active: boolean;
+}
+
 export interface Discount {
   id: string;
   name: string;
@@ -15,6 +22,8 @@ export interface Discount {
   min_quantity: number;
   applies_to: DiscountAppliesTo;
   is_active: boolean;
+  dr_tier_ids: string[];
+  dr_tiers: DiscountDrTier[];
   created_at: string;
   updated_at: string;
 }
@@ -36,6 +45,7 @@ export interface CreateDiscountPayload {
   min_quantity: number;
   applies_to: DiscountAppliesTo;
   is_active: boolean;
+  dr_tier_ids?: string[];
 }
 
 export type UpdateDiscountPayload = Partial<CreateDiscountPayload>;
