@@ -84,9 +84,11 @@ export async function updateLinkBuildingOrder(
   id: string,
   payload: LinkBuildingOrderPayload
 ): Promise<LinkBuildingOrderMutationResponse> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { order_id: _oid, ...update_body } = payload;
   return apiClient.put<LinkBuildingOrderMutationResponse>(
     `/api/admin/link-building-orders/${id}`,
-    payload
+    update_body
   );
 }
 
@@ -127,7 +129,7 @@ export function buildLboPayload(row: LinkBuildingOrderRow): LinkBuildingOrderPay
 
   for (const field of URL_FIELDS) {
     if (typeof payload[field] === "string") {
-      (payload as Record<string, string>)[field] = normalizeUrl(payload[field] as string);
+      (payload as unknown as Record<string, string>)[field] = normalizeUrl(payload[field] as string);
     }
   }
 
