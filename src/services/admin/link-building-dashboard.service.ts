@@ -143,7 +143,7 @@ const URL_FIELDS: (keyof LinkBuildingOrderPayload)[] = [
  */
 export function buildLboPayload(row: LinkBuildingOrderRow): LinkBuildingOrderPayload {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { id: _id, days_left: _dl, projected_health: _ph, admin_team_name: _atn, admin_team_color: _atc, created_at: _ca, updated_at: _ua, ...payload } = row;
+  const { id: _id, admin_team_name: _atn, admin_team_color: _atc, created_at: _ca, updated_at: _ua, ...payload } = row;
 
   for (const field of URL_FIELDS) {
     if (typeof payload[field] === "string") {
