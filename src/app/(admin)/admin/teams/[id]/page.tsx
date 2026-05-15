@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   description: "View and manage team members.",
 };
 
-export default function AdminTeamDetailPage({ params }: { params: { id: string } }) {
-  return <AdminTeamDetail team_id={params.id} />;
+export default async function AdminTeamDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return <AdminTeamDetail team_id={id} />;
 }
