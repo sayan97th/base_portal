@@ -42,6 +42,8 @@ export interface LinkBuildingOrderRow {
   admin_team_name?: string | null;
   /** Derived: team hex color, returned by API but not sent in payloads. */
   admin_team_color?: string | null;
+  /** Derived: status of the parent LinkBuildingOrder (only for client-purchased placements). */
+  parent_order_status?: string | null;
   created_at?: string;
   updated_at?: string;
 }

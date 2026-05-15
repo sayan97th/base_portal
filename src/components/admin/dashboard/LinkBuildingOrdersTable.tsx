@@ -543,6 +543,7 @@ export default function LinkBuildingOrdersTable() {
   const [teams, setTeams] = useState<AdminTeamOption[]>([]);
   const [is_loading, setIsLoading] = useState(true);
   const [save_error, setSaveError] = useState<string | null>(null);
+  const [notification_banner, setNotificationBanner] = useState<string | null>(null);
   const [editing_cell, setEditingCell] = useState<{ row_id: string; col_key: string } | null>(null);
   const [selected_row_id, setSelectedRowId] = useState<string | null>(null);
   const [saving_row_ids, setSavingRowIds] = useState<Set<string>>(new Set());
@@ -798,12 +799,25 @@ export default function LinkBuildingOrdersTable() {
     }
   }, []);
 
-  const persistRowUpdate = useCallback(async (row: LinkBuildingOrderRow) => {
+  const persistRowUpdate = useCallback(async (row: LinkBuildingOrderRow, changed_col_key?: string) => {
     markSaving(row.id);
     setSaveError(null);
     try {
       const res = await updateLinkBuildingOrder(row.id, buildLboPayload(row));
       replaceRow(row.id, res.data);
+
+      const triggers_notification =
+        changed_col_key === "status" &&
+        (res.data.user_id != null || res.data.parent_order_status != null);
+
+      if (triggers_notification) {
+        const order_status = res.data.parent_order_status;
+        if (order_status === "completed") {
+          setNotificationBanner("Order marked complete — client email notification queued.");
+        } else {
+          setNotificationBanner("Order status updated — client email notification queued.");
+        }
+      }
     } catch {
       setSaveError(`Failed to save row "${row.order_id}". Changes may not have been saved.`);
     } finally {
@@ -828,7 +842,7 @@ export default function LinkBuildingOrdersTable() {
     if (new_row_ids_ref.current.has(row.id)) {
       persistNewRow(row);
     } else {
-      persistRowUpdate(row);
+      persistRowUpdate(row, cell.col_key);
     }
   }, [persistNewRow, persistRowUpdate]);
 
@@ -1100,6 +1114,26 @@ export default function LinkBuildingOrdersTable() {
           <button
             onClick={() => setSaveError(null)}
             className="ml-4 rounded p-0.5 text-red-400 hover:text-red-600"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* Notification banner — email queued for client */}
+      {notification_banner && (
+        <div className="flex items-center justify-between border-b border-green-100 bg-green-50 px-4 py-2 dark:border-green-900/30 dark:bg-green-900/20">
+          <div className="flex items-center gap-2">
+            <svg className="h-3.5 w-3.5 shrink-0 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            <p className="text-xs text-green-700 dark:text-green-400">{notification_banner}</p>
+          </div>
+          <button
+            onClick={() => setNotificationBanner(null)}
+            className="ml-4 rounded p-0.5 text-green-500 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
           >
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -1414,6 +1448,24 @@ export default function LinkBuildingOrdersTable() {
                             {row_collaborators.length > 0 && (
                               <RowPresenceIndicator editors={row_collaborators} />
                             )}
+                            {!is_new && row.parent_order_status && (() => {
+                              const is_completed = row.parent_order_status === "completed";
+                              return (
+                                <span
+                                  className={`flex cursor-default items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${
+                                    is_completed
+                                      ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                      : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                                  }`}
+                                  title={`Client order — parent order is ${row.parent_order_status}`}
+                                >
+                                  <svg className="h-2.5 w-2.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                  </svg>
+                                  {is_completed ? "Done" : "Active"}
+                                </span>
+                              );
+                            })()}
                             {is_new && (() => {
                               const missing = getRowMissingRequired(row);
                               return missing.length > 0 ? (
