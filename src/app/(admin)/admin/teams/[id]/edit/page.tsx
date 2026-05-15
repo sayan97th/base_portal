@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   description: "Edit an existing admin team.",
 };
 
-export default function AdminEditTeamPage({ params }: { params: { id: string } }) {
-  return <AdminTeamForm mode="edit" team_id={params.id} />;
+export default async function AdminEditTeamPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return <AdminTeamForm mode="edit" team_id={id} />;
 }
