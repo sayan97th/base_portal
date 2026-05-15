@@ -34,6 +34,8 @@ export interface LinkBuildingOrderRow {
   lb_tl_approval: string;
   approval_date: string;
   final_price: string;
+  /** Optional: links this standalone admin row to a specific client user account. */
+  user_id?: number | null;
   created_at?: string;
   updated_at?: string;
 }
