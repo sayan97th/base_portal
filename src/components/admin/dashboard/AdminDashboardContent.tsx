@@ -15,6 +15,7 @@ import type {
   TeamMemberHealth,
 } from "@/types/admin/backlink-order";
 import BacklinkOrdersTable from "./BacklinkOrdersTable";
+import LinkBuildingOrdersTable from "./LinkBuildingOrdersTable";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -308,6 +309,9 @@ export default function AdminDashboardContent() {
           </>
         )}
       </div>
+
+      {/* Link Building Orders — full-width editable tracking table */}
+      <LinkBuildingOrdersTable />
 
       {/* Backlink Orders — full-width editable tracking table */}
       <BacklinkOrdersTable />

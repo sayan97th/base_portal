@@ -1,0 +1,118 @@
+// ── Link Building Order Row ────────────────────────────────────────────────────
+
+export interface LinkBuildingOrderRow {
+  id: string;
+  order_id: string;
+  team_specific_link_id: string;
+  link_type: string;
+  client: string;
+  keyword: string;
+  landing_page: string;
+  exact_match: string;
+  notes: string;
+  request_date: string;
+  estimated_delivery_date: string;
+  estimated_turnaround_days: string;
+  /** Computed by the backend: (estimated_delivery_date - today) in days, signed string e.g. "-14" */
+  days_left: string;
+  /** Computed by the backend: (days_left / estimated_turnaround_days) * 100, e.g. "75%" */
+  projected_health: string;
+  link_builder: string;
+  pen_name: string;
+  partnership: string;
+  article_title: string;
+  article: string;
+  status: string;
+  live_link: string;
+  live_link_date: string;
+  dr_lbs: string;
+  posting_fee_lbs: string;
+  current_traffic: string;
+  dr_formula: string;
+  current_poc: string;
+  current_price: string;
+  lb_tl_approval: string;
+  approval_date: string;
+  final_price: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** Fields sent to the backend — computed fields and id are excluded. */
+export type LinkBuildingOrderPayload = Omit<
+  LinkBuildingOrderRow,
+  "id" | "days_left" | "projected_health" | "created_at" | "updated_at"
+>;
+
+// ── API response shapes ────────────────────────────────────────────────────────
+
+export interface LinkBuildingOrdersResponse {
+  data: LinkBuildingOrderRow[];
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+  from: number | null;
+  to: number | null;
+}
+
+export interface LinkBuildingOrderMutationResponse {
+  message: string;
+  data: LinkBuildingOrderRow;
+}
+
+export interface LinkBuildingOrderDeleteResponse {
+  message: string;
+}
+
+// ── Search / filter / sort payload (sent as POST body) ────────────────────────
+
+export interface SortRulePayload {
+  key: string;
+  direction: "asc" | "desc";
+  nulls_last?: boolean;
+}
+
+export interface TextColumnFilterPayload {
+  key: string;
+  type: "text";
+  value: string;
+}
+
+export interface SelectColumnFilterPayload {
+  key: string;
+  type: "select";
+  values: string[];
+}
+
+export interface NumberColumnFilterPayload {
+  key: string;
+  type: "number";
+  min: string;
+  max: string;
+}
+
+export interface DateColumnFilterPayload {
+  key: string;
+  type: "date";
+  from: string;
+  to: string;
+}
+
+export type ColumnFilterPayload =
+  | TextColumnFilterPayload
+  | SelectColumnFilterPayload
+  | NumberColumnFilterPayload
+  | DateColumnFilterPayload;
+
+export interface LinkBuildingOrderSearchBody {
+  page?: number;
+  per_page?: number;
+  search?: string;
+  status?: string;
+  link_type?: string;
+  client?: string;
+  link_builder?: string;
+  sort_rules?: SortRulePayload[];
+  column_filters?: ColumnFilterPayload[];
+}
