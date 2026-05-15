@@ -13,10 +13,6 @@ export interface LinkBuildingOrderRow {
   request_date: string;
   estimated_delivery_date: string;
   estimated_turnaround_days: string;
-  /** Computed by the backend: (estimated_delivery_date - today) in days, signed string e.g. "-14" */
-  days_left: string;
-  /** Computed by the backend: (days_left / estimated_turnaround_days) * 100, e.g. "75%" */
-  projected_health: string;
   link_builder: string;
   pen_name: string;
   partnership: string;
@@ -51,7 +47,7 @@ export interface LinkBuildingOrderRow {
 /** Fields sent to the backend — computed/derived fields and id are excluded. */
 export type LinkBuildingOrderPayload = Omit<
   LinkBuildingOrderRow,
-  "id" | "days_left" | "projected_health" | "admin_team_name" | "admin_team_color" | "created_at" | "updated_at"
+  "id" | "admin_team_name" | "admin_team_color" | "created_at" | "updated_at"
 >;
 
 // ── API response shapes ────────────────────────────────────────────────────────

@@ -33,7 +33,6 @@ type ColumnGroup =
   | "team_link"
   | "core"
   | "dates"
-  | "health"
   | "writer"
   | "status_col"
   | "live"
@@ -86,8 +85,6 @@ const COLUMNS: ColumnDef[] = [
   { key: "request_date",              label: "Request Date",            group: "dates",      min_width: 120,  type: "date",   locked: true },
   { key: "estimated_delivery_date",   label: "Estimated Delivery Date", group: "dates",      min_width: 175,  type: "date",   locked: true },
   { key: "estimated_turnaround_days", label: "Est. Turnaround (Days)",  group: "dates",      min_width: 155,  type: "number", locked: true },
-  { key: "days_left",                 label: "Days Left",               group: "health",     min_width: 90,   type: "number", sortable: false },
-  { key: "projected_health",          label: "Projected Health",        group: "health",     min_width: 130,  type: "text",   sortable: false },
   { key: "link_builder",              label: "Link Builder",            group: "writer",     min_width: 170,  type: "text" },
   { key: "pen_name",                  label: "Pen Name",                group: "writer",     min_width: 120,  type: "text" },
   { key: "partnership",               label: "Partnership",             group: "writer",     min_width: 180,  type: "url" },
@@ -113,7 +110,6 @@ const GROUP_HEADER_STYLES: Record<ColumnGroup, string> = {
   team_link:  "bg-pink-600 text-white border-pink-700",
   core:       "bg-gray-700 text-white border-gray-600",
   dates:      "bg-amber-700 text-white border-amber-800",
-  health:     "bg-yellow-400 text-gray-900 border-yellow-500",
   writer:     "bg-gray-200 text-gray-800 border-gray-300 dark:bg-gray-600 dark:text-gray-100 dark:border-gray-500",
   status_col: "bg-purple-700 text-white border-purple-800",
   live:       "bg-rose-400 text-white border-rose-500",
@@ -197,8 +193,6 @@ function createEmptyRow(): LinkBuildingOrderRow {
     request_date:              "",
     estimated_delivery_date:   "",
     estimated_turnaround_days: "30",
-    days_left:                 "",
-    projected_health:          "",
     link_builder:              "",
     pen_name:                  "",
     partnership:               "",
@@ -292,11 +286,6 @@ function isDateOverdue(date_str: string): boolean {
     `${parts[2]}-${parts[0].padStart(2, "0")}-${parts[1].padStart(2, "0")}`
   );
   return !isNaN(date.getTime()) && date < new Date();
-}
-
-function isDaysNegative(days_str: string): boolean {
-  const n = parseInt(days_str, 10);
-  return !isNaN(n) && n < 0;
 }
 
 // ── Editable cell ──────────────────────────────────────────────────────────────
@@ -413,8 +402,6 @@ function EditableCell({
     );
   } else if (col.key === "estimated_delivery_date" && isDateOverdue(value)) {
     display = <span className="font-semibold text-red-500">{value}</span>;
-  } else if (col.key === "days_left" && isDaysNegative(value)) {
-    display = <span className="font-semibold text-red-500">{value}</span>;
   } else if (col.key === "status" && value) {
     const status_map: Record<string, string> = {
       "New Request":     "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
@@ -443,17 +430,6 @@ function EditableCell({
     } else {
       display = <span className="text-gray-300">—</span>;
     }
-  } else if (col.key === "projected_health" && value) {
-    const is_negative = value.startsWith("-");
-    display = (
-      <span
-        className={`font-medium ${
-          is_negative ? "text-red-500" : "text-green-600 dark:text-green-400"
-        }`}
-      >
-        {value}
-      </span>
-    );
   } else {
     display = value ? (
       <span title={value}>{value}</span>
