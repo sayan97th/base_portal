@@ -12,6 +12,8 @@ import {
   deleteLinkBuildingOrder,
   buildLboPayload,
   exportLinkBuildingOrders,
+  listTeamsForSelect,
+  type AdminTeamOption,
 } from "@/services/admin/link-building-dashboard.service";
 import type { LinkBuildingOrderSearchBody, ColumnFilterPayload } from "@/types/admin/link-building-order";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -214,7 +216,70 @@ function createEmptyRow(): LinkBuildingOrderRow {
     lb_tl_approval:            "",
     approval_date:             "",
     final_price:               "",
+    admin_team_id:             null,
   };
+}
+
+// ── Team assign cell ───────────────────────────────────────────────────────────
+
+interface TeamAssignCellProps {
+  admin_team_id: string | null | undefined;
+  teams: AdminTeamOption[];
+  is_editing: boolean;
+  onStartEdit: () => void;
+  onUpdate: (value: string) => void;
+  onStopEdit: () => void;
+}
+
+function TeamAssignCell({
+  admin_team_id,
+  teams,
+  is_editing,
+  onStartEdit,
+  onUpdate,
+  onStopEdit,
+}: TeamAssignCellProps) {
+  const selected_team = teams.find((t) => t.id === admin_team_id);
+
+  if (is_editing) {
+    return (
+      <td className="p-0" style={{ minWidth: 160 }}>
+        <select
+          autoFocus
+          value={admin_team_id ?? ""}
+          onChange={(e) => onUpdate(e.target.value)}
+          onBlur={onStopEdit}
+          className="h-full w-full border-2 border-brand-500 bg-white px-2 py-1.5 text-xs outline-none dark:bg-gray-800 dark:text-white"
+          style={{ minWidth: 160 }}
+        >
+          <option value="">— Unassigned —</option>
+          {teams.map((t) => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </select>
+      </td>
+    );
+  }
+
+  return (
+    <td
+      className="cursor-pointer whitespace-nowrap px-2 py-1.5 text-xs hover:bg-blue-50 dark:hover:bg-blue-900/20"
+      style={{ minWidth: 160 }}
+      onClick={onStartEdit}
+      title="Click to assign a team"
+    >
+      {selected_team ? (
+        <span
+          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium text-white"
+          style={{ backgroundColor: selected_team.color }}
+        >
+          {selected_team.name}
+        </span>
+      ) : (
+        <span className="text-gray-300 dark:text-gray-600">— Unassigned —</span>
+      )}
+    </td>
+  );
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -475,6 +540,7 @@ function TableSkeleton() {
 
 export default function LinkBuildingOrdersTable() {
   const [rows, setRows] = useState<LinkBuildingOrderRow[]>([]);
+  const [teams, setTeams] = useState<AdminTeamOption[]>([]);
   const [is_loading, setIsLoading] = useState(true);
   const [save_error, setSaveError] = useState<string | null>(null);
   const [editing_cell, setEditingCell] = useState<{ row_id: string; col_key: string } | null>(null);
@@ -623,6 +689,12 @@ export default function LinkBuildingOrdersTable() {
 
     prev_activity_ref.current = { editing: editing_cell, selected: selected_row_id };
   }, [editing_cell, selected_row_id, sendRowFocus, sendRowBlur, sendRowSelect]);
+
+  // ── Fetch teams for assign-team dropdown ────────────────────────────────────
+
+  useEffect(() => {
+    listTeamsForSelect().then(setTeams).catch(() => {/* non-critical */});
+  }, []);
 
   // ── Fetch ───────────────────────────────────────────────────────────────────
 
@@ -1118,7 +1190,7 @@ export default function LinkBuildingOrdersTable() {
                   const is_sortable        = col.sortable !== false;
                   const sort_rule          = sort_rules.find((r) => r.key === effective_sort_key);
                   const sort_priority      = sort_rules.findIndex((r) => r.key === effective_sort_key);
-                  const col_filter         = column_filters[col.key];
+                  const col_filter         = column_filters[col.key as Parameters<typeof setFilter>[0]];
                   const filter_is_active   = col_filter ? isFilterActive(col_filter) : false;
 
                   return (
@@ -1227,6 +1299,12 @@ export default function LinkBuildingOrdersTable() {
                   );
                 })}
                 <th
+                  className="border border-gray-700/30 bg-indigo-700 px-2 py-1.5 text-left text-xs font-semibold text-white"
+                  style={{ minWidth: 160 }}
+                >
+                  Assign Team
+                </th>
+                <th
                   aria-label="Row actions"
                   className="w-px border border-gray-700/30 bg-gray-800 px-2 py-2 text-center text-xs font-semibold text-white"
                 >
@@ -1240,7 +1318,7 @@ export default function LinkBuildingOrdersTable() {
               {filtered_rows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={visible_columns.length + 1}
+                    colSpan={visible_columns.length + 2}
                     className="px-6 py-14 text-center text-sm text-gray-400 dark:text-gray-500"
                   >
                     {search || status_filter || link_type_filter || client_filter || link_builder_filter
@@ -1308,6 +1386,16 @@ export default function LinkBuildingOrdersTable() {
                           />
                         );
                       })}
+                      {/* Team assign cell */}
+                      <TeamAssignCell
+                        admin_team_id={row.admin_team_id}
+                        teams={teams}
+                        is_editing={editing_cell?.row_id === row.id && editing_cell?.col_key === "admin_team_id"}
+                        onStartEdit={() => startEditing(row.id, "admin_team_id")}
+                        onUpdate={(val) => updateCell(row.id, "admin_team_id" as keyof LinkBuildingOrderRow, val)}
+                        onStopEdit={stopEditing}
+                      />
+
                       {/* Actions cell */}
                       <td className="w-px whitespace-nowrap border-l border-gray-100 px-2 py-1.5 dark:border-gray-800">
                         {is_saving ? (
@@ -1382,9 +1470,9 @@ export default function LinkBuildingOrdersTable() {
           col_label={COLUMNS.find((c) => c.key === open_filter_col)?.label ?? open_filter_col}
           col_type={COLUMNS.find((c) => c.key === open_filter_col)?.type ?? "text"}
           col_options={COLUMNS.find((c) => c.key === open_filter_col)?.options}
-          current_filter={column_filters[open_filter_col]}
+          current_filter={column_filters[open_filter_col as Parameters<typeof setFilter>[0]]}
           anchor_el={filter_anchor_el}
-          onSetFilter={(filter) => setFilter(open_filter_col, filter)}
+          onSetFilter={(filter) => setFilter(open_filter_col as Parameters<typeof setFilter>[0], filter)}
           onClose={() => {
             setOpenFilterCol(null);
             setFilterAnchorEl(null);

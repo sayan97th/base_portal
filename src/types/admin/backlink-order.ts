@@ -142,16 +142,18 @@ export interface DashboardSummary {
 // ── Team widgets ───────────────────────────────────────────────────────────────
 
 export interface TeamMemberCapacity {
-  user_id: number;
+  team_id: string;
   name: string;
+  color: string;
   capacity_pct: number;
   total_assigned: number;
   max_capacity: number;
 }
 
 export interface TeamMemberHealth {
-  user_id: number;
+  team_id: string;
   name: string;
+  color: string;
   health_pct: number;
   links_on_track: number;
   total_links: number;

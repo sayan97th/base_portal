@@ -36,14 +36,20 @@ export interface LinkBuildingOrderRow {
   final_price: string;
   /** Optional: links this standalone admin row to a specific client user account. */
   user_id?: number | null;
+  /** Admin team responsible for this placement (UUID of admin_teams record). */
+  admin_team_id?: string | null;
+  /** Derived: team name, returned by API but not sent in payloads. */
+  admin_team_name?: string | null;
+  /** Derived: team hex color, returned by API but not sent in payloads. */
+  admin_team_color?: string | null;
   created_at?: string;
   updated_at?: string;
 }
 
-/** Fields sent to the backend — computed fields and id are excluded. */
+/** Fields sent to the backend — computed/derived fields and id are excluded. */
 export type LinkBuildingOrderPayload = Omit<
   LinkBuildingOrderRow,
-  "id" | "days_left" | "projected_health" | "created_at" | "updated_at"
+  "id" | "days_left" | "projected_health" | "admin_team_name" | "admin_team_color" | "created_at" | "updated_at"
 >;
 
 // ── API response shapes ────────────────────────────────────────────────────────

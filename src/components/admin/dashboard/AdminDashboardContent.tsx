@@ -19,11 +19,11 @@ import LinkBuildingOrdersTable from "./LinkBuildingOrdersTable";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function capacityColor(pct: number): string {
-  if (pct >= 90) return "bg-orange-500";
-  if (pct >= 70) return "bg-yellow-500";
-  if (pct >= 50) return "bg-green-500";
-  return "bg-blue-400";
+function capacityTextColor(pct: number): string {
+  if (pct >= 90) return "text-orange-500";
+  if (pct >= 70) return "text-yellow-500";
+  if (pct >= 50) return "text-green-500";
+  return "text-blue-400";
 }
 
 function healthColor(pct: number): string {
@@ -107,26 +107,42 @@ function TeamCapacityWidget({ members }: { members: TeamMemberCapacity[] }) {
       <h2 className="mb-5 text-base font-semibold text-gray-900 dark:text-white">
         Team Capacity
       </h2>
-      <div className="space-y-4">
-        {members.map((member) => (
-          <div key={member.user_id}>
-            <div className="mb-1.5 flex items-center justify-between text-xs">
-              <span className="font-medium text-gray-700 dark:text-gray-300">
-                {member.name}
-              </span>
-              <span className="tabular-nums text-gray-500 dark:text-gray-400">
-                {member.total_assigned} / {member.max_capacity}
-              </span>
+      {members.length === 0 ? (
+        <p className="text-center text-xs text-gray-400 dark:text-gray-500">
+          No active teams configured.
+        </p>
+      ) : (
+        <div className="space-y-4">
+          {members.map((member) => (
+            <div key={member.team_id}>
+              <div className="mb-1.5 flex items-center justify-between text-xs">
+                <span className="flex items-center gap-2 font-medium text-gray-700 dark:text-gray-300">
+                  <span
+                    className="inline-block h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: member.color }}
+                  />
+                  {member.name}
+                </span>
+                <span className="flex items-center gap-1.5 tabular-nums text-gray-500 dark:text-gray-400">
+                  {member.total_assigned} / {member.max_capacity}
+                  <span className={`font-semibold ${capacityTextColor(member.capacity_pct)}`}>
+                    {member.capacity_pct}%
+                  </span>
+                </span>
+              </div>
+              <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                <div
+                  className="h-full rounded-full transition-all duration-700"
+                  style={{
+                    width: `${Math.min(member.capacity_pct, 100)}%`,
+                    backgroundColor: member.color,
+                  }}
+                />
+              </div>
             </div>
-            <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
-              <div
-                className={`h-full rounded-full transition-all duration-700 ${capacityColor(member.capacity_pct)}`}
-                style={{ width: `${Math.min(member.capacity_pct, 100)}%` }}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -139,37 +155,50 @@ function TeamHealthWidget({ members }: { members: TeamMemberHealth[] }) {
       <h2 className="mb-5 text-base font-semibold text-gray-900 dark:text-white">
         Team Health
       </h2>
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs">
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-            {members.map((member) => (
-              <tr key={member.user_id}>
-                <td className="py-2.5 pr-4 font-medium text-gray-700 dark:text-gray-300">
-                  {member.name}
-                </td>
-                <td className="py-2.5 pr-4">
-                  <span className={`tabular-nums font-semibold ${healthColor(member.health_pct)}`}>
-                    {member.health_pct}%
-                  </span>
-                </td>
-                <td className="py-2.5 pr-4 tabular-nums text-gray-500 dark:text-gray-400">
-                  {member.links_on_track}/{member.total_links} links on track
-                </td>
-                <td className="py-2.5 text-right">
-                  <span
-                    className={`tabular-nums font-medium ${member.links_delayed === 0
-                        ? "text-green-500 dark:text-green-400"
-                        : "text-orange-500"
+      {members.length === 0 ? (
+        <p className="text-center text-xs text-gray-400 dark:text-gray-500">
+          No active teams configured.
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+              {members.map((member) => (
+                <tr key={member.team_id}>
+                  <td className="py-2.5 pr-4">
+                    <span className="flex items-center gap-2 font-medium text-gray-700 dark:text-gray-300">
+                      <span
+                        className="inline-block h-2.5 w-2.5 rounded-full"
+                        style={{ backgroundColor: member.color }}
+                      />
+                      {member.name}
+                    </span>
+                  </td>
+                  <td className="py-2.5 pr-4">
+                    <span className={`tabular-nums font-semibold ${healthColor(member.health_pct)}`}>
+                      {member.health_pct}%
+                    </span>
+                  </td>
+                  <td className="py-2.5 pr-4 tabular-nums text-gray-500 dark:text-gray-400">
+                    {member.links_on_track}/{member.total_links} on track
+                  </td>
+                  <td className="py-2.5 text-right">
+                    <span
+                      className={`tabular-nums font-medium ${
+                        member.links_delayed === 0
+                          ? "text-green-500 dark:text-green-400"
+                          : "text-orange-500"
                       }`}
-                  >
-                    {member.links_delayed} links delayed
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                    >
+                      {member.links_delayed} delayed
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
