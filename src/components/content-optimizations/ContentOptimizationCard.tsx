@@ -1,13 +1,12 @@
 import React from "react";
 import type { ContentOptimizationTier } from "@/types/client/content-optimization";
+import QuantityStepper from "@/components/shared/QuantityStepper";
 
 interface ContentOptimizationCardProps {
   tier: ContentOptimizationTier;
   quantity: number;
   onQuantityChange: (quantity: number) => void;
 }
-
-const quantity_options = Array.from({ length: 20 }, (_, i) => i + 1);
 
 const ContentOptimizationCard: React.FC<ContentOptimizationCardProps> = ({
   tier,
@@ -24,15 +23,10 @@ const ContentOptimizationCard: React.FC<ContentOptimizationCardProps> = ({
     }
   };
 
-  const handleQuantitySelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    e.stopPropagation();
-    onQuantityChange(Number(e.target.value));
-  };
-
   return (
     <div
       onClick={handleToggle}
-      className={`relative cursor-pointer rounded-2xl border bg-white p-5 transition-all dark:bg-white/[0.03] ${
+      className={`relative cursor-pointer rounded-2xl border bg-white p-5 transition-all dark:bg-white/3 ${
         is_selected
           ? "border-coral-500 ring-2 ring-coral-500/20 dark:border-coral-500"
           : "border-gray-200 hover:border-gray-300 dark:border-gray-800 dark:hover:border-gray-700"
@@ -69,20 +63,13 @@ const ContentOptimizationCard: React.FC<ContentOptimizationCardProps> = ({
         Turnaround time: {tier.turnaround_days} {tier.turnaround_days === 1 ? "Day" : "Days"}
       </p>
 
-      {/* Quantity Dropdown */}
+      {/* Quantity stepper */}
       {is_selected && (
-        <div className="mb-3" onClick={(e) => e.stopPropagation()}>
-          <select
-            value={quantity}
-            onChange={handleQuantitySelect}
-            className="h-9 rounded-lg border border-gray-300 bg-white px-3 py-1 text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-          >
-            {quantity_options.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
-              </option>
-            ))}
-          </select>
+        <div className="mb-3">
+          <QuantityStepper
+            quantity={quantity}
+            onQuantityChange={onQuantityChange}
+          />
         </div>
       )}
 

@@ -1,5 +1,6 @@
 import React from "react";
 import type { DrTier } from "@/types/client/link-building";
+import QuantityStepper from "@/components/shared/QuantityStepper";
 
 interface DrTierCardProps {
   tier: DrTier;
@@ -38,18 +39,6 @@ const DrTierCard: React.FC<DrTierCardProps> = ({
   const handleCheckToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
     onQuantityChange(is_selected ? 0 : 1);
-  };
-
-  const handleIncrement = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (tier.max_quantity == null || quantity < tier.max_quantity) {
-      onQuantityChange(quantity + 1);
-    }
-  };
-
-  const handleDecrement = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onQuantityChange(Math.max(0, quantity - 1));
   };
 
   return (
@@ -124,9 +113,10 @@ const DrTierCard: React.FC<DrTierCardProps> = ({
             )}
           </div>
         ) : (
-          /* Multi-value tier: +/- quantity controls */
+          /* Multi-value tier: stepper with manual input */
           !is_selected ? (
             <button
+              type="button"
               onClick={(e) => { e.stopPropagation(); onQuantityChange(1); }}
               className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-coral-500 text-coral-500 transition-colors hover:bg-coral-500 hover:text-white"
               aria-label={`Add ${tier.label}`}
@@ -141,39 +131,11 @@ const DrTierCard: React.FC<DrTierCardProps> = ({
               </svg>
             </button>
           ) : (
-            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-              <button
-                onClick={handleDecrement}
-                className="flex h-7 w-7 items-center justify-center rounded-full border border-gray-300 text-gray-500 transition-colors hover:border-coral-400 hover:text-coral-500 dark:border-gray-600 dark:text-gray-400"
-                aria-label="Decrease quantity"
-              >
-                <svg width="10" height="2" viewBox="0 0 10 2" fill="none">
-                  <path
-                    d="M1 1H9"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </button>
-              <span className="min-w-[18px] text-center text-sm font-semibold text-gray-800 dark:text-white/90">
-                {quantity}
-              </span>
-              <button
-                onClick={handleIncrement}
-                className="flex h-7 w-7 items-center justify-center rounded-full bg-coral-500 text-white transition-colors hover:bg-coral-600"
-                aria-label="Increase quantity"
-              >
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                  <path
-                    d="M6 1V11M1 6H11"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </button>
-            </div>
+            <QuantityStepper
+              quantity={quantity}
+              onQuantityChange={onQuantityChange}
+              max_quantity={tier.max_quantity}
+            />
           )
         )}
       </div>

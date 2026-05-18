@@ -1,13 +1,12 @@
 import React from "react";
 import type { NewContentTier } from "@/types/client/new-content";
+import QuantityStepper from "@/components/shared/QuantityStepper";
 
 interface ArticleCardProps {
   tier: NewContentTier;
   quantity: number;
   onQuantityChange: (quantity: number) => void;
 }
-
-const quantity_options = Array.from({ length: 20 }, (_, i) => i + 1);
 
 const ArticleCard: React.FC<ArticleCardProps> = ({
   tier,
@@ -22,11 +21,6 @@ const ArticleCard: React.FC<ArticleCardProps> = ({
     } else {
       onQuantityChange(1);
     }
-  };
-
-  const handleQuantitySelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    e.stopPropagation();
-    onQuantityChange(Number(e.target.value));
   };
 
   return (
@@ -69,20 +63,13 @@ const ArticleCard: React.FC<ArticleCardProps> = ({
         Turnaround Time: {tier.turnaround_time}
       </p>
 
-      {/* Quantity Dropdown */}
+      {/* Quantity stepper */}
       {is_selected && (
-        <div className="mb-3" onClick={(e) => e.stopPropagation()}>
-          <select
-            value={quantity}
-            onChange={handleQuantitySelect}
-            className="h-9 rounded-lg border border-gray-300 bg-white px-3 py-1 text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-          >
-            {quantity_options.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
-              </option>
-            ))}
-          </select>
+        <div className="mb-3">
+          <QuantityStepper
+            quantity={quantity}
+            onQuantityChange={onQuantityChange}
+          />
         </div>
       )}
 
