@@ -272,7 +272,7 @@ export default function SignInForm() {
                       Forgot password?
                     </Link>
                   </div>
-                  <Button className="w-full" size="sm" disabled={is_submitting}>
+                  <Button className="w-full" size="sm" type="submit" disabled={is_submitting}>
                     {is_submitting ? "Signing in…" : "Sign in"}
                   </Button>
                 </div>
@@ -399,6 +399,7 @@ export default function SignInForm() {
                 <Button
                   className="w-full"
                   size="sm"
+                  type="submit"
                   disabled={is_verifying || otp_code.replace(/\s/g, "").length < 6}
                 >
                   {is_verifying ? (
