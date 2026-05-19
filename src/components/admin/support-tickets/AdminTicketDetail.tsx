@@ -732,6 +732,124 @@ function PriorityDropdown({
   );
 }
 
+function ChangeStatusModal({
+  current_status,
+  selected_status,
+  loading,
+  error,
+  onSelect,
+  onConfirm,
+  onClose,
+}: {
+  current_status: TicketStatus;
+  selected_status: TicketStatus;
+  loading: boolean;
+  error: string | null;
+  onSelect: (s: TicketStatus) => void;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const ALL_STATUSES: { status: TicketStatus; label: string; description: string }[] = [
+    { status: "open", label: "Open", description: "Ticket is open and awaiting response" },
+    { status: "in_progress", label: "In Progress", description: "Actively being worked on" },
+    { status: "resolved", label: "Resolved", description: "Issue has been resolved" },
+    { status: "closed", label: "Closed", description: "Ticket is closed" },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-black/50 dark:bg-black/70"
+        onClick={onClose}
+      />
+      <div className="relative z-10 w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900">
+        <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 px-5 py-4">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Change Ticket Status</h2>
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300 transition-colors disabled:opacity-50"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="p-5 space-y-2">
+          {ALL_STATUSES.map(({ status, label, description }) => {
+            const is_current = status === current_status;
+            const is_selected = status === selected_status;
+            return (
+              <button
+                key={status}
+                onClick={() => !is_current && onSelect(status)}
+                disabled={is_current}
+                className={`w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all ${
+                  is_selected
+                    ? "border-brand-400 bg-brand-50 dark:border-brand-500/50 dark:bg-brand-500/10"
+                    : is_current
+                    ? "border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50 cursor-default opacity-60"
+                    : "border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800"
+                }`}
+              >
+                <span className={`h-3 w-3 rounded-full shrink-0 ${status_dot_color_map[status]}`} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-sm font-medium ${is_selected ? "text-brand-700 dark:text-brand-300" : "text-gray-800 dark:text-gray-200"}`}>
+                      {label}
+                    </span>
+                    {is_current && (
+                      <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500">(current)</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{description}</p>
+                </div>
+                {is_selected && !is_current && (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-brand-500 shrink-0">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {error && (
+          <div className="mx-5 mb-4 flex items-center gap-2 rounded-lg border border-error-200 bg-error-50 px-4 py-2.5 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+              <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
+            </svg>
+            {error}
+          </div>
+        )}
+
+        <div className="flex items-center justify-end gap-2 border-t border-gray-100 dark:border-gray-800 px-5 py-4">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="rounded-lg border border-gray-300 dark:border-gray-700 px-4 py-2 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={loading || selected_status === current_status}
+            className="rounded-lg bg-brand-500 px-4 py-2 text-xs font-medium text-white hover:bg-brand-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+          >
+            {loading && (
+              <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+            )}
+            {loading ? "Updating…" : "Confirm Change"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function getActionIcon(status: TicketStatus): React.ReactNode {
   if (status === "in_progress") return (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

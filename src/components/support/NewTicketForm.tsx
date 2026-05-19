@@ -130,7 +130,6 @@ const NewTicketForm: React.FC = () => {
             Cancel
           </button>
           <Button
-            type="button"
             variant="coral"
             size="sm"
             onClick={handleSubmit}
