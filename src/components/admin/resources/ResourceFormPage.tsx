@@ -6,6 +6,7 @@ import Link from "next/link";
 import type {
   AdminResource,
   AdminResourceFile,
+  AssignedClient,
   ResourceCategory,
   ResourceStatus,
   CreateResourcePayload,
@@ -16,6 +17,7 @@ import {
   getAdminResource,
   uploadAdminResourceFile,
   deleteAdminResourceFile,
+  fetchAssignableClients,
 } from "@/services/admin/resources.service";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -66,7 +68,8 @@ interface FormFields {
   description: string;
   category: ResourceCategory;
   status: ResourceStatus;
-  organization_id: string;
+  is_hidden: boolean;
+  client_ids: number[];
 }
 
 interface FormErrors {
@@ -82,7 +85,8 @@ function getEmptyForm(): FormFields {
     description: "",
     category: "document",
     status: "draft",
-    organization_id: "",
+    is_hidden: false,
+    client_ids: [],
   };
 }
 
@@ -92,7 +96,8 @@ function formFromResource(resource: AdminResource): FormFields {
     description: resource.description ?? "",
     category: resource.category,
     status: resource.status,
-    organization_id: resource.organization_id ? String(resource.organization_id) : "",
+    is_hidden: resource.is_hidden,
+    client_ids: (resource.assigned_clients ?? []).map((c) => c.id),
   };
 }
 
@@ -417,6 +422,345 @@ function DropZone({ onFiles }: { onFiles: (files: File[]) => void }) {
   );
 }
 
+// ── Client Assignment Section ─────────────────────────────────────────────────
+
+function ClientAssignmentSection({
+  is_hidden,
+  client_ids,
+  assigned_clients_data,
+  onHiddenChange,
+  onClientIdsChange,
+}: {
+  is_hidden: boolean;
+  client_ids: number[];
+  assigned_clients_data: AssignedClient[];
+  onHiddenChange: (v: boolean) => void;
+  onClientIdsChange: (ids: number[]) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [results, setResults] = useState<AssignedClient[]>([]);
+  const [is_searching, setIsSearching] = useState(false);
+  const [show_dropdown, setShowDropdown] = useState(false);
+  const search_ref = useRef<HTMLInputElement>(null);
+  const dropdown_ref = useRef<HTMLDivElement>(null);
+  const debounce_timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // selected clients = full objects sourced from assigned_clients_data + any from search results
+  const [known_clients, setKnownClients] = useState<AssignedClient[]>(assigned_clients_data);
+
+  useEffect(() => {
+    // merge new data into known_clients when prop changes (e.g. after resource load)
+    setKnownClients((prev) => {
+      const merged = [...prev];
+      for (const c of assigned_clients_data) {
+        if (!merged.find((m) => m.id === c.id)) merged.push(c);
+      }
+      return merged;
+    });
+  }, [assigned_clients_data]);
+
+  const selected_clients = known_clients.filter((c) => client_ids.includes(c.id));
+
+  const handleSearch = (value: string) => {
+    setSearch(value);
+    if (debounce_timer.current) clearTimeout(debounce_timer.current);
+
+    if (!value.trim()) {
+      setResults([]);
+      setShowDropdown(false);
+      return;
+    }
+
+    setIsSearching(true);
+    setShowDropdown(true);
+    debounce_timer.current = setTimeout(async () => {
+      try {
+        const data = await fetchAssignableClients(value);
+        setResults(data);
+        // merge into known so we can resolve names when selected
+        setKnownClients((prev) => {
+          const merged = [...prev];
+          for (const c of data) {
+            if (!merged.find((m) => m.id === c.id)) merged.push(c);
+          }
+          return merged;
+        });
+      } catch {
+        setResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+  };
+
+  const addClient = (client: AssignedClient) => {
+    if (!client_ids.includes(client.id)) {
+      onClientIdsChange([...client_ids, client.id]);
+    }
+    setSearch("");
+    setResults([]);
+    setShowDropdown(false);
+    search_ref.current?.focus();
+  };
+
+  const removeClient = (id: number) => {
+    onClientIdsChange(client_ids.filter((cid) => cid !== id));
+  };
+
+  // close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        dropdown_ref.current &&
+        !dropdown_ref.current.contains(e.target as Node) &&
+        search_ref.current &&
+        !search_ref.current.contains(e.target as Node)
+      ) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const visibility_mode: "hidden" | "restricted" | "public" = is_hidden
+    ? "hidden"
+    : client_ids.length > 0
+    ? "restricted"
+    : "public";
+
+  const visibility_config = {
+    hidden: {
+      label: "Hidden",
+      description: "No client can access this resource.",
+      icon_bg: "bg-red-50 dark:bg-red-500/10",
+      icon_color: "text-red-500 dark:text-red-400",
+      badge: "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400",
+      dot: "bg-red-500",
+    },
+    restricted: {
+      label: "Restricted",
+      description: `Only ${client_ids.length} selected ${client_ids.length === 1 ? "client" : "clients"} can view this.`,
+      icon_bg: "bg-amber-50 dark:bg-amber-500/10",
+      icon_color: "text-amber-500 dark:text-amber-400",
+      badge: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400",
+      dot: "bg-amber-500",
+    },
+    public: {
+      label: "Public",
+      description: "All active clients can view this resource.",
+      icon_bg: "bg-emerald-50 dark:bg-emerald-500/10",
+      icon_color: "text-emerald-500 dark:text-emerald-400",
+      badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400",
+      dot: "bg-emerald-500",
+    },
+  }[visibility_mode];
+
+  return (
+    <SectionCard
+      title="Client Assignment"
+      description="Control which clients can access this resource."
+      icon={
+        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+        </svg>
+      }
+    >
+      {/* Visibility status badge */}
+      <div className={`flex items-center gap-3 rounded-xl p-3.5 ${visibility_config.icon_bg}`}>
+        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${visibility_config.dot}`} />
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm font-semibold ${visibility_config.icon_color}`}>
+            {visibility_config.label}
+          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            {visibility_config.description}
+          </p>
+        </div>
+        <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${visibility_config.badge}`}>
+          {visibility_mode === "public" ? "All clients" : visibility_mode === "restricted" ? `${client_ids.length} assigned` : "Hidden"}
+        </span>
+      </div>
+
+      {/* Hidden toggle */}
+      <div className="flex items-center justify-between rounded-xl border border-gray-100 px-4 py-3 dark:border-gray-700">
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-700">
+            <svg className="h-4 w-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Hide from all clients</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500">Overrides all assignments — no client can see it.</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => onHiddenChange(!is_hidden)}
+          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+            is_hidden ? "bg-red-500" : "bg-gray-200 dark:bg-gray-700"
+          }`}
+        >
+          <span
+            className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ${
+              is_hidden ? "translate-x-5" : "translate-x-0"
+            }`}
+          />
+        </button>
+      </div>
+
+      {/* Hidden warning */}
+      {is_hidden && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 dark:border-red-500/30 dark:bg-red-500/10">
+          <svg className="mt-0.5 h-4 w-4 shrink-0 text-red-500 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+          </svg>
+          <p className="text-xs text-red-700 dark:text-red-400">
+            This resource is hidden. No client will see it regardless of assignments below.
+          </p>
+        </div>
+      )}
+
+      {/* Divider */}
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center" aria-hidden="true">
+          <div className="w-full border-t border-gray-100 dark:border-gray-700" />
+        </div>
+        <div className="relative flex justify-center">
+          <span className="bg-white px-3 text-xs text-gray-400 dark:bg-gray-800 dark:text-gray-500">
+            Client selection
+          </span>
+        </div>
+      </div>
+
+      {/* Info block: visibility rules */}
+      <div className="flex items-start gap-2.5 rounded-xl border border-blue-100 bg-blue-50 px-3.5 py-3 dark:border-blue-500/20 dark:bg-blue-500/10">
+        <svg className="mt-0.5 h-4 w-4 shrink-0 text-blue-500 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+        </svg>
+        <p className="text-xs leading-relaxed text-blue-700 dark:text-blue-300">
+          <span className="font-semibold">No clients selected</span> — visible to all clients.{" "}
+          <span className="font-semibold">Clients selected</span> — only those clients will see it.
+        </p>
+      </div>
+
+      {/* Client search */}
+      <div className="relative">
+        <div className="relative">
+          <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400">
+            {is_searching ? (
+              <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            ) : (
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+              </svg>
+            )}
+          </span>
+          <input
+            ref={search_ref}
+            type="text"
+            value={search}
+            onChange={(e) => handleSearch(e.target.value)}
+            onFocus={() => { if (results.length > 0) setShowDropdown(true); }}
+            placeholder="Search clients by name or email…"
+            className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-9 pr-4 text-sm text-gray-800 placeholder-gray-400 transition-colors focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-500"
+          />
+        </div>
+
+        {/* Dropdown results */}
+        {show_dropdown && (
+          <div
+            ref={dropdown_ref}
+            className="absolute z-20 mt-1.5 w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-800"
+          >
+            {results.length === 0 && !is_searching && (
+              <div className="px-4 py-3 text-center text-sm text-gray-400 dark:text-gray-500">
+                No clients found.
+              </div>
+            )}
+            {results.map((client) => {
+              const already_selected = client_ids.includes(client.id);
+              return (
+                <button
+                  key={client.id}
+                  type="button"
+                  onClick={() => !already_selected && addClient(client)}
+                  disabled={already_selected}
+                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors ${
+                    already_selected
+                      ? "cursor-default bg-gray-50 opacity-60 dark:bg-gray-700/50"
+                      : "hover:bg-brand-50 dark:hover:bg-brand-500/10"
+                  }`}
+                >
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                    {client.name.charAt(0).toUpperCase()}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-gray-800 dark:text-white">{client.name}</p>
+                    <p className="truncate text-xs text-gray-400 dark:text-gray-500">{client.email}</p>
+                  </div>
+                  {already_selected && (
+                    <span className="shrink-0 rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-600 dark:bg-brand-500/20 dark:text-brand-400">
+                      Added
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Selected clients chips */}
+      {selected_clients.length > 0 && (
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+            Assigned ({selected_clients.length})
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {selected_clients.map((client) => (
+              <span
+                key={client.id}
+                className="flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 py-1 pl-2.5 pr-1.5 text-xs font-medium text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300"
+              >
+                <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-brand-200 text-[9px] font-bold text-brand-700 dark:bg-brand-500/30 dark:text-brand-300">
+                  {client.name.charAt(0).toUpperCase()}
+                </span>
+                <span className="max-w-[140px] truncate">{client.name}</span>
+                <button
+                  type="button"
+                  onClick={() => removeClient(client.id)}
+                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-brand-500 transition-colors hover:bg-brand-200 hover:text-brand-700 dark:text-brand-400 dark:hover:bg-brand-500/20"
+                  title={`Remove ${client.name}`}
+                >
+                  <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {selected_clients.length === 0 && !is_hidden && (
+        <div className="flex items-center gap-2 rounded-xl border border-dashed border-gray-200 px-3.5 py-3 dark:border-gray-700">
+          <svg className="h-4 w-4 shrink-0 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+          </svg>
+          <p className="text-xs text-gray-400 dark:text-gray-500">
+            No clients selected — resource will be visible to all clients.
+          </p>
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function ResourceFormPage({ mode, resource_id }: ResourceFormPageProps) {
@@ -425,6 +769,9 @@ export default function ResourceFormPage({ mode, resource_id }: ResourceFormPage
   // ── Form State ───────────────────────────────────────────────────────────
   const [form, setForm] = useState<FormFields>(getEmptyForm());
   const [errors, setErrors] = useState<FormErrors>({});
+
+  // holds full AssignedClient objects so names can be shown in chips
+  const [assigned_clients_data, setAssignedClientsData] = useState<AssignedClient[]>([]);
 
   // ── Loading / Save State ─────────────────────────────────────────────────
   const [is_loading_resource, setIsLoadingResource] = useState(mode === "edit");
@@ -447,6 +794,7 @@ export default function ResourceFormPage({ mode, resource_id }: ResourceFormPage
       .then((resource) => {
         setForm(formFromResource(resource));
         setExistingFiles(resource.files ?? []);
+        setAssignedClientsData(resource.assigned_clients ?? []);
       })
       .catch(() => setSaveError("Failed to load resource data."))
       .finally(() => setIsLoadingResource(false));
@@ -528,7 +876,8 @@ export default function ResourceFormPage({ mode, resource_id }: ResourceFormPage
       description: form.description.trim() || null,
       category: form.category,
       status: form.status,
-      organization_id: form.organization_id ? Number(form.organization_id) : null,
+      is_hidden: form.is_hidden,
+      client_ids: form.client_ids,
     };
 
     try {
@@ -542,7 +891,6 @@ export default function ResourceFormPage({ mode, resource_id }: ResourceFormPage
         await updateAdminResource(resource_id_state, payload);
       }
 
-      // Upload staged files
       if (res_id) {
         await uploadStagedFiles(res_id);
       }
@@ -565,6 +913,18 @@ export default function ResourceFormPage({ mode, resource_id }: ResourceFormPage
 
   const has_valid_staged = staged_files.some((f) => !f.error);
   const total_file_count = existing_files.length + staged_files.filter((f) => !f.error).length;
+
+  const visibility_label = form.is_hidden
+    ? "Hidden"
+    : form.client_ids.length > 0
+    ? `${form.client_ids.length} client${form.client_ids.length === 1 ? "" : "s"}`
+    : "All clients";
+
+  const visibility_color = form.is_hidden
+    ? "text-red-600 dark:text-red-400"
+    : form.client_ids.length > 0
+    ? "text-amber-600 dark:text-amber-400"
+    : "text-emerald-600 dark:text-emerald-400";
 
   // ── Loading state ─────────────────────────────────────────────────────────
 
@@ -667,28 +1027,14 @@ export default function ResourceFormPage({ mode, resource_id }: ResourceFormPage
             </Field>
           </SectionCard>
 
-          {/* Organization */}
-          <SectionCard
-            title="Organization Assignment"
-            description="Assign this resource to a specific organization. Leave empty to share with all."
-            icon={
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
-              </svg>
-            }
-          >
-            <Field
-              label="Organization ID"
-              hint="Enter the numeric ID of the target organization, or leave blank for all."
-            >
-              <Input
-                type="number"
-                value={form.organization_id}
-                onChange={(v) => setField("organization_id", v)}
-                placeholder="e.g. 42 (leave blank for all organizations)"
-              />
-            </Field>
-          </SectionCard>
+          {/* Client Assignment */}
+          <ClientAssignmentSection
+            is_hidden={form.is_hidden}
+            client_ids={form.client_ids}
+            assigned_clients_data={assigned_clients_data}
+            onHiddenChange={(v) => setField("is_hidden", v)}
+            onClientIdsChange={(ids) => setField("client_ids", ids)}
+          />
 
           {/* File Attachments */}
           <SectionCard
@@ -852,13 +1198,17 @@ export default function ResourceFormPage({ mode, resource_id }: ResourceFormPage
                   {form.description}
                 </p>
               )}
-              <div className="mt-3 flex items-center gap-2 border-t border-gray-100 pt-2.5 dark:border-gray-700">
+              <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-2.5 dark:border-gray-700">
                 <span className="text-xs text-gray-400 dark:text-gray-500">
                   {total_file_count} {total_file_count === 1 ? "file" : "files"}
                 </span>
                 <span className="text-gray-300 dark:text-gray-600">·</span>
                 <span className={`text-xs font-medium ${form.status === "published" ? "text-emerald-600 dark:text-emerald-400" : "text-gray-400 dark:text-gray-500"}`}>
                   {form.status === "published" ? "Published" : "Draft"}
+                </span>
+                <span className="text-gray-300 dark:text-gray-600">·</span>
+                <span className={`text-xs font-medium ${visibility_color}`}>
+                  {visibility_label}
                 </span>
               </div>
             </div>

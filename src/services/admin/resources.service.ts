@@ -2,6 +2,7 @@ import { apiClient } from "@/lib/api-client";
 import type {
   AdminResource,
   AdminResourceFile,
+  AssignedClient,
   CreateResourcePayload,
   UpdateResourcePayload,
   AdminResourceFilters,
@@ -29,7 +30,7 @@ export async function listAdminResources(
 }
 
 /**
- * Fetch a single resource with all its files.
+ * Fetch a single resource with all its files and assigned clients.
  * Hits GET /api/admin/resources/{id}
  */
 export async function getAdminResource(id: number): Promise<AdminResource> {
@@ -54,7 +55,7 @@ export async function createAdminResource(
 }
 
 /**
- * Update an existing resource's metadata.
+ * Update an existing resource's metadata and client assignments.
  * Hits PATCH /api/admin/resources/{id}
  */
 export async function updateAdminResource(
@@ -120,4 +121,19 @@ export async function deleteAdminResourceFile(
   return apiClient.delete<void>(
     `/api/admin/resources/${resource_id}/files/${file_id}`
   );
+}
+
+/**
+ * Fetch a searchable list of active client users for the assignment select.
+ * Hits GET /api/admin/resources/clients
+ */
+export async function fetchAssignableClients(
+  search?: string
+): Promise<AssignedClient[]> {
+  const params = new URLSearchParams();
+  if (search?.trim()) params.set("search", search.trim());
+  const response = await apiClient.get<{ data: AssignedClient[] }>(
+    `/api/admin/resources/clients?${params.toString()}`
+  );
+  return response.data;
 }

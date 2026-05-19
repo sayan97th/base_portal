@@ -32,14 +32,22 @@ export interface AdminResourceFile {
   download_url: string;
 }
 
+export interface AssignedClient {
+  id: number;
+  name: string;
+  email: string;
+}
+
 export interface AdminResource {
   id: number;
   title: string;
   description?: string | null;
   category: ResourceCategory;
   status: ResourceStatus;
+  is_hidden: boolean;
   organization_id: number | null;
   organization?: { id: number; name: string } | null;
+  assigned_clients: AssignedClient[];
   created_at: string;
   updated_at: string;
   files: AdminResourceFile[];
@@ -50,7 +58,8 @@ export interface CreateResourcePayload {
   description?: string | null;
   category: ResourceCategory;
   status: ResourceStatus;
-  organization_id?: number | null;
+  is_hidden: boolean;
+  client_ids: number[];
 }
 
 export type UpdateResourcePayload = Partial<CreateResourcePayload>;
