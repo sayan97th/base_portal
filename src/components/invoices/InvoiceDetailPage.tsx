@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import Badge from "../ui/badge/Badge";
 import {
@@ -23,11 +24,11 @@ const STATUS_CONFIG: Record<
   string,
   { color: "success" | "warning" | "error" | "info" | "light"; dot: string; label: string }
 > = {
-  paid:    { color: "success", dot: "bg-success-500", label: "Paid" },
-  unpaid:  { color: "warning", dot: "bg-warning-500", label: "Unpaid" },
-  overdue: { color: "error",   dot: "bg-error-500",   label: "Overdue" },
-  refund:  { color: "info",    dot: "bg-blue-500",    label: "Refund" },
-  void:    { color: "light",   dot: "bg-gray-500",    label: "Void" },
+  paid: { color: "success", dot: "bg-success-500", label: "Paid" },
+  unpaid: { color: "warning", dot: "bg-warning-500", label: "Unpaid" },
+  overdue: { color: "error", dot: "bg-error-500", label: "Overdue" },
+  refund: { color: "info", dot: "bg-blue-500", label: "Refund" },
+  void: { color: "light", dot: "bg-gray-500", label: "Void" },
 };
 
 const PRODUCT_TYPE_ORDER: ProductType[] = [
@@ -79,19 +80,17 @@ function PayInvoiceBanner({ invoice }: { invoice: InvoiceDetail }) {
 
   return (
     <div
-      className={`flex flex-col gap-4 rounded-xl border p-5 sm:flex-row sm:items-center sm:justify-between ${
-        is_overdue
-          ? "border-error-200 bg-error-50 dark:border-error-500/30 dark:bg-error-500/10"
-          : "border-warning-200 bg-warning-50 dark:border-warning-500/30 dark:bg-warning-500/10"
-      }`}
+      className={`flex flex-col gap-4 rounded-xl border p-5 sm:flex-row sm:items-center sm:justify-between ${is_overdue
+        ? "border-error-200 bg-error-50 dark:border-error-500/30 dark:bg-error-500/10"
+        : "border-warning-200 bg-warning-50 dark:border-warning-500/30 dark:bg-warning-500/10"
+        }`}
     >
       <div className="flex items-start gap-3">
         <div
-          className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-            is_overdue
-              ? "bg-error-100 dark:bg-error-500/20"
-              : "bg-warning-100 dark:bg-warning-500/20"
-          }`}
+          className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${is_overdue
+            ? "bg-error-100 dark:bg-error-500/20"
+            : "bg-warning-100 dark:bg-warning-500/20"
+            }`}
         >
           <svg
             className={`h-4 w-4 ${is_overdue ? "text-error-600 dark:text-error-400" : "text-warning-600 dark:text-warning-400"}`}
@@ -116,11 +115,10 @@ function PayInvoiceBanner({ invoice }: { invoice: InvoiceDetail }) {
       </div>
       <Link
         href={`/invoices/${invoice.unique_id}/pay`}
-        className={`inline-flex shrink-0 items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold text-white transition-colors ${
-          is_overdue
-            ? "bg-error-600 hover:bg-error-700 dark:bg-error-500 dark:hover:bg-error-600"
-            : "bg-warning-500 hover:bg-warning-600 dark:bg-warning-500 dark:hover:bg-warning-600"
-        }`}
+        className={`inline-flex shrink-0 items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold text-white transition-colors ${is_overdue
+          ? "bg-error-600 hover:bg-error-700 dark:bg-error-500 dark:hover:bg-error-600"
+          : "bg-warning-500 hover:bg-warning-600 dark:bg-warning-500 dark:hover:bg-warning-600"
+          }`}
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
@@ -387,8 +385,24 @@ const InvoiceDetailPage: React.FC<InvoiceDetailPageProps> = ({ invoice_id }) => 
         <div className="flex flex-col justify-between gap-6 sm:flex-row">
           <div>
             <div className="mb-4">
-              <span className="text-2xl font-bold tracking-wide text-gray-900 dark:text-white">BASE</span>
-              <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">SEARCH MARKETING</span>
+              <Image
+                src="/images/logo/base-logo.png"
+                alt="BASE Search Marketing"
+                width={160}
+                height={40}
+                className="dark:hidden"
+                style={{ height: "auto" }}
+                priority
+              />
+              <Image
+                src="/images/logo/base-logo.png"
+                alt="BASE Search Marketing"
+                width={160}
+                height={40}
+                className="hidden dark:block"
+                style={{ height: "auto" }}
+                priority
+              />
             </div>
             <div className="space-y-0.5 text-theme-sm text-gray-500 dark:text-gray-400">
               <p>BASE Search Marketing</p>
