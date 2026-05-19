@@ -1,6 +1,7 @@
 "use client";
 import React, { useCallback, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "../context/SidebarContext";
 import {
@@ -151,18 +152,25 @@ const AppSidebar: React.FC = () => {
         className={`py-8 flex ${!isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
           }`}
       >
-        <Link href="/" className="flex items-center gap-2">
+        <Link href="/" className="flex items-center">
           {showText ? (
-            <span className="text-xl font-bold text-gray-900 dark:text-white">
-              BASE{" "}
-              <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
-                Search Marketing
-              </span>
-            </span>
+            <Image
+              src="/images/logo/base-logo.png"
+              alt="BASE Search Marketing"
+              width={130}
+              height={40}
+              className="object-contain"
+              priority
+            />
           ) : (
-            <span className="text-xl font-bold text-gray-900 dark:text-white">
-              B
-            </span>
+            <Image
+              src="/images/logo/base-logo.png"
+              alt="BASE Search Marketing"
+              width={40}
+              height={40}
+              className="object-contain"
+              priority
+            />
           )}
         </Link>
       </div>
