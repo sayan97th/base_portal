@@ -25,18 +25,18 @@ const CREDIT_PACKAGES: CreditPackage[] = [
     id: "credits_3000",
     name: "One-Time — 3,000 Credits",
     credits: 3000,
-    price: 2700,
+    price: 2640,
     original_price: 3000,
-    discount_pct: 10,
+    discount_pct: 12,
     description: "Perfect for getting started with BASE services.",
   },
   {
     id: "credits_5000",
     name: "One-Time — 5,000 Credits",
     credits: 5000,
-    price: 4500,
+    price: 4400,
     original_price: 5000,
-    discount_pct: 10,
+    discount_pct: 12,
     description: "Our most popular bundle for growing teams.",
     is_popular: true,
   },
@@ -44,9 +44,9 @@ const CREDIT_PACKAGES: CreditPackage[] = [
     id: "credits_10000",
     name: "One-Time — 10,000 Credits",
     credits: 10000,
-    price: 9000,
+    price: 8800,
     original_price: 10000,
-    discount_pct: 10,
+    discount_pct: 12,
     description: "Maximum value for high-volume users.",
   },
 ];
@@ -292,7 +292,7 @@ function SelectPackageStep({
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
           </svg>
           <p className="text-xs text-emerald-700 dark:text-emerald-400">
-            All packages include a <strong>10% bulk discount</strong>. Credits are added to your account
+            All packages include a <strong>12% bulk discount</strong>. Credits are added to your account
             immediately after purchase and can be used across all BASE services.
           </p>
         </div>
@@ -1146,7 +1146,7 @@ function BuyCreditsForm({ packages }: { packages: CreditPackage[] }) {
               <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
               </svg>
-              <span className="text-sm font-semibold text-white">10% bulk discount on all packages</span>
+              <span className="text-sm font-semibold text-white">12% bulk discount on all packages</span>
             </div>
           </div>
         </div>
