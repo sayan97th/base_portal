@@ -12,10 +12,19 @@ export interface AdminTicketClient {
   organization: { id: number; name: string } | null;
 }
 
+export interface AdminUserForSelect {
+  id: number;
+  first_name: string;
+  last_name: string;
+  email: string;
+}
+
 export interface AdminApiTicket extends Omit<ApiTicket, "user"> {
   user: AdminTicketClient;
   messages_count?: number;
   messages?: ApiTicketMessage[];
+  assigned_to: number | null;
+  assigned_admin: AdminUserForSelect | null;
 }
 
 export interface AdminTicketClientStats {
@@ -58,6 +67,7 @@ export interface PaginatedAdminTicketsResponse {
 export interface AdminUpdateTicketPayload {
   status?: TicketStatus;
   priority?: TicketPriority;
+  assigned_to?: number | null;
 }
 
 interface AdminUpdateTicketResponse {
@@ -69,6 +79,10 @@ interface AdminAddMessageResponse {
   message: string;
   ticket_message: ApiTicketMessage;
   support_ticket: AdminApiTicket;
+}
+
+interface AdminUsersForSelectResponse {
+  data: AdminUserForSelect[];
 }
 
 export const adminSupportTicketsService = {
@@ -108,5 +122,23 @@ export const adminSupportTicketsService = {
       `/api/admin/support-tickets/${ticket_id}/messages`,
       { content }
     );
+  },
+
+  async getAdminUsersForSelect(search?: string): Promise<AdminUserForSelect[]> {
+    const params = new URLSearchParams();
+    if (search) params.set("search", search);
+    const query = params.toString();
+    const response = await apiClient.get<AdminUsersForSelectResponse>(
+      `/api/admin/support-tickets/admin-users${query ? `?${query}` : ""}`
+    );
+    return response.data;
+  },
+
+  async assignTicket(ticket_id: number, admin_id: number | null): Promise<AdminApiTicket> {
+    const response = await apiClient.patch<AdminUpdateTicketResponse>(
+      `/api/admin/support-tickets/${ticket_id}`,
+      { assigned_to: admin_id }
+    );
+    return response.support_ticket;
   },
 };

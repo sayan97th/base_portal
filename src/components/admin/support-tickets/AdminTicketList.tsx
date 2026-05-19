@@ -248,6 +248,13 @@ function AdminTicketCard({
 }) {
   const client_name = ticket.user ? getSenderName(ticket.user) : "Unknown Client";
   const org_name = ticket.user?.organization?.name;
+  const assigned = ticket.assigned_admin;
+  const assigned_initials = assigned
+    ? ((assigned.first_name?.[0] ?? "") + (assigned.last_name?.[0] ?? "")).toUpperCase()
+    : null;
+  const assigned_name = assigned
+    ? `${assigned.first_name} ${assigned.last_name}`
+    : null;
 
   return (
     <button
@@ -311,6 +318,19 @@ function AdminTicketCard({
               <span className="text-[11px] text-gray-400 dark:text-gray-500" title={formatTicketDate(ticket.created_at)}>
                 {timeAgo(ticket.created_at)}
               </span>
+
+              {/* Assigned admin badge */}
+              {assigned && assigned_initials && (
+                <span
+                  className="inline-flex items-center gap-1.5 text-[11px] text-indigo-600 dark:text-indigo-400"
+                  title={`Assigned to ${assigned_name}`}
+                >
+                  <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-500/20 text-[9px] font-bold text-indigo-700 dark:text-indigo-300 shrink-0">
+                    {assigned_initials}
+                  </span>
+                  <span className="truncate max-w-[80px]">{assigned_name}</span>
+                </span>
+              )}
             </div>
           </div>
         </div>
