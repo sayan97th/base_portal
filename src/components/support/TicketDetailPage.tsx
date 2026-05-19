@@ -80,32 +80,64 @@ const TicketDetailPage: React.FC<TicketDetailPageProps> = ({ ticket_id }) => {
 
 function TicketDetailSkeleton() {
   return (
-    <div className="space-y-6 animate-pulse">
-      {/* Header skeleton */}
-      <div className="flex items-start gap-3 pb-5 border-b border-gray-200 dark:border-gray-800">
+    <div className="animate-pulse">
+      {/* Header */}
+      <div className="flex items-start gap-3 pb-5 mb-6 border-b border-gray-200 dark:border-gray-800">
         <div className="h-9 w-9 rounded-lg bg-gray-100 dark:bg-gray-800 shrink-0" />
         <div className="flex-1 space-y-2">
           <div className="flex items-center gap-2">
-            <div className="h-4 w-16 rounded bg-gray-100 dark:bg-gray-800" />
+            <div className="h-3.5 w-16 rounded bg-gray-100 dark:bg-gray-800" />
             <div className="h-5 w-20 rounded-full bg-gray-100 dark:bg-gray-800" />
             <div className="h-5 w-16 rounded-full bg-gray-100 dark:bg-gray-800" />
           </div>
           <div className="h-6 w-72 rounded bg-gray-200 dark:bg-gray-700" />
-          <div className="h-4 w-48 rounded bg-gray-100 dark:bg-gray-800" />
+          <div className="h-3.5 w-48 rounded bg-gray-100 dark:bg-gray-800" />
         </div>
       </div>
 
-      {/* Messages skeleton */}
-      <div className="space-y-4">
-        {[1, 2].map((i) => (
-          <div key={i} className={`flex gap-3 ${i % 2 === 0 ? "flex-row-reverse" : ""}`}>
-            <div className="h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-700 shrink-0" />
-            <div className="space-y-1.5 max-w-sm">
-              <div className="h-3 w-24 rounded bg-gray-100 dark:bg-gray-800" />
-              <div className="h-16 w-64 rounded-2xl bg-gray-100 dark:bg-gray-800" />
+      {/* Two-column */}
+      <div className="flex gap-6">
+        {/* Conversation */}
+        <div className="flex-1 space-y-5">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className={`flex gap-3 ${i % 2 !== 0 ? "flex-row-reverse" : ""}`}>
+              <div className="h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-700 shrink-0" />
+              <div className={`space-y-1.5 max-w-xs ${i % 2 !== 0 ? "items-end flex flex-col" : ""}`}>
+                <div className="h-3 w-24 rounded bg-gray-100 dark:bg-gray-800" />
+                <div className={`h-16 w-56 rounded-2xl bg-gray-100 dark:bg-gray-800 ${i % 2 !== 0 ? "rounded-tr-sm" : "rounded-tl-sm"}`} />
+              </div>
+            </div>
+          ))}
+          {/* Reply area */}
+          <div className="border-t border-gray-200 dark:border-gray-800 pt-5 mt-2 space-y-3">
+            <div className="h-24 w-full rounded-xl bg-gray-100 dark:bg-gray-800" />
+            <div className="flex justify-end">
+              <div className="h-9 w-28 rounded-lg bg-gray-200 dark:bg-gray-700" />
             </div>
           </div>
-        ))}
+        </div>
+
+        {/* Sidebar */}
+        <div className="hidden lg:flex flex-col gap-4 w-72 shrink-0">
+          <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-white/2 p-4 space-y-3">
+            <div className="h-3 w-16 rounded bg-gray-200 dark:bg-gray-700" />
+            {[1, 2, 3, 4].map((j) => (
+              <div key={j} className="flex items-center gap-3">
+                <div className="h-6 w-6 rounded-full bg-gray-200 dark:bg-gray-700 shrink-0" />
+                <div className="h-3 w-20 rounded bg-gray-100 dark:bg-gray-800" />
+              </div>
+            ))}
+          </div>
+          <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-white/2 p-4 space-y-3">
+            <div className="h-3 w-12 rounded bg-gray-200 dark:bg-gray-700" />
+            {[1, 2, 3].map((j) => (
+              <div key={j} className="flex justify-between">
+                <div className="h-3 w-16 rounded bg-gray-100 dark:bg-gray-800" />
+                <div className="h-3 w-20 rounded bg-gray-100 dark:bg-gray-800" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
