@@ -232,12 +232,16 @@ function drawTableRows(doc: jsPDF, items: InvoiceLineItem[], y_position: number)
     total: PAGE_WIDTH - PAGE_MARGIN,
   };
   const row_height = 10;
+  const item_col_width = 72;
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(FONT_SIZES.body);
 
   items.forEach((item) => {
-    const new_y = checkPageBreak(doc, y_position, row_height + 5);
+    const name_lines: string[] = doc.splitTextToSize(item.item_name, item_col_width);
+    const actual_height = Math.max(row_height, name_lines.length * 5 + 5);
+
+    const new_y = checkPageBreak(doc, y_position, actual_height + 5);
     if (new_y !== y_position) {
       y_position = drawTableHeader(doc, new_y);
     } else {
@@ -245,17 +249,18 @@ function drawTableRows(doc: jsPDF, items: InvoiceLineItem[], y_position: number)
     }
 
     doc.setDrawColor(...COLORS.border);
-    doc.rect(PAGE_MARGIN, y_position - 5, CONTENT_WIDTH, row_height, "S");
+    doc.rect(PAGE_MARGIN, y_position - 5, CONTENT_WIDTH, actual_height, "S");
 
     doc.setTextColor(...COLORS.primary);
-    doc.text(item.item_name, col_positions.item + 4, y_position + 1);
+    doc.text(name_lines, col_positions.item + 4, y_position + 1);
 
+    const value_y = y_position + (actual_height - row_height) / 2 + 1;
     doc.setTextColor(...COLORS.secondary);
-    doc.text(item.price, col_positions.price, y_position + 1);
-    doc.text(`x ${item.quantity}`, col_positions.quantity, y_position + 1);
-    doc.text(item.item_total, col_positions.total - 4, y_position + 1, { align: "right" });
+    doc.text(item.price, col_positions.price, value_y);
+    doc.text(`x ${item.quantity}`, col_positions.quantity, value_y);
+    doc.text(item.item_total, col_positions.total - 4, value_y, { align: "right" });
 
-    y_position += row_height;
+    y_position += actual_height;
   });
 
   return y_position;
@@ -439,6 +444,29 @@ function drawSummarySection(doc: jsPDF, invoice: InvoiceDetail, y_position: numb
   return y_position;
 }
 
+function drawNotesSection(doc: jsPDF, notes: string, y_position: number): number {
+  y_position = checkPageBreak(doc, y_position, 25);
+  y_position += 8;
+
+  doc.setFontSize(FONT_SIZES.small);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(146, 64, 14);
+  doc.text("Note from BASE", PAGE_MARGIN, y_position);
+
+  y_position += 5;
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...COLORS.secondary);
+
+  const note_lines: string[] = doc.splitTextToSize(notes, CONTENT_WIDTH);
+  note_lines.forEach((line: string) => {
+    y_position = checkPageBreak(doc, y_position, 6);
+    doc.text(line, PAGE_MARGIN, y_position);
+    y_position += 5;
+  });
+
+  return y_position;
+}
+
 export async function generateInvoicePdf(invoice: InvoiceDetail): Promise<void> {
   const logo_data = await loadLogoBase64();
 
@@ -466,14 +494,17 @@ export async function generateInvoicePdf(invoice: InvoiceDetail): Promise<void> 
 
   const billed_start_y = y_position;
   y_position = drawBilledToSection(doc, invoice, y_position);
+  const meta_end_y = drawInvoiceMetadata(doc, invoice, billed_start_y);
 
-  drawInvoiceMetadata(doc, invoice, billed_start_y);
-
-  y_position += 10;
+  y_position = Math.max(y_position, meta_end_y) + 10;
 
   y_position = drawLineItemsTable(doc, invoice, y_position);
 
   y_position = drawSummarySection(doc, invoice, y_position);
+
+  if (invoice.notes) {
+    y_position = drawNotesSection(doc, invoice.notes, y_position);
+  }
 
   doc.save(`invoice_${invoice.invoice_number}_${invoice.unique_id}.pdf`);
 }
