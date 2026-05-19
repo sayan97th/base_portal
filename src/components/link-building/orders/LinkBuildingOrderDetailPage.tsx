@@ -54,6 +54,8 @@ function getStatusConfig(status: OrderStatus): {
       return { color: "success", label: "Completed", dot: "bg-success-500" };
     case "cancelled":
       return { color: "error", label: "Cancelled", dot: "bg-error-500" };
+    default:
+      return { color: "info", label: status, dot: "bg-blue-light-500" };
   }
 }
 

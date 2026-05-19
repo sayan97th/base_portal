@@ -54,7 +54,7 @@ export interface CreateOrderPayload {
   };
 }
 
-export type OrderStatus = "pending" | "processing" | "completed" | "cancelled";
+export type OrderStatus = "pending" | "processing" | "completed" | "cancelled" | "payment_pending";
 
 export interface LinkBuildingOrderSummary {
   id: string;

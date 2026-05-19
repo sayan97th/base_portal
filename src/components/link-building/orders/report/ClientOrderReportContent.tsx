@@ -129,6 +129,12 @@ const ORDER_STATUS_CONFIG: Record<
     text: "text-error-700 dark:text-error-400",
     dot: "bg-error-500",
   },
+  payment_pending: {
+    label: "Payment Pending",
+    bg: "bg-orange-50 dark:bg-orange-500/10",
+    text: "text-orange-700 dark:text-orange-400",
+    dot: "bg-orange-500",
+  },
 };
 
 export default function ClientOrderReportContent({ order_id }: ClientOrderReportContentProps) {

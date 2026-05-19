@@ -103,6 +103,7 @@ export type DisplayStatus =
 
 const api_to_display_status: Record<OrderStatus, DisplayStatus> = {
   pending: "New request",
+  payment_pending: "New request",
   processing: "Writing article",
   completed: "Live",
   cancelled: "Cancelled",

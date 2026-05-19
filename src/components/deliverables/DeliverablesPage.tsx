@@ -81,6 +81,12 @@ const ORDER_STATUS_CONFIG: Record<
     text: "text-error-700 dark:text-error-400",
     dot: "bg-error-500",
   },
+  payment_pending: {
+    label: "Payment Pending",
+    bg: "bg-gray-100 dark:bg-gray-500/10",
+    text: "text-gray-700 dark:text-gray-400",
+    dot: "bg-gray-500",
+  },
 };
 
 const STATUS_FILTER_OPTIONS: { label: string; value: OrderStatus | "" }[] = [
@@ -89,6 +95,7 @@ const STATUS_FILTER_OPTIONS: { label: string; value: OrderStatus | "" }[] = [
   { label: "Processing", value: "processing" },
   { label: "Completed", value: "completed" },
   { label: "Cancelled", value: "cancelled" },
+  { label: "Payment Pending", value: "payment_pending" },
 ];
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
