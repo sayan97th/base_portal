@@ -69,6 +69,7 @@ interface FormFields {
   category: ResourceCategory;
   status: ResourceStatus;
   is_hidden: boolean;
+  is_client_restricted: boolean;
   client_ids: number[];
 }
 
@@ -86,18 +87,21 @@ function getEmptyForm(): FormFields {
     category: "document",
     status: "draft",
     is_hidden: false,
+    is_client_restricted: false,
     client_ids: [],
   };
 }
 
 function formFromResource(resource: AdminResource): FormFields {
+  const client_ids = (resource.assigned_clients ?? []).map((c) => c.id);
   return {
     title: resource.title,
     description: resource.description ?? "",
     category: resource.category,
     status: resource.status,
     is_hidden: resource.is_hidden,
-    client_ids: (resource.assigned_clients ?? []).map((c) => c.id),
+    is_client_restricted: client_ids.length > 0,
+    client_ids,
   };
 }
 
@@ -219,27 +223,32 @@ function SectionCard({
   title,
   description,
   icon,
+  action,
   children,
 }: {
   title: string;
   description?: string;
   icon?: React.ReactNode;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
-      <div className="mb-5 flex items-start gap-3">
-        {icon && (
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 dark:bg-brand-500/10">
-            <span className="text-brand-500 dark:text-brand-400">{icon}</span>
-          </div>
-        )}
-        <div>
-          <h2 className="text-base font-semibold text-gray-800 dark:text-white">{title}</h2>
-          {description && (
-            <p className="mt-0.5 text-sm text-gray-400 dark:text-gray-500">{description}</p>
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          {icon && (
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 dark:bg-brand-500/10">
+              <span className="text-brand-500 dark:text-brand-400">{icon}</span>
+            </div>
           )}
+          <div>
+            <h2 className="text-base font-semibold text-gray-800 dark:text-white">{title}</h2>
+            {description && (
+              <p className="mt-0.5 text-sm text-gray-400 dark:text-gray-500">{description}</p>
+            )}
+          </div>
         </div>
+        {action && <div className="shrink-0">{action}</div>}
       </div>
       <div className="space-y-4">{children}</div>
     </div>
@@ -427,11 +436,15 @@ function DropZone({ onFiles }: { onFiles: (files: File[]) => void }) {
 function ClientAssignmentSection({
   client_ids,
   assigned_clients_data,
+  is_client_restricted,
   onClientIdsChange,
+  onClientRestrictedChange,
 }: {
   client_ids: number[];
   assigned_clients_data: AssignedClient[];
+  is_client_restricted: boolean;
   onClientIdsChange: (ids: number[]) => void;
+  onClientRestrictedChange: (restricted: boolean) => void;
 }) {
   const [search_query, setSearchQuery] = useState("");
   const [all_clients, setAllClients] = useState<AssignedClient[]>([]);
@@ -460,6 +473,14 @@ function ClientAssignmentSection({
 
   const selected_clients = known_clients.filter((c) => client_ids.includes(c.id));
 
+  const toggleClientRestriction = () => {
+    const next = !is_client_restricted;
+    onClientRestrictedChange(next);
+    if (!next) {
+      onClientIdsChange([]);
+    }
+  };
+
   const toggleClient = (client: AssignedClient) => {
     if (client_ids.includes(client.id)) {
       onClientIdsChange(client_ids.filter((id) => id !== client.id));
@@ -472,139 +493,174 @@ function ClientAssignmentSection({
     onClientIdsChange(client_ids.filter((cid) => cid !== id));
   };
 
+  const restriction_switch = (
+    <button
+      type="button"
+      onClick={toggleClientRestriction}
+      title={is_client_restricted ? "Disable client restriction" : "Enable client restriction"}
+      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+        is_client_restricted ? "bg-brand-500" : "bg-gray-200 dark:bg-gray-700"
+      }`}
+    >
+      <span
+        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ${
+          is_client_restricted ? "translate-x-5" : "translate-x-0"
+        }`}
+      />
+    </button>
+  );
+
   return (
     <SectionCard
       title="Client Assignment"
-      description="Select which clients can access this resource."
+      description={
+        is_client_restricted
+          ? "Select which clients can access this resource."
+          : "Shared with all active clients."
+      }
       icon={
         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
         </svg>
       }
+      action={restriction_switch}
     >
-      {/* Info note */}
-      <div className="flex items-start gap-2.5 rounded-xl border border-blue-100 bg-blue-50 px-3.5 py-3 dark:border-blue-500/20 dark:bg-blue-500/10">
-        <svg className="mt-0.5 h-4 w-4 shrink-0 text-blue-500 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-        </svg>
-        <p className="text-xs leading-relaxed text-blue-700 dark:text-blue-300">
-          <span className="font-semibold">No clients selected</span> — visible to all active clients.{" "}
-          <span className="font-semibold">Clients selected</span> — only those clients will see it.
-        </p>
-      </div>
-
-      {/* Search / filter */}
-      <div className="relative">
-        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400">
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+      {!is_client_restricted ? (
+        /* Switch OFF — shared with everyone */
+        <div className="flex items-start gap-2.5 rounded-xl border border-emerald-100 bg-emerald-50 px-3.5 py-3 dark:border-emerald-500/20 dark:bg-emerald-500/10">
+          <svg className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
           </svg>
-        </span>
-        <input
-          type="text"
-          value={search_query}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Filter by name or email…"
-          className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-9 pr-9 text-sm text-gray-800 placeholder-gray-400 transition-colors focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-500"
-        />
-        {search_query && (
-          <button
-            type="button"
-            onClick={() => setSearchQuery("")}
-            className="absolute inset-y-0 right-3 flex items-center text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        )}
-      </div>
-
-      {/* Client list */}
-      <div className="max-h-72 overflow-y-auto rounded-xl border border-gray-200 dark:border-gray-700">
-        {is_loading_clients ? (
-          <div className="flex items-center justify-center py-8">
-            <svg className="h-5 w-5 animate-spin text-brand-500" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-          </div>
-        ) : filtered_clients.length === 0 ? (
-          <div className="px-4 py-6 text-center text-sm text-gray-400 dark:text-gray-500">
-            {search_query ? "No clients match your search." : "No clients available."}
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-100 dark:divide-gray-700">
-            {filtered_clients.map((client) => {
-              const is_selected = client_ids.includes(client.id);
-              return (
-                <button
-                  key={client.id}
-                  type="button"
-                  onClick={() => toggleClient(client)}
-                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors ${
-                    is_selected
-                      ? "bg-brand-50 dark:bg-brand-500/10"
-                      : "hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                  }`}
-                >
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-600 dark:bg-gray-700 dark:text-gray-300">
-                    {client.name.charAt(0).toUpperCase()}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-gray-800 dark:text-white">{client.name}</p>
-                    <p className="truncate text-xs text-gray-400 dark:text-gray-500">{client.email}</p>
-                  </div>
-                  <span
-                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 transition-colors ${
-                      is_selected
-                        ? "border-brand-500 bg-brand-500"
-                        : "border-gray-300 dark:border-gray-600"
-                    }`}
-                  >
-                    {is_selected && (
-                      <svg className="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                      </svg>
-                    )}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Selected chips */}
-      {selected_clients.length > 0 && (
-        <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
-            Assigned ({selected_clients.length})
+          <p className="text-xs leading-relaxed text-emerald-700 dark:text-emerald-300">
+            This resource will be visible to <span className="font-semibold">all active clients</span>. Enable the toggle above to restrict access to specific clients.
           </p>
-          <div className="flex flex-wrap gap-2">
-            {selected_clients.map((client) => (
-              <span
-                key={client.id}
-                className="flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 py-1 pl-2.5 pr-1.5 text-xs font-medium text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300"
-              >
-                <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-brand-200 text-[9px] font-bold text-brand-700 dark:bg-brand-500/30 dark:text-brand-300">
-                  {client.name.charAt(0).toUpperCase()}
-                </span>
-                <span className="max-w-[140px] truncate">{client.name}</span>
-                <button
-                  type="button"
-                  onClick={() => removeClient(client.id)}
-                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-brand-500 transition-colors hover:bg-brand-200 hover:text-brand-700 dark:text-brand-400 dark:hover:bg-brand-500/20"
-                  title={`Remove ${client.name}`}
-                >
-                  <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </span>
-            ))}
-          </div>
         </div>
+      ) : (
+        <>
+          {/* Info note */}
+          <div className="flex items-start gap-2.5 rounded-xl border border-blue-100 bg-blue-50 px-3.5 py-3 dark:border-blue-500/20 dark:bg-blue-500/10">
+            <svg className="mt-0.5 h-4 w-4 shrink-0 text-blue-500 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+            </svg>
+            <p className="text-xs leading-relaxed text-blue-700 dark:text-blue-300">
+              Only the selected clients will have access to this resource. Disable the toggle above to share with everyone.
+            </p>
+          </div>
+
+          {/* Search / filter */}
+          <div className="relative">
+            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+              </svg>
+            </span>
+            <input
+              type="text"
+              value={search_query}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Filter by name or email…"
+              className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-9 pr-9 text-sm text-gray-800 placeholder-gray-400 transition-colors focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-500"
+            />
+            {search_query && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute inset-y-0 right-3 flex items-center text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+
+          {/* Client list */}
+          <div className="max-h-72 overflow-y-auto rounded-xl border border-gray-200 dark:border-gray-700">
+            {is_loading_clients ? (
+              <div className="flex items-center justify-center py-8">
+                <svg className="h-5 w-5 animate-spin text-brand-500" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              </div>
+            ) : filtered_clients.length === 0 ? (
+              <div className="px-4 py-6 text-center text-sm text-gray-400 dark:text-gray-500">
+                {search_query ? "No clients match your search." : "No clients available."}
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                {filtered_clients.map((client) => {
+                  const is_selected = client_ids.includes(client.id);
+                  return (
+                    <button
+                      key={client.id}
+                      type="button"
+                      onClick={() => toggleClient(client)}
+                      className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors ${
+                        is_selected
+                          ? "bg-brand-50 dark:bg-brand-500/10"
+                          : "hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                      }`}
+                    >
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                        {client.name.charAt(0).toUpperCase()}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-gray-800 dark:text-white">{client.name}</p>
+                        <p className="truncate text-xs text-gray-400 dark:text-gray-500">{client.email}</p>
+                      </div>
+                      <span
+                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 transition-colors ${
+                          is_selected
+                            ? "border-brand-500 bg-brand-500"
+                            : "border-gray-300 dark:border-gray-600"
+                        }`}
+                      >
+                        {is_selected && (
+                          <svg className="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                        )}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Selected chips */}
+          {selected_clients.length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                Assigned ({selected_clients.length})
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {selected_clients.map((client) => (
+                  <span
+                    key={client.id}
+                    className="flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 py-1 pl-2.5 pr-1.5 text-xs font-medium text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300"
+                  >
+                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-brand-200 text-[9px] font-bold text-brand-700 dark:bg-brand-500/30 dark:text-brand-300">
+                      {client.name.charAt(0).toUpperCase()}
+                    </span>
+                    <span className="max-w-[140px] truncate">{client.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeClient(client.id)}
+                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-brand-500 transition-colors hover:bg-brand-200 hover:text-brand-700 dark:text-brand-400 dark:hover:bg-brand-500/20"
+                      title={`Remove ${client.name}`}
+                    >
+                      <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </SectionCard>
   );
@@ -934,7 +990,9 @@ export default function ResourceFormPage({ mode, resource_id }: ResourceFormPage
           <ClientAssignmentSection
             client_ids={form.client_ids}
             assigned_clients_data={assigned_clients_data}
+            is_client_restricted={form.is_client_restricted}
             onClientIdsChange={(ids) => setField("client_ids", ids)}
+            onClientRestrictedChange={(restricted) => setField("is_client_restricted", restricted)}
           />
 
           {/* File Attachments */}
