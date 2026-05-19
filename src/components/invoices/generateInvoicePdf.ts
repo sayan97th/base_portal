@@ -43,22 +43,58 @@ const PRODUCT_TYPE_ORDER: ProductType[] = [
 
 const PAGE_MARGIN = 20;
 const PAGE_WIDTH = 210;
+const PAGE_HEIGHT = 297;
 const CONTENT_WIDTH = PAGE_WIDTH - PAGE_MARGIN * 2;
+const BOTTOM_MARGIN = 25;
 
-function drawCompanyHeader(doc: jsPDF, y_position: number): number {
-  doc.setFontSize(FONT_SIZES.title);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COLORS.primary);
-  doc.text("BASE", PAGE_MARGIN, y_position);
+// Logo original size: 875 x 355 px — aspect ratio ≈ 2.465
+const LOGO_PDF_WIDTH = 42;
+const LOGO_PDF_HEIGHT = LOGO_PDF_WIDTH / (875 / 355);
 
-  const base_width = doc.getTextWidth("BASE");
-  doc.setFontSize(FONT_SIZES.small);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...COLORS.secondary);
-  doc.text("SEARCH MARKETING", PAGE_MARGIN + base_width + 3, y_position);
+async function loadLogoBase64(): Promise<string | null> {
+  try {
+    const response = await fetch("/images/logo/base-logo.png");
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
 
-  y_position += 8;
+function checkPageBreak(doc: jsPDF, y_position: number, needed = 15): number {
+  if (y_position + needed > PAGE_HEIGHT - BOTTOM_MARGIN) {
+    doc.addPage();
+    return PAGE_MARGIN + 10;
+  }
+  return y_position;
+}
+
+function drawCompanyHeader(doc: jsPDF, logo_data: string | null, y_position: number): number {
+  if (logo_data) {
+    doc.addImage(logo_data, "PNG", PAGE_MARGIN, y_position - 4, LOGO_PDF_WIDTH, LOGO_PDF_HEIGHT);
+    y_position += LOGO_PDF_HEIGHT + 2;
+  } else {
+    doc.setFontSize(FONT_SIZES.title);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...COLORS.primary);
+    doc.text("BASE", PAGE_MARGIN, y_position);
+
+    const base_width = doc.getTextWidth("BASE");
+    doc.setFontSize(FONT_SIZES.small);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...COLORS.secondary);
+    doc.text("SEARCH MARKETING", PAGE_MARGIN + base_width + 3, y_position);
+    y_position += 8;
+  }
+
   doc.setFontSize(FONT_SIZES.body);
+  doc.setFont("helvetica", "normal");
   doc.setTextColor(...COLORS.secondary);
   const company_lines = [
     "BASE Search Marketing",
@@ -79,21 +115,26 @@ function drawStatusBadge(
   x_position: number,
   y_position: number
 ): void {
-  const is_paid = status === "paid";
-  const badge_text = is_paid ? "Paid" : "Void";
-  const badge_color = is_paid ? COLORS.success : COLORS.error;
+  const status_map: Record<string, { text: string; color: [number, number, number] }> = {
+    paid:    { text: "Paid",    color: COLORS.success },
+    void:    { text: "Void",    color: COLORS.error },
+    unpaid:  { text: "Unpaid",  color: [217, 119, 6] },
+    overdue: { text: "Overdue", color: COLORS.error },
+    refund:  { text: "Refund",  color: [37, 99, 235] },
+  };
 
+  const cfg = status_map[status] ?? { text: status, color: COLORS.secondary };
   doc.setFontSize(FONT_SIZES.small);
-  const text_width = doc.getTextWidth(badge_text);
+  const text_width = doc.getTextWidth(cfg.text);
   const badge_width = text_width + 12;
   const badge_height = 7;
 
-  doc.setFillColor(...badge_color);
+  doc.setFillColor(...cfg.color);
   doc.roundedRect(x_position, y_position - badge_height + 2, badge_width, badge_height, 2, 2, "F");
 
   doc.setTextColor(...COLORS.white);
   doc.setFont("helvetica", "bold");
-  doc.text(badge_text, x_position + 6, y_position);
+  doc.text(cfg.text, x_position + 6, y_position);
 }
 
 function drawBilledToSection(doc: jsPDF, invoice: InvoiceDetail, y_position: number): number {
@@ -196,6 +237,13 @@ function drawTableRows(doc: jsPDF, items: InvoiceLineItem[], y_position: number)
   doc.setFontSize(FONT_SIZES.body);
 
   items.forEach((item) => {
+    const new_y = checkPageBreak(doc, y_position, row_height + 5);
+    if (new_y !== y_position) {
+      y_position = drawTableHeader(doc, new_y);
+    } else {
+      y_position = new_y;
+    }
+
     doc.setDrawColor(...COLORS.border);
     doc.rect(PAGE_MARGIN, y_position - 5, CONTENT_WIDTH, row_height, "S");
 
@@ -223,6 +271,8 @@ function drawProductSectionHeader(
   const label = PRODUCT_TYPE_LABELS[product_type];
   const header_height = 9;
 
+  y_position = checkPageBreak(doc, y_position, header_height + 20);
+
   doc.setFillColor(...colors.bg);
   doc.setDrawColor(...COLORS.border);
   doc.setLineWidth(0.3);
@@ -245,6 +295,7 @@ function drawLineItemsTable(doc: jsPDF, invoice: InvoiceDetail, y_position: numb
   const has_product_types = invoice.line_items.some((item) => item.product_type);
 
   if (!has_product_types) {
+    y_position = checkPageBreak(doc, y_position, 20);
     y_position = drawTableHeader(doc, y_position);
     y_position = drawTableRows(doc, invoice.line_items, y_position);
     return y_position;
@@ -270,7 +321,7 @@ function drawLineItemsTable(doc: jsPDF, invoice: InvoiceDetail, y_position: numb
     if (pt !== "other") {
       y_position = drawProductSectionHeader(doc, pt as ProductType, items.length, y_position);
     } else {
-      // Generic "Other" header
+      y_position = checkPageBreak(doc, y_position, 25);
       doc.setFillColor(...COLORS.table_header_bg);
       doc.setDrawColor(...COLORS.border);
       doc.setLineWidth(0.3);
@@ -294,6 +345,11 @@ function drawSummarySection(doc: jsPDF, invoice: InvoiceDetail, y_position: numb
   const right_x = PAGE_WIDTH - PAGE_MARGIN;
   const label_x = right_x - 70;
 
+  let needed = 30;
+  if (invoice.discount) needed += 8;
+  if (invoice.coupon_discounts?.length) needed += 8 + invoice.coupon_discounts.length * 8;
+
+  y_position = checkPageBreak(doc, y_position, needed);
   y_position += 5;
 
   doc.setFontSize(FONT_SIZES.body);
@@ -324,6 +380,8 @@ function drawSummarySection(doc: jsPDF, invoice: InvoiceDetail, y_position: numb
     y_position += 5;
 
     invoice.coupon_discounts.forEach((coupon) => {
+      y_position = checkPageBreak(doc, y_position, 10);
+
       const badge_text_width = doc.getTextWidth(coupon.code);
       const badge_w = badge_text_width + 6;
       const badge_h = 5;
@@ -358,6 +416,7 @@ function drawSummarySection(doc: jsPDF, invoice: InvoiceDetail, y_position: numb
     doc.line(label_x, y_position - 1, right_x, y_position - 1);
   }
 
+  y_position = checkPageBreak(doc, y_position, 20);
   y_position += 5;
 
   doc.setDrawColor(...COLORS.border);
@@ -380,18 +439,20 @@ function drawSummarySection(doc: jsPDF, invoice: InvoiceDetail, y_position: numb
   return y_position;
 }
 
-export function generateInvoicePdf(invoice: InvoiceDetail): void {
+export async function generateInvoicePdf(invoice: InvoiceDetail): Promise<void> {
+  const logo_data = await loadLogoBase64();
+
   const doc = new jsPDF({
     orientation: "portrait",
     unit: "mm",
     format: "a4",
   });
 
-  let y_position = 25;
+  let y_position = 22;
 
-  y_position = drawCompanyHeader(doc, y_position);
+  y_position = drawCompanyHeader(doc, logo_data, y_position);
 
-  const title_y = 25;
+  const title_y = 22;
   doc.setFontSize(16);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...COLORS.primary);
@@ -414,6 +475,5 @@ export function generateInvoicePdf(invoice: InvoiceDetail): void {
 
   y_position = drawSummarySection(doc, invoice, y_position);
 
-  const file_name = `invoice_${invoice.invoice_number}_${invoice.unique_id}.pdf`;
-  doc.save(file_name);
+  doc.save(`invoice_${invoice.invoice_number}_${invoice.unique_id}.pdf`);
 }
