@@ -49,6 +49,9 @@ const AdminTicketDetail: React.FC<AdminTicketDetailProps> = ({ ticket: initial_t
   const [reply_error, setReplyError] = useState<string | null>(null);
   const [updating_status, setUpdatingStatus] = useState(false);
   const [updating_priority, setUpdatingPriority] = useState(false);
+  const [show_status_modal, setShowStatusModal] = useState(false);
+  const [modal_selected_status, setModalSelectedStatus] = useState<TicketStatus>(initial_ticket.status);
+  const [modal_status_error, setModalStatusError] = useState<string | null>(null);
   const messages_end_ref = useRef<HTMLDivElement>(null);
   const textarea_ref = useRef<HTMLTextAreaElement>(null);
 
@@ -131,6 +134,42 @@ const AdminTicketDetail: React.FC<AdminTicketDetailProps> = ({ ticket: initial_t
     (a) => a.status !== ticket.status
   );
 
+  const handleOpenStatusModal = () => {
+    setModalSelectedStatus(ticket.status);
+    setModalStatusError(null);
+    setShowStatusModal(true);
+  };
+
+  const handleCloseStatusModal = useCallback(() => {
+    if (updating_status) return;
+    setShowStatusModal(false);
+    setModalStatusError(null);
+  }, [updating_status]);
+
+  const handleConfirmStatusChange = useCallback(async () => {
+    if (modal_selected_status === ticket.status) {
+      setShowStatusModal(false);
+      return;
+    }
+    setUpdatingStatus(true);
+    setModalStatusError(null);
+    try {
+      const updated = await adminSupportTicketsService.updateTicket(ticket.id, { status: modal_selected_status });
+      setTicket((prev) => ({
+        ...prev,
+        status:      updated.status,
+        resolved_at: updated.resolved_at,
+        closed_at:   updated.closed_at,
+      }));
+      setShowStatusModal(false);
+    } catch (err: unknown) {
+      const api_error = err as { message?: string };
+      setModalStatusError(api_error?.message ?? "Failed to update status. Please try again.");
+    } finally {
+      setUpdatingStatus(false);
+    }
+  }, [modal_selected_status, ticket.id, ticket.status]);
+
   return (
     <div className="space-y-0">
       {/* ── Header ── */}
@@ -166,11 +205,23 @@ const AdminTicketDetail: React.FC<AdminTicketDetailProps> = ({ ticket: initial_t
           </p>
         </div>
 
-        <PriorityDropdown
-          current={ticket.priority}
-          loading={updating_priority}
-          onChange={handlePriorityUpdate}
-        />
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={handleOpenStatusModal}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 dark:border-gray-700 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-400 dark:hover:border-gray-600 transition-all"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+            Change Status
+          </button>
+          <PriorityDropdown
+            current={ticket.priority}
+            loading={updating_priority}
+            onChange={handlePriorityUpdate}
+          />
+        </div>
       </div>
 
       {/* ── Two-column layout ── */}
@@ -464,6 +515,18 @@ const AdminTicketDetail: React.FC<AdminTicketDetailProps> = ({ ticket: initial_t
 
         </aside>
       </div>
+
+      {show_status_modal && (
+        <ChangeStatusModal
+          current_status={ticket.status}
+          selected_status={modal_selected_status}
+          loading={updating_status}
+          error={modal_status_error}
+          onSelect={setModalSelectedStatus}
+          onConfirm={handleConfirmStatusChange}
+          onClose={handleCloseStatusModal}
+        />
+      )}
     </div>
   );
 };
@@ -694,6 +757,139 @@ function getActionIcon(status: TicketStatus): React.ReactNode {
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 .49-4.02" />
     </svg>
+  );
+}
+
+const STATUS_MODAL_OPTIONS: { status: TicketStatus; description: string }[] = [
+  { status: "open",        description: "Ticket is open and awaiting a response" },
+  { status: "in_progress", description: "Ticket is actively being worked on" },
+  { status: "resolved",    description: "The issue has been resolved successfully" },
+  { status: "closed",      description: "Ticket is closed and no further action is needed" },
+];
+
+function ChangeStatusModal({
+  current_status,
+  selected_status,
+  loading,
+  error,
+  onSelect,
+  onConfirm,
+  onClose,
+}: {
+  current_status: TicketStatus;
+  selected_status: TicketStatus;
+  loading: boolean;
+  error: string | null;
+  onSelect: (status: TicketStatus) => void;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const has_changed = selected_status !== current_status;
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !loading) onClose();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [loading, onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      onClick={(e) => { if (e.target === e.currentTarget && !loading) onClose(); }}
+    >
+      <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white">Change Ticket Status</h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Select the new status for this ticket</p>
+          </div>
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="flex items-center justify-center h-8 w-8 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-200 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+            aria-label="Close modal"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Status options */}
+        <div className="p-5 space-y-2">
+          {STATUS_MODAL_OPTIONS.map(({ status, description }) => {
+            const is_selected = selected_status === status;
+            const is_current  = current_status === status;
+            return (
+              <button
+                key={status}
+                onClick={() => onSelect(status)}
+                disabled={loading}
+                className={`w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
+                  is_selected
+                    ? "border-brand-300 bg-brand-50 dark:border-brand-500/40 dark:bg-brand-500/10"
+                    : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                }`}
+              >
+                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold shrink-0 ${status_bg_map[status]}`}>
+                  {status_label_map[status]}
+                </span>
+                <p className="flex-1 min-w-0 text-xs text-gray-600 dark:text-gray-400">{description}</p>
+                <div className="flex items-center gap-2 shrink-0">
+                  {is_current && (
+                    <span className="text-[10px] text-gray-400 dark:text-gray-500 font-medium">Current</span>
+                  )}
+                  {is_selected && (
+                    <div className="h-4 w-4 rounded-full bg-brand-500 flex items-center justify-center">
+                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div className="mx-5 mb-4 flex items-center gap-2 rounded-lg border border-error-200 bg-error-50 px-4 py-2.5 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+              <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
+            </svg>
+            {error}
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2.5 px-5 py-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="rounded-lg border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={loading || !has_changed}
+            className="rounded-lg bg-brand-500 hover:bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
+          >
+            {loading && (
+              <svg className="animate-spin" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+            )}
+            {loading ? "Updating…" : "Confirm Change"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
