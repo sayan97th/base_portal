@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   description: "View and reply to your support ticket.",
 };
 
-export default function TicketRoute({ params }: { params: { id: string } }) {
-  return <TicketDetailPage ticket_id={Number(params.id)} />;
+export default async function TicketRoute({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return <TicketDetailPage ticket_id={Number(id)} />;
 }

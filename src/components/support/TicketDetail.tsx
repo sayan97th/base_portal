@@ -10,9 +10,6 @@ import {
   status_bg_map,
   status_label_map,
   status_dot_color_map,
-  priority_color_map,
-  priority_dot_map,
-  priority_label_map,
   formatTicketDate,
   formatMessageTime,
   getSenderInitials,
@@ -118,10 +115,6 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initial_ticket, cur
             <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${status_bg_map[ticket.status]}`}>
               {status_label_map[ticket.status]}
             </span>
-            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${priority_color_map[ticket.priority]}`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${priority_dot_map[ticket.priority]}`} />
-              {priority_label_map[ticket.priority]}
-            </span>
           </div>
 
           <h1 className="text-xl font-semibold text-gray-900 dark:text-white leading-tight truncate">
@@ -160,7 +153,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initial_ticket, cur
                 const show_divider =
                   i === 0 ||
                   new Date(msg.created_at).toDateString() !==
-                    new Date(prev_msg.created_at).toDateString();
+                  new Date(prev_msg.created_at).toDateString();
                 return (
                   <React.Fragment key={msg.id}>
                     {show_divider && <DateDivider date={msg.created_at} />}
@@ -231,10 +224,6 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initial_ticket, cur
 
                 <div className="flex items-center justify-between">
                   <p className="text-[11px] text-gray-400 dark:text-gray-500 hidden sm:block">
-                    <kbd className="rounded border border-gray-200 dark:border-gray-700 px-1 py-0.5 font-mono text-[10px] bg-white dark:bg-gray-800">⌘</kbd>
-                    {" + "}
-                    <kbd className="rounded border border-gray-200 dark:border-gray-700 px-1 py-0.5 font-mono text-[10px] bg-white dark:bg-gray-800">↵</kbd>
-                    {" to send"}
                   </p>
                   <Button
                     variant="coral"
@@ -278,13 +267,12 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initial_ticket, cur
                     {/* Track */}
                     <div className="flex flex-col items-center">
                       <div
-                        className={`h-6 w-6 rounded-full flex items-center justify-center shrink-0 transition-all ${
-                          is_active
-                            ? `ring-2 ring-offset-2 ring-offset-gray-50 dark:ring-offset-gray-900/50 ring-current ${status_dot_color_map[step]}`
-                            : is_done
+                        className={`h-6 w-6 rounded-full flex items-center justify-center shrink-0 transition-all ${is_active
+                          ? `ring-2 ring-offset-2 ring-offset-gray-50 dark:ring-offset-gray-900/50 ring-current ${status_dot_color_map[step]}`
+                          : is_done
                             ? status_dot_color_map[step]
                             : "bg-gray-200 dark:bg-gray-700"
-                        }`}
+                          }`}
                       >
                         {is_done ? (
                           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
@@ -302,13 +290,12 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initial_ticket, cur
                     {/* Label */}
                     <div className="pb-5 pt-0.5">
                       <span
-                        className={`text-xs leading-none font-medium ${
-                          is_active
-                            ? "text-gray-900 dark:text-white"
-                            : is_done
+                        className={`text-xs leading-none font-medium ${is_active
+                          ? "text-gray-900 dark:text-white"
+                          : is_done
                             ? "text-gray-400 dark:text-gray-500 line-through"
                             : "text-gray-400 dark:text-gray-600"
-                        }`}
+                          }`}
                       >
                         {status_label_map[step]}
                       </span>
@@ -332,13 +319,6 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initial_ticket, cur
           {/* Details */}
           <SidebarCard title="Details">
             <div className="space-y-3">
-              <SidebarRow label="Priority">
-                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${priority_color_map[ticket.priority]}`}>
-                  <span className={`h-1.5 w-1.5 rounded-full ${priority_dot_map[ticket.priority]}`} />
-                  {priority_label_map[ticket.priority]}
-                </span>
-              </SidebarRow>
-
               {ticket.related_order && (
                 <SidebarRow label="Service">
                   <span className="text-xs text-gray-700 dark:text-gray-300 font-medium">
@@ -377,10 +357,10 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initial_ticket, cur
             </div>
           </SidebarCard>
 
-          {/* Actions */}
-          <SidebarCard title="Actions">
-            <div className="space-y-2">
-              {is_closed ? (
+          {/* Actions — only shown when the ticket is closed */}
+          {is_closed && (
+            <SidebarCard title="Actions">
+              <div className="space-y-2">
                 <SidebarAction
                   label="Reopen Ticket"
                   color="brand"
@@ -393,51 +373,9 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticket: initial_ticket, cur
                     </svg>
                   }
                 />
-              ) : (
-                <>
-                  {ticket.status !== "in_progress" && (
-                    <SidebarAction
-                      label="Mark In Progress"
-                      color="warning"
-                      loading={updating_status}
-                      onClick={() => handleStatusUpdate("in_progress")}
-                      icon={
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="12" cy="12" r="10" />
-                          <polyline points="12 6 12 12 16 14" />
-                        </svg>
-                      }
-                    />
-                  )}
-                  {ticket.status !== "resolved" && (
-                    <SidebarAction
-                      label="Mark as Resolved"
-                      color="success"
-                      loading={updating_status}
-                      onClick={() => handleStatusUpdate("resolved")}
-                      icon={
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      }
-                    />
-                  )}
-                  <SidebarAction
-                    label="Close Ticket"
-                    color="danger"
-                    loading={updating_status}
-                    onClick={() => handleStatusUpdate("closed")}
-                    icon={
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
-                    }
-                  />
-                </>
-              )}
-            </div>
-          </SidebarCard>
+              </div>
+            </SidebarCard>
+          )}
         </aside>
       </div>
     </div>
@@ -463,9 +401,8 @@ function MessageBubble({
     <div className={`flex gap-3 ${is_own ? "flex-row-reverse" : "flex-row"}`}>
       {/* Avatar */}
       <div
-        className={`shrink-0 flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-bold text-white ${
-          is_own ? "bg-coral-500" : "bg-brand-500"
-        }`}
+        className={`shrink-0 flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-bold text-white ${is_own ? "bg-coral-500" : "bg-brand-500"
+          }`}
         title={full_name}
       >
         {initials}
@@ -488,11 +425,10 @@ function MessageBubble({
 
         {/* Bubble */}
         <div
-          className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-            is_own
-              ? "rounded-tr-sm bg-coral-500 text-white"
-              : "rounded-tl-sm bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-white/90"
-          } ${!has_html ? "whitespace-pre-wrap" : ""}`}
+          className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${is_own
+            ? "rounded-tr-sm bg-coral-500 text-white"
+            : "rounded-tl-sm bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-white/90"
+            } ${!has_html ? "whitespace-pre-wrap" : ""}`}
           {...(has_html
             ? { dangerouslySetInnerHTML: { __html: message.content } }
             : { children: message.content }
