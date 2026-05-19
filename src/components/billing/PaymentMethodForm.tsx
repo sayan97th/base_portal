@@ -965,7 +965,6 @@ const PaymentMethodForm: React.FC<PaymentMethodFormProps> = ({
             <Button
               variant="primary"
               size="md"
-              type="submit"
               disabled={!isCardComplete() || is_submitting || !stripe}
             >
               {is_submitting ? (
