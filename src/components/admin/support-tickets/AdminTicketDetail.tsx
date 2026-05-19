@@ -6,6 +6,7 @@ import Button from "@/components/ui/button/Button";
 import {
   ApiTicketMessage,
   TicketStatus,
+  TicketPriority,
   status_bg_map,
   status_label_map,
   status_dot_color_map,
@@ -47,6 +48,7 @@ const AdminTicketDetail: React.FC<AdminTicketDetailProps> = ({ ticket: initial_t
   const [sending, setSending] = useState(false);
   const [reply_error, setReplyError] = useState<string | null>(null);
   const [updating_status, setUpdatingStatus] = useState(false);
+  const [updating_priority, setUpdatingPriority] = useState(false);
   const messages_end_ref = useRef<HTMLDivElement>(null);
   const textarea_ref = useRef<HTMLTextAreaElement>(null);
 
@@ -98,6 +100,17 @@ const AdminTicketDetail: React.FC<AdminTicketDetailProps> = ({ ticket: initial_t
     }
   };
 
+  const handlePriorityUpdate = useCallback(async (new_priority: TicketPriority) => {
+    if (updating_priority || new_priority === ticket.priority) return;
+    setUpdatingPriority(true);
+    try {
+      const updated = await adminSupportTicketsService.updateTicket(ticket.id, { priority: new_priority });
+      setTicket((prev) => ({ ...prev, priority: updated.priority }));
+    } finally {
+      setUpdatingPriority(false);
+    }
+  }, [updating_priority, ticket.id, ticket.priority]);
+
   const handleStatusUpdate = useCallback(async (new_status: TicketStatus) => {
     if (updating_status || new_status === ticket.status) return;
     setUpdatingStatus(true);
@@ -140,10 +153,6 @@ const AdminTicketDetail: React.FC<AdminTicketDetailProps> = ({ ticket: initial_t
             <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${status_bg_map[ticket.status]}`}>
               {status_label_map[ticket.status]}
             </span>
-            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${priority_color_map[ticket.priority]}`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${priority_dot_map[ticket.priority]}`} />
-              {priority_label_map[ticket.priority]}
-            </span>
           </div>
 
           <h1 className="text-xl font-semibold text-gray-900 dark:text-white leading-tight">
@@ -156,6 +165,12 @@ const AdminTicketDetail: React.FC<AdminTicketDetailProps> = ({ ticket: initial_t
             {` · ${messages.length} message${messages.length !== 1 ? "s" : ""}`}
           </p>
         </div>
+
+        <PriorityDropdown
+          current={ticket.priority}
+          loading={updating_priority}
+          onChange={handlePriorityUpdate}
+        />
       </div>
 
       {/* ── Two-column layout ── */}
@@ -572,6 +587,90 @@ function SidebarAction({
       )}
       {loading ? "Updating…" : label}
     </button>
+  );
+}
+
+const PRIORITY_OPTIONS: { value: TicketPriority; label: string }[] = [
+  { value: "low",    label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high",   label: "High" },
+];
+
+const priority_active_classes: Record<TicketPriority, string> = {
+  low:    "bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-500/15 dark:border-blue-500/30 dark:text-blue-400",
+  medium: "bg-warning-50 border-warning-300 text-warning-700 dark:bg-warning-500/15 dark:border-warning-500/30 dark:text-warning-400",
+  high:   "bg-error-50 border-error-300 text-error-700 dark:bg-error-500/15 dark:border-error-500/30 dark:text-error-400",
+};
+
+function PriorityDropdown({
+  current,
+  loading,
+  onChange,
+}: {
+  current: TicketPriority;
+  loading: boolean;
+  onChange: (p: TicketPriority) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        disabled={loading}
+        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-all hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed ${priority_color_map[current]}`}
+      >
+        {loading ? (
+          <svg className="animate-spin" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+          </svg>
+        ) : (
+          <span className={`h-1.5 w-1.5 rounded-full ${priority_dot_map[current]}`} />
+        )}
+        {priority_label_map[current]}
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${open ? "rotate-180" : ""}`}>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-1.5 z-50 min-w-[130px] rounded-xl border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900 py-1 overflow-hidden">
+          {PRIORITY_OPTIONS.map(({ value, label }) => {
+            const is_active = value === current;
+            return (
+              <button
+                key={value}
+                onClick={() => { onChange(value); setOpen(false); }}
+                disabled={is_active}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium transition-colors disabled:cursor-default ${
+                  is_active
+                    ? priority_active_classes[value]
+                    : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
+                }`}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${priority_dot_map[value]}`} />
+                {label}
+                {is_active && (
+                  <svg className="ml-auto" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
