@@ -1,60 +1,57 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import TicketList from "./TicketList";
-import NewTicketForm from "./NewTicketForm";
-import { Ticket, ticket_list } from "./supportData";
-
-type SupportView = "list" | "new_ticket";
+import { ApiTicket } from "./supportData";
+import { supportTicketsService } from "@/services/client/support-tickets.service";
 
 const SupportPage: React.FC = () => {
-  const [current_view, setCurrentView] = useState<SupportView>("list");
-  const [tickets, setTickets] = useState<Ticket[]>(ticket_list);
+  const [tickets, setTickets] = useState<ApiTicket[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleCreateTicket = (ticket_data: {
-    subject: string;
-    related_order: string;
-    message: string;
-  }) => {
-    const new_ticket: Ticket = {
-      id: `TKT-${String(tickets.length + 1).padStart(3, "0")}`,
-      subject: ticket_data.subject,
-      created_at: new Date().toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      }),
-      status: "open",
-      priority: "medium",
-      related_order: ticket_data.related_order,
-      messages: [
-        {
-          id: "msg_1",
-          content: ticket_data.message,
-          sender: "You",
-          created_at: new Date().toISOString(),
-        },
-      ],
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchTickets = async () => {
+      try {
+        const response = await supportTicketsService.getTickets({ per_page: 50 });
+        if (!cancelled) setTickets(response.data);
+      } catch {
+        if (!cancelled) setError("Failed to load tickets. Please refresh the page.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     };
 
-    setTickets((prev) => [new_ticket, ...prev]);
-    setCurrentView("list");
-  };
+    fetchTickets();
+    return () => { cancelled = true; };
+  }, []);
+
+  if (error) {
+    return (
+      <div className="rounded-2xl border border-gray-200 bg-white p-8 dark:border-gray-800 dark:bg-white/3">
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-error-50 dark:bg-error-500/10">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-error-500">
+              <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400"
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-8">
-      {current_view === "list" && (
-        <TicketList
-          tickets={tickets}
-          onNewTicket={() => setCurrentView("new_ticket")}
-        />
-      )}
-      {current_view === "new_ticket" && (
-        <NewTicketForm
-          onBack={() => setCurrentView("list")}
-          onSubmit={handleCreateTicket}
-        />
-      )}
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3 lg:p-8">
+      <TicketList tickets={tickets} loading={loading} />
     </div>
   );
 };
