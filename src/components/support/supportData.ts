@@ -102,6 +102,10 @@ export const order_options = [
   { value: "pr_campaign", label: "PR Campaign" },
 ];
 
+export const order_label_map: Record<string, string> = Object.fromEntries(
+  order_options.map(({ value, label }) => [value, label])
+);
+
 export function formatTicketDate(date_string: string): string {
   return new Date(date_string).toLocaleDateString("en-US", {
     year: "numeric",

@@ -11,6 +11,7 @@ import {
   priority_color_map,
   priority_dot_map,
   priority_label_map,
+  order_label_map,
   timeAgo,
   formatTicketDate,
   getSenderName,
@@ -300,11 +301,8 @@ function AdminTicketCard({
               </span>
 
               {ticket.related_order && (
-                <span className="inline-flex items-center gap-1 text-[11px] text-gray-500 dark:text-gray-400">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 0 1-8 0" />
-                  </svg>
-                  {ticket.related_order}
+                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                  {order_label_map[ticket.related_order] ?? ticket.related_order}
                 </span>
               )}
 
