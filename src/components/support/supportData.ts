@@ -93,10 +93,13 @@ export const priority_label_map: Record<TicketPriority, string> = {
 };
 
 export const order_options = [
-  { value: "ord_001", label: "ORD-001 - Link Building Campaign" },
-  { value: "ord_002", label: "ORD-002 - Content Refresh Package" },
-  { value: "ord_003", label: "ORD-003 - SEO Growth Plan" },
-  { value: "ord_004", label: "ORD-004 - PR Campaign" },
+  { value: "link_building", label: "Link Building" },
+  { value: "premium_mentions", label: "Premium Mentions" },
+  { value: "new_content", label: "New Content" },
+  { value: "content_refresh", label: "Content Refresh" },
+  { value: "sme_content", label: "SME Content" },
+  { value: "seo_packages", label: "SEO Packages" },
+  { value: "pr_campaign", label: "PR Campaign" },
 ];
 
 export function formatTicketDate(date_string: string): string {
