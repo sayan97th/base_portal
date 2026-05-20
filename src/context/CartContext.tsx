@@ -128,6 +128,8 @@ export interface CartContextType {
   bulk_discount_details: BulkDiscountDetail[];
   subtotal_after_bulk: number;
   total_discount: number;
+  effective_discount_amount: number;
+  active_discount_type: "bulk" | "coupon" | "none";
   total: number;
   item_count: number;
 
@@ -461,9 +463,27 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     0
   );
 
-  const total = Math.max(0, subtotal_after_bulk - total_discount);
+  // Only one discount type applies — whichever gives the bigger savings.
+  const effective_discount_amount = Math.max(bulk_discount_amount, total_discount);
+
+  const active_discount_type: "bulk" | "coupon" | "none" =
+    total_discount > 0 && total_discount >= bulk_discount_amount
+      ? "coupon"
+      : bulk_discount_amount > 0
+      ? "bulk"
+      : "none";
+
+  const total = Math.max(0, subtotal - effective_discount_amount);
 
   const item_count = items.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Auto-clear coupon when bulk discount becomes the better deal after items are added.
+  useEffect(() => {
+    if (!is_cart_ready) return;
+    if (applied_coupons.length > 0 && bulk_discount_amount > total_discount) {
+      setAppliedCoupons([]);
+    }
+  }, [is_cart_ready, bulk_discount_amount, total_discount]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <CartContext.Provider
@@ -496,6 +516,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         bulk_discount_details,
         subtotal_after_bulk,
         total_discount,
+        effective_discount_amount,
+        active_discount_type,
         total,
         item_count,
         bulk_discount_configs,

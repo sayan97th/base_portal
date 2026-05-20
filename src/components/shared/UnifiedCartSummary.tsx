@@ -100,8 +100,9 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
     subtotal,
     bulk_discount_amount,
     bulk_discount_details,
-    subtotal_after_bulk,
     total_discount,
+    effective_discount_amount,
+    active_discount_type,
     total,
     setItemQuantity,
     setAppliedCoupons,
@@ -126,7 +127,7 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
   // When paying with credits, no bulk discounts or coupons are applied —
   // credits already represent a discounted value.
   const effective_base = is_applying_credits ? subtotal : total;
-  const has_any_discount = (!is_applying_credits && (bulk_discount_amount > 0 || total_discount > 0)) || effective_credits > 0;
+  const has_any_discount = (!is_applying_credits && effective_discount_amount > 0) || effective_credits > 0;
   const raw_subtotal = subtotal;
   const total_after_credits = Math.max(0, effective_base - effective_credits);
   const credits_savings_pct = effective_base > 0 ? Math.round((effective_credits / effective_base) * 100) : 0;
@@ -134,18 +135,22 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
   // Suppress coupon field when paying with credits
   const effective_show_coupon = show_coupon_field && !is_applying_credits;
 
-  // Teasers: configs where threshold is not yet met but the relevant product type has items
+  // Teasers: configs where threshold is not yet met, hidden when a coupon is winning
   const teaser_details = bulk_discount_details.filter((d) => {
     if (d.is_applied) return false;
+    if (active_discount_type === "coupon") return false;
     if (d.config.applies_to === "all") return items.length > 0;
     return items.some((i) => i.product_type === d.config.applies_to);
   });
 
-  // Applied badges + price breakdown rows
-  const applied_details = bulk_discount_details.filter((d) => d.is_applied);
+  // Applied bulk badges — hidden when a coupon is the active discount
+  const applied_details = bulk_discount_details.filter(
+    (d) => d.is_applied && active_discount_type === "bulk"
+  );
 
+  // Coupon minimum check uses full subtotal since coupon replaces bulk if it wins
   const cart_below_minimum =
-    subtotal_after_bulk < MINIMUM_CART_FOR_COUPON &&
+    subtotal < MINIMUM_CART_FOR_COUPON &&
     coupon_input_code.trim().length > 0;
 
   const grouped_items = PRODUCT_TYPE_ORDER.map((product_type) => ({
@@ -173,15 +178,13 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
     const trimmed_code = coupon_input_code.trim();
     if (!trimmed_code) return;
 
-    const already_applied = applied_coupons.some(
-      (c) => c.code.toUpperCase() === trimmed_code.toUpperCase()
-    );
-    if (already_applied) {
-      setCouponError("This promo code has already been applied.");
+    // Only one promo code is allowed per order
+    if (applied_coupons.length >= 1) {
+      setCouponError("Only one promo code can be applied per order. Remove the current one first.");
       return;
     }
 
-    if (subtotal_after_bulk < MINIMUM_CART_FOR_COUPON) {
+    if (subtotal < MINIMUM_CART_FOR_COUPON) {
       setCouponError(
         `A minimum cart total of $${MINIMUM_CART_FOR_COUPON.toLocaleString(
           "en-US",
@@ -195,11 +198,6 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
     setCouponError(null);
 
     try {
-      const applied_discount = applied_coupons.reduce(
-        (sum, c) => sum + c.discount_amount,
-        0
-      );
-
       const lb_items = items.filter((i) => i.product_type === "link_building");
       const lb_tier_ids = lb_items.map((i) => i.tier_id);
       const lb_tier_amounts: Record<string, number> = {};
@@ -216,9 +214,10 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
           (product_type_amounts[i.product_type] ?? 0) + item_total;
       });
 
+      // Validate against full subtotal — if coupon wins, bulk discount won't apply
       const response = await validateCoupon({
         code: trimmed_code,
-        order_amount: Math.max(0, subtotal_after_bulk - applied_discount),
+        order_amount: subtotal,
         cart_product_types,
         product_type_amounts,
         ...(lb_tier_ids.length > 0 && {
@@ -228,10 +227,23 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
       });
 
       if (response.valid) {
+        // Reject coupon if the bulk quantity discount gives more savings
+        if (bulk_discount_amount > 0 && response.discount_amount < bulk_discount_amount) {
+          setCouponError(
+            `Your bulk quantity discount ($${bulk_discount_amount.toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}) saves more than this promo code ($${response.discount_amount.toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}). Only one discount type can apply — keep the bulk discount for better savings.`
+          );
+          return;
+        }
+
         setCouponInputCode("");
         setCouponError(null);
-        setAppliedCoupons((prev) => [
-          ...prev,
+        setAppliedCoupons([
           {
             coupon_id: response.coupon_id,
             code: response.code,
