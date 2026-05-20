@@ -111,6 +111,7 @@ export interface LinkBuildingOrderDetail {
   subtotal_before_discount: number;
   total_amount: number;
   credit_amount?: number;
+  payment_method?: string;
   status: OrderStatus;
   payment_intent_id: string | null;
   created_at: string;

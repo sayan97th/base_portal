@@ -94,6 +94,7 @@ export interface NewContentOrderDetail {
   subtotal_before_discount?: number;
   total_amount: number;
   credit_amount?: number;
+  payment_method?: string;
   status: string;
   created_at: string;
   updated_at: string;

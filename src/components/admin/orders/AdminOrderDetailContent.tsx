@@ -123,6 +123,12 @@ const WalletIcon = ({ className = "h-3.5 w-3.5" }: { className?: string }) => (
   </svg>
 );
 
+const CreditCardIcon = ({ className = "h-3.5 w-3.5" }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
+  </svg>
+);
+
 const UserIcon = () => (
   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
@@ -470,8 +476,22 @@ const InvoiceCard = ({ invoice }: InvoiceCardProps) => {
       </div>
       <dl className="px-5 py-1">
         <InfoRow label="Invoice Number" value={<span className="font-mono">{invoice.invoice_number}</span>} />
-        <InfoRow label="Payment Method" value={invoice.payment_method} />
-        <InfoRow label="Currency" value={invoice.currency_type.toUpperCase()} />
+        <InfoRow
+          label="Payment Method"
+          value={
+            invoice.payment_method === "Credit Card" ? (
+              <span className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-400">
+                <CreditCardIcon className="h-3 w-3" />
+                Credit Card
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-semibold text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-400">
+                <WalletIcon className="h-3 w-3" />
+                Account Credits
+              </span>
+            )
+          }
+        />
         <InfoRow label="Subtotal" value={formatCurrency(invoice.subtotal_amount)} />
         {invoice.discount_amount != null && invoice.discount_amount > 0 && (
           <InfoRow
@@ -903,6 +923,24 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
                   <InfoRow label="Items" value={`${order.items.length} item${order.items.length !== 1 ? "s" : ""}`} />
                   <InfoRow label="Placed" value={formatDate(order.created_at)} />
                   <InfoRow label="Last Updated" value={formatDate(order.updated_at)} />
+                  {order.invoice && (
+                    <InfoRow
+                      label="Payment Method"
+                      value={
+                        order.invoice.payment_method === "Credit Card" ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-400">
+                            <CreditCardIcon className="h-3 w-3" />
+                            Credit Card
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-semibold text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-400">
+                            <WalletIcon className="h-3 w-3" />
+                            Account Credits
+                          </span>
+                        )
+                      }
+                    />
+                  )}
                   {(() => {
                     const order_items_subtotal = order.items.reduce((s, i) => s + i.subtotal, 0);
                     const order_coupon_total = order.coupons?.reduce((s, c) => s + c.discount_amount, 0) ?? 0;

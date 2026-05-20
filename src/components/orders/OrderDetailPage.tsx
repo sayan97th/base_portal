@@ -184,6 +184,13 @@ function getDetectedCreditAmount(detected: DetectedOrderDetail | null): number {
   return data.credit_amount ?? 0;
 }
 
+// Extract payment_method from any detected order type
+function getDetectedPaymentMethod(detected: DetectedOrderDetail | null): string {
+  if (!detected) return "Credit Card";
+  const data = detected.data as { payment_method?: string };
+  return data.payment_method ?? "Credit Card";
+}
+
 // Extract subtotal_before_discount from any detected order type
 function getDetectedSubtotal(detected: DetectedOrderDetail | null): number {
   if (!detected) return 0;
@@ -318,6 +325,22 @@ const WalletIcon = () => (
       strokeLinecap="round"
       strokeLinejoin="round"
       d="M21 12a2.25 2.25 0 0 0-2.25-2.25H15a3 3 0 1 1-6 0H5.25A2.25 2.25 0 0 0 3 12m18 0v6a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 18v-6m18 0V9M3 12V9m18-3a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v3m18 0H3"
+    />
+  </svg>
+);
+
+const CreditCardIcon = () => (
+  <svg
+    className="h-3.5 w-3.5"
+    fill="none"
+    viewBox="0 0 24 24"
+    strokeWidth={2}
+    stroke="currentColor"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z"
     />
   </svg>
 );
@@ -570,23 +593,59 @@ const CouponRow: React.FC<{ coupon: GenericOrderCoupon }> = ({ coupon }) => (
   </div>
 );
 
+// ─── Payment Method Badge ────────────────────────────────────────────────────────
+
+const PaymentMethodBadge: React.FC<{ payment_method: string }> = ({ payment_method }) => {
+  const is_card = payment_method === "Credit Card";
+  return (
+    <div className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 ${
+      is_card
+        ? "border-blue-200 bg-blue-50 dark:border-blue-500/20 dark:bg-blue-500/10"
+        : "border-sky-200 bg-sky-50 dark:border-sky-500/20 dark:bg-sky-500/10"
+    }`}>
+      <span className={`flex h-6 w-6 items-center justify-center rounded-full ${
+        is_card
+          ? "bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400"
+          : "bg-sky-100 text-sky-600 dark:bg-sky-500/20 dark:text-sky-400"
+      }`}>
+        {is_card ? <CreditCardIcon /> : <WalletIcon />}
+      </span>
+      <div>
+        <p className={`text-xs font-medium uppercase tracking-wide ${
+          is_card ? "text-blue-500 dark:text-blue-400" : "text-sky-500 dark:text-sky-400"
+        }`}>
+          Payment Method
+        </p>
+        <p className={`text-sm font-semibold ${
+          is_card ? "text-blue-700 dark:text-blue-300" : "text-sky-700 dark:text-sky-300"
+        }`}>
+          {is_card ? "Credit Card" : "Account Credits"}
+        </p>
+      </div>
+    </div>
+  );
+};
+
 // ─── Credits Panel ───────────────────────────────────────────────────────────────
 
-const CreditsPanel: React.FC<{ credit_amount: number }> = ({ credit_amount }) => (
-  <div className="flex items-center justify-between gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 dark:border-sky-500/20 dark:bg-sky-500/10">
-    <div className="flex items-center gap-2">
-      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-sky-100 text-sky-600 dark:bg-sky-500/20 dark:text-sky-400">
-        <WalletIcon />
-      </span>
-      <span className="text-sm font-medium text-sky-700 dark:text-sky-400">
-        Credits Applied
+const CreditsPanel: React.FC<{ credit_amount: number; payment_method: string }> = ({ credit_amount, payment_method }) => {
+  const fully_credits = payment_method === "Account Balance";
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 dark:border-sky-500/20 dark:bg-sky-500/10">
+      <div className="flex items-center gap-2">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-sky-100 text-sky-600 dark:bg-sky-500/20 dark:text-sky-400">
+          <WalletIcon />
+        </span>
+        <span className="text-sm font-medium text-sky-700 dark:text-sky-400">
+          {fully_credits ? "Paid with Credits" : "Credits Applied"}
+        </span>
+      </div>
+      <span className="text-sm font-semibold tabular-nums text-sky-700 dark:text-sky-400">
+        -{formatCurrency(credit_amount)}
       </span>
     </div>
-    <span className="text-sm font-semibold tabular-nums text-sky-700 dark:text-sky-400">
-      -{formatCurrency(credit_amount)}
-    </span>
-  </div>
-);
+  );
+};
 
 // ─── Skeleton ───────────────────────────────────────────────────────────────────
 
@@ -679,6 +738,10 @@ const OrderDetailPage: React.FC<OrderDetailPageProps> = ({ order_id }) => {
   const credit_amount = is_lb
     ? (lb_data?.credit_amount ?? 0)
     : getDetectedCreditAmount(detected);
+
+  const payment_method = is_lb
+    ? (lb_data?.payment_method ?? "Credit Card")
+    : getDetectedPaymentMethod(detected);
 
   const items_subtotal = is_lb
     ? (lb_data?.items.reduce((s, i) => s + i.subtotal, 0) ?? 0)
@@ -953,7 +1016,7 @@ const OrderDetailPage: React.FC<OrderDetailPageProps> = ({ order_id }) => {
 
                   {/* Credits applied — all product types */}
                   {credit_amount > 0 && (
-                    <CreditsPanel credit_amount={credit_amount} />
+                    <CreditsPanel credit_amount={credit_amount} payment_method={payment_method} />
                   )}
 
                   {/* Total */}
@@ -1001,6 +1064,9 @@ const OrderDetailPage: React.FC<OrderDetailPageProps> = ({ order_id }) => {
                   </address>
                 </div>
               )}
+
+              {/* Payment Method */}
+              <PaymentMethodBadge payment_method={payment_method} />
 
               {/* Order Metadata */}
               <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3">
