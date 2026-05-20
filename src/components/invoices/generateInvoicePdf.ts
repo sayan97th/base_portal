@@ -172,13 +172,23 @@ function drawInvoiceMetadata(doc: jsPDF, invoice: InvoiceDetail, y_position: num
   const right_x = PAGE_WIDTH - PAGE_MARGIN;
   const label_x = right_x - 70;
 
-  const meta_fields = [
+  const is_credits_payment = invoice.payment_method === "Account Balance";
+  const is_credits_currency = invoice.total.includes("credits");
+
+  const meta_fields: { label: string; value: string; highlight?: boolean }[] = [
     { label: "Invoice number", value: invoice.invoice_number },
     { label: "Unique ID", value: invoice.unique_id },
     { label: "Date issued", value: invoice.date_issued },
     { label: "Date due", value: invoice.date_due },
     { label: "Date paid", value: invoice.date_paid ?? "—" },
-    { label: "Payment method", value: invoice.payment_method },
+    {
+      label: "Payment method",
+      value: is_credits_payment ? "Account Credits" : invoice.payment_method,
+      highlight: is_credits_payment,
+    },
+    ...(is_credits_currency
+      ? [{ label: "Currency", value: "Credits", highlight: true }]
+      : []),
   ];
 
   doc.setFontSize(FONT_SIZES.body);
@@ -189,7 +199,7 @@ function drawInvoiceMetadata(doc: jsPDF, invoice: InvoiceDetail, y_position: num
     doc.text(field.label, label_x, y_position, { align: "left" });
 
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(...COLORS.primary);
+    doc.setTextColor(...(field.highlight ? COLORS.success : COLORS.primary));
     doc.text(field.value, right_x, y_position, { align: "right" });
 
     y_position += 6;
@@ -349,6 +359,7 @@ function drawLineItemsTable(doc: jsPDF, invoice: InvoiceDetail, y_position: numb
 function drawSummarySection(doc: jsPDF, invoice: InvoiceDetail, y_position: number): number {
   const right_x = PAGE_WIDTH - PAGE_MARGIN;
   const label_x = right_x - 70;
+  const is_credits_payment = invoice.payment_method === "Account Balance";
 
   let needed = 30;
   if (invoice.discount) needed += 8;
@@ -440,6 +451,26 @@ function drawSummarySection(doc: jsPDF, invoice: InvoiceDetail, y_position: numb
   doc.setTextColor(...COLORS.secondary);
   doc.text("Credit", label_x, y_position);
   doc.text(invoice.credit, right_x, y_position, { align: "right" });
+
+  if (is_credits_payment && invoice.status === "paid") {
+    y_position += 10;
+    y_position = checkPageBreak(doc, y_position, 14);
+
+    const banner_w = CONTENT_WIDTH;
+    const banner_h = 10;
+    doc.setFillColor(...COLORS.success_bg);
+    doc.setDrawColor(...COLORS.success_border);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(PAGE_MARGIN, y_position - 6, banner_w, banner_h, 2, 2, "FD");
+
+    doc.setFontSize(FONT_SIZES.small);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...COLORS.success);
+    doc.text("Paid with Account Credits", PAGE_MARGIN + 5, y_position);
+
+    doc.setFont("helvetica", "normal");
+    doc.text("Settled using account balance", PAGE_MARGIN + 5 + doc.getTextWidth("Paid with Account Credits") + 4, y_position);
+  }
 
   return y_position;
 }
