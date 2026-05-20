@@ -772,29 +772,38 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
 
             {/* Payment method indicator */}
             {!is_payment_pending && session.payment_method && (
-              <div className={`flex items-center gap-2 border-t px-4 py-3 ${
-                session.payment_method === "Credit Card"
-                  ? "border-blue-100 bg-blue-50/60 dark:border-blue-500/20 dark:bg-blue-500/5"
-                  : "border-sky-100 bg-sky-50/60 dark:border-sky-500/20 dark:bg-sky-500/5"
-              }`}>
-                <span className={`flex h-5 w-5 items-center justify-center rounded-full ${
-                  session.payment_method === "Credit Card"
-                    ? "bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400"
-                    : "bg-sky-100 text-sky-600 dark:bg-sky-500/20 dark:text-sky-400"
-                }`}>
-                  {session.payment_method === "Credit Card"
-                    ? <CreditCardIcon className="h-3 w-3" />
-                    : <WalletIcon className="h-3 w-3" />
-                  }
-                </span>
-                <span className={`text-xs font-medium ${
-                  session.payment_method === "Credit Card"
-                    ? "text-blue-700 dark:text-blue-400"
-                    : "text-sky-700 dark:text-sky-400"
-                }`}>
-                  Paid with {session.payment_method === "Credit Card" ? "Credit Card" : "Account Credits"}
-                </span>
-              </div>
+              session.payment_method === "Credit Card" ? (
+                <div className="flex items-center gap-2 border-t border-blue-100 bg-blue-50/60 dark:border-blue-500/20 dark:bg-blue-500/5 px-4 py-3">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400">
+                    <CreditCardIcon className="h-3 w-3" />
+                  </span>
+                  <span className="text-xs font-medium text-blue-700 dark:text-blue-400">
+                    Paid with Credit Card
+                  </span>
+                </div>
+              ) : (
+                <div className="border-t border-emerald-100 dark:border-emerald-500/20 bg-linear-to-r from-emerald-50 to-teal-50/40 dark:from-emerald-500/8 dark:to-teal-500/5 px-4 py-3.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-500/20 shadow-sm">
+                        <WalletIcon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                      </span>
+                      <div>
+                        <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                          Paid with Account Credits
+                        </p>
+                        <p className="text-[11px] text-emerald-600/70 dark:text-emerald-500 mt-0.5">
+                          Deducted from your account balance
+                        </p>
+                      </div>
+                    </div>
+                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 px-3 py-1 text-sm font-bold text-emerald-700 dark:text-emerald-400">
+                      <CheckCircleIcon className="h-3.5 w-3.5" />
+                      {formatCurrency(session.total_amount)}
+                    </span>
+                  </div>
+                </div>
+              )
             )}
           </div>
         )}
