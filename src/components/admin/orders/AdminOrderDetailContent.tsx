@@ -104,6 +104,14 @@ const PRODUCT_TYPE_CONFIG: Record<
   },
 };
 
+function billingHasContent(billing: { company: string | null; address: string; city: string; state: string; country: string; postal_code: string }): boolean {
+  return !!(billing.address || billing.city || billing.state || billing.country || billing.postal_code || billing.company);
+}
+
+function isCreditsPayment(payment_intent_id: string | null): boolean {
+  return !!payment_intent_id && payment_intent_id.startsWith("credits_");
+}
+
 function getItemPrimaryLabel(item: OrderItem): string {
   if (item.item_name) return item.item_name;
   if (item.dr_tier?.label) return item.dr_tier.label;
@@ -1059,8 +1067,8 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
               {/* Invoice Card */}
               {order.invoice && <InvoiceCard invoice={order.invoice} />}
 
-              {/* Billing Address */}
-              {order.billing && (
+              {/* Billing Address — only shown when actual address data exists */}
+              {order.billing && billingHasContent(order.billing) && (
                 <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
                   <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
                     <h3 className="text-sm font-semibold text-gray-800 dark:text-white/90">Billing Address</h3>
@@ -1069,25 +1077,52 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
                     {order.billing.company && (
                       <p className="font-medium text-gray-800 dark:text-white/80">{order.billing.company}</p>
                     )}
-                    <p>{order.billing.address}</p>
-                    <p>
-                      {order.billing.city}, {order.billing.state} {order.billing.postal_code}
-                    </p>
-                    <p>{order.billing.country}</p>
+                    {order.billing.address && <p>{order.billing.address}</p>}
+                    {(order.billing.city || order.billing.state || order.billing.postal_code) && (
+                      <p>
+                        {[order.billing.city, order.billing.state, order.billing.postal_code]
+                          .filter(Boolean)
+                          .join(", ")}
+                      </p>
+                    )}
+                    {order.billing.country && <p>{order.billing.country}</p>}
                   </address>
                 </div>
               )}
 
-              {/* Payment Intent */}
+              {/* Payment Reference */}
               {order.payment_intent_id && (
-                <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3">
-                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    Payment Reference
-                  </h3>
-                  <p className="break-all font-mono text-xs text-gray-600 dark:text-gray-400">
-                    {order.payment_intent_id}
-                  </p>
-                </div>
+                isCreditsPayment(order.payment_intent_id) ? (
+                  <div className="overflow-hidden rounded-xl border border-sky-200 bg-sky-50 dark:border-sky-500/25 dark:bg-sky-500/10">
+                    <div className="border-b border-sky-200 px-5 py-3.5 dark:border-sky-500/25">
+                      <h3 className="text-xs font-semibold uppercase tracking-wider text-sky-600 dark:text-sky-400">
+                        Payment Reference
+                      </h3>
+                    </div>
+                    <div className="flex items-center gap-3 px-5 py-4">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-500/20">
+                        <WalletIcon className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+                      </span>
+                      <div>
+                        <p className="text-sm font-semibold text-sky-800 dark:text-sky-200">
+                          Paid with Account Credits
+                        </p>
+                        <p className="mt-0.5 text-xs text-sky-600/80 dark:text-sky-400/80">
+                          This order was fully paid using platform credits
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3">
+                    <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                      Payment Reference
+                    </h3>
+                    <p className="break-all font-mono text-xs text-gray-600 dark:text-gray-400">
+                      {order.payment_intent_id}
+                    </p>
+                  </div>
+                )
               )}
             </div>
           </div>
