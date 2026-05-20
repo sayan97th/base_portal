@@ -4,6 +4,7 @@ import { useSidebar } from "@/context/SidebarContext";
 import AppHeader from "@/layout/AppHeader";
 import AppSidebar from "@/layout/AppSidebar";
 import Backdrop from "@/layout/Backdrop";
+import ImpersonationBanner from "@/components/ImpersonationBanner";
 import React from "react";
 
 export default function UserLayout({
@@ -29,6 +30,8 @@ export default function UserLayout({
       <div
         className={`flex-1 transition-all  duration-300 ease-in-out ${mainContentMargin}`}
       >
+        {/* Impersonation Banner — shown above header when admin is impersonating */}
+        <ImpersonationBanner />
         {/* Header */}
         <AppHeader />
         {/* Page Content */}

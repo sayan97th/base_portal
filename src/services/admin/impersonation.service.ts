@@ -1,0 +1,100 @@
+import { apiClient, setToken, getToken, removeToken } from "@/lib/api-client";
+import { setPrimaryRoleCookie } from "@/lib/roles";
+import type { ImpersonationResponse, ImpersonationMeta } from "@/types/auth";
+
+const ADMIN_TOKEN_KEY = "impersonation_admin_token";
+const ADMIN_EXPIRES_KEY = "impersonation_admin_expires_at";
+const IMPERSONATION_META_KEY = "impersonation_meta";
+
+export const impersonationService = {
+  async startImpersonation(user_id: number): Promise<ImpersonationResponse> {
+    const data = await apiClient.post<ImpersonationResponse>(
+      `/api/admin/users/${user_id}/impersonate`
+    );
+
+    const admin_token = getToken();
+    const admin_expires_at =
+      typeof window !== "undefined"
+        ? localStorage.getItem("token_expires_at")
+        : null;
+
+    if (admin_token) {
+      localStorage.setItem(ADMIN_TOKEN_KEY, admin_token);
+    }
+    if (admin_expires_at) {
+      localStorage.setItem(ADMIN_EXPIRES_KEY, admin_expires_at);
+    }
+
+    const meta: ImpersonationMeta = {
+      admin_id: data.admin_user.id,
+      admin_first_name: data.admin_user.first_name,
+      admin_last_name: data.admin_user.last_name,
+      admin_email: data.admin_user.email,
+      client_id: data.impersonated_user.id,
+      client_first_name: data.impersonated_user.first_name,
+      client_last_name: data.impersonated_user.last_name,
+      client_email: data.impersonated_user.email,
+      started_at: new Date().toISOString(),
+    };
+    localStorage.setItem(IMPERSONATION_META_KEY, JSON.stringify(meta));
+
+    setToken(data.impersonation_token);
+    const expires_at = Date.now() + data.expires_in * 1000;
+    localStorage.setItem("token_expires_at", expires_at.toString());
+    setPrimaryRoleCookie("client");
+
+    return data;
+  },
+
+  async stopImpersonation(): Promise<void> {
+    try {
+      await apiClient.post("/api/admin/impersonation/stop");
+    } catch {
+      // Always restore the admin token even if the API call fails
+    }
+
+    const admin_token = localStorage.getItem(ADMIN_TOKEN_KEY);
+    const admin_expires_at = localStorage.getItem(ADMIN_EXPIRES_KEY);
+
+    if (admin_token) {
+      setToken(admin_token);
+    } else {
+      removeToken();
+    }
+
+    if (admin_expires_at) {
+      localStorage.setItem("token_expires_at", admin_expires_at);
+    } else {
+      localStorage.removeItem("token_expires_at");
+    }
+
+    localStorage.removeItem(ADMIN_TOKEN_KEY);
+    localStorage.removeItem(ADMIN_EXPIRES_KEY);
+    localStorage.removeItem(IMPERSONATION_META_KEY);
+
+    setPrimaryRoleCookie("admin");
+  },
+
+  isImpersonating(): boolean {
+    if (typeof window === "undefined") return false;
+    return !!localStorage.getItem(ADMIN_TOKEN_KEY);
+  },
+
+  getImpersonationMeta(): ImpersonationMeta | null {
+    if (typeof window === "undefined") return null;
+    const raw = localStorage.getItem(IMPERSONATION_META_KEY);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as ImpersonationMeta;
+    } catch {
+      return null;
+    }
+  },
+
+  clearImpersonation(): void {
+    if (typeof window === "undefined") return;
+    localStorage.removeItem(ADMIN_TOKEN_KEY);
+    localStorage.removeItem(ADMIN_EXPIRES_KEY);
+    localStorage.removeItem(IMPERSONATION_META_KEY);
+  },
+};

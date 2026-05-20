@@ -236,3 +236,32 @@ export interface TwoFactorDisableData {
 export interface TwoFactorDisableResponse {
   message: string;
 }
+
+// ── Impersonation ──────────────────────────────────────────────────────────────
+
+export interface ImpersonationAdminUser {
+  id: number;
+  first_name: string;
+  last_name: string;
+  email: string;
+}
+
+export interface ImpersonationResponse {
+  impersonation_token: string;
+  token_type: string;
+  expires_in: number;
+  impersonated_user: User;
+  admin_user: ImpersonationAdminUser;
+}
+
+export interface ImpersonationMeta {
+  admin_id: number;
+  admin_first_name: string;
+  admin_last_name: string;
+  admin_email: string;
+  client_id: number;
+  client_first_name: string;
+  client_last_name: string;
+  client_email: string;
+  started_at: string;
+}

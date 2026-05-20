@@ -2,7 +2,9 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { listAdminClients, banUser, unbanUser } from "@/services/admin/user.service";
+import { impersonationService } from "@/services/admin/impersonation.service";
 import type { AdminUser, ClientSortField, ClientEmailStatusFilter, ClientAccountStatusFilter, SortDirection } from "@/types/admin";
 import type { ApiError } from "@/types/auth";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -10,6 +12,7 @@ import BanUserModal from "@/components/admin/users/BanUserModal";
 import ClientFiltersBar from "@/components/admin/clients/ClientFiltersBar";
 import AddClientModal from "@/components/admin/clients/AddClientModal";
 import ClientActionsDropdown from "@/components/admin/clients/ClientActionsDropdown";
+import ImpersonationDialog from "@/components/admin/clients/ImpersonationDialog";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -139,6 +142,8 @@ function SkeletonRows() {
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export default function AdminClientsContent() {
+  const router = useRouter();
+
   const [clients, setClients] = useState<AdminUser[]>([]);
   const [page, setPage] = useState(1);
   const [last_page, setLastPage] = useState(1);
@@ -166,6 +171,11 @@ export default function AdminClientsContent() {
   const [ban_mode, setBanMode] = useState<"ban" | "unban">("ban");
   const [is_ban_loading, setIsBanLoading] = useState(false);
   const [ban_error, setBanError] = useState<string | null>(null);
+
+  // ── Impersonation state ──────────────────────────────────────────────────
+  const [impersonate_target, setImpersonateTarget] = useState<AdminUser | null>(null);
+  const [is_impersonating, setIsImpersonating] = useState(false);
+  const [impersonation_error, setImpersonationError] = useState<string | null>(null);
 
   // Reset to page 1 whenever any filter changes
   useEffect(() => {
@@ -266,6 +276,32 @@ export default function AdminClientsContent() {
     }
   };
 
+  // ── Impersonation handlers ────────────────────────────────────────────────
+
+  const openImpersonateDialog = (client: AdminUser) => {
+    setImpersonateTarget(client);
+    setImpersonationError(null);
+  };
+
+  const closeImpersonateDialog = () => {
+    if (!is_impersonating) setImpersonateTarget(null);
+  };
+
+  const handleImpersonateConfirm = async () => {
+    if (!impersonate_target) return;
+    setIsImpersonating(true);
+    setImpersonationError(null);
+
+    try {
+      await impersonationService.startImpersonation(impersonate_target.id);
+      router.push("/dashboard");
+    } catch (err: unknown) {
+      const api_error = err as ApiError;
+      setImpersonationError(api_error.message || "Failed to start impersonation. Please try again.");
+      setIsImpersonating(false);
+    }
+  };
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   const has_filters =
@@ -336,6 +372,11 @@ export default function AdminClientsContent() {
       {ban_error && (
         <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">
           {ban_error}
+        </div>
+      )}
+      {impersonation_error && (
+        <div className="rounded-xl bg-violet-50 px-4 py-3 text-sm text-violet-700 dark:bg-violet-500/10 dark:text-violet-400">
+          {impersonation_error}
         </div>
       )}
 
@@ -446,6 +487,18 @@ export default function AdminClientsContent() {
                           <p className="truncate text-xs text-gray-500 dark:text-gray-400">
                             {client.email}
                           </p>
+                          {client.is_active && (
+                            <button
+                              onClick={() => openImpersonateDialog(client)}
+                              className="mt-0.5 inline-flex items-center gap-1 text-xs text-violet-500 transition-colors hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300"
+                            >
+                              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                              </svg>
+                              Impersonation
+                            </button>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -484,6 +537,19 @@ export default function AdminClientsContent() {
                     {/* Actions column */}
                     <td className="px-5 py-3.5 text-right">
                       <div className="inline-flex items-center gap-2">
+                        {client.is_active && (
+                          <button
+                            onClick={() => openImpersonateDialog(client)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-700 shadow-xs transition-colors hover:bg-violet-100 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-400 dark:hover:bg-violet-500/20"
+                            title="Impersonate this client"
+                          >
+                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                            </svg>
+                            Impersonate
+                          </button>
+                        )}
                         <Link
                           href={`/admin/users/${client.id}?from=clients`}
                           className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 shadow-xs transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-white/3 dark:text-gray-400 dark:hover:bg-white/5"
@@ -576,6 +642,17 @@ export default function AdminClientsContent() {
           setRefreshCounter((c) => c + 1);
         }}
       />
+
+      {/* ── Impersonation dialog ── */}
+      {impersonate_target && (
+        <ImpersonationDialog
+          client={impersonate_target}
+          is_open={!!impersonate_target}
+          is_loading={is_impersonating}
+          onConfirm={handleImpersonateConfirm}
+          onClose={closeImpersonateDialog}
+        />
+      )}
     </div>
   );
 }
