@@ -60,6 +60,7 @@ const ContentOptimizationsPage: React.FC = () => {
     getQuantitiesForProductType,
     setItemQuantity,
     item_count,
+    subtotal,
     total,
   } = useCart();
   const { saved_billing_address, has_saved_address } = useBillingAddress();
@@ -291,7 +292,7 @@ const ContentOptimizationsPage: React.FC = () => {
                   onPayLater={handlePayLater}
                   is_loading={is_submitting}
                   error_message={submit_error}
-                  total_amount={total}
+                  total_amount={is_applying_credits ? subtotal : total}
                   saved_billing_address={saved_billing_address}
                   onApplySavedAddress={handleApplySavedAddress}
                   back_label={back_label_for_checkout}

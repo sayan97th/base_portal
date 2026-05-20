@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useCart } from "@/context/CartContext";
 import { validateCoupon } from "@/services/client/coupons.service";
 import type { CartProductType } from "@/types/client/unified-cart";
@@ -105,11 +105,28 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
   const [coupon_error, setCouponError] = useState<string | null>(null);
   const [coupon_is_applying, setCouponIsApplying] = useState(false);
 
+  // When credits are applied, clear any previously applied coupons — credits
+  // represent pre-purchased value so no additional discounts are allowed.
+  useEffect(() => {
+    if (is_applying_credits && (applied_coupons.length > 0 || coupon_input_code.trim())) {
+      setAppliedCoupons([]);
+      setCouponInputCode("");
+      setCouponError(null);
+    }
+  }, [is_applying_credits]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const effective_credits = is_applying_credits ? credits_to_apply : 0;
-  const has_any_discount = bulk_discount_amount > 0 || total_discount > 0 || effective_credits > 0;
+
+  // When paying with credits, no bulk discounts or coupons are applied —
+  // credits already represent a discounted value.
+  const effective_base = is_applying_credits ? subtotal : total;
+  const has_any_discount = (!is_applying_credits && (bulk_discount_amount > 0 || total_discount > 0)) || effective_credits > 0;
   const raw_subtotal = subtotal;
-  const total_after_credits = Math.max(0, total - effective_credits);
-  const credits_savings_pct = total > 0 ? Math.round((effective_credits / total) * 100) : 0;
+  const total_after_credits = Math.max(0, effective_base - effective_credits);
+  const credits_savings_pct = effective_base > 0 ? Math.round((effective_credits / effective_base) * 100) : 0;
+
+  // Suppress coupon field when paying with credits
+  const effective_show_coupon = show_coupon_field && !is_applying_credits;
 
   // Teasers: configs where threshold is not yet met but the relevant product type has items
   const teaser_details = bulk_discount_details.filter((d) => {
@@ -239,8 +256,8 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
         Order Summary
       </h2>
 
-      {/* Bulk discount progress teasers — one per eligible config */}
-      {teaser_details.map((detail) => {
+      {/* Bulk discount progress teasers — hidden when paying with credits */}
+      {!is_applying_credits && teaser_details.map((detail) => {
         const pct = Math.round(detail.config.discount_rate);
         return (
           <div
@@ -274,8 +291,8 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
         );
       })}
 
-      {/* Bulk discount applied badges — one per applied config */}
-      {applied_details.map((detail) => {
+      {/* Bulk discount applied badges — hidden when paying with credits */}
+      {!is_applying_credits && applied_details.map((detail) => {
         const pct = Math.round(detail.config.discount_rate);
         return (
           <div
@@ -399,8 +416,30 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
         </p>
       )}
 
+      {/* Credits mode: no coupons or discounts allowed */}
+      {show_coupon_field && is_applying_credits && (
+        <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-3 dark:border-emerald-500/20 dark:bg-emerald-500/10">
+          <svg
+            className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+            />
+          </svg>
+          <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
+            Promo codes and bulk discounts are not available when paying with account credits. Credits already represent a discounted value.
+          </p>
+        </div>
+      )}
+
       {/* Multi-coupon section */}
-      {show_coupon_field && (
+      {effective_show_coupon && (
         <div className="mb-5">
           <div className="mb-3 flex items-center gap-2">
             <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-500/20">
@@ -618,7 +657,8 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
               </p>
             </div>
 
-            {applied_details.map((detail) => (
+            {/* Bulk discounts — suppressed when paying with credits */}
+            {!is_applying_credits && applied_details.map((detail) => (
               <div key={detail.config.id} className="flex items-center justify-between">
                 <p className="text-xs font-medium text-violet-600 dark:text-violet-400">
                   Bulk Discount ({Math.round(detail.config.discount_rate)}% off{" "}
@@ -634,40 +674,43 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
               </div>
             ))}
 
-            {applied_coupons.length > 1
-              ? applied_coupons.map((applied) => (
-                  <div
-                    key={applied.code}
-                    className="flex items-center justify-between"
-                  >
-                    <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 truncate max-w-[60%]">
-                      {applied.coupon_name}
-                    </p>
-                    <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
-                      &minus;$
-                      {applied.discount_amount.toLocaleString("en-US", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </p>
-                  </div>
-                ))
-              : total_discount > 0 && (
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                      Coupon Discount
-                    </p>
-                    <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
-                      &minus;$
-                      {total_discount.toLocaleString("en-US", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </p>
-                  </div>
-                )}
+            {/* Coupon discounts — suppressed when paying with credits */}
+            {!is_applying_credits && (
+              applied_coupons.length > 1
+                ? applied_coupons.map((applied) => (
+                    <div
+                      key={applied.code}
+                      className="flex items-center justify-between"
+                    >
+                      <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 truncate max-w-[60%]">
+                        {applied.coupon_name}
+                      </p>
+                      <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                        &minus;$
+                        {applied.discount_amount.toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </p>
+                    </div>
+                  ))
+                : total_discount > 0 && (
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                        Coupon Discount
+                      </p>
+                      <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                        &minus;$
+                        {total_discount.toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </p>
+                    </div>
+                  )
+            )}
 
-            {applied_coupons.length > 1 && (
+            {!is_applying_credits && applied_coupons.length > 1 && (
               <div className="flex items-center justify-between rounded-lg bg-emerald-50 px-2.5 py-1.5 dark:bg-emerald-500/10">
                 <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
                   Total Savings

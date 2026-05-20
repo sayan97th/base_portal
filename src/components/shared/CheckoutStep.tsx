@@ -509,6 +509,19 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
     onCreditsChange?.(is_applying_credits, is_applying_credits ? credits_to_apply : 0);
   }, [is_applying_credits, credits_to_apply, onCreditsChange]);
 
+  // When the parent adjusts total_amount (e.g., switching between discounted and
+  // full-price base when credits are toggled), re-calibrate credits_to_apply to
+  // the new maximum so the user's credits always cover the correct amount.
+  const prev_total_amount_ref = useRef(total_amount);
+  useEffect(() => {
+    const prev = prev_total_amount_ref.current;
+    prev_total_amount_ref.current = total_amount;
+    if (!is_applying_credits || total_amount === prev || !has_auto_applied.current) return;
+    const new_max = Math.min(credit_balance, Math.ceil(total_amount));
+    setCreditsToApply(new_max);
+    setCreditsInput(String(new_max));
+  }, [total_amount, is_applying_credits, credit_balance]);
+
   // ── Credits handlers ──────────────────────────────────────────
 
   const handleCreditsToggle = useCallback((enabled: boolean) => {
