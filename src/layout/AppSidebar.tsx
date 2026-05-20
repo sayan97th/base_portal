@@ -99,7 +99,6 @@ const sidebar_sections: SidebarSection[] = [
     items: [
       { name: "Profile", icon: <UserCircleIcon />, path: "/profile" },
       { name: "Orders", icon: <ListIcon />, path: "/orders" },
-      { name: "Team", icon: <GroupIcon />, path: "/team" },
       { name: "Billing", icon: <CreditCardIcon />, path: "/billing" },
       { name: "Invoices", icon: <DollarLineIcon />, path: "/invoices" },
       { name: "Credits", icon: <BoltIcon />, path: "/credits" },
