@@ -238,6 +238,7 @@ export interface ValidateCouponResponse {
   discount_type: CouponDiscountType;
   discount_value: number;
   applies_to: CouponAppliesTo;
+  product_types?: string[];
   dr_tier_id: string | null;
   minimum_purchase_amount: number | null;
   discount_amount: number;

@@ -45,6 +45,10 @@ export interface CartAppliedCoupon {
   discount_amount: number;
   discount_type: string;
   discount_value: number;
+  applies_to?: string;
+  product_types?: string[];
+  minimum_purchase_amount?: number | null;
+  dr_tier_id?: string | null;
 }
 
 export interface UnifiedCartPayload {

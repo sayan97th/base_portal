@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 
 export interface SummaryItem {
   id: string;
@@ -145,6 +145,29 @@ const OrderSummary: React.FC<OrderSummaryProps> = ({
     },
     [applyCoupon]
   );
+
+  // Keep a stable ref to on_coupon_applied so effects can call it without
+  // adding it to their dependency arrays (avoids re-triggering on identity changes).
+  const on_coupon_applied_ref = useRef(on_coupon_applied);
+  useEffect(() => {
+    on_coupon_applied_ref.current = on_coupon_applied;
+  });
+
+  // Auto-remove the coupon when all items are cleared from the cart.
+  useEffect(() => {
+    if (!applied_coupon || total > 0) return;
+    setAppliedCoupon(null);
+    setCouponInput("");
+    setCouponError("");
+    on_coupon_applied_ref.current?.(null, 0);
+  }, [total, applied_coupon]);
+
+  // Notify the parent whenever the effective discount changes due to a total change,
+  // so the parent's tracked charge amount stays in sync.
+  useEffect(() => {
+    if (!applied_coupon) return;
+    on_coupon_applied_ref.current?.(applied_coupon.code, discount_amount);
+  }, [discount_amount, applied_coupon]);
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03] lg:sticky lg:top-24">

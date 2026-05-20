@@ -107,6 +107,8 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
     setItemQuantity,
     setAppliedCoupons,
     setCouponInputCode,
+    coupon_adjustment_notice,
+    setCouponAdjustmentNotice,
   } = useCart();
 
   const [coupon_error, setCouponError] = useState<string | null>(null);
@@ -243,6 +245,7 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
 
         setCouponInputCode("");
         setCouponError(null);
+        setCouponAdjustmentNotice(null);
         setAppliedCoupons([
           {
             coupon_id: response.coupon_id,
@@ -251,6 +254,10 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
             discount_amount: response.discount_amount,
             discount_type: response.discount_type,
             discount_value: response.discount_value,
+            applies_to: response.applies_to,
+            product_types: response.product_types ?? [],
+            minimum_purchase_amount: response.minimum_purchase_amount,
+            dr_tier_id: response.dr_tier_id,
           },
         ]);
       } else {
@@ -266,6 +273,7 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
   const handleRemoveCoupon = (code: string) => {
     setAppliedCoupons((prev) => prev.filter((c) => c.code !== code));
     setCouponError(null);
+    setCouponAdjustmentNotice(null);
   };
 
   return (
@@ -497,6 +505,38 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
           <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
             Promo codes and bulk discounts are not available when paying with account credits. Credits already represent a discounted value.
           </p>
+        </div>
+      )}
+
+      {/* Coupon adjustment notice — shown when a coupon is auto-removed or recalculated */}
+      {coupon_adjustment_notice && (
+        <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-2.5 dark:border-amber-500/25 dark:bg-amber-500/10">
+          <svg
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"
+            />
+          </svg>
+          <p className="flex-1 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+            {coupon_adjustment_notice}
+          </p>
+          <button
+            type="button"
+            onClick={() => setCouponAdjustmentNotice(null)}
+            className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-amber-500/60 transition-colors hover:bg-amber-200 hover:text-amber-700 dark:hover:bg-amber-500/20 dark:hover:text-amber-300"
+            aria-label="Dismiss notice"
+          >
+            <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
       )}
 

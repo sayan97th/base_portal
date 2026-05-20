@@ -27,6 +27,7 @@ import type { Discount, BulkDiscountDetail } from "@/types/admin/discounts";
 const CART_STORAGE_KEY = "unified_cart_v1";
 const CART_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
 const SERVER_SYNC_DEBOUNCE_MS = 1500;
+const MINIMUM_CART_FOR_COUPON = 500;
 
 interface CartSnapshot extends UnifiedCartPayload {
   version: 1;
@@ -134,6 +135,9 @@ export interface CartContextType {
   item_count: number;
 
   bulk_discount_configs: Discount[];
+
+  coupon_adjustment_notice: string | null;
+  setCouponAdjustmentNotice: Dispatch<SetStateAction<string | null>>;
 }
 
 const CartContext = createContext<CartContextType | null>(null);
@@ -146,6 +150,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [order_notes, setOrderNotes] = useState("");
   const [is_cart_ready, setIsCartReady] = useState(false);
   const [bulk_discount_configs, setBulkDiscountConfigs] = useState<Discount[]>([]);
+  const [coupon_adjustment_notice, setCouponAdjustmentNotice] = useState<string | null>(null);
 
   const save_timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -477,13 +482,112 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const item_count = items.reduce((sum, item) => sum + item.quantity, 0);
 
-  // Auto-clear coupon when bulk discount becomes the better deal after items are added.
+  // Recalculate and validate applied coupons whenever items or bulk discount change.
+  // Keeps discount amounts in sync with the current cart, removes coupons that no
+  // longer qualify, and defers to bulk discount when it gives more savings.
+  // Anti-gaming: prevents clients from locking in a discount then adjusting quantities
+  // to extract more value than the coupon was intended to provide.
   useEffect(() => {
-    if (!is_cart_ready) return;
-    if (applied_coupons.length > 0 && bulk_discount_amount > total_discount) {
+    if (!is_cart_ready || applied_coupons.length === 0) return;
+
+    const new_subtotal = items.reduce(
+      (sum, i) => sum + i.quantity * i.unit_price,
+      0
+    );
+
+    // Cart dropped below the global minimum — remove all coupons
+    if (new_subtotal < MINIMUM_CART_FOR_COUPON) {
       setAppliedCoupons([]);
+      setCouponAdjustmentNotice(
+        `Your promo code was removed because your cart dropped below the $${MINIMUM_CART_FOR_COUPON.toLocaleString(
+          "en-US",
+          { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+        )} minimum required for promo codes.`
+      );
+      return;
     }
-  }, [is_cart_ready, bulk_discount_amount, total_discount]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    let changed = false;
+    const updated: CartAppliedCoupon[] = [];
+
+    for (const coupon of applied_coupons) {
+      let applicable_subtotal = new_subtotal;
+
+      // Determine the subtotal this coupon can act on
+      if (coupon.product_types && coupon.product_types.length > 0) {
+        applicable_subtotal = items
+          .filter((i) => (coupon.product_types as string[]).includes(i.product_type))
+          .reduce((sum, i) => sum + i.quantity * i.unit_price, 0);
+
+        if (applicable_subtotal === 0) {
+          changed = true;
+          setCouponAdjustmentNotice(
+            `Promo code "${coupon.code}" was removed — none of the qualifying products remain in your cart.`
+          );
+          continue;
+        }
+      } else if (coupon.applies_to === "specific_product" && coupon.dr_tier_id) {
+        applicable_subtotal = items
+          .filter(
+            (i) =>
+              i.product_type === "link_building" &&
+              i.tier_id === coupon.dr_tier_id
+          )
+          .reduce((sum, i) => sum + i.quantity * i.unit_price, 0);
+
+        if (applicable_subtotal === 0) {
+          changed = true;
+          setCouponAdjustmentNotice(
+            `Promo code "${coupon.code}" was removed — the qualifying product is no longer in your cart.`
+          );
+          continue;
+        }
+      }
+
+      // Check minimum purchase requirement
+      if (
+        coupon.applies_to === "minimum_purchase" &&
+        coupon.minimum_purchase_amount != null &&
+        new_subtotal < coupon.minimum_purchase_amount
+      ) {
+        changed = true;
+        setCouponAdjustmentNotice(
+          `Promo code "${coupon.code}" was removed — your cart no longer meets the $${coupon.minimum_purchase_amount.toLocaleString(
+            "en-US",
+            { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+          )} minimum purchase requirement.`
+        );
+        continue;
+      }
+
+      // Recalculate discount based on current applicable subtotal
+      const new_discount =
+        coupon.discount_type === "percentage"
+          ? Math.round(applicable_subtotal * (coupon.discount_value / 100) * 100) / 100
+          : Math.min(coupon.discount_value, applicable_subtotal);
+
+      if (new_discount !== coupon.discount_amount) changed = true;
+
+      updated.push({ ...coupon, discount_amount: new_discount });
+    }
+
+    if (updated.length === 0) {
+      if (changed) setAppliedCoupons([]);
+      return;
+    }
+
+    // Defer to bulk discount when it now gives more savings than the recalculated coupon
+    const recalculated_coupon_total = updated.reduce(
+      (sum, c) => sum + c.discount_amount,
+      0
+    );
+    if (bulk_discount_amount > 0 && bulk_discount_amount > recalculated_coupon_total) {
+      setAppliedCoupons([]);
+      return;
+    }
+
+    if (changed) setAppliedCoupons(updated);
+  }, [is_cart_ready, items, applied_coupons, bulk_discount_amount]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <CartContext.Provider
@@ -521,6 +625,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         total,
         item_count,
         bulk_discount_configs,
+        coupon_adjustment_notice,
+        setCouponAdjustmentNotice,
       }}
     >
       {children}
