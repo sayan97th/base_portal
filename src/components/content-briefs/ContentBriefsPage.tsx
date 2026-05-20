@@ -237,6 +237,9 @@ const ContentBriefsPage: React.FC = () => {
               action_label="Proceed to Checkout"
               onAction={handleProceedFromReview}
               show_coupon_field
+              is_quantity_locked
+              on_back={() => { setCurrentStep("intake"); scrollToTop(); }}
+              back_label="Back to Intake Form"
             />
           </div>
         </div>
@@ -275,6 +278,9 @@ const ContentBriefsPage: React.FC = () => {
                 }}
                 is_applying_credits={is_applying_credits}
                 credits_to_apply={credits_to_apply}
+                is_quantity_locked
+                on_back={handlePrevious}
+                back_label={back_label_for_checkout}
               />
             </div>
           </div>

@@ -292,6 +292,9 @@ const LinkBuildingPage: React.FC = () => {
                 action_label="Proceed to Checkout"
                 onAction={handleProceedFromReview}
                 show_coupon_field
+                is_quantity_locked
+                on_back={() => { setCurrentStep("intake"); scrollToTop(); }}
+                back_label="Back to Intake Form"
               />
             </div>
           </div>
@@ -332,6 +335,9 @@ const LinkBuildingPage: React.FC = () => {
                   }}
                   is_applying_credits={is_applying_credits}
                   credits_to_apply={credits_to_apply}
+                  is_quantity_locked
+                  on_back={handlePrevious}
+                  back_label={has_intake_items ? "Back to Order Review" : "Back to Selection"}
                 />
               </div>
             </div>

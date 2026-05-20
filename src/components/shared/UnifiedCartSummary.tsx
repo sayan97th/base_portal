@@ -76,6 +76,9 @@ interface UnifiedCartSummaryProps {
   checkout_action?: CheckoutAction;
   credits_to_apply?: number;
   is_applying_credits?: boolean;
+  is_quantity_locked?: boolean;
+  on_back?: () => void;
+  back_label?: string;
 }
 
 const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
@@ -86,6 +89,9 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
   checkout_action,
   credits_to_apply = 0,
   is_applying_credits = false,
+  is_quantity_locked = false,
+  on_back,
+  back_label = "Back",
 }) => {
   const {
     items,
@@ -252,9 +258,23 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/3 lg:sticky lg:top-24">
-      <h2 className="mb-5 text-base font-semibold text-gray-800 dark:text-white/90">
-        Order Summary
-      </h2>
+      <div className="mb-5 flex items-center justify-between">
+        <h2 className="text-base font-semibold text-gray-800 dark:text-white/90">
+          Order Summary
+        </h2>
+        {on_back && (
+          <button
+            type="button"
+            onClick={on_back}
+            className="inline-flex items-center gap-1 text-xs font-medium text-gray-400 transition-colors hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-300"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+            </svg>
+            {back_label}
+          </button>
+        )}
+      </div>
 
       {/* Bulk discount progress teasers — hidden when paying with credits */}
       {!is_applying_credits && teaser_details.map((detail) => {
@@ -324,6 +344,24 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
         );
       })}
 
+      {/* Locked notice when quantities cannot be modified */}
+      {is_quantity_locked && grouped_items.length > 0 && (
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2.5 dark:border-amber-500/20 dark:bg-amber-500/10">
+          <svg
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+          </svg>
+          <p className="text-[11px] font-medium text-amber-700 dark:text-amber-400">
+            Quantities are locked at this step. Use the back button above to modify your order.
+          </p>
+        </div>
+      )}
+
       {/* Items grouped by product type */}
       {grouped_items.length > 0 ? (
         <div className="mb-6 space-y-5">
@@ -342,6 +380,7 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() =>
+                            !is_quantity_locked &&
                             handleQuantityChange(
                               item.product_type,
                               item.tier_id,
@@ -350,7 +389,12 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
                               item.quantity - 1
                             )
                           }
-                          className="flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 text-gray-500 transition-colors hover:border-coral-400 hover:text-coral-500 dark:border-gray-600 dark:text-gray-400"
+                          disabled={is_quantity_locked}
+                          className={`flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 text-gray-500 transition-colors dark:border-gray-600 dark:text-gray-400 ${
+                            is_quantity_locked
+                              ? "cursor-not-allowed opacity-40"
+                              : "hover:border-coral-400 hover:text-coral-500"
+                          }`}
                           aria-label={`Decrease ${item.tier_name}`}
                         >
                           <svg width="8" height="2" viewBox="0 0 8 2" fill="none">
@@ -367,6 +411,7 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
                         </span>
                         <button
                           onClick={() =>
+                            !is_quantity_locked &&
                             handleQuantityChange(
                               item.product_type,
                               item.tier_id,
@@ -375,7 +420,12 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
                               item.quantity + 1
                             )
                           }
-                          className="flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 text-gray-500 transition-colors hover:border-coral-400 hover:text-coral-500 dark:border-gray-600 dark:text-gray-400"
+                          disabled={is_quantity_locked}
+                          className={`flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 text-gray-500 transition-colors dark:border-gray-600 dark:text-gray-400 ${
+                            is_quantity_locked
+                              ? "cursor-not-allowed opacity-40"
+                              : "hover:border-coral-400 hover:text-coral-500"
+                          }`}
                           aria-label={`Increase ${item.tier_name}`}
                         >
                           <svg
