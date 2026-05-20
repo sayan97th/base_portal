@@ -1147,8 +1147,8 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
                     { label: "Date issued", value: invoice.date_issued ? formatDate(invoice.date_issued) : "—" },
                     { label: "Date due", value: invoice.date_due ? formatDate(invoice.date_due) : "—" },
                     { label: "Date paid", value: invoice.date_paid ? <span className="text-success-600 dark:text-success-400">{formatDate(invoice.date_paid)}</span> : "—" },
-                    { label: "Payment method", value: invoice.payment_method },
-                    { label: "Currency", value: invoice.currency_type.toUpperCase() },
+                    { label: "Payment method", value: is_credits ? "Account Credits" : invoice.payment_method },
+                    { label: "Currency", value: is_credits ? "Credits" : invoice.currency_type.toUpperCase() },
                   ].map((field) => (
                     <div key={field.label} className="flex justify-between gap-6 sm:justify-end">
                       <dt className="text-gray-500 dark:text-gray-400">{field.label}</dt>
@@ -1419,10 +1419,22 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
               </div>
               <StatusBadge status={invoice.status} />
             </div>
+            {is_credits && (
+              <div className="flex items-center gap-2.5 border-b border-emerald-100 bg-emerald-50 px-5 py-3 dark:border-emerald-500/20 dark:bg-emerald-500/10">
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-500/20">
+                  <svg className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                  </svg>
+                </div>
+                <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                  Paid with Account Credits
+                </p>
+              </div>
+            )}
             <dl className="px-5 py-1">
               <InfoRow label="Invoice #" value={<span className="font-mono">{invoice.invoice_number}</span>} />
-              <InfoRow label="Payment Method" value={invoice.payment_method} />
-              <InfoRow label="Currency" value={invoice.currency_type.toUpperCase()} />
+              <InfoRow label="Payment Method" value={is_credits ? "Account Credits" : invoice.payment_method} />
+              <InfoRow label="Currency" value={is_credits ? "Credits" : invoice.currency_type.toUpperCase()} />
               <InfoRow label="Subtotal" value={formatAmount(invoice.subtotal_amount)} />
               {invoice.discount_amount != null && invoice.discount_amount > 0 && (
                 <InfoRow
