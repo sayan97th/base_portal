@@ -331,6 +331,8 @@ const InvoiceDetailPage: React.FC<InvoiceDetailPageProps> = ({ invoice_id }) => 
   );
 
   const can_pay = PAYABLE_STATUSES.includes(invoice.status);
+  const is_credits_payment = invoice.payment_method === "Account Balance";
+  const is_credits_currency = invoice.total.includes("credits");
 
   return (
     <div className="space-y-6">
@@ -377,6 +379,33 @@ const InvoiceDetailPage: React.FC<InvoiceDetailPageProps> = ({ invoice_id }) => 
 
       {/* Payment banner for unpaid / overdue invoices */}
       {can_pay && <PayInvoiceBanner invoice={invoice} />}
+
+      {/* Account Credits paid banner */}
+      {is_credits_payment && invoice.status === "paid" && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-100 dark:border-emerald-500/20 bg-linear-to-r from-emerald-50 to-teal-50/40 dark:from-emerald-500/8 dark:to-teal-500/5 px-5 py-4">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-500/20 shadow-sm">
+              <svg className="h-4 w-4 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 0 0-2.25-2.25H15a3 3 0 1 1-6 0H5.25A2.25 2.25 0 0 0 3 12m18 0v6a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 18v-6m18 0V9M3 12V9m18-3a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v3m18 0H3" />
+              </svg>
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                Paid with Account Credits
+              </p>
+              <p className="text-xs text-emerald-600/70 dark:text-emerald-500 mt-0.5">
+                This invoice was settled using your account balance
+              </p>
+            </div>
+          </div>
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 px-3 py-1 text-sm font-bold text-emerald-700 dark:text-emerald-400">
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {invoice.total}
+          </span>
+        </div>
+      )}
 
       {/* Invoice Card */}
       <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/3 sm:p-8">
@@ -458,11 +487,21 @@ const InvoiceDetailPage: React.FC<InvoiceDetailPageProps> = ({ invoice_id }) => 
                 { label: "Date issued", value: invoice.date_issued },
                 { label: "Date due", value: invoice.date_due },
                 { label: "Date paid", value: invoice.date_paid ?? "—" },
-                { label: "Payment method", value: invoice.payment_method },
+                {
+                  label: "Payment method",
+                  value: is_credits_payment ? "Account Credits" : invoice.payment_method,
+                },
+                ...(is_credits_currency ? [{ label: "Currency", value: "Credits" }] : []),
               ].map((field) => (
                 <div key={field.label} className="flex justify-between gap-8 sm:justify-end">
                   <dt className="text-gray-500 dark:text-gray-400">{field.label}</dt>
-                  <dd className="font-medium text-gray-900 dark:text-white">{field.value}</dd>
+                  <dd className={`font-medium ${
+                    field.label === "Payment method" && is_credits_payment
+                      ? "text-emerald-700 dark:text-emerald-400"
+                      : field.label === "Currency" && is_credits_currency
+                        ? "text-emerald-700 dark:text-emerald-400"
+                        : "text-gray-900 dark:text-white"
+                  }`}>{field.value}</dd>
                 </div>
               ))}
             </dl>
