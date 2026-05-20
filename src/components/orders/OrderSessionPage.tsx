@@ -164,6 +164,12 @@ const CreditCardIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const WalletIcon = ({ className }: { className?: string }) => (
+  <svg className={className ?? "h-4 w-4"} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 0 0-2.25-2.25H15a3 3 0 1 1-6 0H5.25A2.25 2.25 0 0 0 3 12m18 0v6a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 18v-6m18 0V9M3 12V9m18-3a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v3m18 0H3" />
+  </svg>
+);
+
 const BoltIcon = ({ className }: { className?: string }) => (
   <svg className={className ?? "h-3.5 w-3.5"} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
@@ -763,6 +769,33 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
                 {formatCurrency(session.total_amount)}
               </span>
             </div>
+
+            {/* Payment method indicator */}
+            {!is_payment_pending && session.payment_method && (
+              <div className={`flex items-center gap-2 border-t px-4 py-3 ${
+                session.payment_method === "Credit Card"
+                  ? "border-blue-100 bg-blue-50/60 dark:border-blue-500/20 dark:bg-blue-500/5"
+                  : "border-sky-100 bg-sky-50/60 dark:border-sky-500/20 dark:bg-sky-500/5"
+              }`}>
+                <span className={`flex h-5 w-5 items-center justify-center rounded-full ${
+                  session.payment_method === "Credit Card"
+                    ? "bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400"
+                    : "bg-sky-100 text-sky-600 dark:bg-sky-500/20 dark:text-sky-400"
+                }`}>
+                  {session.payment_method === "Credit Card"
+                    ? <CreditCardIcon className="h-3 w-3" />
+                    : <WalletIcon className="h-3 w-3" />
+                  }
+                </span>
+                <span className={`text-xs font-medium ${
+                  session.payment_method === "Credit Card"
+                    ? "text-blue-700 dark:text-blue-400"
+                    : "text-sky-700 dark:text-sky-400"
+                }`}>
+                  Paid with {session.payment_method === "Credit Card" ? "Credit Card" : "Account Credits"}
+                </span>
+              </div>
+            )}
           </div>
         )}
       </div>

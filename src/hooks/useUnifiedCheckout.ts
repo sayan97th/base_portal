@@ -231,11 +231,14 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
         });
 
         const confirmed_group_id = result.session_id ?? purchase_group_id;
+        const is_credits_payment = payment_intent_id.startsWith("credits_");
         const purchase_group = {
           purchase_group_id: confirmed_group_id,
           created_at: new Date().toISOString(),
           order_title: order_title || null,
           total_amount: total,
+          payment_status: "paid" as const,
+          payment_method: is_credits_payment ? "Account Balance" : "Credit Card",
           orders: result.orders.map((o) => ({
             order_id: o.order_id,
             product_type: o.product_type,
@@ -362,6 +365,7 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
         created_at: new Date().toISOString(),
         order_title: order_title || null,
         total_amount: total,
+        payment_status: "pending" as const,
         orders: result.orders.map((o) => ({
           order_id: o.order_id,
           product_type: o.product_type,

@@ -14,6 +14,7 @@ export interface PurchaseGroup {
   orders: PurchaseGroupOrder[];
   payment_status?: string | null;
   invoice_unique_id?: string | null;
+  payment_method?: string | null;
 }
 
 export interface CreatePurchaseGroupPayload {
@@ -24,4 +25,5 @@ export interface CreatePurchaseGroupPayload {
   orders: PurchaseGroupOrder[];
   payment_status?: string | null;
   invoice_unique_id?: string | null;
+  payment_method?: string | null;
 }
