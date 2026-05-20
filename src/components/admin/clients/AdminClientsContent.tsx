@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { listAdminClients, banUser, unbanUser } from "@/services/admin/user.service";
 import { impersonationService } from "@/services/admin/impersonation.service";
 import type { AdminUser, ClientSortField, ClientEmailStatusFilter, ClientAccountStatusFilter, SortDirection } from "@/types/admin";
@@ -142,8 +141,6 @@ function SkeletonRows() {
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export default function AdminClientsContent() {
-  const router = useRouter();
-
   const [clients, setClients] = useState<AdminUser[]>([]);
   const [page, setPage] = useState(1);
   const [last_page, setLastPage] = useState(1);
@@ -294,7 +291,7 @@ export default function AdminClientsContent() {
 
     try {
       await impersonationService.startImpersonation(impersonate_target.id);
-      router.push("/dashboard");
+      window.location.href = "/";
     } catch (err: unknown) {
       const api_error = err as ApiError;
       setImpersonationError(api_error.message || "Failed to start impersonation. Please try again.");

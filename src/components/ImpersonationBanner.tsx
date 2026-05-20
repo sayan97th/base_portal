@@ -1,26 +1,25 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { impersonationService } from "@/services/admin/impersonation.service";
 import type { ImpersonationMeta } from "@/types/auth";
 
+function computeElapsed(started_at: string): string {
+  const diff = Math.floor((Date.now() - new Date(started_at).getTime()) / 1000);
+  if (diff < 60) return `${diff}s`;
+  const minutes = Math.floor(diff / 60);
+  const seconds = diff % 60;
+  if (minutes < 60) return `${minutes}m ${seconds}s`;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${hours}h ${mins}m`;
+}
+
 function useElapsedTime(started_at: string): string {
-  const [elapsed, setElapsed] = useState("");
+  const [elapsed, setElapsed] = useState(() => computeElapsed(started_at));
 
   useEffect(() => {
-    function compute() {
-      const diff = Math.floor((Date.now() - new Date(started_at).getTime()) / 1000);
-      if (diff < 60) return `${diff}s`;
-      const minutes = Math.floor(diff / 60);
-      const seconds = diff % 60;
-      if (minutes < 60) return `${minutes}m ${seconds}s`;
-      const hours = Math.floor(minutes / 60);
-      const mins = minutes % 60;
-      return `${hours}h ${mins}m`;
-    }
-    setElapsed(compute());
-    const id = setInterval(() => setElapsed(compute()), 1000);
+    const id = setInterval(() => setElapsed(computeElapsed(started_at)), 1000);
     return () => clearInterval(id);
   }, [started_at]);
 
@@ -28,16 +27,15 @@ function useElapsedTime(started_at: string): string {
 }
 
 export default function ImpersonationBanner() {
-  const router = useRouter();
-  const [meta, setMeta] = useState<ImpersonationMeta | null>(null);
+  const [meta] = useState<ImpersonationMeta | null>(() => {
+    if (typeof window === "undefined") return null;
+    return impersonationService.isImpersonating()
+      ? impersonationService.getImpersonationMeta()
+      : null;
+  });
+
   const [is_stopping, setIsStopping] = useState(false);
   const elapsed = useElapsedTime(meta?.started_at ?? new Date().toISOString());
-
-  useEffect(() => {
-    if (impersonationService.isImpersonating()) {
-      setMeta(impersonationService.getImpersonationMeta());
-    }
-  }, []);
 
   if (!meta) return null;
 
@@ -46,10 +44,10 @@ export default function ImpersonationBanner() {
     setIsStopping(true);
     try {
       await impersonationService.stopImpersonation();
-      router.push("/admin/clients");
     } catch {
       impersonationService.clearImpersonation();
-      router.push("/admin/clients");
+    } finally {
+      window.location.href = "/admin/clients";
     }
   }
 
