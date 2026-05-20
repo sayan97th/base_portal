@@ -84,7 +84,7 @@ const ContentRefreshUpsell: React.FC = () => {
       {/* See Details link */}
       <div className="mt-5 flex justify-end">
         <Link
-          href="/content-optimizations"
+          href="/content-refresh/content-optimizations"
           className="inline-flex items-center gap-1 text-sm font-medium text-coral-500 transition-colors hover:text-coral-600 dark:text-coral-400 dark:hover:text-coral-300"
         >
           See Details
