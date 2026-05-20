@@ -27,14 +27,16 @@ function useElapsedTime(started_at: string): string {
 }
 
 export default function ImpersonationBanner() {
-  const [meta] = useState<ImpersonationMeta | null>(() => {
-    if (typeof window === "undefined") return null;
-    return impersonationService.isImpersonating()
-      ? impersonationService.getImpersonationMeta()
-      : null;
-  });
-
+  const [meta, setMeta] = useState<ImpersonationMeta | null>(null);
   const [is_stopping, setIsStopping] = useState(false);
+
+  useEffect(() => {
+    setMeta(
+      impersonationService.isImpersonating()
+        ? impersonationService.getImpersonationMeta()
+        : null
+    );
+  }, []);
   const elapsed = useElapsedTime(meta?.started_at ?? new Date().toISOString());
 
   if (!meta) return null;
