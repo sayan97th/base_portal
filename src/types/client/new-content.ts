@@ -78,14 +78,26 @@ export interface NewContentOrderItemDetail {
   intake_rows?: NewContentIntakeRow[];
 }
 
+export interface NewContentOrderCoupon {
+  coupon_id: string;
+  code: string;
+  name: string;
+  discount_type: string;
+  discount_value: number;
+  discount_amount: number;
+}
+
 export interface NewContentOrderDetail {
   id: string;
   order_title?: string | null;
   order_notes: string | null;
+  subtotal_before_discount?: number;
   total_amount: number;
+  credit_amount?: number;
   status: string;
   created_at: string;
   updated_at: string;
   items: NewContentOrderItemDetail[];
+  coupons?: NewContentOrderCoupon[];
 }
 

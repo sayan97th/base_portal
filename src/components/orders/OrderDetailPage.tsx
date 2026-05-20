@@ -16,7 +16,6 @@ import {
   type DetectedOrderDetail,
 } from "@/services/client/order-detail.service";
 import type {
-  OrderCouponDetail,
   OrderItemDetail,
   LinkBuildingOrderDetail,
 } from "@/types/client/link-building";
@@ -40,6 +39,16 @@ interface ContentItem {
   quantity: number;
   unit_price: number;
   subtotal: number;
+}
+
+// Generic coupon shape shared across all order types
+interface GenericOrderCoupon {
+  coupon_id: string;
+  code: string;
+  name: string;
+  discount_type: string;
+  discount_value: number;
+  discount_amount: number;
 }
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
@@ -161,6 +170,27 @@ function buildContentItems(detected: DetectedOrderDetail): ContentItem[] {
   }));
 }
 
+// Extract coupons from any detected order type
+function getDetectedCoupons(detected: DetectedOrderDetail | null): GenericOrderCoupon[] {
+  if (!detected) return [];
+  const data = detected.data as { coupons?: GenericOrderCoupon[] };
+  return data.coupons ?? [];
+}
+
+// Extract credit_amount from any detected order type
+function getDetectedCreditAmount(detected: DetectedOrderDetail | null): number {
+  if (!detected) return 0;
+  const data = detected.data as { credit_amount?: number };
+  return data.credit_amount ?? 0;
+}
+
+// Extract subtotal_before_discount from any detected order type
+function getDetectedSubtotal(detected: DetectedOrderDetail | null): number {
+  if (!detected) return 0;
+  const data = detected.data as { subtotal_before_discount?: number; total_amount: number };
+  return data.subtotal_before_discount ?? data.total_amount;
+}
+
 // ─── Icons ─────────────────────────────────────────────────────────────────────
 
 const BackIcon = () => (
@@ -256,6 +286,38 @@ const ExternalLinkIcon = () => (
       strokeLinecap="round"
       strokeLinejoin="round"
       d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244"
+    />
+  </svg>
+);
+
+const SparkleIcon = () => (
+  <svg
+    className="h-3.5 w-3.5"
+    fill="none"
+    viewBox="0 0 24 24"
+    strokeWidth={2}
+    stroke="currentColor"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"
+    />
+  </svg>
+);
+
+const WalletIcon = () => (
+  <svg
+    className="h-3.5 w-3.5"
+    fill="none"
+    viewBox="0 0 24 24"
+    strokeWidth={2}
+    stroke="currentColor"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M21 12a2.25 2.25 0 0 0-2.25-2.25H15a3 3 0 1 1-6 0H5.25A2.25 2.25 0 0 0 3 12m18 0v6a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 18v-6m18 0V9M3 12V9m18-3a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v3m18 0H3"
     />
   </svg>
 );
@@ -487,6 +549,45 @@ const ContentItemCard: React.FC<{ item: ContentItem; index: number }> = ({
   </div>
 );
 
+// ─── Coupon Row ──────────────────────────────────────────────────────────────────
+
+const CouponRow: React.FC<{ coupon: GenericOrderCoupon }> = ({ coupon }) => (
+  <div className="flex items-start justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-500/20 dark:bg-emerald-500/10">
+    <div className="min-w-0">
+      <span className="inline-flex items-center rounded border border-emerald-300 bg-white px-1.5 py-0.5 font-mono text-xs font-semibold tracking-wider text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/5 dark:text-emerald-400">
+        {coupon.code}
+      </span>
+      <p className="mt-0.5 truncate text-xs text-emerald-600 dark:text-emerald-500">
+        {coupon.name}
+        {coupon.discount_type === "percentage"
+          ? ` — ${coupon.discount_value}% off`
+          : ""}
+      </p>
+    </div>
+    <span className="shrink-0 text-sm font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
+      -{formatCurrency(coupon.discount_amount)}
+    </span>
+  </div>
+);
+
+// ─── Credits Panel ───────────────────────────────────────────────────────────────
+
+const CreditsPanel: React.FC<{ credit_amount: number }> = ({ credit_amount }) => (
+  <div className="flex items-center justify-between gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 dark:border-sky-500/20 dark:bg-sky-500/10">
+    <div className="flex items-center gap-2">
+      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-sky-100 text-sky-600 dark:bg-sky-500/20 dark:text-sky-400">
+        <WalletIcon />
+      </span>
+      <span className="text-sm font-medium text-sky-700 dark:text-sky-400">
+        Credits Applied
+      </span>
+    </div>
+    <span className="text-sm font-semibold tabular-nums text-sky-700 dark:text-sky-400">
+      -{formatCurrency(credit_amount)}
+    </span>
+  </div>
+);
+
 // ─── Skeleton ───────────────────────────────────────────────────────────────────
 
 const SkeletonBlock = ({ className }: { className?: string }) => (
@@ -570,23 +671,41 @@ const OrderDetailPage: React.FC<OrderDetailPageProps> = ({ order_id }) => {
     (detected?.data as { updated_at?: string })?.updated_at ?? "";
   const status_cfg = status ? getStatusConfig(status) : null;
 
-  const coupon_discount_total =
-    lb_data?.coupons?.reduce((s, c) => s + c.discount_amount, 0) ?? 0;
-  const raw_subtotal =
-    lb_data?.subtotal_before_discount ??
-    lb_data?.items.reduce((s, i) => s + i.subtotal, 0) ??
-    0;
-  const total_links =
-    lb_data?.items.reduce((s, i) => s + i.quantity, 0) ?? 0;
-  const bulk_discount_amount = Math.max(
-    0,
-    Math.round(
-      (raw_subtotal - (lb_data?.total_amount ?? 0) - coupon_discount_total) *
-        100
-    ) / 100
-  );
+  // Unified financial data extraction — works for all product types
+  const all_coupons: GenericOrderCoupon[] = is_lb
+    ? ((lb_data?.coupons as GenericOrderCoupon[]) ?? [])
+    : getDetectedCoupons(detected);
+
+  const credit_amount = is_lb
+    ? (lb_data?.credit_amount ?? 0)
+    : getDetectedCreditAmount(detected);
+
+  const items_subtotal = is_lb
+    ? (lb_data?.items.reduce((s, i) => s + i.subtotal, 0) ?? 0)
+    : (detected && !is_lb ? buildContentItems(detected).reduce((s, i) => s + i.subtotal, 0) : 0);
+
+  const raw_subtotal = is_lb
+    ? (lb_data?.subtotal_before_discount ?? items_subtotal)
+    : getDetectedSubtotal(detected);
+
+  const coupon_discount_total = all_coupons.reduce((s, c) => s + c.discount_amount, 0);
+
+  const total_links = lb_data?.items.reduce((s, i) => s + i.quantity, 0) ?? 0;
+
+  // Bulk discount only applies to link building; subtract credits from the calculation
+  const bulk_discount_amount = is_lb
+    ? Math.max(
+        0,
+        Math.round(
+          (raw_subtotal - total_amount - coupon_discount_total - credit_amount) * 100
+        ) / 100
+      )
+    : 0;
+
   const has_bulk_discount = total_links >= 10 && bulk_discount_amount > 0;
-  const total_savings = bulk_discount_amount + coupon_discount_total;
+  const total_savings = bulk_discount_amount + coupon_discount_total + credit_amount;
+  const has_discounts_or_credits =
+    has_bulk_discount || coupon_discount_total > 0 || credit_amount > 0;
 
   const content_items = detected && !is_lb ? buildContentItems(detected) : [];
   const keywords_link = detected
@@ -697,7 +816,6 @@ const OrderDetailPage: React.FC<OrderDetailPageProps> = ({ order_id }) => {
                 {created_at && ` · Placed on ${formatDate(created_at)}`}
               </p>
             </div>
-            {/* Keywords shortcut for content product types */}
             {keywords_link && (
               <Link
                 href={keywords_link}
@@ -752,6 +870,7 @@ const OrderDetailPage: React.FC<OrderDetailPageProps> = ({ order_id }) => {
                   Order Summary
                 </h3>
                 <dl className="space-y-3">
+                  {/* Line items */}
                   {is_lb
                     ? lb_data!.items.map((item) => (
                         <div key={item.id} className="flex justify-between gap-2">
@@ -780,70 +899,64 @@ const OrderDetailPage: React.FC<OrderDetailPageProps> = ({ order_id }) => {
                         </div>
                       ))}
 
-                  {is_lb && (
-                    <>
-                      <div className="flex justify-between gap-2 border-t border-gray-100 pt-3 dark:border-gray-800">
-                        <dt className="text-sm text-gray-500 dark:text-gray-400">
-                          Subtotal
-                        </dt>
-                        <dd className="text-sm font-medium text-gray-800 dark:text-white/90">
-                          {formatCurrency(raw_subtotal)}
-                        </dd>
-                      </div>
-                      <div className="flex justify-between gap-2">
-                        <dt className="text-sm text-gray-500 dark:text-gray-400">
-                          Total links
-                        </dt>
-                        <dd className="text-sm font-medium text-gray-800 dark:text-white/90">
-                          {total_links}
-                        </dd>
-                      </div>
-                      {has_bulk_discount && (
-                        <div className="flex justify-between gap-2">
-                          <dt className="text-sm font-medium text-violet-600 dark:text-violet-400">
-                            Bulk Discount (10% off)
-                          </dt>
-                          <dd className="text-sm font-semibold tabular-nums text-violet-600 dark:text-violet-400">
-                            -{formatCurrency(bulk_discount_amount)}
-                          </dd>
-                        </div>
-                      )}
-                      {lb_data!.coupons && lb_data!.coupons.length > 0 && (
-                        <div className="border-t border-dashed border-gray-200 pt-3 dark:border-gray-700">
-                          <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                            <TagIcon />
-                            Coupon discounts applied
-                          </p>
-                          <div className="space-y-2">
-                            {lb_data!.coupons.map(
-                              (coupon: OrderCouponDetail) => (
-                                <div
-                                  key={coupon.coupon_id}
-                                  className="flex items-start justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-500/20 dark:bg-emerald-500/10"
-                                >
-                                  <div className="min-w-0">
-                                    <span className="inline-flex items-center rounded border border-emerald-300 bg-white px-1.5 py-0.5 font-mono text-xs font-semibold tracking-wider text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/5 dark:text-emerald-400">
-                                      {coupon.code}
-                                    </span>
-                                    <p className="mt-0.5 truncate text-xs text-emerald-600 dark:text-emerald-500">
-                                      {coupon.name}
-                                      {coupon.discount_type === "percentage"
-                                        ? ` — ${coupon.discount_value}% off`
-                                        : ""}
-                                    </p>
-                                  </div>
-                                  <span className="shrink-0 text-sm font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
-                                    -{formatCurrency(coupon.discount_amount)}
-                                  </span>
-                                </div>
-                              )
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </>
+                  {/* Subtotal row — shown when there are any discounts or credits */}
+                  {has_discounts_or_credits && (
+                    <div className="flex justify-between gap-2 border-t border-gray-100 pt-3 dark:border-gray-800">
+                      <dt className="text-sm text-gray-500 dark:text-gray-400">
+                        Subtotal
+                      </dt>
+                      <dd className="text-sm font-medium text-gray-800 dark:text-white/90">
+                        {formatCurrency(raw_subtotal)}
+                      </dd>
+                    </div>
                   )}
 
+                  {/* LB-only rows */}
+                  {is_lb && (
+                    <div className="flex justify-between gap-2">
+                      <dt className="text-sm text-gray-500 dark:text-gray-400">
+                        Total links
+                      </dt>
+                      <dd className="text-sm font-medium text-gray-800 dark:text-white/90">
+                        {total_links}
+                      </dd>
+                    </div>
+                  )}
+
+                  {/* Bulk discount — LB only */}
+                  {has_bulk_discount && (
+                    <div className="flex justify-between gap-2">
+                      <dt className="flex items-center gap-1.5 text-sm font-medium text-violet-600 dark:text-violet-400">
+                        <SparkleIcon />
+                        Bulk Discount (10% off)
+                      </dt>
+                      <dd className="text-sm font-semibold tabular-nums text-violet-600 dark:text-violet-400">
+                        -{formatCurrency(bulk_discount_amount)}
+                      </dd>
+                    </div>
+                  )}
+
+                  {/* Coupon discounts — all product types */}
+                  {all_coupons.length > 0 && (
+                    <div className={`space-y-2 ${has_discounts_or_credits && !has_bulk_discount ? "" : "border-t border-dashed border-gray-200 pt-3 dark:border-gray-700"}`}>
+                      <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                        <TagIcon />
+                        Coupon discounts applied
+                      </p>
+                      <div className="space-y-2">
+                        {all_coupons.map((coupon) => (
+                          <CouponRow key={coupon.coupon_id} coupon={coupon} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Credits applied — all product types */}
+                  {credit_amount > 0 && (
+                    <CreditsPanel credit_amount={credit_amount} />
+                  )}
+
+                  {/* Total */}
                   <div className="flex justify-between gap-2 border-t border-gray-200 pt-3 dark:border-gray-700">
                     <dt className="text-base font-semibold text-gray-900 dark:text-white">
                       Total
@@ -853,7 +966,8 @@ const OrderDetailPage: React.FC<OrderDetailPageProps> = ({ order_id }) => {
                     </dd>
                   </div>
 
-                  {is_lb && total_savings > 0 && (
+                  {/* Total savings badge */}
+                  {total_savings > 0 && (
                     <div className="flex justify-between gap-2 rounded-lg bg-emerald-50 px-3 py-2 dark:bg-emerald-500/10">
                       <dt className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
                         Total savings
@@ -921,7 +1035,7 @@ const OrderDetailPage: React.FC<OrderDetailPageProps> = ({ order_id }) => {
                 </dl>
               </div>
 
-              {/* CTAs — same for all product types */}
+              {/* CTAs */}
               <Link
                 href={`/orders/${order_id}/tracking`}
                 className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-brand-500/20 transition-colors hover:bg-brand-600"

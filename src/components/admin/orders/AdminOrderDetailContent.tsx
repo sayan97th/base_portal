@@ -117,6 +117,12 @@ const BackIcon = () => (
   </svg>
 );
 
+const WalletIcon = ({ className = "h-3.5 w-3.5" }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 0 0-2.25-2.25H15a3 3 0 1 1-6 0H5.25A2.25 2.25 0 0 0 3 12m18 0v6a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 18v-6m18 0V9M3 12V9m18-3a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v3m18 0H3" />
+  </svg>
+);
+
 const UserIcon = () => (
   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
@@ -500,10 +506,19 @@ const InvoiceCard = ({ invoice }: InvoiceCardProps) => {
             ))}
           </>
         )}
-        {invoice.credit_amount > 0 && (
+        {(invoice.credit_amount ?? 0) > 0 && (
           <InfoRow
-            label="Credits Applied"
-            value={<span className="text-emerald-600 dark:text-emerald-400">-{formatCurrency(invoice.credit_amount)}</span>}
+            label={
+              <span className="flex items-center gap-1.5 font-medium text-sky-600 dark:text-sky-400">
+                <WalletIcon />
+                {invoice.payment_method === "Account Balance" ? "Paid with Credits" : "Credits Applied"}
+              </span>
+            }
+            value={
+              <span className="font-semibold tabular-nums text-sky-600 dark:text-sky-400">
+                -{formatCurrency(invoice.credit_amount)}
+              </span>
+            }
           />
         )}
         <InfoRow
@@ -891,12 +906,18 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
                   {(() => {
                     const order_items_subtotal = order.items.reduce((s, i) => s + i.subtotal, 0);
                     const order_coupon_total = order.coupons?.reduce((s, c) => s + c.discount_amount, 0) ?? 0;
+                    const order_credit_amount = order.invoice?.credit_amount ?? 0;
                     const order_bulk_discount = Math.max(
                       0,
-                      Math.round(((order.subtotal_before_discount ?? order_items_subtotal) - order.total_amount - order_coupon_total) * 100) / 100
+                      Math.round(
+                        ((order.subtotal_before_discount ?? order_items_subtotal) - order.total_amount - order_coupon_total - order_credit_amount) * 100
+                      ) / 100
                     );
-                    const order_total_savings = order_bulk_discount + order_coupon_total;
-                    const show_breakdown = order_bulk_discount > 0 || (order.coupons && order.coupons.length > 0);
+                    const order_total_savings = order_bulk_discount + order_coupon_total + order_credit_amount;
+                    const show_breakdown =
+                      order_bulk_discount > 0 ||
+                      (order.coupons && order.coupons.length > 0) ||
+                      order_credit_amount > 0;
 
                     return show_breakdown ? (
                       <>
@@ -943,6 +964,21 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
                                 </dd>
                               </div>
                             ))}
+                          </div>
+                        )}
+                        {order_credit_amount > 0 && (
+                          <div className="flex items-center justify-between gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 dark:border-sky-500/20 dark:bg-sky-500/10">
+                            <dt className="flex items-center gap-2 text-sm font-medium text-sky-700 dark:text-sky-400">
+                              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-500/20">
+                                <WalletIcon className="h-3 w-3 text-sky-600 dark:text-sky-400" />
+                              </span>
+                              {order.invoice?.payment_method === "Account Balance"
+                                ? "Paid with Credits"
+                                : "Credits Applied"}
+                            </dt>
+                            <dd className="text-sm font-semibold tabular-nums text-sky-700 dark:text-sky-400">
+                              -{formatCurrency(order_credit_amount)}
+                            </dd>
                           </div>
                         )}
                         <div className="flex items-center justify-between border-t border-gray-100 py-2.5 dark:border-gray-800">

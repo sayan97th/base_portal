@@ -73,13 +73,25 @@ export interface ContentBriefOrderItemDetail {
   co_intake_rows?: ContentBriefIntakeRow[];
 }
 
+export interface ContentBriefOrderCoupon {
+  coupon_id: string;
+  code: string;
+  name: string;
+  discount_type: string;
+  discount_value: number;
+  discount_amount: number;
+}
+
 export interface ContentBriefOrderDetail {
   id: string;
   order_title?: string | null;
   order_notes: string | null;
+  subtotal_before_discount?: number;
   total_amount: number;
+  credit_amount?: number;
   status: string;
   created_at: string;
   updated_at: string;
   items: ContentBriefOrderItemDetail[];
+  coupons?: ContentBriefOrderCoupon[];
 }
