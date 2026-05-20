@@ -38,6 +38,12 @@ export interface LinkBuildingOrderRow {
   admin_team_name?: string | null;
   /** Derived: team hex color, returned by API but not sent in payloads. */
   admin_team_color?: string | null;
+  /** Admin-side user assigned to own this order. */
+  assigned_admin_user_id?: number | null;
+  /** Derived: full name of the assigned admin user, returned by API but not sent in payloads. */
+  assigned_admin_user_name?: string | null;
+  /** Derived: avatar URL of the assigned admin user, returned by API but not sent in payloads. */
+  assigned_admin_user_avatar?: string | null;
   /** Derived: status of the parent LinkBuildingOrder (only for client-purchased placements). */
   parent_order_status?: string | null;
   created_at?: string;
@@ -47,7 +53,13 @@ export interface LinkBuildingOrderRow {
 /** Fields sent to the backend — computed/derived fields and id are excluded. */
 export type LinkBuildingOrderPayload = Omit<
   LinkBuildingOrderRow,
-  "id" | "admin_team_name" | "admin_team_color" | "created_at" | "updated_at"
+  | "id"
+  | "admin_team_name"
+  | "admin_team_color"
+  | "assigned_admin_user_name"
+  | "assigned_admin_user_avatar"
+  | "created_at"
+  | "updated_at"
 >;
 
 // ── API response shapes ────────────────────────────────────────────────────────

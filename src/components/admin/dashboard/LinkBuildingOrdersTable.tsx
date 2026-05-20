@@ -12,8 +12,8 @@ import {
   deleteLinkBuildingOrder,
   buildLboPayload,
   exportLinkBuildingOrders,
-  listTeamsForSelect,
-  type AdminTeamOption,
+  listAdminUsersForSelect,
+  type AdminUserOption,
 } from "@/services/admin/link-building-dashboard.service";
 import type { LinkBuildingOrderSearchBody, ColumnFilterPayload } from "@/types/admin/link-building-order";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -211,44 +211,45 @@ function createEmptyRow(): LinkBuildingOrderRow {
     approval_date:             "",
     final_price:               "",
     admin_team_id:             null,
+    assigned_admin_user_id:    null,
   };
 }
 
-// ── Team assign cell ───────────────────────────────────────────────────────────
+// ── User assign cell ───────────────────────────────────────────────────────────
 
-interface TeamAssignCellProps {
-  admin_team_id: string | null | undefined;
-  teams: AdminTeamOption[];
+interface UserAssignCellProps {
+  assigned_admin_user_id: number | null | undefined;
+  admin_users: AdminUserOption[];
   is_editing: boolean;
   onStartEdit: () => void;
   onUpdate: (value: string) => void;
   onStopEdit: () => void;
 }
 
-function TeamAssignCell({
-  admin_team_id,
-  teams,
+function UserAssignCell({
+  assigned_admin_user_id,
+  admin_users,
   is_editing,
   onStartEdit,
   onUpdate,
   onStopEdit,
-}: TeamAssignCellProps) {
-  const selected_team = teams.find((t) => t.id === admin_team_id);
+}: UserAssignCellProps) {
+  const selected_user = admin_users.find((u) => u.id === assigned_admin_user_id);
 
   if (is_editing) {
     return (
-      <td className="p-0" style={{ minWidth: 160 }}>
+      <td className="p-0" style={{ minWidth: 180 }}>
         <select
           autoFocus
-          value={admin_team_id ?? ""}
+          value={assigned_admin_user_id ?? ""}
           onChange={(e) => onUpdate(e.target.value)}
           onBlur={onStopEdit}
           className="h-full w-full border-2 border-brand-500 bg-white px-2 py-1.5 text-xs outline-none dark:bg-gray-800 dark:text-white"
-          style={{ minWidth: 160 }}
+          style={{ minWidth: 180 }}
         >
           <option value="">— Unassigned —</option>
-          {teams.map((t) => (
-            <option key={t.id} value={t.id}>{t.name}</option>
+          {admin_users.map((u) => (
+            <option key={u.id} value={u.id}>{u.name}</option>
           ))}
         </select>
       </td>
@@ -258,16 +259,26 @@ function TeamAssignCell({
   return (
     <td
       className="cursor-pointer whitespace-nowrap px-2 py-1.5 text-xs hover:bg-blue-50 dark:hover:bg-blue-900/20"
-      style={{ minWidth: 160 }}
+      style={{ minWidth: 180 }}
       onClick={onStartEdit}
-      title="Click to assign a team"
+      title="Click to assign a user"
     >
-      {selected_team ? (
-        <span
-          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium text-white"
-          style={{ backgroundColor: selected_team.color }}
-        >
-          {selected_team.name}
+      {selected_user ? (
+        <span className="inline-flex items-center gap-1.5">
+          {selected_user.avatar_url ? (
+            <img
+              src={selected_user.avatar_url}
+              alt={selected_user.name}
+              className="h-5 w-5 rounded-full object-cover"
+            />
+          ) : (
+            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-bold text-white">
+              {selected_user.name.charAt(0).toUpperCase()}
+            </span>
+          )}
+          <span className="font-medium text-gray-700 dark:text-gray-200">
+            {selected_user.name}
+          </span>
         </span>
       ) : (
         <span className="text-gray-300 dark:text-gray-600">— Unassigned —</span>
@@ -516,7 +527,7 @@ function TableSkeleton() {
 
 export default function LinkBuildingOrdersTable() {
   const [rows, setRows] = useState<LinkBuildingOrderRow[]>([]);
-  const [teams, setTeams] = useState<AdminTeamOption[]>([]);
+  const [admin_users, setAdminUsers] = useState<AdminUserOption[]>([]);
   const [is_loading, setIsLoading] = useState(true);
   const [save_error, setSaveError] = useState<string | null>(null);
   const [notification_banner, setNotificationBanner] = useState<string | null>(null);
@@ -667,10 +678,10 @@ export default function LinkBuildingOrdersTable() {
     prev_activity_ref.current = { editing: editing_cell, selected: selected_row_id };
   }, [editing_cell, selected_row_id, sendRowFocus, sendRowBlur, sendRowSelect]);
 
-  // ── Fetch teams for assign-team dropdown ────────────────────────────────────
+  // ── Fetch admin users for assign-user dropdown ──────────────────────────────
 
   useEffect(() => {
-    listTeamsForSelect().then(setTeams).catch(() => {/* non-critical */});
+    listAdminUsersForSelect().then(setAdminUsers).catch(() => {/* non-critical */});
   }, []);
 
   // ── Fetch ───────────────────────────────────────────────────────────────────
@@ -1310,9 +1321,9 @@ export default function LinkBuildingOrdersTable() {
                 })}
                 <th
                   className="border border-gray-700/30 bg-indigo-700 px-2 py-1.5 text-left text-xs font-semibold text-white"
-                  style={{ minWidth: 160 }}
+                  style={{ minWidth: 180 }}
                 >
-                  Assign Team
+                  Assigned To
                 </th>
                 <th
                   aria-label="Row actions"
@@ -1396,13 +1407,13 @@ export default function LinkBuildingOrdersTable() {
                           />
                         );
                       })}
-                      {/* Team assign cell */}
-                      <TeamAssignCell
-                        admin_team_id={row.admin_team_id}
-                        teams={teams}
-                        is_editing={editing_cell?.row_id === row.id && editing_cell?.col_key === "admin_team_id"}
-                        onStartEdit={() => startEditing(row.id, "admin_team_id")}
-                        onUpdate={(val) => updateCell(row.id, "admin_team_id" as keyof LinkBuildingOrderRow, val)}
+                      {/* Assign user cell */}
+                      <UserAssignCell
+                        assigned_admin_user_id={row.assigned_admin_user_id}
+                        admin_users={admin_users}
+                        is_editing={editing_cell?.row_id === row.id && editing_cell?.col_key === "assigned_admin_user_id"}
+                        onStartEdit={() => startEditing(row.id, "assigned_admin_user_id")}
+                        onUpdate={(val) => updateCell(row.id, "assigned_admin_user_id" as keyof LinkBuildingOrderRow, val as unknown as string)}
                         onStopEdit={stopEditing}
                       />
 

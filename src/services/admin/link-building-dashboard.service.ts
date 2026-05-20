@@ -66,6 +66,24 @@ export async function listTeamsForSelect(): Promise<AdminTeamOption[]> {
   return res.data;
 }
 
+// ── Admin users for assignable-user dropdown ───────────────────────────────────
+
+export interface AdminUserOption {
+  id: number;
+  name: string;
+  email: string;
+  avatar_url: string | null;
+}
+
+/**
+ * GET /api/admin/link-building-orders/assignable-users
+ * Returns admin-side users (super_admin, admin, staff) for the "Assigned To" dropdown.
+ */
+export async function listAdminUsersForSelect(): Promise<AdminUserOption[]> {
+  const res = await apiClient.get<{ data: AdminUserOption[] }>("/api/admin/link-building-orders/assignable-users");
+  return res.data;
+}
+
 // ── Link Building Orders Dashboard ────────────────────────────────────────────
 
 /**
@@ -143,7 +161,16 @@ const URL_FIELDS: (keyof LinkBuildingOrderPayload)[] = [
  */
 export function buildLboPayload(row: LinkBuildingOrderRow): LinkBuildingOrderPayload {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { id: _id, admin_team_name: _atn, admin_team_color: _atc, created_at: _ca, updated_at: _ua, ...payload } = row;
+  const {
+    id: _id,
+    admin_team_name: _atn,
+    admin_team_color: _atc,
+    assigned_admin_user_name: _aaun,
+    assigned_admin_user_avatar: _aaav,
+    created_at: _ca,
+    updated_at: _ua,
+    ...payload
+  } = row;
 
   for (const field of URL_FIELDS) {
     if (typeof payload[field] === "string") {
@@ -153,6 +180,10 @@ export function buildLboPayload(row: LinkBuildingOrderRow): LinkBuildingOrderPay
 
   if (payload.admin_team_id === "") {
     payload.admin_team_id = null;
+  }
+
+  if ((payload.assigned_admin_user_id as unknown as string) === "") {
+    payload.assigned_admin_user_id = null;
   }
 
   return payload;
