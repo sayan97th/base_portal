@@ -338,8 +338,8 @@ async function generateAdminInvoicePdf(invoice: AdminInvoice): Promise<void> {
     { label: "Date issued",    value: invoice.date_issued ? formatDate(invoice.date_issued) : "—" },
     { label: "Date due",       value: invoice.date_due ? formatDate(invoice.date_due) : "—" },
     { label: "Date paid",      value: invoice.date_paid ? formatDate(invoice.date_paid) : "—" },
-    { label: "Payment method", value: invoice.payment_method },
-    { label: "Currency",       value: invoice.currency_type.toUpperCase() },
+    { label: "Payment method", value: invoice.currency_type === "credits" ? "Account Credits" : invoice.payment_method },
+    { label: "Currency",       value: invoice.currency_type === "credits" ? "Credits" : invoice.currency_type.toUpperCase() },
   ];
   doc.setFontSize(10);
   meta_fields.forEach((field) => {
@@ -352,7 +352,22 @@ async function generateAdminInvoicePdf(invoice: AdminInvoice): Promise<void> {
     meta_y += 6;
   });
 
-  y = Math.max(y, meta_y) + 5;
+  if (invoice.currency_type === "credits") {
+    const banner_y = Math.max(y, meta_y) + 3;
+    const banner_text = "Paid with Account Credits";
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    const banner_w = doc.getTextWidth(banner_text) + 16;
+    doc.setFillColor(240, 253, 244);
+    doc.setDrawColor(187, 247, 208);
+    doc.setLineWidth(0.4);
+    doc.roundedRect(right_x - banner_w, banner_y - 4.5, banner_w, 8, 2, 2, "FD");
+    doc.setTextColor(22, 163, 74);
+    doc.text(banner_text, right_x - banner_w / 2, banner_y, { align: "center" });
+    y = banner_y + 8;
+  } else {
+    y = Math.max(y, meta_y) + 5;
+  }
 
   // ── Customer info ──────────────────────────────────────────────────────────
   doc.setFontSize(10);
@@ -456,13 +471,17 @@ async function generateAdminInvoicePdf(invoice: AdminInvoice): Promise<void> {
     doc.line(sum_label_x, y - 1, right_x, y - 1);
   }
 
+  const pdf_is_credits = invoice.currency_type === "credits";
+  const pdf_format_amount = (amount: number): string =>
+    pdf_is_credits ? `${amount} credits` : formatCurrency(amount);
+
   if (invoice.credit_amount > 0) {
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...PDF_COLORS.secondary);
     doc.text("Credits Applied", sum_label_x, y);
     doc.setTextColor(...PDF_COLORS.success);
-    doc.text(`-${formatCurrency(invoice.credit_amount)}`, right_x, y, { align: "right" });
+    doc.text(`-${pdf_format_amount(invoice.credit_amount)}`, right_x, y, { align: "right" });
     y += 7;
   }
 
@@ -474,7 +493,7 @@ async function generateAdminInvoicePdf(invoice: AdminInvoice): Promise<void> {
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...PDF_COLORS.primary);
   doc.text("Total", sum_label_x, y);
-  doc.text(formatCurrency(invoice.total_amount), right_x, y, { align: "right" });
+  doc.text(pdf_format_amount(invoice.total_amount), right_x, y, { align: "right" });
 
   doc.save(`invoice_${invoice.invoice_number}_${invoice.unique_id}.pdf`);
 }
