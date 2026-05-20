@@ -245,7 +245,6 @@ const NewContentPage: React.FC = () => {
                 action_label="Review Order"
                 onAction={() => intake_step_ref.current?.triggerNext()}
                 is_action_disabled={!has_intake_items}
-                show_coupon_field
               />
             </div>
           </div>
@@ -265,7 +264,6 @@ const NewContentPage: React.FC = () => {
               <UnifiedCartSummary
                 action_label="Proceed to Checkout"
                 onAction={handleProceedFromReview}
-                show_coupon_field
                 is_quantity_locked
                 on_back={() => { setCurrentStep("intake"); scrollToTop(); }}
                 back_label="Back to Intake Form"
