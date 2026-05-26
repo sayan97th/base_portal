@@ -6,6 +6,7 @@ import {
   validateAdminInvitationToken,
   acceptAdminInvitation,
 } from "@/services/admin/invitation.service";
+import { useAuth } from "@/context/AuthContext";
 import { EyeCloseIcon, EyeIcon } from "@/icons";
 import type { AdminInvitation } from "@/types/admin";
 import type { ApiError } from "@/types/auth";
@@ -23,6 +24,7 @@ type FormState = {
 
 export default function AcceptInvitationForm({ token }: Props) {
   const router = useRouter();
+  const { refreshUser } = useAuth();
 
   const [invitation, setInvitation] = useState<AdminInvitation | null>(null);
   const [is_validating, setIsValidating] = useState(true);
@@ -78,6 +80,7 @@ export default function AcceptInvitationForm({ token }: Props) {
         ...form,
         invitation_token: token,
       });
+      await refreshUser();
       router.push("/admin/dashboard");
     } catch (err: unknown) {
       const api_err = err as ApiError;
