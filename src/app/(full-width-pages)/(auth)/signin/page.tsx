@@ -3,8 +3,9 @@ import { Metadata } from "next";
 import { Suspense } from "react";
 
 export const metadata: Metadata = {
-  title: "Next.js SignIn Page | TailAdmin - Next.js Dashboard Template",
-  description: "This is Next.js Signin Page TailAdmin Dashboard Template",
+  title: "Sign In | BASE Search Marketing",
+  description:
+    "Sign in to your BASE Search Marketing client portal to manage your link building and content services.",
 };
 
 export default function SignIn() {
