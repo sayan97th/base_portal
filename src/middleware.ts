@@ -38,7 +38,9 @@ export function middleware(request: NextRequest) {
     }
     // Everything else requires authentication.
     const signin_url = new URL("/signin", request.url);
-    signin_url.searchParams.set("callbackUrl", pathname);
+    if (pathname !== "/") {
+      signin_url.searchParams.set("callbackUrl", pathname);
+    }
     return NextResponse.redirect(signin_url);
   }
 
