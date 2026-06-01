@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { deliverablesService } from "@/services/client/deliverables.service";
 import type { DeliverableSummary, DeliverableListFilters } from "@/types/client/deliverables";
-import type { ClientPaginatedResponse } from "@/types/client/link-building";
-import type { OrderStatus } from "@/types/client/link-building";
+import type { ClientPaginatedResponse, OrderStatus } from "@/types/client/link-building";
+import DeliverableOrderCard from "./DeliverableOrderCard";
 
-// ── Icons ───────────────────────────────────────────────────────────────────
+// ── Icons ─────────────────────────────────────────────────────────────────────
 
 const ReportIcon = () => (
   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
@@ -18,24 +17,6 @@ const ReportIcon = () => (
 const SearchIcon = () => (
   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 15.803 7.5 7.5 0 0016.803 16.803z" />
-  </svg>
-);
-
-const LinkIcon = () => (
-  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
-  </svg>
-);
-
-const ArrowRightIcon = () => (
-  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-  </svg>
-);
-
-const EmptyIcon = () => (
-  <svg className="h-16 w-16" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
   </svg>
 );
 
@@ -51,43 +32,13 @@ const ChevronRightIcon = () => (
   </svg>
 );
 
-// ── Status config ───────────────────────────────────────────────────────────
+const EmptyIcon = () => (
+  <svg className="h-16 w-16" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
+  </svg>
+);
 
-const ORDER_STATUS_CONFIG: Record<
-  OrderStatus,
-  { label: string; bg: string; text: string; dot: string }
-> = {
-  pending: {
-    label: "Pending",
-    bg: "bg-warning-50 dark:bg-warning-500/10",
-    text: "text-warning-700 dark:text-warning-400",
-    dot: "bg-warning-500",
-  },
-  processing: {
-    label: "Processing",
-    bg: "bg-blue-50 dark:bg-blue-500/10",
-    text: "text-blue-700 dark:text-blue-400",
-    dot: "bg-blue-500",
-  },
-  completed: {
-    label: "Completed",
-    bg: "bg-success-50 dark:bg-success-500/10",
-    text: "text-success-700 dark:text-success-400",
-    dot: "bg-success-500",
-  },
-  cancelled: {
-    label: "Cancelled",
-    bg: "bg-error-50 dark:bg-error-500/10",
-    text: "text-error-700 dark:text-error-400",
-    dot: "bg-error-500",
-  },
-  payment_pending: {
-    label: "Payment Pending",
-    bg: "bg-gray-100 dark:bg-gray-500/10",
-    text: "text-gray-700 dark:text-gray-400",
-    dot: "bg-gray-500",
-  },
-};
+// ── Status filter options ─────────────────────────────────────────────────────
 
 const STATUS_FILTER_OPTIONS: { label: string; value: OrderStatus | "" }[] = [
   { label: "All Statuses", value: "" },
@@ -98,44 +49,47 @@ const STATUS_FILTER_OPTIONS: { label: string; value: OrderStatus | "" }[] = [
   { label: "Payment Pending", value: "payment_pending" },
 ];
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-// ── Skeleton ─────────────────────────────────────────────────────────────────
-
-const Skeleton = ({ className }: { className?: string }) => (
-  <div className={`animate-pulse rounded-xl bg-gray-100 dark:bg-gray-800 ${className}`} />
-);
+// ── Loading skeleton ──────────────────────────────────────────────────────────
 
 function LoadingSkeleton() {
   return (
-    <div className="space-y-3">
-      {[1, 2, 3, 4, 5].map((i) => (
+    <div className="space-y-4">
+      {[1, 2, 3].map((i) => (
         <div
           key={i}
-          className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900"
+          className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
         >
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <Skeleton className="h-10 w-10 rounded-xl" />
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-48" />
-                <Skeleton className="h-3 w-32" />
+          <div className="h-1 w-full animate-pulse bg-gray-100 dark:bg-gray-800" />
+          <div className="p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="h-10 w-10 animate-pulse rounded-xl bg-gray-100 dark:bg-gray-800" />
+                <div className="space-y-2">
+                  <div className="h-4 w-56 animate-pulse rounded-full bg-gray-100 dark:bg-gray-800" />
+                  <div className="h-3 w-36 animate-pulse rounded-full bg-gray-100 dark:bg-gray-800" />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <div className="h-8 w-28 animate-pulse rounded-lg bg-gray-100 dark:bg-gray-800" />
+                <div className="h-8 w-8 animate-pulse rounded-lg bg-gray-100 dark:bg-gray-800" />
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <Skeleton className="h-6 w-24 rounded-full" />
-              <Skeleton className="h-8 w-28 rounded-lg" />
+            <div className="mt-4 flex gap-3">
+              <div className="h-5 w-24 animate-pulse rounded-full bg-gray-100 dark:bg-gray-800" />
+              <div className="h-5 w-20 animate-pulse rounded-full bg-gray-100 dark:bg-gray-800" />
+            </div>
+            <div className="mt-3">
+              <div className="h-1.5 w-full animate-pulse rounded-full bg-gray-100 dark:bg-gray-800" />
+            </div>
+          </div>
+          <div className="border-t border-gray-100 dark:border-gray-800">
+            <div className="bg-gray-50/80 px-5 py-2.5 dark:bg-white/[0.02]">
+              <div className="h-3 w-24 animate-pulse rounded-full bg-gray-100 dark:bg-gray-800" />
+            </div>
+            <div className="space-y-2 p-5">
+              {[1, 2, 3].map((j) => (
+                <div key={j} className="h-4 w-full animate-pulse rounded-full bg-gray-100 dark:bg-gray-800" />
+              ))}
             </div>
           </div>
         </div>
@@ -144,76 +98,7 @@ function LoadingSkeleton() {
   );
 }
 
-// ── Deliverable card ─────────────────────────────────────────────────────────
-
-interface DeliverableCardProps {
-  item: DeliverableSummary;
-}
-
-function DeliverableCard({ item }: DeliverableCardProps) {
-  const status_cfg = ORDER_STATUS_CONFIG[item.status];
-  const delivery_pct =
-    item.total_links > 0
-      ? Math.round((item.live_count / item.total_links) * 100)
-      : 0;
-
-  return (
-    <div className="group rounded-2xl border border-gray-200 bg-white transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
-      <div className="p-5">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          {/* Left — icon + title + meta */}
-          <div className="flex min-w-0 items-center gap-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
-              <ReportIcon />
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
-                {item.order_title ?? `Order ${item.order_id.slice(0, 8).toUpperCase()}`}
-              </p>
-              <p className="mt-0.5 font-mono text-xs text-gray-400 dark:text-gray-500">
-                {item.order_id.slice(0, 8).toUpperCase()} · Created {formatDate(item.created_at)}
-              </p>
-            </div>
-          </div>
-
-          {/* Right — stats + badge + button */}
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Link counts */}
-            <div className="hidden items-center gap-4 sm:flex">
-              <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                <LinkIcon />
-                <span className="font-medium text-gray-800 dark:text-gray-200">{item.total_links}</span>
-                <span>total</span>
-              </div>
-              <div className="h-3 w-px bg-gray-200 dark:bg-gray-700" />
-             
-            </div>
-
-            {/* Status badge */}
-            <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${status_cfg.bg} ${status_cfg.text}`}
-            >
-              <span className={`h-1.5 w-1.5 rounded-full ${status_cfg.dot}`} />
-              {status_cfg.label}
-            </span>
-
-            {/* View report button */}
-            <Link
-              href={`/link-building/orders/${item.order_id}/report`}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-600 dark:bg-brand-600 dark:hover:bg-brand-500"
-            >
-              View Report
-              <ArrowRightIcon />
-            </Link>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  );
-}
-
-// ── Pagination ───────────────────────────────────────────────────────────────
+// ── Pagination ────────────────────────────────────────────────────────────────
 
 interface PaginationProps {
   current_page: number;
@@ -230,8 +115,11 @@ function Pagination({ current_page, last_page, total, per_page, onPageChange }: 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
       <p className="text-xs text-gray-500 dark:text-gray-400">
-        Showing <span className="font-medium text-gray-700 dark:text-gray-300">{from}–{to}</span> of{" "}
-        <span className="font-medium text-gray-700 dark:text-gray-300">{total}</span> deliverables
+        Showing{" "}
+        <span className="font-medium text-gray-700 dark:text-gray-300">{from}–{to}</span>{" "}
+        of{" "}
+        <span className="font-medium text-gray-700 dark:text-gray-300">{total}</span>{" "}
+        deliverables
       </p>
       <div className="flex items-center gap-1">
         <button
@@ -279,7 +167,7 @@ function Pagination({ current_page, last_page, total, per_page, onPageChange }: 
   );
 }
 
-// ── Main page component ──────────────────────────────────────────────────────
+// ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function DeliverablesPage() {
   const [result, setResult] = useState<ClientPaginatedResponse<DeliverableSummary> | null>(null);
@@ -328,6 +216,15 @@ export default function DeliverablesPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  function clearFilters() {
+    setSearch("");
+    setSearchInput("");
+    setStatusFilter("");
+    setCurrentPage(1);
+  }
+
+  const has_filters = Boolean(search || status_filter);
+
   return (
     <div className="space-y-6">
       {/* Page header */}
@@ -341,7 +238,7 @@ export default function DeliverablesPage() {
             <div>
               <h1 className="text-xl font-bold text-gray-900 dark:text-white">Deliverables</h1>
               <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
-                All your order reports and link delivery progress in one place.
+                Track your order details and link delivery status at a glance. Each card auto-expands to show placement-level progress.
               </p>
             </div>
           </div>
@@ -357,7 +254,7 @@ export default function DeliverablesPage() {
             </span>
             <input
               type="text"
-              placeholder="Search by title or order ID..."
+              placeholder="Search by title or order ID…"
               value={search_input}
               onChange={(e) => setSearchInput(e.target.value)}
               className="h-9 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:placeholder-gray-500 dark:focus:border-brand-500"
@@ -382,6 +279,15 @@ export default function DeliverablesPage() {
             </option>
           ))}
         </select>
+
+        {has_filters && (
+          <button
+            onClick={clearFilters}
+            className="h-9 rounded-lg border border-gray-200 px-3 text-sm text-gray-500 transition-colors hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+          >
+            Clear
+          </button>
+        )}
       </div>
 
       {/* Loading */}
@@ -391,7 +297,13 @@ export default function DeliverablesPage() {
       {!is_loading && error && (
         <div className="rounded-2xl border border-error-200 bg-error-50 p-6 dark:border-error-500/20 dark:bg-error-500/10">
           <div className="flex items-start gap-3">
-            <svg className="mt-0.5 h-5 w-5 shrink-0 text-error-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <svg
+              className="mt-0.5 h-5 w-5 shrink-0 text-error-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+            >
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
             </svg>
             <div>
@@ -414,17 +326,15 @@ export default function DeliverablesPage() {
             <EmptyIcon />
           </div>
           <div className="text-center">
-            <p className="text-base font-semibold text-gray-600 dark:text-gray-300">
-              No deliverables found
-            </p>
+            <p className="text-base font-semibold text-gray-600 dark:text-gray-300">No deliverables found</p>
             <p className="mt-1 max-w-sm text-sm text-gray-400 dark:text-gray-500">
-              {search || status_filter
+              {has_filters
                 ? "No results match your current filters. Try adjusting your search."
                 : "Your deliverable reports will appear here once your orders are processed."}
             </p>
-            {(search || status_filter) && (
+            {has_filters && (
               <button
-                onClick={() => { setSearch(""); setSearchInput(""); setStatusFilter(""); setCurrentPage(1); }}
+                onClick={clearFilters}
                 className="mt-3 text-sm font-medium text-brand-500 hover:text-brand-600 dark:text-brand-400"
               >
                 Clear filters
@@ -437,18 +347,28 @@ export default function DeliverablesPage() {
       {/* Deliverables list */}
       {!is_loading && !error && result && result.data.length > 0 && (
         <div className="space-y-4">
+          {/* List header */}
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Deliverables ({result.total})
+              Deliverables
+              <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                {result.total}
+              </span>
             </h2>
           </div>
 
-          <div className="space-y-3">
+          {/* Cards */}
+          <div className="space-y-4">
             {result.data.map((item) => (
-              <DeliverableCard key={item.order_id} item={item} />
+              <DeliverableOrderCard
+                key={item.order_id}
+                item={item}
+                default_expanded={true}
+              />
             ))}
           </div>
 
+          {/* Pagination */}
           {result.last_page > 1 && (
             <Pagination
               current_page={result.current_page}
