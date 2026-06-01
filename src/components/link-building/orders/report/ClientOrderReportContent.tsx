@@ -179,11 +179,11 @@ export default function ClientOrderReportContent({ order_id }: ClientOrderReport
     <div className="space-y-6">
       {/* Back navigation */}
       <Link
-        href={`/link-building/orders/${order_id}`}
+        href="/orders"
         className="inline-flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
       >
         <BackIcon />
-        Back to Order
+        Back to Orders
       </Link>
 
       {/* Loading */}

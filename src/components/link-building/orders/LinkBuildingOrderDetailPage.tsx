@@ -386,11 +386,11 @@ const LinkBuildingOrderDetailPage: React.FC<
     <div className="space-y-6">
       {/* Back Link */}
       <Link
-        href="/link-building"
+        href="/orders"
         className="inline-flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
       >
         <BackIcon />
-        Back to Link Building
+        Back to Orders
       </Link>
 
       {/* Loading State */}
