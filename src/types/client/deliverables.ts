@@ -1,4 +1,5 @@
 import type { OrderStatus } from "@/types/client/link-building";
+import type { OrderReport } from "@/types/admin/order-report";
 
 export interface DeliverableSummary {
   order_id: string;
@@ -10,6 +11,7 @@ export interface DeliverableSummary {
   pending_count: number;
   tables_count: number;
   report_sent_at: string | null;
+  report: OrderReport | null;
 }
 
 export interface DeliverableListFilters {

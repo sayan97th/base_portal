@@ -238,17 +238,22 @@ function PlacementTable({ rows }: PlacementTableProps) {
 interface DeliverableOrderCardProps {
   item: DeliverableSummary;
   default_expanded?: boolean;
+  /** Pre-loaded report from the list endpoint. When provided the card never
+   *  makes a separate fetch — null means the order has no report yet. */
+  initial_report?: OrderReport | null;
 }
 
 export default function DeliverableOrderCard({
   item,
   default_expanded = true,
+  initial_report,
 }: DeliverableOrderCardProps) {
+  const preloaded = initial_report !== undefined;
   const [is_expanded, setIsExpanded] = useState(default_expanded);
-  const [report, setReport] = useState<OrderReport | null>(null);
+  const [report, setReport] = useState<OrderReport | null>(preloaded ? initial_report : null);
   const [is_loading_report, setIsLoadingReport] = useState(false);
   const [report_error, setReportError] = useState<string | null>(null);
-  const [has_fetched, setHasFetched] = useState(false);
+  const [has_fetched, setHasFetched] = useState(preloaded);
 
   const status_cfg = order_status_config[item.status] ?? order_status_config.pending;
   const live_pct = item.total_links > 0 ? Math.round((item.live_count / item.total_links) * 100) : 0;

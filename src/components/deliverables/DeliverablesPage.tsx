@@ -363,6 +363,7 @@ export default function DeliverablesPage() {
               <DeliverableOrderCard
                 key={item.order_id}
                 item={item}
+                initial_report={item.report}
                 default_expanded={true}
               />
             ))}
