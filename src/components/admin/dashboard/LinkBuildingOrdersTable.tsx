@@ -90,7 +90,6 @@ const COLUMNS: ColumnDef[] = [
   { key: "request_date",              label: "Request Date",            group: "dates",      min_width: 120,  type: "date",   locked: true },
   { key: "estimated_delivery_date",   label: "Estimated Delivery Date", group: "dates",      min_width: 175,  type: "date",   locked: true },
   { key: "estimated_turnaround_days", label: "Est. Turnaround (Days)",  group: "dates",      min_width: 155,  type: "number", locked: true },
-  { key: "link_builder",              label: "Link Builder",            group: "writer",     min_width: 170,  type: "text" },
   { key: "pen_name",                  label: "Pen Name",                group: "writer",     min_width: 120,  type: "text" },
   { key: "partnership",               label: "Partnership",             group: "writer",     min_width: 180,  type: "url" },
   { key: "article_title",             label: "Article Title",           group: "writer",     min_width: 220,  type: "text" },
@@ -547,7 +546,6 @@ export default function LinkBuildingOrdersTable() {
   const [status_filter, setStatusFilter] = useState<string>("");
   const [client_filter, setClientFilter] = useState<string>("");
   const [link_type_filter, setLinkTypeFilter] = useState<string>("");
-  const [link_builder_filter, setLinkBuilderFilter] = useState<string>("");
   const [show_filter_panel, setShowFilterPanel] = useState(false);
   const [hidden_columns, setHiddenColumns] = useState<Set<string>>(new Set());
   const [current_page, setCurrentPage] = useState(1);
@@ -576,7 +574,6 @@ export default function LinkBuildingOrdersTable() {
 
   const debounced_search          = useDebounce(search, 400);
   const debounced_client_filter   = useDebounce(client_filter, 400);
-  const debounced_link_builder_filter = useDebounce(link_builder_filter, 400);
 
   const current_body_ref = useRef<LinkBuildingOrderSearchBody>({});
 
@@ -731,7 +728,6 @@ export default function LinkBuildingOrdersTable() {
       status:       status_filter || undefined,
       link_type:    link_type_filter || undefined,
       client:       debounced_client_filter.trim() || undefined,
-      link_builder: debounced_link_builder_filter.trim() || undefined,
       sort_rules:   sort_rules.length > 0 ? sort_rules : undefined,
       column_filters: active_col_filters.length > 0 ? active_col_filters : undefined,
     };
@@ -744,7 +740,6 @@ export default function LinkBuildingOrdersTable() {
     status_filter,
     link_type_filter,
     debounced_client_filter,
-    debounced_link_builder_filter,
     sort_rules,
     column_filters,
   ]);
@@ -970,7 +965,6 @@ export default function LinkBuildingOrdersTable() {
     status_filter !== "" ||
     client_filter !== "" ||
     link_type_filter !== "" ||
-    link_builder_filter !== "" ||
     hidden_columns.size > 0 ||
     active_filter_count > 0 ||
     sort_rules.length > 0;
@@ -980,7 +974,6 @@ export default function LinkBuildingOrdersTable() {
     setStatusFilter("");
     setClientFilter("");
     setLinkTypeFilter("");
-    setLinkBuilderFilter("");
     setHiddenColumns(new Set());
     clearColumnFilters();
     clearSort();
@@ -1063,14 +1056,6 @@ export default function LinkBuildingOrdersTable() {
             placeholder="Client..."
             value={client_filter}
             onChange={(e) => setClientFilter(e.target.value)}
-            className="h-8 rounded-lg border border-gray-200 bg-gray-50 px-3 text-xs outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-          />
-          {/* Link Builder filter */}
-          <input
-            type="text"
-            placeholder="Link Builder..."
-            value={link_builder_filter}
-            onChange={(e) => setLinkBuilderFilter(e.target.value)}
             className="h-8 rounded-lg border border-gray-200 bg-gray-50 px-3 text-xs outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
           />
           {/* Clear all filters */}
@@ -1375,7 +1360,7 @@ export default function LinkBuildingOrdersTable() {
                     colSpan={visible_columns.length + 2}
                     className="px-6 py-14 text-center text-sm text-gray-400 dark:text-gray-500"
                   >
-                    {search || status_filter || link_type_filter || client_filter || link_builder_filter
+                    {search || status_filter || link_type_filter || client_filter
                       ? "No rows match the active filters."
                       : 'No link building orders found. Click "Add Row" to create one.'}
                   </td>
