@@ -142,6 +142,13 @@ function generateOrderId(): string {
   return `LBO-${y}${m}${d}-${rand}`;
 }
 
+function formatDateMMDDYYYY(date: Date): string {
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  const y = date.getFullYear();
+  return `${m}/${d}/${y}`;
+}
+
 const REQUIRED_FIELDS: (keyof LinkBuildingOrderRow)[] = [
   "link_type",
   "client",
@@ -188,6 +195,10 @@ function saveDraftsToStorage(draft_rows: LinkBuildingOrderRow[]): void {
 }
 
 function createEmptyRow(): LinkBuildingOrderRow {
+  const today = new Date();
+  const delivery_date = new Date(today);
+  delivery_date.setDate(delivery_date.getDate() + 30);
+
   return {
     id:                        createTempId(),
     order_id:                  generateOrderId(),
@@ -199,8 +210,8 @@ function createEmptyRow(): LinkBuildingOrderRow {
     exact_match:               "No",
     notes:                     "",
     internal_notes:            "",
-    request_date:              "",
-    estimated_delivery_date:   "",
+    request_date:              formatDateMMDDYYYY(today),
+    estimated_delivery_date:   formatDateMMDDYYYY(delivery_date),
     estimated_turnaround_days: "30",
     link_builder:              "",
     pen_name:                  "",
