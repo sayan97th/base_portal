@@ -106,6 +106,7 @@ const COLUMNS: ColumnDef[] = [
   { key: "lb_tl_approval",            label: "LB TL Approval",         group: "pricing",    min_width: 130,  type: "text" },
   { key: "approval_date",             label: "Approval Date",           group: "pricing",    min_width: 120,  type: "date" },
   { key: "final_price",               label: "Final Price",             group: "pricing",    min_width: 110,  type: "text" },
+  { key: "currency",                  label: "Currency",                group: "pricing",    min_width: 100,  type: "select", options: ["USD", "EUR"] },
 ];
 
 // ── Group header styles ────────────────────────────────────────────────────────
@@ -215,6 +216,7 @@ function createEmptyRow(): LinkBuildingOrderRow {
     lb_tl_approval:            "",
     approval_date:             "",
     final_price:               "",
+    currency:                  "USD",
     admin_team_id:             null,
     assigned_admin_user_id:    null,
   };

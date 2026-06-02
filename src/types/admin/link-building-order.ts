@@ -30,6 +30,8 @@ export interface LinkBuildingOrderRow {
   lb_tl_approval: string;
   approval_date: string;
   final_price: string;
+  /** Currency for pricing fields: USD or EUR. */
+  currency: string;
   /** Optional: links this standalone admin row to a specific client user account. */
   user_id?: number | null;
   /** Admin team responsible for this placement (UUID of admin_teams record). */
