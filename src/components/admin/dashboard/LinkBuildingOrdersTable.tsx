@@ -55,11 +55,16 @@ interface ColumnDef {
 // ── Column definitions ─────────────────────────────────────────────────────────
 
 const LINK_TYPE_OPTIONS = [
-  "DA 30+ External",
-  "DA 40+ External",
-  "DA 50+ External",
-  "DA 30+ Internal",
-  "DA 40+ Internal",
+  "DR 30+ External",
+  "DR 40+ External",
+  "DR 50+ External",
+  "DR 60+ External",
+  "DR 70+ External",
+  "DR 30+ Internal",
+  "DR 40+ Internal",
+  "DR 50+ Internal",
+  "DR 60+ Internal",
+  "DR 70+ Internal",
 ];
 
 const STATUS_OPTIONS = [
