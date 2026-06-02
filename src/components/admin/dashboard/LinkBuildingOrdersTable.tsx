@@ -346,6 +346,8 @@ interface EditableCellProps {
   onUpdate: (value: string) => void;
   onStopEdit: () => void;
   onKeyNav: (direction: "next" | "prev" | "down") => void;
+  /** When provided on a select column, fires immediately on change and saves without waiting for blur. */
+  onSelectImmediateSave?: (value: string) => void;
 }
 
 function EditableCell({
@@ -360,6 +362,7 @@ function EditableCell({
   onUpdate,
   onStopEdit,
   onKeyNav,
+  onSelectImmediateSave,
 }: EditableCellProps) {
   const input_ref = useRef<HTMLInputElement>(null);
   const select_ref = useRef<HTMLSelectElement>(null);
@@ -392,8 +395,14 @@ function EditableCell({
           <select
             ref={select_ref}
             value={value}
-            onChange={(e) => onUpdate(e.target.value)}
-            onBlur={onStopEdit}
+            onChange={(e) => {
+              if (onSelectImmediateSave) {
+                onSelectImmediateSave(e.target.value);
+              } else {
+                onUpdate(e.target.value);
+              }
+            }}
+            onBlur={onSelectImmediateSave ? undefined : onStopEdit}
             onKeyDown={handleKeyDown}
             className="h-full w-full border-2 border-brand-500 bg-white px-2 py-1.5 text-xs outline-none dark:bg-gray-800 dark:text-white"
             style={{ minWidth: col.min_width }}
@@ -986,6 +995,24 @@ export default function LinkBuildingOrdersTable() {
     setEditingCell(null);
   }, []);
 
+  // ── Partnership check ────────────────────────────────────────────────────────
+
+  const handlePartnershipCheckChange = useCallback((row_id: string, new_value: string) => {
+    const base_row = rows_ref.current.find((r) => r.id === row_id);
+    if (!base_row) return;
+
+    const updated_row: LinkBuildingOrderRow = { ...base_row, partnership_check: new_value };
+
+    setRows((prev) => prev.map((r) => (r.id === row_id ? updated_row : r)));
+    setEditingCell(null);
+
+    if (new_row_ids_ref.current.has(row_id)) {
+      persistNewRow(updated_row);
+    } else {
+      persistRowUpdate(updated_row, "partnership_check");
+    }
+  }, [persistNewRow, persistRowUpdate]);
+
   // ── Column visibility ───────────────────────────────────────────────────────
 
   const toggleColumn = useCallback((col_key: string) => {
@@ -1464,6 +1491,11 @@ export default function LinkBuildingOrdersTable() {
                             onUpdate={(val) => updateCell(row.id, col.key, val)}
                             onStopEdit={stopEditing}
                             onKeyNav={(dir) => navigateCell(row.id, col.key, dir)}
+                            onSelectImmediateSave={
+                              col.key === "partnership_check"
+                                ? (val) => handlePartnershipCheckChange(row.id, val)
+                                : undefined
+                            }
                           />
                         );
                       })}
