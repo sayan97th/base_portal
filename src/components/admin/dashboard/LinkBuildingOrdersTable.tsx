@@ -174,7 +174,10 @@ function getRowMissingRequired(row: LinkBuildingOrderRow): string[] {
 
 // ── Draft persistence (localStorage) ──────────────────────────────────────────
 
-const DRAFT_STORAGE_KEY = "lbo_row_drafts_v1";
+const DRAFT_STORAGE_KEY   = "lbo_row_drafts_v1";
+const PER_PAGE_STORAGE_KEY = "lbo_per_page_v1";
+const PER_PAGE_OPTIONS     = [10, 25, 50, 100, 150, 200] as const;
+type PerPageOption = (typeof PER_PAGE_OPTIONS)[number];
 
 type DraftRowData = Omit<LinkBuildingOrderRow, "id">;
 
@@ -635,6 +638,17 @@ export default function LinkBuildingOrdersTable() {
   const [current_page, setCurrentPage] = useState(1);
   const [last_page, setLastPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [from_row, setFromRow] = useState<number | null>(null);
+  const [to_row, setToRow] = useState<number | null>(null);
+  const [per_page, setPerPage] = useState<PerPageOption>(() => {
+    if (typeof window === "undefined") return 50;
+    const saved = localStorage.getItem(PER_PAGE_STORAGE_KEY);
+    if (saved) {
+      const parsed = parseInt(saved, 10) as PerPageOption;
+      if ((PER_PAGE_OPTIONS as readonly number[]).includes(parsed)) return parsed;
+    }
+    return 50;
+  });
 
   // ── Batch editing ───────────────────────────────────────────────────────────
   const [selected_row_ids, setSelectedRowIds] = useState<Set<string>>(new Set());
@@ -656,6 +670,9 @@ export default function LinkBuildingOrdersTable() {
 
   const rows_ref = useRef<LinkBuildingOrderRow[]>([]);
   rows_ref.current = rows;
+
+  const per_page_ref = useRef<PerPageOption>(per_page);
+  per_page_ref.current = per_page;
 
   const editing_cell_ref = useRef<{ row_id: string; col_key: string } | null>(null);
   editing_cell_ref.current = editing_cell;
@@ -788,10 +805,12 @@ export default function LinkBuildingOrdersTable() {
     setIsLoading(true);
     setSaveError(null);
     try {
-      const res = await listLinkBuildingOrders({ ...body, page, per_page: 50 });
+      const res = await listLinkBuildingOrders({ ...body, page, per_page: per_page_ref.current });
       setCurrentPage(res.current_page);
       setLastPage(res.last_page);
       setTotal(res.total);
+      setFromRow(res.from);
+      setToRow(res.to);
 
       if (!drafts_restored_ref.current) {
         drafts_restored_ref.current = true;
@@ -834,6 +853,7 @@ export default function LinkBuildingOrdersTable() {
     debounced_client_filter,
     sort_rules,
     column_filters,
+    per_page,
   ]);
 
   // ── Derived state ───────────────────────────────────────────────────────────
@@ -1088,6 +1108,13 @@ export default function LinkBuildingOrdersTable() {
     clearColumnFilters();
     clearSort();
   }, [clearColumnFilters, clearSort]);
+
+  const handlePerPageChange = useCallback((option: PerPageOption) => {
+    setPerPage(option);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(PER_PAGE_STORAGE_KEY, String(option));
+    }
+  }, []);
 
   // ── Batch selection ─────────────────────────────────────────────────────────
 
@@ -1901,36 +1928,74 @@ export default function LinkBuildingOrdersTable() {
         />
       )}
 
-      {/* Footer — pagination + summary */}
-      <div className="flex items-center justify-between border-t border-gray-100 px-4 py-2 dark:border-gray-800">
+      {/* Footer — summary · rows-per-page · pagination */}
+      <div className="flex flex-wrap items-center justify-between gap-y-2 border-t border-gray-100 px-4 py-2 dark:border-gray-800">
+
+        {/* Left: row range + column count */}
         <p className="text-xs text-gray-400 dark:text-gray-600">
-          {total} total rows &middot; {visible_columns.length} of {COLUMNS.length} columns visible
+          {is_loading ? (
+            "Loading…"
+          ) : total === 0 ? (
+            "No rows"
+          ) : (
+            <>
+              Showing{" "}
+              <span className="font-medium text-gray-600 dark:text-gray-300">
+                {from_row ?? 1}–{to_row ?? filtered_rows.length}
+              </span>{" "}
+              of{" "}
+              <span className="font-medium text-gray-600 dark:text-gray-300">{total}</span>{" "}
+              rows &middot; {visible_columns.length} of {COLUMNS.length} columns visible
+            </>
+          )}
         </p>
-        {last_page > 1 && (
-          <div className="flex items-center gap-2">
-            <button
-              disabled={current_page <= 1 || is_loading}
-              onClick={() => fetchRows(current_page - 1, current_body_ref.current)}
-              className="flex h-6 w-6 items-center justify-center rounded border border-gray-200 text-gray-500 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
-            >
-              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-              </svg>
-            </button>
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              Page {current_page} of {last_page}
-            </span>
-            <button
-              disabled={current_page >= last_page || is_loading}
-              onClick={() => fetchRows(current_page + 1, current_body_ref.current)}
-              className="flex h-6 w-6 items-center justify-center rounded border border-gray-200 text-gray-500 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
-            >
-              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-              </svg>
-            </button>
-          </div>
-        )}
+
+        {/* Center: rows-per-page select */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
+            Rows per page:
+          </span>
+          <select
+            value={per_page}
+            onChange={(e) => handlePerPageChange(parseInt(e.target.value, 10) as PerPageOption)}
+            disabled={is_loading}
+            className="h-7 rounded-lg border border-gray-200 bg-white px-2 pr-6 text-xs text-gray-600 outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+          >
+            {PER_PAGE_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option} rows
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Right: prev / page counter / next */}
+        <div className="flex items-center gap-2">
+          <button
+            disabled={current_page <= 1 || is_loading}
+            onClick={() => fetchRows(current_page - 1, current_body_ref.current)}
+            className="flex h-6 w-6 items-center justify-center rounded border border-gray-200 text-gray-500 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+            title="Previous page"
+          >
+            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+            </svg>
+          </button>
+          <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+            {last_page <= 1 ? "1 page" : `Page ${current_page} of ${last_page}`}
+          </span>
+          <button
+            disabled={current_page >= last_page || is_loading}
+            onClick={() => fetchRows(current_page + 1, current_body_ref.current)}
+            className="flex h-6 w-6 items-center justify-center rounded border border-gray-200 text-gray-500 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+            title="Next page"
+          >
+            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+            </svg>
+          </button>
+        </div>
+
       </div>
     </div>
   );
