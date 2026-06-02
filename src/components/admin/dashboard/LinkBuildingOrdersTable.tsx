@@ -12,6 +12,7 @@ import {
   deleteLinkBuildingOrder,
   buildLboPayload,
   exportLinkBuildingOrders,
+  batchUpdateLinkBuildingOrders,
   listAdminUsersForSelect,
   type AdminUserOption,
 } from "@/services/admin/link-building-dashboard.service";
@@ -348,6 +349,8 @@ interface EditableCellProps {
   onKeyNav: (direction: "next" | "prev" | "down") => void;
   /** When provided on a select column, fires immediately on change and saves without waiting for blur. */
   onSelectImmediateSave?: (value: string) => void;
+  /** When provided, shows a copy-to-clipboard icon on cell hover. */
+  onCopy?: (value: string) => void;
 }
 
 function EditableCell({
@@ -363,9 +366,20 @@ function EditableCell({
   onStopEdit,
   onKeyNav,
   onSelectImmediateSave,
+  onCopy,
 }: EditableCellProps) {
-  const input_ref = useRef<HTMLInputElement>(null);
+  const input_ref  = useRef<HTMLInputElement>(null);
   const select_ref = useRef<HTMLSelectElement>(null);
+  const [just_copied, setJustCopied] = useState(false);
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!value || !onCopy) return;
+    navigator.clipboard.writeText(value).catch(() => {});
+    onCopy(value);
+    setJustCopied(true);
+    setTimeout(() => setJustCopied(false), 1200);
+  };
 
   useEffect(() => {
     if (is_editing) {
@@ -514,7 +528,7 @@ function EditableCell({
 
   return (
     <td
-      className={`relative cursor-pointer whitespace-nowrap px-2 py-1.5 text-xs text-gray-700 transition-colors dark:text-gray-300 ${
+      className={`group/cell relative cursor-pointer whitespace-nowrap px-2 py-1.5 text-xs text-gray-700 transition-colors dark:text-gray-300 ${
         is_required_error
           ? "bg-red-50/80 ring-1 ring-inset ring-red-300 hover:bg-red-100/60 dark:bg-red-900/20 dark:ring-red-700"
           : "hover:bg-blue-50 dark:hover:bg-blue-900/20"
@@ -525,7 +539,7 @@ function EditableCell({
           : undefined
       }
       onClick={onStartEdit}
-      title={is_required_error ? `Required: ${col.label} must be filled to save this row` : "Click to edit"}
+      title={is_required_error ? `Required: ${col.label} must be filled to save this row` : "Click to edit · Hover for copy"}
     >
       {show_row_floater && <RowPresenceFloater editors={row_editors} />}
       {has_cell_editors && <CellPresenceOverlay editors={cell_editors} />}
@@ -539,6 +553,25 @@ function EditableCell({
           display
         )}
       </div>
+      {onCopy && value && !is_required_error && (
+        <button
+          className={`absolute right-0.5 top-1/2 -translate-y-1/2 rounded p-0.5 opacity-0 transition-all group-hover/cell:opacity-60 hover:!opacity-100 hover:bg-white dark:hover:bg-gray-700 ${
+            just_copied ? "!opacity-100 text-green-500" : "text-gray-400"
+          }`}
+          onClick={handleCopy}
+          title="Copy cell value"
+        >
+          {just_copied ? (
+            <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          ) : (
+            <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          )}
+        </button>
+      )}
     </td>
   );
 }
@@ -603,6 +636,13 @@ export default function LinkBuildingOrdersTable() {
   const [last_page, setLastPage] = useState(1);
   const [total, setTotal] = useState(0);
 
+  // ── Batch editing ───────────────────────────────────────────────────────────
+  const [selected_row_ids, setSelectedRowIds] = useState<Set<string>>(new Set());
+  const [clipboard_cell, setClipboardCell]    = useState<{ value: string; col_key: string } | null>(null);
+  const [batch_field, setBatchField]          = useState<string>("");
+  const [batch_value, setBatchValue]          = useState<string>("");
+  const [is_batch_saving, setIsBatchSaving]   = useState(false);
+
   const { sort_rules, toggleSort, clearSort } = useTableSort();
   const {
     column_filters,
@@ -620,8 +660,9 @@ export default function LinkBuildingOrdersTable() {
   const editing_cell_ref = useRef<{ row_id: string; col_key: string } | null>(null);
   editing_cell_ref.current = editing_cell;
 
-  const new_row_ids_ref = useRef<Set<string>>(new Set());
-  const drafts_restored_ref = useRef(false);
+  const new_row_ids_ref      = useRef<Set<string>>(new Set());
+  const drafts_restored_ref  = useRef(false);
+  const select_all_ref       = useRef<HTMLInputElement>(null);
 
   const debounced_search          = useDebounce(search, 400);
   const debounced_client_filter   = useDebounce(client_filter, 400);
@@ -1048,6 +1089,113 @@ export default function LinkBuildingOrdersTable() {
     clearSort();
   }, [clearColumnFilters, clearSort]);
 
+  // ── Batch selection ─────────────────────────────────────────────────────────
+
+  const clearSelection = useCallback(() => {
+    setSelectedRowIds(new Set());
+  }, []);
+
+  const toggleRowSelection = useCallback((row_id: string) => {
+    setSelectedRowIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(row_id)) next.delete(row_id);
+      else next.add(row_id);
+      return next;
+    });
+  }, []);
+
+  const selectAllRows = useCallback(() => {
+    setSelectedRowIds(new Set(filtered_rows.map((r) => r.id)));
+  }, [filtered_rows]);
+
+  const copyCellValue = useCallback((value: string, col_key: string) => {
+    setClipboardCell({ value, col_key });
+  }, []);
+
+  const handleBatchApply = useCallback(async () => {
+    if (!batch_field || selected_row_ids.size === 0) return;
+
+    setIsBatchSaving(true);
+    setSaveError(null);
+    try {
+      const persisted_ids = Array.from(selected_row_ids).filter(
+        (id) => !new_row_ids_ref.current.has(id)
+      );
+
+      if (persisted_ids.length > 0) {
+        await batchUpdateLinkBuildingOrders(persisted_ids, {
+          [batch_field]: batch_value || null,
+        });
+      }
+
+      setRows((prev) =>
+        prev.map((r) =>
+          selected_row_ids.has(r.id) ? { ...r, [batch_field]: batch_value } : r
+        )
+      );
+
+      const col_label = COLUMNS.find((c) => c.key === batch_field)?.label ?? batch_field;
+      setNotificationBanner(
+        `"${col_label}" set for ${selected_row_ids.size} row${selected_row_ids.size !== 1 ? "s" : ""}.`
+      );
+      clearSelection();
+      setBatchField("");
+      setBatchValue("");
+    } catch {
+      setSaveError("Batch update failed. Please try again.");
+    } finally {
+      setIsBatchSaving(false);
+    }
+  }, [batch_field, batch_value, selected_row_ids, clearSelection]);
+
+  const handlePasteClipboard = useCallback(async () => {
+    if (!clipboard_cell || selected_row_ids.size === 0) return;
+
+    setIsBatchSaving(true);
+    setSaveError(null);
+    try {
+      const persisted_ids = Array.from(selected_row_ids).filter(
+        (id) => !new_row_ids_ref.current.has(id)
+      );
+
+      if (persisted_ids.length > 0) {
+        await batchUpdateLinkBuildingOrders(persisted_ids, {
+          [clipboard_cell.col_key]: clipboard_cell.value,
+        });
+      }
+
+      setRows((prev) =>
+        prev.map((r) =>
+          selected_row_ids.has(r.id)
+            ? { ...r, [clipboard_cell.col_key]: clipboard_cell.value }
+            : r
+        )
+      );
+
+      const col_label  = COLUMNS.find((c) => c.key === clipboard_cell.col_key)?.label ?? clipboard_cell.col_key;
+      const short_val  = clipboard_cell.value.length > 30
+        ? clipboard_cell.value.slice(0, 30) + "…"
+        : clipboard_cell.value;
+      setNotificationBanner(
+        `Pasted "${short_val}" → "${col_label}" for ${selected_row_ids.size} row${selected_row_ids.size !== 1 ? "s" : ""}.`
+      );
+      clearSelection();
+    } catch {
+      setSaveError("Batch paste failed. Please try again.");
+    } finally {
+      setIsBatchSaving(false);
+    }
+  }, [clipboard_cell, selected_row_ids, clearSelection]);
+
+  // ── Indeterminate state for select-all checkbox ─────────────────────────────
+
+  useEffect(() => {
+    if (!select_all_ref.current) return;
+    const some = filtered_rows.some((r) => selected_row_ids.has(r.id));
+    const all  = filtered_rows.length > 0 && filtered_rows.every((r) => selected_row_ids.has(r.id));
+    select_all_ref.current.indeterminate = some && !all;
+  }, [filtered_rows, selected_row_ids]);
+
   // ── Export ──────────────────────────────────────────────────────────────────
 
   const handleExport = useCallback(async () => {
@@ -1241,6 +1389,115 @@ export default function LinkBuildingOrdersTable() {
         </div>
       )}
 
+      {/* Batch edit bar — slides in when rows are selected */}
+      {selected_row_ids.size > 0 && (
+        <div className="flex flex-wrap items-center gap-3 border-b border-indigo-200 bg-indigo-50 px-4 py-2.5 dark:border-indigo-900/40 dark:bg-indigo-950/20">
+          {/* Row count badge */}
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-indigo-600 px-1.5 text-[10px] font-bold text-white">
+              {selected_row_ids.size}
+            </span>
+            <span className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">
+              {selected_row_ids.size === 1 ? "1 row selected" : `${selected_row_ids.size} rows selected`}
+            </span>
+          </div>
+
+          <div className="h-4 w-px shrink-0 bg-indigo-200 dark:bg-indigo-800" />
+
+          {/* Clipboard paste shortcut — appears after copying a cell */}
+          {clipboard_cell && (() => {
+            const paste_col_label = COLUMNS.find((c) => c.key === clipboard_cell.col_key)?.label ?? clipboard_cell.col_key;
+            const short_val = clipboard_cell.value.length > 22
+              ? clipboard_cell.value.slice(0, 22) + "…"
+              : clipboard_cell.value;
+            return (
+              <>
+                <button
+                  onClick={handlePasteClipboard}
+                  disabled={is_batch_saving}
+                  className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
+                  title={`Paste "${clipboard_cell.value}" into "${paste_col_label}" for all selected rows`}
+                >
+                  <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                  Paste &ldquo;{short_val}&rdquo; → {paste_col_label}
+                </button>
+                <div className="h-4 w-px shrink-0 bg-indigo-200 dark:bg-indigo-800" />
+              </>
+            );
+          })()}
+
+          {/* Manual batch fill */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-indigo-600 dark:text-indigo-400">Fill field:</span>
+            <select
+              value={batch_field}
+              onChange={(e) => { setBatchField(e.target.value); setBatchValue(""); }}
+              className="h-7 rounded border border-indigo-200 bg-white px-2 text-xs outline-none focus:border-indigo-400 dark:border-indigo-800 dark:bg-gray-800 dark:text-gray-200"
+            >
+              <option value="">Choose column…</option>
+              {COLUMNS.filter((c) => !c.locked).map((col) => (
+                <option key={col.key} value={col.key}>{col.label}</option>
+              ))}
+            </select>
+            {batch_field && (() => {
+              const col_def = COLUMNS.find((c) => c.key === batch_field);
+              if (!col_def) return null;
+              if (col_def.type === "select" && col_def.options) {
+                return (
+                  <select
+                    value={batch_value}
+                    onChange={(e) => setBatchValue(e.target.value)}
+                    className="h-7 rounded border border-indigo-200 bg-white px-2 text-xs outline-none focus:border-indigo-400 dark:border-indigo-800 dark:bg-gray-800 dark:text-gray-200"
+                  >
+                    <option value="">-- Select --</option>
+                    {col_def.options.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                );
+              }
+              return (
+                <input
+                  type="text"
+                  placeholder={`Value for ${col_def.label}…`}
+                  value={batch_value}
+                  onChange={(e) => setBatchValue(e.target.value)}
+                  className="h-7 rounded border border-indigo-200 bg-white px-2 text-xs outline-none focus:border-indigo-400 dark:border-indigo-800 dark:bg-gray-800 dark:text-gray-200"
+                  style={{ minWidth: 140 }}
+                />
+              );
+            })()}
+            {batch_field && (
+              <button
+                onClick={handleBatchApply}
+                disabled={is_batch_saving || !batch_value}
+                className="flex h-7 items-center gap-1.5 rounded-lg bg-indigo-600 px-3 text-xs font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {is_batch_saving ? (
+                  <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                ) : null}
+                Apply to {selected_row_ids.size} row{selected_row_ids.size !== 1 ? "s" : ""}
+              </button>
+            )}
+          </div>
+
+          <button
+            onClick={clearSelection}
+            className="ml-auto flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
+          >
+            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            Clear selection
+          </button>
+        </div>
+      )}
+
       {/* Column visibility panel */}
       {show_filter_panel && (
         <div className="border-b border-gray-100 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-gray-800/50">
@@ -1293,6 +1550,23 @@ export default function LinkBuildingOrdersTable() {
           <table className="min-w-full border-collapse text-xs">
             <thead>
               <tr>
+                {/* Select-all checkbox column */}
+                <th className="w-px border border-gray-700/30 bg-gray-800 px-2 py-1.5 text-center">
+                  <input
+                    ref={select_all_ref}
+                    type="checkbox"
+                    checked={
+                      filtered_rows.length > 0 &&
+                      filtered_rows.every((r) => selected_row_ids.has(r.id))
+                    }
+                    onChange={(e) => {
+                      if (e.target.checked) selectAllRows();
+                      else clearSelection();
+                    }}
+                    className="h-3.5 w-3.5 cursor-pointer rounded accent-indigo-500"
+                    title="Select / deselect all visible rows"
+                  />
+                </th>
                 {visible_columns.map((col) => {
                   const effective_sort_key = col.sort_key ?? (col.key as string);
                   const is_sortable        = col.sortable !== false;
@@ -1426,7 +1700,7 @@ export default function LinkBuildingOrdersTable() {
               {filtered_rows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={visible_columns.length + 2}
+                    colSpan={visible_columns.length + 3}
                     className="px-6 py-14 text-center text-sm text-gray-400 dark:text-gray-500"
                   >
                     {search || status_filter || link_type_filter || client_filter
@@ -1438,6 +1712,7 @@ export default function LinkBuildingOrdersTable() {
                 filtered_rows.map((row, row_idx) => {
                   const is_saving       = saving_row_ids.has(row.id);
                   const is_new          = new_row_ids_ref.current.has(row.id);
+                  const is_multi_selected  = selected_row_ids.has(row.id);
                   const row_collaborators  = row_editors.get(row.id) ?? [];
                   const has_collaborators  = !is_new && row_collaborators.length > 0;
                   const primary_editor     = has_collaborators ? row_collaborators[0] : null;
@@ -1455,6 +1730,8 @@ export default function LinkBuildingOrdersTable() {
                           ? "border-l-2 border-l-amber-400 bg-amber-50/30 dark:border-l-amber-500 dark:bg-amber-900/10"
                           : has_collaborators
                           ? "border-l-[3px]"
+                          : is_multi_selected
+                          ? "border-l-2 border-l-indigo-400 bg-indigo-50/50 dark:border-l-indigo-500 dark:bg-indigo-950/20"
                           : is_locally_selected
                           ? "border-l-2 border-l-brand-400 bg-brand-50/30 dark:border-l-brand-500 dark:bg-brand-900/10"
                           : row_idx % 2 === 0
@@ -1470,6 +1747,18 @@ export default function LinkBuildingOrdersTable() {
                           : undefined
                       }
                     >
+                      {/* Row checkbox */}
+                      <td
+                        className="w-px border-r border-gray-100 px-2 py-1.5 dark:border-gray-800"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={is_multi_selected}
+                          onChange={() => toggleRowSelection(row.id)}
+                          className="h-3.5 w-3.5 cursor-pointer rounded accent-indigo-500"
+                        />
+                      </td>
                       {visible_columns.map((col, col_idx) => {
                         const is_editing =
                           editing_cell?.row_id === row.id &&
@@ -1496,6 +1785,7 @@ export default function LinkBuildingOrdersTable() {
                                 ? (val) => handlePartnershipCheckChange(row.id, val)
                                 : undefined
                             }
+                            onCopy={(val) => copyCellValue(val, col.key)}
                           />
                         );
                       })}

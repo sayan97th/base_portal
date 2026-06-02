@@ -129,6 +129,20 @@ export async function updateLinkBuildingOrder(
 }
 
 /**
+ * POST /api/admin/link-building-orders/batch-update
+ * Updates one or more fields across multiple rows atomically.
+ */
+export async function batchUpdateLinkBuildingOrders(
+  row_ids: string[],
+  updates: Partial<Record<keyof LinkBuildingOrderRow, string | null>>
+): Promise<{ message: string; updated_count: number }> {
+  return apiClient.post("/api/admin/link-building-orders/batch-update", {
+    row_ids,
+    updates,
+  });
+}
+
+/**
  * DELETE /api/admin/link-building-orders/{id}
  * Permanently removes a link building order row.
  */
