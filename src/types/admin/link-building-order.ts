@@ -18,6 +18,8 @@ export interface LinkBuildingOrderRow {
   link_builder: string;
   pen_name: string;
   partnership: string;
+  /** Status of the partnership check process. */
+  partnership_check: string;
   article_title: string;
   article: string;
   status: string;

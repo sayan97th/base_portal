@@ -78,6 +78,14 @@ const STATUS_OPTIONS = [
   "Cancelled",
 ];
 
+const PARTNERSHIP_CHECK_OPTIONS = [
+  "Approved",
+  "Not Approved",
+  "Ready",
+  "Rejected",
+  "Scheduled",
+];
+
 const COLUMNS: ColumnDef[] = [
   { key: "order_id",                  label: "Order ID",                group: "order",      min_width: 110,  type: "text" },
   { key: "status",                    label: "Status",                  group: "status_col", min_width: 130,  type: "select", options: STATUS_OPTIONS },
@@ -94,6 +102,7 @@ const COLUMNS: ColumnDef[] = [
   { key: "estimated_turnaround_days", label: "Est. Turnaround (Days)",  group: "dates",      min_width: 155,  type: "number", locked: true },
   { key: "pen_name",                  label: "Pen Name",                group: "writer",     min_width: 120,  type: "text" },
   { key: "partnership",               label: "Partnership",             group: "writer",     min_width: 180,  type: "url" },
+  { key: "partnership_check",         label: "Partnership Check",       group: "writer",     min_width: 155,  type: "select", options: PARTNERSHIP_CHECK_OPTIONS },
   { key: "article_title",             label: "Article Title",           group: "writer",     min_width: 220,  type: "text" },
   { key: "article",                   label: "Article",                 group: "writer",     min_width: 120,  type: "url" },
   { key: "live_link",                 label: "Live Link",               group: "live",       min_width: 220,  type: "url" },
@@ -216,6 +225,7 @@ function createEmptyRow(): LinkBuildingOrderRow {
     link_builder:              "",
     pen_name:                  "",
     partnership:               "",
+    partnership_check:         "",
     article_title:             "",
     article:                   "",
     status:                    "New Request",
@@ -453,6 +463,23 @@ function EditableCell({
         }`}
       >
         {value === "Live" && <span className="h-1.5 w-1.5 rounded-full bg-green-500" />}
+        {value}
+      </span>
+    );
+  } else if (col.key === "partnership_check" && value) {
+    const pc_map: Record<string, string> = {
+      "Approved":     "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+      "Not Approved": "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+      "Ready":        "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+      "Rejected":     "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",
+      "Scheduled":    "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+    };
+    display = (
+      <span
+        className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-medium ${
+          pc_map[value] ?? "bg-gray-100 text-gray-600"
+        }`}
+      >
         {value}
       </span>
     );
