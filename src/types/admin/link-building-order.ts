@@ -10,6 +10,8 @@ export interface LinkBuildingOrderRow {
   landing_page: string;
   exact_match: string;
   notes: string;
+  /** Internal-only notes — not visible to clients. */
+  internal_notes: string;
   request_date: string;
   estimated_delivery_date: string;
   estimated_turnaround_days: string;

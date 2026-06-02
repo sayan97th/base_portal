@@ -32,6 +32,7 @@ type ColumnGroup =
   | "order"
   | "team_link"
   | "core"
+  | "internal"
   | "dates"
   | "writer"
   | "status_col"
@@ -86,7 +87,8 @@ const COLUMNS: ColumnDef[] = [
   { key: "keyword",                   label: "Keyword",                 group: "core",       min_width: 200,  type: "text",   required: true },
   { key: "landing_page",              label: "Landing Page",            group: "core",       min_width: 240,  type: "url",    required: true },
   { key: "exact_match",               label: "Exact Match?",            group: "core",       min_width: 100,  type: "select", options: ["Yes", "No"] },
-  { key: "notes",                     label: "Notes",                   group: "core",       min_width: 160,  type: "text" },
+  { key: "notes",                     label: "Notes (Client)",           group: "core",       min_width: 160,  type: "text" },
+  { key: "internal_notes",            label: "Internal Notes",           group: "internal",   min_width: 200,  type: "text" },
   { key: "request_date",              label: "Request Date",            group: "dates",      min_width: 120,  type: "date",   locked: true },
   { key: "estimated_delivery_date",   label: "Estimated Delivery Date", group: "dates",      min_width: 175,  type: "date",   locked: true },
   { key: "estimated_turnaround_days", label: "Est. Turnaround (Days)",  group: "dates",      min_width: 155,  type: "number", locked: true },
@@ -114,6 +116,7 @@ const GROUP_HEADER_STYLES: Record<ColumnGroup, string> = {
   order:      "bg-gray-950 text-white border-gray-800",
   team_link:  "bg-pink-600 text-white border-pink-700",
   core:       "bg-gray-700 text-white border-gray-600",
+  internal:   "bg-slate-600 text-white border-slate-700",
   dates:      "bg-amber-700 text-white border-amber-800",
   writer:     "bg-gray-200 text-gray-800 border-gray-300 dark:bg-gray-600 dark:text-gray-100 dark:border-gray-500",
   status_col: "bg-purple-700 text-white border-purple-800",
@@ -195,6 +198,7 @@ function createEmptyRow(): LinkBuildingOrderRow {
     landing_page:              "",
     exact_match:               "No",
     notes:                     "",
+    internal_notes:            "",
     request_date:              "",
     estimated_delivery_date:   "",
     estimated_turnaround_days: "30",
