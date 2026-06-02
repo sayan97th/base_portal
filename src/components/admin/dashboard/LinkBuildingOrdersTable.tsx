@@ -222,8 +222,8 @@ interface UserAssignCellProps {
   admin_users: AdminUserOption[];
   is_editing: boolean;
   onStartEdit: () => void;
-  onUpdate: (value: string) => void;
-  onStopEdit: () => void;
+  onAssignUser: (value: string) => void;
+  onCancelEdit: () => void;
 }
 
 function UserAssignCell({
@@ -231,10 +231,12 @@ function UserAssignCell({
   admin_users,
   is_editing,
   onStartEdit,
-  onUpdate,
-  onStopEdit,
+  onAssignUser,
+  onCancelEdit,
 }: UserAssignCellProps) {
-  const selected_user = admin_users.find((u) => u.id === assigned_admin_user_id);
+  const selected_user = admin_users.find(
+    (u) => assigned_admin_user_id != null && u.id === Number(assigned_admin_user_id)
+  );
 
   if (is_editing) {
     return (
@@ -242,8 +244,8 @@ function UserAssignCell({
         <select
           autoFocus
           value={assigned_admin_user_id ?? ""}
-          onChange={(e) => onUpdate(e.target.value)}
-          onBlur={onStopEdit}
+          onChange={(e) => onAssignUser(e.target.value)}
+          onBlur={onCancelEdit}
           className="h-full w-full border-2 border-brand-500 bg-white px-2 py-1.5 text-xs outline-none dark:bg-gray-800 dark:text-white"
           style={{ minWidth: 180 }}
         >
@@ -916,6 +918,30 @@ export default function LinkBuildingOrdersTable() {
     }
   }, []);
 
+  // ── Assign user ─────────────────────────────────────────────────────────────
+
+  const handleAssignUserChange = useCallback((row_id: string, str_value: string) => {
+    const numeric_val: number | null = str_value === "" ? null : Number(str_value);
+
+    const base_row = rows_ref.current.find((r) => r.id === row_id);
+    if (!base_row) return;
+
+    const updated_row: LinkBuildingOrderRow = { ...base_row, assigned_admin_user_id: numeric_val };
+
+    setRows((prev) => prev.map((r) => (r.id === row_id ? updated_row : r)));
+    setEditingCell(null);
+
+    if (new_row_ids_ref.current.has(row_id)) {
+      persistNewRow(updated_row);
+    } else {
+      persistRowUpdate(updated_row, "assigned_admin_user_id");
+    }
+  }, [persistNewRow, persistRowUpdate]);
+
+  const cancelAssignEdit = useCallback(() => {
+    setEditingCell(null);
+  }, []);
+
   // ── Column visibility ───────────────────────────────────────────────────────
 
   const toggleColumn = useCallback((col_key: string) => {
@@ -1413,8 +1439,8 @@ export default function LinkBuildingOrdersTable() {
                         admin_users={admin_users}
                         is_editing={editing_cell?.row_id === row.id && editing_cell?.col_key === "assigned_admin_user_id"}
                         onStartEdit={() => startEditing(row.id, "assigned_admin_user_id")}
-                        onUpdate={(val) => updateCell(row.id, "assigned_admin_user_id" as keyof LinkBuildingOrderRow, val as unknown as string)}
-                        onStopEdit={stopEditing}
+                        onAssignUser={(val) => handleAssignUserChange(row.id, val)}
+                        onCancelEdit={cancelAssignEdit}
                       />
 
                       {/* Actions cell */}
