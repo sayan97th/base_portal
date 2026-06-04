@@ -145,12 +145,9 @@ function createTempId(): string {
 }
 
 function generateOrderId(): string {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  const rand = Math.random().toString(36).toUpperCase().slice(2, 7);
-  return `LBO-${y}${m}${d}-${rand}`;
+  // Returns a visual placeholder for draft rows. The server always assigns
+  // the real BL-{n} ID when the row is saved (see store() on the backend).
+  return "BL-####";
 }
 
 function formatDateMMDDYYYY(date: Date): string {
@@ -891,8 +888,9 @@ export default function LinkBuildingOrdersTable() {
     } catch {
       const all_drafts = rows_ref.current.filter((r) => new_row_ids_ref.current.has(r.id));
       saveDraftsToStorage(all_drafts);
+      const row_label = row.client ? `"${row.client}"` : "the new row";
       setSaveError(
-        `Could not save "${row.order_id}" to the server — fill all required fields (Link Type, Client, Keyword, Landing Page) then click any cell to retry.`
+        `Could not save ${row_label} to the server — fill all required fields (Link Type, Client, Keyword, Landing Page) then click any cell to retry.`
       );
     } finally {
       unmarkSaving(row.id);
