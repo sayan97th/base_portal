@@ -89,51 +89,51 @@ const PARTNERSHIP_CHECK_OPTIONS = [
 ];
 
 const COLUMNS: ColumnDef[] = [
-  { key: "order_id",                  label: "Order ID",                group: "order",      min_width: 110,  type: "text" },
-  { key: "status",                    label: "Status",                  group: "status_col", min_width: 130,  type: "select", options: STATUS_OPTIONS },
-  { key: "team_specific_link_id",     label: "Team Specific Link ID",   group: "team_link",  min_width: 160,  type: "text" },
-  { key: "link_type",                 label: "Link Type",               group: "core",       min_width: 155,  type: "select", options: LINK_TYPE_OPTIONS, required: true },
-  { key: "client",                    label: "Client",                  group: "core",       min_width: 120,  type: "text",   required: true },
-  { key: "keyword",                   label: "Keyword",                 group: "core",       min_width: 200,  type: "text",   required: true },
-  { key: "landing_page",              label: "Landing Page",            group: "core",       min_width: 240,  type: "url",    required: true },
-  { key: "exact_match",               label: "Exact Match?",            group: "core",       min_width: 100,  type: "select", options: ["Yes", "No"] },
-  { key: "notes",                     label: "Notes (Client)",           group: "core",       min_width: 160,  type: "text" },
-  { key: "internal_notes",            label: "Internal Notes",           group: "internal",   min_width: 200,  type: "text" },
-  { key: "request_date",              label: "Request Date",            group: "dates",      min_width: 120,  type: "date",   locked: true },
-  { key: "estimated_delivery_date",   label: "Estimated Delivery Date", group: "dates",      min_width: 175,  type: "date",   locked: true },
-  { key: "estimated_turnaround_days", label: "Est. Turnaround (Days)",  group: "dates",      min_width: 155,  type: "number", locked: true },
-  { key: "pen_name",                  label: "Pen Name",                group: "writer",     min_width: 120,  type: "text" },
-  { key: "partnership",               label: "Partnership",             group: "writer",     min_width: 180,  type: "url" },
-  { key: "partnership_check",         label: "Partnership Check",       group: "writer",     min_width: 155,  type: "select", options: PARTNERSHIP_CHECK_OPTIONS },
-  { key: "article_title",             label: "Article Title",           group: "writer",     min_width: 220,  type: "text" },
-  { key: "article",                   label: "Article",                 group: "writer",     min_width: 120,  type: "url" },
-  { key: "live_link",                 label: "Live Link",               group: "live",       min_width: 220,  type: "url" },
-  { key: "live_link_date",            label: "Live Link Date",          group: "live",       min_width: 120,  type: "date" },
-  { key: "dr_lbs",                    label: "DR",                      group: "metrics",    min_width: 80,   type: "number" },
-  { key: "posting_fee_lbs",           label: "Posting Fee",             group: "metrics",    min_width: 135,  type: "text" },
-  { key: "current_traffic",           label: "Current Traffic",         group: "metrics",    min_width: 120,  type: "number" },
-  { key: "dr_formula",                label: "DR Formula",              group: "pricing",    min_width: 100,  type: "number" },
-  { key: "current_poc",               label: "Current POC",             group: "pricing",    min_width: 130,  type: "text" },
-  { key: "current_price",             label: "Current Price",           group: "pricing",    min_width: 120,  type: "text" },
-  { key: "lb_tl_approval",            label: "LB TL Approval",         group: "pricing",    min_width: 130,  type: "text" },
-  { key: "approval_date",             label: "Approval Date",           group: "pricing",    min_width: 120,  type: "date" },
-  { key: "final_price",               label: "Final Price",             group: "pricing",    min_width: 110,  type: "text" },
-  { key: "currency",                  label: "Currency",                group: "pricing",    min_width: 100,  type: "select", options: ["USD", "EUR"] },
+  { key: "order_id", label: "Order ID", group: "order", min_width: 110, type: "text" },
+  { key: "status", label: "Status", group: "status_col", min_width: 130, type: "select", options: STATUS_OPTIONS },
+  { key: "team_specific_link_id", label: "Team Specific Link ID", group: "team_link", min_width: 160, type: "text" },
+  { key: "link_type", label: "Link Type", group: "core", min_width: 155, type: "select", options: LINK_TYPE_OPTIONS, required: true },
+  { key: "client", label: "Client", group: "core", min_width: 120, type: "text", required: true },
+  { key: "keyword", label: "Keyword", group: "core", min_width: 200, type: "text", required: true },
+  { key: "landing_page", label: "Landing Page", group: "core", min_width: 240, type: "url", required: true },
+  { key: "exact_match", label: "Exact Match?", group: "core", min_width: 100, type: "select", options: ["Yes", "No"] },
+  { key: "notes", label: "Notes (Client)", group: "core", min_width: 160, type: "text" },
+  { key: "internal_notes", label: "Internal Notes", group: "internal", min_width: 200, type: "text" },
+  { key: "request_date", label: "Request Date", group: "dates", min_width: 120, type: "date", locked: true },
+  { key: "estimated_delivery_date", label: "Estimated Delivery Date", group: "dates", min_width: 175, type: "date", locked: true },
+  { key: "estimated_turnaround_days", label: "Est. Turnaround (Days)", group: "dates", min_width: 155, type: "number", locked: true },
+  { key: "pen_name", label: "Pen Name", group: "writer", min_width: 120, type: "text" },
+  { key: "partnership", label: "Partnership", group: "writer", min_width: 180, type: "url" },
+  { key: "partnership_check", label: "Partnership Check", group: "writer", min_width: 155, type: "select", options: PARTNERSHIP_CHECK_OPTIONS },
+  { key: "article_title", label: "Article Title", group: "writer", min_width: 220, type: "text" },
+  { key: "article", label: "Article", group: "writer", min_width: 120, type: "url" },
+  { key: "live_link", label: "Live Link", group: "live", min_width: 220, type: "url" },
+  { key: "live_link_date", label: "Live Link Date", group: "live", min_width: 120, type: "date" },
+  { key: "dr_lbs", label: "DR", group: "metrics", min_width: 80, type: "number" },
+  { key: "posting_fee_lbs", label: "Posting Fee", group: "metrics", min_width: 135, type: "text" },
+  { key: "current_traffic", label: "Current Traffic", group: "metrics", min_width: 120, type: "number" },
+  { key: "dr_formula", label: "DR Formula", group: "pricing", min_width: 100, type: "number" },
+  { key: "current_poc", label: "Current POC", group: "pricing", min_width: 130, type: "text" },
+  { key: "current_price", label: "Current Price", group: "pricing", min_width: 120, type: "text" },
+  { key: "lb_tl_approval", label: "LB TL Approval", group: "pricing", min_width: 130, type: "text" },
+  { key: "approval_date", label: "Approval Date", group: "pricing", min_width: 120, type: "date" },
+  { key: "final_price", label: "Final Price", group: "pricing", min_width: 110, type: "text" },
+  { key: "currency", label: "Currency", group: "pricing", min_width: 100, type: "select", options: ["USD", "EUR"] },
 ];
 
 // ── Group header styles ────────────────────────────────────────────────────────
 
 const GROUP_HEADER_STYLES: Record<ColumnGroup, string> = {
-  order:      "bg-gray-950 text-white border-gray-800",
-  team_link:  "bg-pink-600 text-white border-pink-700",
-  core:       "bg-gray-700 text-white border-gray-600",
-  internal:   "bg-slate-600 text-white border-slate-700",
-  dates:      "bg-amber-700 text-white border-amber-800",
-  writer:     "bg-gray-200 text-gray-800 border-gray-300 dark:bg-gray-600 dark:text-gray-100 dark:border-gray-500",
+  order: "bg-gray-950 text-white border-gray-800",
+  team_link: "bg-pink-600 text-white border-pink-700",
+  core: "bg-gray-700 text-white border-gray-600",
+  internal: "bg-slate-600 text-white border-slate-700",
+  dates: "bg-amber-700 text-white border-amber-800",
+  writer: "bg-gray-200 text-gray-800 border-gray-300 dark:bg-gray-600 dark:text-gray-100 dark:border-gray-500",
   status_col: "bg-purple-700 text-white border-purple-800",
-  live:       "bg-rose-400 text-white border-rose-500",
-  metrics:    "bg-emerald-700 text-white border-emerald-800",
-  pricing:    "bg-gray-200 text-gray-800 border-gray-300 dark:bg-gray-600 dark:text-gray-100 dark:border-gray-500",
+  live: "bg-rose-400 text-white border-rose-500",
+  metrics: "bg-emerald-700 text-white border-emerald-800",
+  pricing: "bg-gray-200 text-gray-800 border-gray-300 dark:bg-gray-600 dark:text-gray-100 dark:border-gray-500",
 };
 
 // ── Empty row factory ──────────────────────────────────────────────────────────
@@ -175,9 +175,9 @@ function getRowMissingRequired(row: LinkBuildingOrderRow): string[] {
 
 // ── Draft persistence (localStorage) ──────────────────────────────────────────
 
-const DRAFT_STORAGE_KEY   = "lbo_row_drafts_v1";
+const DRAFT_STORAGE_KEY = "lbo_row_drafts_v1";
 const PER_PAGE_STORAGE_KEY = "lbo_per_page_v1";
-const PER_PAGE_OPTIONS     = [10, 25, 50, 100, 150, 200] as const;
+const PER_PAGE_OPTIONS = [10, 25, 50, 100, 150, 200, 250, 500] as const;
 type PerPageOption = (typeof PER_PAGE_OPTIONS)[number];
 
 type DraftRowData = Omit<LinkBuildingOrderRow, "id">;
@@ -214,40 +214,40 @@ function createEmptyRow(): LinkBuildingOrderRow {
   delivery_date.setDate(delivery_date.getDate() + 30);
 
   return {
-    id:                        createTempId(),
-    order_id:                  generateOrderId(),
-    team_specific_link_id:     "",
-    link_type:                 "",
-    client:                    "",
-    keyword:                   "",
-    landing_page:              "",
-    exact_match:               "No",
-    notes:                     "",
-    internal_notes:            "",
-    request_date:              formatDateMMDDYYYY(today),
-    estimated_delivery_date:   formatDateMMDDYYYY(delivery_date),
+    id: createTempId(),
+    order_id: generateOrderId(),
+    team_specific_link_id: "",
+    link_type: "",
+    client: "",
+    keyword: "",
+    landing_page: "",
+    exact_match: "No",
+    notes: "",
+    internal_notes: "",
+    request_date: formatDateMMDDYYYY(today),
+    estimated_delivery_date: formatDateMMDDYYYY(delivery_date),
     estimated_turnaround_days: "30",
-    link_builder:              "",
-    pen_name:                  "",
-    partnership:               "",
-    partnership_check:         "",
-    article_title:             "",
-    article:                   "",
-    status:                    "New Request",
-    live_link:                 "",
-    live_link_date:            "",
-    dr_lbs:                    "",
-    posting_fee_lbs:           "",
-    current_traffic:           "",
-    dr_formula:                "",
-    current_poc:               "",
-    current_price:             "",
-    lb_tl_approval:            "",
-    approval_date:             "",
-    final_price:               "",
-    currency:                  "USD",
-    admin_team_id:             null,
-    assigned_admin_user_id:    null,
+    link_builder: "",
+    pen_name: "",
+    partnership: "",
+    partnership_check: "",
+    article_title: "",
+    article: "",
+    status: "New Request",
+    live_link: "",
+    live_link_date: "",
+    dr_lbs: "",
+    posting_fee_lbs: "",
+    current_traffic: "",
+    dr_formula: "",
+    current_poc: "",
+    current_price: "",
+    lb_tl_approval: "",
+    approval_date: "",
+    final_price: "",
+    currency: "USD",
+    admin_team_id: null,
+    assigned_admin_user_id: null,
   };
 }
 
@@ -372,14 +372,14 @@ function EditableCell({
   onSelectImmediateSave,
   onCopy,
 }: EditableCellProps) {
-  const input_ref  = useRef<HTMLInputElement>(null);
+  const input_ref = useRef<HTMLInputElement>(null);
   const select_ref = useRef<HTMLSelectElement>(null);
   const [just_copied, setJustCopied] = useState(false);
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!value || !onCopy) return;
-    navigator.clipboard.writeText(value).catch(() => {});
+    navigator.clipboard.writeText(value).catch(() => { });
     onCopy(value);
     setJustCopied(true);
     setTimeout(() => setJustCopied(false), 1200);
@@ -475,19 +475,18 @@ function EditableCell({
     display = <span className="font-semibold text-red-500">{value}</span>;
   } else if (col.key === "status" && value) {
     const status_map: Record<string, string> = {
-      "New Request":     "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-      Reviewing:         "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400",
-      Ordered:           "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
-      Pending:           "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-      Live:              "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+      "New Request": "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+      Reviewing: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400",
+      Ordered: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+      Pending: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+      Live: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
       "Quality Control": "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
-      Cancelled:         "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+      Cancelled: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
     };
     display = (
       <span
-        className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs font-medium ${
-          status_map[value] ?? "bg-gray-100 text-gray-600"
-        }`}
+        className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs font-medium ${status_map[value] ?? "bg-gray-100 text-gray-600"
+          }`}
       >
         {value === "Live" && <span className="h-1.5 w-1.5 rounded-full bg-green-500" />}
         {value}
@@ -495,17 +494,16 @@ function EditableCell({
     );
   } else if (col.key === "partnership_check" && value) {
     const pc_map: Record<string, string> = {
-      "Approved":     "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+      "Approved": "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
       "Not Approved": "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-      "Ready":        "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-      "Rejected":     "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",
-      "Scheduled":    "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+      "Ready": "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+      "Rejected": "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",
+      "Scheduled": "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
     };
     display = (
       <span
-        className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-medium ${
-          pc_map[value] ?? "bg-gray-100 text-gray-600"
-        }`}
+        className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-medium ${pc_map[value] ?? "bg-gray-100 text-gray-600"
+          }`}
       >
         {value}
       </span>
@@ -527,16 +525,15 @@ function EditableCell({
   }
 
   const is_required_error = is_draft && (col.required ?? false) && !value;
-  const has_cell_editors   = cell_editors.length > 0;
-  const show_row_floater   = is_first_col && row_editors.length > 0;
+  const has_cell_editors = cell_editors.length > 0;
+  const show_row_floater = is_first_col && row_editors.length > 0;
 
   return (
     <td
-      className={`group/cell relative cursor-pointer whitespace-nowrap px-2 py-1.5 text-xs text-gray-700 transition-colors dark:text-gray-300 ${
-        is_required_error
-          ? "bg-red-50/80 ring-1 ring-inset ring-red-300 hover:bg-red-100/60 dark:bg-red-900/20 dark:ring-red-700"
-          : "hover:bg-blue-50 dark:hover:bg-blue-900/20"
-      }`}
+      className={`group/cell relative cursor-pointer whitespace-nowrap px-2 py-1.5 text-xs text-gray-700 transition-colors dark:text-gray-300 ${is_required_error
+        ? "bg-red-50/80 ring-1 ring-inset ring-red-300 hover:bg-red-100/60 dark:bg-red-900/20 dark:ring-red-700"
+        : "hover:bg-blue-50 dark:hover:bg-blue-900/20"
+        }`}
       style={
         has_cell_editors
           ? { outline: `2px solid ${cell_editors[0].color}`, outlineOffset: "-2px" }
@@ -559,9 +556,8 @@ function EditableCell({
       </div>
       {onCopy && value && !is_required_error && (
         <button
-          className={`absolute right-0.5 top-1/2 -translate-y-1/2 rounded p-0.5 opacity-0 transition-all group-hover/cell:opacity-60 hover:!opacity-100 hover:bg-white dark:hover:bg-gray-700 ${
-            just_copied ? "!opacity-100 text-green-500" : "text-gray-400"
-          }`}
+          className={`absolute right-0.5 top-1/2 -translate-y-1/2 rounded p-0.5 opacity-0 transition-all group-hover/cell:opacity-60 hover:!opacity-100 hover:bg-white dark:hover:bg-gray-700 ${just_copied ? "!opacity-100 text-green-500" : "text-gray-400"
+            }`}
           onClick={handleCopy}
           title="Copy cell value"
         >
@@ -653,10 +649,10 @@ export default function LinkBuildingOrdersTable() {
 
   // ── Batch editing ───────────────────────────────────────────────────────────
   const [selected_row_ids, setSelectedRowIds] = useState<Set<string>>(new Set());
-  const [clipboard_cell, setClipboardCell]    = useState<{ value: string; col_key: string } | null>(null);
-  const [batch_field, setBatchField]          = useState<string>("");
-  const [batch_value, setBatchValue]          = useState<string>("");
-  const [is_batch_saving, setIsBatchSaving]   = useState(false);
+  const [clipboard_cell, setClipboardCell] = useState<{ value: string; col_key: string } | null>(null);
+  const [batch_field, setBatchField] = useState<string>("");
+  const [batch_value, setBatchValue] = useState<string>("");
+  const [is_batch_saving, setIsBatchSaving] = useState(false);
 
   const { sort_rules, toggleSort, clearSort } = useTableSort();
   const {
@@ -678,12 +674,12 @@ export default function LinkBuildingOrdersTable() {
   const editing_cell_ref = useRef<{ row_id: string; col_key: string } | null>(null);
   editing_cell_ref.current = editing_cell;
 
-  const new_row_ids_ref      = useRef<Set<string>>(new Set());
-  const drafts_restored_ref  = useRef(false);
-  const select_all_ref       = useRef<HTMLInputElement>(null);
+  const new_row_ids_ref = useRef<Set<string>>(new Set());
+  const drafts_restored_ref = useRef(false);
+  const select_all_ref = useRef<HTMLInputElement>(null);
 
-  const debounced_search          = useDebounce(search, 400);
-  const debounced_client_filter   = useDebounce(client_filter, 400);
+  const debounced_search = useDebounce(search, 400);
+  const debounced_client_filter = useDebounce(client_filter, 400);
 
   const current_body_ref = useRef<LinkBuildingOrderSearchBody>({});
 
@@ -746,12 +742,12 @@ export default function LinkBuildingOrdersTable() {
     sendRowBlur,
     sendRowSelect,
   } = useLinkBuildingCollaboration({
-    current_user_id:     user?.id ?? 0,
-    current_user_name:   user ? `${user.first_name} ${user.last_name}`.trim() : "Unknown",
+    current_user_id: user?.id ?? 0,
+    current_user_name: user ? `${user.first_name} ${user.last_name}`.trim() : "Unknown",
     current_user_avatar: user?.profile_photo_url ?? null,
-    onRowUpdated:        handleRemoteRowUpdated,
-    onRowCreated:        handleRemoteRowCreated,
-    onRowDeleted:        handleRemoteRowDeleted,
+    onRowUpdated: handleRemoteRowUpdated,
+    onRowCreated: handleRemoteRowCreated,
+    onRowDeleted: handleRemoteRowDeleted,
   });
 
   const local_session_id_ref = useRef(local_session_id);
@@ -797,7 +793,7 @@ export default function LinkBuildingOrdersTable() {
   // ── Fetch admin users for assign-user dropdown ──────────────────────────────
 
   useEffect(() => {
-    listAdminUsersForSelect().then(setAdminUsers).catch(() => {/* non-critical */});
+    listAdminUsersForSelect().then(setAdminUsers).catch(() => {/* non-critical */ });
   }, []);
 
   // ── Fetch ───────────────────────────────────────────────────────────────────
@@ -815,9 +811,9 @@ export default function LinkBuildingOrdersTable() {
 
       if (!drafts_restored_ref.current) {
         drafts_restored_ref.current = true;
-        const saved_drafts     = loadDrafts();
+        const saved_drafts = loadDrafts();
         const server_order_ids = new Set(res.data.map((r) => r.order_id));
-        const restored         = saved_drafts.filter((d) => !server_order_ids.has(d.order_id));
+        const restored = saved_drafts.filter((d) => !server_order_ids.has(d.order_id));
         restored.forEach((d) => new_row_ids_ref.current.add(d.id));
         setRows([...restored, ...res.data]);
       } else {
@@ -836,17 +832,17 @@ export default function LinkBuildingOrdersTable() {
       .map(([key, f]) => ({ key, ...f } as ColumnFilterPayload));
 
     const body: LinkBuildingOrderSearchBody = {
-      search:       debounced_search.trim() || undefined,
-      status:       status_filter || undefined,
-      link_type:    link_type_filter || undefined,
-      client:       debounced_client_filter.trim() || undefined,
-      sort_rules:   sort_rules.length > 0 ? sort_rules : undefined,
+      search: debounced_search.trim() || undefined,
+      status: status_filter || undefined,
+      link_type: link_type_filter || undefined,
+      client: debounced_client_filter.trim() || undefined,
+      sort_rules: sort_rules.length > 0 ? sort_rules : undefined,
       column_filters: active_col_filters.length > 0 ? active_col_filters : undefined,
     };
 
     current_body_ref.current = body;
     fetchRows(1, body);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     debounced_search,
     status_filter,
@@ -860,7 +856,7 @@ export default function LinkBuildingOrdersTable() {
   // ── Derived state ───────────────────────────────────────────────────────────
 
   const visible_columns = COLUMNS.filter((col) => !hidden_columns.has(col.key));
-  const filtered_rows   = rows;
+  const filtered_rows = rows;
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -977,7 +973,7 @@ export default function LinkBuildingOrdersTable() {
           setEditingCell({ row_id, col_key: next_col.key });
         } else if (filtered_rows[row_idx + 1]) {
           setEditingCell({
-            row_id:  filtered_rows[row_idx + 1].id,
+            row_id: filtered_rows[row_idx + 1].id,
             col_key: visible_columns[0].key,
           });
         }
@@ -1000,7 +996,7 @@ export default function LinkBuildingOrdersTable() {
     new_row_ids_ref.current.add(new_row.id);
     setRows((prev) => {
       const updated = [...prev, new_row];
-      const drafts  = updated.filter((r) => new_row_ids_ref.current.has(r.id));
+      const drafts = updated.filter((r) => new_row_ids_ref.current.has(r.id));
       saveDraftsToStorage(drafts);
       return updated;
     });
@@ -1014,7 +1010,7 @@ export default function LinkBuildingOrdersTable() {
       new_row_ids_ref.current.delete(row_id);
       setRows((prev) => {
         const updated = prev.filter((r) => r.id !== row_id);
-        const drafts  = updated.filter((r) => new_row_ids_ref.current.has(r.id));
+        const drafts = updated.filter((r) => new_row_ids_ref.current.has(r.id));
         saveDraftsToStorage(drafts);
         return updated;
       });
@@ -1200,8 +1196,8 @@ export default function LinkBuildingOrdersTable() {
         )
       );
 
-      const col_label  = COLUMNS.find((c) => c.key === clipboard_cell.col_key)?.label ?? clipboard_cell.col_key;
-      const short_val  = clipboard_cell.value.length > 30
+      const col_label = COLUMNS.find((c) => c.key === clipboard_cell.col_key)?.label ?? clipboard_cell.col_key;
+      const short_val = clipboard_cell.value.length > 30
         ? clipboard_cell.value.slice(0, 30) + "…"
         : clipboard_cell.value;
       setNotificationBanner(
@@ -1220,7 +1216,7 @@ export default function LinkBuildingOrdersTable() {
   useEffect(() => {
     if (!select_all_ref.current) return;
     const some = filtered_rows.some((r) => selected_row_ids.has(r.id));
-    const all  = filtered_rows.length > 0 && filtered_rows.every((r) => selected_row_ids.has(r.id));
+    const all = filtered_rows.length > 0 && filtered_rows.every((r) => selected_row_ids.has(r.id));
     select_all_ref.current.indeterminate = some && !all;
   }, [filtered_rows, selected_row_ids]);
 
@@ -1326,11 +1322,10 @@ export default function LinkBuildingOrdersTable() {
           {/* Column filter toggle */}
           <button
             onClick={() => setShowFilterPanel((v) => !v)}
-            className={`flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors ${
-              show_filter_panel
-                ? "border-brand-400 bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
-                : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
-            }`}
+            className={`flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors ${show_filter_panel
+              ? "border-brand-400 bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
+              : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+              }`}
           >
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
@@ -1565,11 +1560,10 @@ export default function LinkBuildingOrdersTable() {
                 <button
                   key={col.key}
                   onClick={() => toggleColumn(col.key)}
-                  className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors ${
-                    is_visible
-                      ? "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                      : "border-dashed border-gray-300 bg-transparent text-gray-400 line-through dark:border-gray-600 dark:text-gray-500"
-                  }`}
+                  className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors ${is_visible
+                    ? "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                    : "border-dashed border-gray-300 bg-transparent text-gray-400 line-through dark:border-gray-600 dark:text-gray-500"
+                    }`}
                 >
                   {is_visible ? (
                     <svg className="h-2.5 w-2.5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
@@ -1615,11 +1609,11 @@ export default function LinkBuildingOrdersTable() {
                 </th>
                 {visible_columns.map((col) => {
                   const effective_sort_key = col.sort_key ?? (col.key as string);
-                  const is_sortable        = col.sortable !== false;
-                  const sort_rule          = sort_rules.find((r) => r.key === effective_sort_key);
-                  const sort_priority      = sort_rules.findIndex((r) => r.key === effective_sort_key);
-                  const col_filter         = column_filters[col.key as Parameters<typeof setFilter>[0]];
-                  const filter_is_active   = col_filter ? isFilterActive(col_filter) : false;
+                  const is_sortable = col.sortable !== false;
+                  const sort_rule = sort_rules.find((r) => r.key === effective_sort_key);
+                  const sort_priority = sort_rules.findIndex((r) => r.key === effective_sort_key);
+                  const col_filter = column_filters[col.key as Parameters<typeof setFilter>[0]];
+                  const filter_is_active = col_filter ? isFilterActive(col_filter) : false;
 
                   return (
                     <th
@@ -1638,12 +1632,11 @@ export default function LinkBuildingOrdersTable() {
                             !is_sortable
                               ? "This column cannot be sorted"
                               : sort_rules.length > 0
-                              ? "Click to sort · Shift+Click to add secondary sort"
-                              : "Click to sort · Shift+Click for multi-column sort"
+                                ? "Click to sort · Shift+Click to add secondary sort"
+                                : "Click to sort · Shift+Click for multi-column sort"
                           }
-                          className={`flex flex-1 items-center gap-1 whitespace-nowrap text-left ${
-                            is_sortable ? "hover:opacity-75" : "cursor-default opacity-50"
-                          }`}
+                          className={`flex flex-1 items-center gap-1 whitespace-nowrap text-left ${is_sortable ? "hover:opacity-75" : "cursor-default opacity-50"
+                            }`}
                         >
                           {col.locked && (
                             <svg
@@ -1706,11 +1699,10 @@ export default function LinkBuildingOrdersTable() {
                             }
                           }}
                           title="Filter this column"
-                          className={`shrink-0 rounded p-0.5 transition-opacity ${
-                            filter_is_active
-                              ? "opacity-100 text-yellow-200"
-                              : "opacity-30 hover:opacity-80"
-                          }`}
+                          className={`shrink-0 rounded p-0.5 transition-opacity ${filter_is_active
+                            ? "opacity-100 text-yellow-200"
+                            : "opacity-30 hover:opacity-80"
+                            }`}
                         >
                           <svg
                             className="h-3 w-3"
@@ -1756,12 +1748,12 @@ export default function LinkBuildingOrdersTable() {
                 </tr>
               ) : (
                 filtered_rows.map((row, row_idx) => {
-                  const is_saving       = saving_row_ids.has(row.id);
-                  const is_new          = new_row_ids_ref.current.has(row.id);
-                  const is_multi_selected  = selected_row_ids.has(row.id);
-                  const row_collaborators  = row_editors.get(row.id) ?? [];
-                  const has_collaborators  = !is_new && row_collaborators.length > 0;
-                  const primary_editor     = has_collaborators ? row_collaborators[0] : null;
+                  const is_saving = saving_row_ids.has(row.id);
+                  const is_new = new_row_ids_ref.current.has(row.id);
+                  const is_multi_selected = selected_row_ids.has(row.id);
+                  const row_collaborators = row_editors.get(row.id) ?? [];
+                  const has_collaborators = !is_new && row_collaborators.length > 0;
+                  const primary_editor = has_collaborators ? row_collaborators[0] : null;
                   const is_locally_selected =
                     !is_new && selected_row_id === row.id && !has_collaborators;
 
@@ -1771,25 +1763,24 @@ export default function LinkBuildingOrdersTable() {
                       onClick={() => {
                         if (!is_new) setSelectedRowId(row.id);
                       }}
-                      className={`group border-b border-gray-100 transition-colors dark:border-gray-800 ${
-                        is_new
-                          ? "border-l-2 border-l-amber-400 bg-amber-50/30 dark:border-l-amber-500 dark:bg-amber-900/10"
-                          : has_collaborators
+                      className={`group border-b border-gray-100 transition-colors dark:border-gray-800 ${is_new
+                        ? "border-l-2 border-l-amber-400 bg-amber-50/30 dark:border-l-amber-500 dark:bg-amber-900/10"
+                        : has_collaborators
                           ? "border-l-[3px]"
                           : is_multi_selected
-                          ? "border-l-2 border-l-indigo-400 bg-indigo-50/50 dark:border-l-indigo-500 dark:bg-indigo-950/20"
-                          : is_locally_selected
-                          ? "border-l-2 border-l-brand-400 bg-brand-50/30 dark:border-l-brand-500 dark:bg-brand-900/10"
-                          : row_idx % 2 === 0
-                          ? "bg-white dark:bg-gray-900"
-                          : "bg-gray-50/60 dark:bg-gray-800/30"
-                      } ${is_saving ? "opacity-60" : ""} hover:bg-blue-50/40 dark:hover:bg-blue-900/10`}
+                            ? "border-l-2 border-l-indigo-400 bg-indigo-50/50 dark:border-l-indigo-500 dark:bg-indigo-950/20"
+                            : is_locally_selected
+                              ? "border-l-2 border-l-brand-400 bg-brand-50/30 dark:border-l-brand-500 dark:bg-brand-900/10"
+                              : row_idx % 2 === 0
+                                ? "bg-white dark:bg-gray-900"
+                                : "bg-gray-50/60 dark:bg-gray-800/30"
+                        } ${is_saving ? "opacity-60" : ""} hover:bg-blue-50/40 dark:hover:bg-blue-900/10`}
                       style={
                         primary_editor
                           ? {
-                              borderLeftColor:  primary_editor.color,
-                              backgroundColor: `${primary_editor.color}14`,
-                            }
+                            borderLeftColor: primary_editor.color,
+                            backgroundColor: `${primary_editor.color}14`,
+                          }
                           : undefined
                       }
                     >
@@ -1867,11 +1858,10 @@ export default function LinkBuildingOrdersTable() {
                               const is_completed = row.parent_order_status === "completed";
                               return (
                                 <span
-                                  className={`flex cursor-default items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${
-                                    is_completed
-                                      ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                                      : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                                  }`}
+                                  className={`flex cursor-default items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${is_completed
+                                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                    : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                                    }`}
                                   title={`Client order — parent order is ${row.parent_order_status}`}
                                 >
                                   <svg className="h-2.5 w-2.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
