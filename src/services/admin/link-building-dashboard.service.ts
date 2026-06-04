@@ -292,12 +292,19 @@ export async function getLinkBuildingImportStatus(
 /**
  * POST /api/admin/link-building-orders/export
  * Triggers a CSV file download in the browser.
+ *
+ * When `row_ids` is provided, only those specific rows are exported and
+ * all filter parameters from `body` are ignored by the backend.
  */
 export async function exportLinkBuildingOrders(
-  body: LinkBuildingOrderSearchBody = {}
+  body: LinkBuildingOrderSearchBody = {},
+  row_ids?: string[]
 ): Promise<void> {
   const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
   const token = getToken();
+
+  const request_body =
+    row_ids && row_ids.length > 0 ? { row_ids } : body;
 
   const response = await fetch(`${base}/api/admin/link-building-orders/export`, {
     method: "POST",
@@ -306,7 +313,7 @@ export async function exportLinkBuildingOrders(
       Accept: "text/csv",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify(request_body),
   });
 
   if (!response.ok) {

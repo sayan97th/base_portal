@@ -1228,13 +1228,45 @@ export default function LinkBuildingOrdersTable() {
 
   // ── Export ──────────────────────────────────────────────────────────────────
 
-  const handleExport = useCallback(async () => {
+  const [show_export_menu, setShowExportMenu] = useState(false);
+  const [is_exporting, setIsExporting] = useState(false);
+  const export_btn_ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!show_export_menu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (export_btn_ref.current && !export_btn_ref.current.contains(e.target as Node)) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [show_export_menu]);
+
+  const handleExportAll = useCallback(async () => {
+    setShowExportMenu(false);
+    setIsExporting(true);
     try {
       await exportLinkBuildingOrders(current_body_ref.current);
     } catch {
       setSaveError("Export failed. Please try again.");
+    } finally {
+      setIsExporting(false);
     }
   }, []);
+
+  const handleExportSelected = useCallback(async () => {
+    if (selected_row_ids.size === 0) return;
+    setShowExportMenu(false);
+    setIsExporting(true);
+    try {
+      await exportLinkBuildingOrders({}, Array.from(selected_row_ids));
+    } catch {
+      setSaveError("Export of selected rows failed. Please try again.");
+    } finally {
+      setIsExporting(false);
+    }
+  }, [selected_row_ids]);
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
@@ -1345,16 +1377,104 @@ export default function LinkBuildingOrdersTable() {
             </svg>
             Import CSV
           </button>
-          {/* Export */}
-          <button
-            onClick={handleExport}
-            className="flex h-8 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Export CSV
-          </button>
+          {/* Export dropdown */}
+          <div ref={export_btn_ref} className="relative">
+            <button
+              onClick={() => setShowExportMenu((v) => !v)}
+              disabled={is_exporting}
+              className={`flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                selected_row_ids.size > 0
+                  ? "border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-900/20 dark:text-violet-400 dark:hover:bg-violet-900/40"
+                  : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+              }`}
+            >
+              {is_exporting ? (
+                <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                </svg>
+              ) : (
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              )}
+              Export
+              {selected_row_ids.size > 0 && (
+                <span className="inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-violet-600 px-1 text-[10px] font-bold text-white">
+                  {selected_row_ids.size}
+                </span>
+              )}
+              <svg className="h-3 w-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+              </svg>
+            </button>
+
+            {show_export_menu && (
+              <div className="absolute right-0 top-full z-50 mt-1.5 w-68 min-w-[17rem] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl shadow-gray-200/60 dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/30">
+                <div className="border-b border-gray-100 px-4 py-3 dark:border-gray-700">
+                  <p className="text-xs font-semibold text-gray-800 dark:text-gray-100">Export Data</p>
+                  <p className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">Download records as a CSV file</p>
+                </div>
+
+                {/* Option 1 — Export all filtered */}
+                <button
+                  onClick={handleExportAll}
+                  className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                >
+                  <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
+                    <svg className="h-4 w-4 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h9.75m4.5-4.5v12m0 0l-3.75-3.75M17.25 21L21 17.25" />
+                    </svg>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-gray-800 dark:text-gray-100">Export All Filtered</p>
+                    <p className="mt-0.5 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
+                      {total.toLocaleString()} row{total !== 1 ? "s" : ""} · applies current search &amp; filters
+                    </p>
+                  </div>
+                </button>
+
+                {/* Divider */}
+                <div className="mx-4 border-t border-gray-100 dark:border-gray-700" />
+
+                {/* Option 2 — Export selected */}
+                <button
+                  onClick={selected_row_ids.size > 0 ? handleExportSelected : undefined}
+                  disabled={selected_row_ids.size === 0}
+                  className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors ${
+                    selected_row_ids.size > 0
+                      ? "hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                      : "cursor-not-allowed opacity-50"
+                  }`}
+                >
+                  <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                    selected_row_ids.size > 0
+                      ? "bg-violet-100 dark:bg-violet-900/30"
+                      : "bg-gray-100 dark:bg-gray-700"
+                  }`}>
+                    <svg className={`h-4 w-4 ${selected_row_ids.size > 0 ? "text-violet-600 dark:text-violet-400" : "text-gray-400"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-2 text-xs font-semibold text-gray-800 dark:text-gray-100">
+                      Export Selected
+                      {selected_row_ids.size > 0 && (
+                        <span className="inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-violet-600 px-1.5 text-[10px] font-bold text-white">
+                          {selected_row_ids.size}
+                        </span>
+                      )}
+                    </p>
+                    <p className="mt-0.5 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
+                      {selected_row_ids.size > 0
+                        ? `Export only the ${selected_row_ids.size} checked row${selected_row_ids.size !== 1 ? "s" : ""}`
+                        : "Check rows in the table to enable this option"}
+                    </p>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
           {/* Add row */}
           <button
             onClick={addRow}
@@ -1525,15 +1645,39 @@ export default function LinkBuildingOrdersTable() {
             )}
           </div>
 
-          <button
-            onClick={clearSelection}
-            className="ml-auto flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
-          >
-            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-            Clear selection
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            {/* Export selected shortcut */}
+            <button
+              onClick={handleExportSelected}
+              disabled={is_exporting || is_batch_saving}
+              title={`Download ${selected_row_ids.size} selected row${selected_row_ids.size !== 1 ? "s" : ""} as CSV`}
+              className="flex items-center gap-1.5 rounded-lg border border-violet-300 bg-white px-3 py-1 text-xs font-medium text-violet-700 transition-colors hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-violet-700 dark:bg-gray-800 dark:text-violet-400 dark:hover:bg-violet-900/20"
+            >
+              {is_exporting ? (
+                <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                </svg>
+              ) : (
+                <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              )}
+              Export {selected_row_ids.size} row{selected_row_ids.size !== 1 ? "s" : ""}
+            </button>
+
+            <div className="h-4 w-px shrink-0 bg-indigo-200 dark:bg-indigo-800" />
+
+            <button
+              onClick={clearSelection}
+              className="flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
+            >
+              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Clear selection
+            </button>
+          </div>
         </div>
       )}
 
