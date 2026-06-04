@@ -203,6 +203,92 @@ export function buildLboPayload(row: LinkBuildingOrderRow): LinkBuildingOrderPay
   return payload;
 }
 
+// ── Import ─────────────────────────────────────────────────────────────────────
+
+export interface ImportStatus {
+  status: "queued" | "processing" | "completed" | "failed";
+  total: number;
+  processed: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  errors: Array<{ order_id: string; message: string }>;
+}
+
+export interface ImportStartResponse {
+  message: string;
+  import_id: string;
+  total: number;
+}
+
+/**
+ * POST /api/admin/link-building-orders/import
+ * Uploads a CSV file and starts a background batch-import job.
+ * Calls onUploadProgress(0-100) during the file transfer phase.
+ * Returns an import_id that can be polled via getLinkBuildingImportStatus().
+ */
+export function importLinkBuildingOrders(
+  file: File,
+  onUploadProgress?: (percent: number) => void
+): Promise<ImportStartResponse> {
+  return new Promise((resolve, reject) => {
+    const base  = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+    const token = getToken();
+
+    const form_data = new FormData();
+    form_data.append("file", file);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${base}/api/admin/link-building-orders/import`);
+
+    if (token) {
+      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    }
+    xhr.setRequestHeader("Accept", "application/json");
+
+    if (onUploadProgress) {
+      xhr.upload.addEventListener("progress", (e) => {
+        if (e.lengthComputable) {
+          onUploadProgress(Math.round((e.loaded / e.total) * 100));
+        }
+      });
+    }
+
+    xhr.addEventListener("load", () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(JSON.parse(xhr.responseText) as ImportStartResponse);
+        } catch {
+          reject(new Error("Invalid response from server."));
+        }
+      } else {
+        try {
+          reject(JSON.parse(xhr.responseText));
+        } catch {
+          reject(new Error(`Upload failed with status ${xhr.status}.`));
+        }
+      }
+    });
+
+    xhr.addEventListener("error", () => reject(new Error("Network error during upload.")));
+    xhr.addEventListener("abort", () => reject(new Error("Upload was cancelled.")));
+
+    xhr.send(form_data);
+  });
+}
+
+/**
+ * GET /api/admin/link-building-orders/import-status/{import_id}
+ * Returns the current progress of a running or completed import job.
+ */
+export async function getLinkBuildingImportStatus(
+  import_id: string
+): Promise<ImportStatus> {
+  return apiClient.get<ImportStatus>(
+    `/api/admin/link-building-orders/import-status/${import_id}`
+  );
+}
+
 /**
  * POST /api/admin/link-building-orders/export
  * Triggers a CSV file download in the browser.

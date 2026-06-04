@@ -16,6 +16,7 @@ import {
   listAdminUsersForSelect,
   type AdminUserOption,
 } from "@/services/admin/link-building-dashboard.service";
+import LinkBuildingOrderImportModal from "./LinkBuildingOrderImportModal";
 import type { LinkBuildingOrderSearchBody, ColumnFilterPayload } from "@/types/admin/link-building-order";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useAuth } from "@/context/AuthContext";
@@ -1223,6 +1224,14 @@ export default function LinkBuildingOrdersTable() {
     select_all_ref.current.indeterminate = some && !all;
   }, [filtered_rows, selected_row_ids]);
 
+  // ── Import modal ─────────────────────────────────────────────────────────────
+
+  const [show_import_modal, setShowImportModal] = useState(false);
+
+  const handleImportComplete = useCallback(() => {
+    fetchRows(1, current_body_ref.current);
+  }, [fetchRows]);
+
   // ── Export ──────────────────────────────────────────────────────────────────
 
   const handleExport = useCallback(async () => {
@@ -1332,6 +1341,16 @@ export default function LinkBuildingOrdersTable() {
                 {hidden_columns.size}
               </span>
             )}
+          </button>
+          {/* Import CSV */}
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="flex h-8 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+            </svg>
+            Import CSV
           </button>
           {/* Export */}
           <button
@@ -1910,6 +1929,13 @@ export default function LinkBuildingOrdersTable() {
           </table>
         </div>
       )}
+
+      {/* Import modal */}
+      <LinkBuildingOrderImportModal
+        is_open={show_import_modal}
+        onClose={() => setShowImportModal(false)}
+        onImportComplete={handleImportComplete}
+      />
 
       {/* Per-column filter dropdown */}
       {open_filter_col && (
