@@ -14,7 +14,6 @@ import type {
   TeamMemberCapacity,
   TeamMemberHealth,
 } from "@/types/admin/backlink-order";
-import BacklinkOrdersTable from "./BacklinkOrdersTable";
 import LinkBuildingOrdersTable from "./LinkBuildingOrdersTable";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -184,11 +183,10 @@ function TeamHealthWidget({ members }: { members: TeamMemberHealth[] }) {
                   </td>
                   <td className="py-2.5 text-right">
                     <span
-                      className={`tabular-nums font-medium ${
-                        member.links_delayed === 0
+                      className={`tabular-nums font-medium ${member.links_delayed === 0
                           ? "text-green-500 dark:text-green-400"
                           : "text-orange-500"
-                      }`}
+                        }`}
                     >
                       {member.links_delayed} delayed
                     </span>
