@@ -78,9 +78,7 @@ const STATUS_OPTIONS = [
   "Live",
   "Quality Control",
   "Cancelled",
-];
-
-const PARTNERSHIP_CHECK_OPTIONS = [
+  "Partnership Check",
   "Approved",
   "Not Approved",
   "Ready",
@@ -103,7 +101,6 @@ const COLUMNS: ColumnDef[] = [
   { key: "estimated_delivery_date", label: "Delivery Date", group: "dates", min_width: 175, type: "date", locked: true },
   { key: "pen_name", label: "Pen Name", group: "writer", min_width: 120, type: "text" },
   { key: "partnership", label: "Partnership", group: "writer", min_width: 180, type: "url" },
-  { key: "partnership_check", label: "Partnership Check", group: "writer", min_width: 155, type: "select", options: PARTNERSHIP_CHECK_OPTIONS },
   { key: "article_title", label: "Article Title", group: "writer", min_width: 220, type: "text" },
   { key: "article", label: "Article", group: "writer", min_width: 120, type: "url" },
   { key: "live_link", label: "Live Link", group: "live", min_width: 220, type: "url" },
@@ -478,6 +475,12 @@ function EditableCell({
       Live: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
       "Quality Control": "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
       Cancelled: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+      "Partnership Check": "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+      Approved: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+      "Not Approved": "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+      Ready: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400",
+      Rejected: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",
+      Scheduled: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
     };
     display = (
       <span
@@ -485,22 +488,6 @@ function EditableCell({
           }`}
       >
         {value === "Live" && <span className="h-1.5 w-1.5 rounded-full bg-green-500" />}
-        {value}
-      </span>
-    );
-  } else if (col.key === "partnership_check" && value) {
-    const pc_map: Record<string, string> = {
-      "Approved": "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-      "Not Approved": "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-      "Ready": "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-      "Rejected": "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",
-      "Scheduled": "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
-    };
-    display = (
-      <span
-        className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-medium ${pc_map[value] ?? "bg-gray-100 text-gray-600"
-          }`}
-      >
         {value}
       </span>
     );
@@ -1049,24 +1036,6 @@ export default function LinkBuildingOrdersTable() {
   const cancelAssignEdit = useCallback(() => {
     setEditingCell(null);
   }, []);
-
-  // ── Partnership check ────────────────────────────────────────────────────────
-
-  const handlePartnershipCheckChange = useCallback((row_id: string, new_value: string) => {
-    const base_row = rows_ref.current.find((r) => r.id === row_id);
-    if (!base_row) return;
-
-    const updated_row: LinkBuildingOrderRow = { ...base_row, partnership_check: new_value };
-
-    setRows((prev) => prev.map((r) => (r.id === row_id ? updated_row : r)));
-    setEditingCell(null);
-
-    if (new_row_ids_ref.current.has(row_id)) {
-      persistNewRow(updated_row);
-    } else {
-      persistRowUpdate(updated_row, "partnership_check");
-    }
-  }, [persistNewRow, persistRowUpdate]);
 
   // ── Column visibility ───────────────────────────────────────────────────────
 
@@ -1958,11 +1927,7 @@ export default function LinkBuildingOrdersTable() {
                             onUpdate={(val) => updateCell(row.id, col.key, val)}
                             onStopEdit={stopEditing}
                             onKeyNav={(dir) => navigateCell(row.id, col.key, dir)}
-                            onSelectImmediateSave={
-                              col.key === "partnership_check"
-                                ? (val) => handlePartnershipCheckChange(row.id, val)
-                                : undefined
-                            }
+                            onSelectImmediateSave={undefined}
                             onCopy={(val) => copyCellValue(val, col.key)}
                           />
                         );
