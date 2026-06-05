@@ -401,6 +401,7 @@ function EditableCell({
 
   if (is_editing) {
     if (col.type === "select" && col.options) {
+      const has_current_value = !value || col.options.includes(value);
       return (
         <td className="p-0">
           <select
@@ -419,6 +420,11 @@ function EditableCell({
             style={{ minWidth: col.min_width }}
           >
             <option value="">-- Select --</option>
+            {!has_current_value && (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            )}
             {col.options.map((opt) => (
               <option key={opt} value={opt}>
                 {opt}
