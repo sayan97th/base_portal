@@ -596,6 +596,7 @@ function ClientAssignmentSection({
               <div className="divide-y divide-gray-100 dark:divide-gray-700">
                 {filtered_clients.map((client) => {
                   const is_selected = client_ids.includes(client.id);
+                  const is_disabled = !client.is_active;
                   return (
                     <button
                       key={client.id}
@@ -604,14 +605,29 @@ function ClientAssignmentSection({
                       className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors ${
                         is_selected
                           ? "bg-brand-50 dark:bg-brand-500/10"
+                          : is_disabled
+                          ? "opacity-50 hover:bg-gray-50 dark:hover:bg-gray-700/50"
                           : "hover:bg-gray-50 dark:hover:bg-gray-700/50"
                       }`}
                     >
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                        is_disabled
+                          ? "bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500"
+                          : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                      }`}>
                         {client.name.charAt(0).toUpperCase()}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-gray-800 dark:text-white">{client.name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className={`truncate text-sm font-medium ${
+                            is_disabled ? "text-gray-400 dark:text-gray-500" : "text-gray-800 dark:text-white"
+                          }`}>{client.name}</p>
+                          {is_disabled && (
+                            <span className="shrink-0 rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-400 dark:bg-gray-700 dark:text-gray-500">
+                              Disabled
+                            </span>
+                          )}
+                        </div>
                         <p className="truncate text-xs text-gray-400 dark:text-gray-500">{client.email}</p>
                       </div>
                       <span
@@ -641,15 +657,28 @@ function ClientAssignmentSection({
                 Assigned ({selected_clients.length})
               </p>
               <div className="flex flex-wrap gap-2">
-                {selected_clients.map((client) => (
+                {selected_clients.map((client) => {
+                  const is_chip_disabled = !client.is_active;
+                  return (
                   <span
                     key={client.id}
-                    className="flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 py-1 pl-2.5 pr-1.5 text-xs font-medium text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300"
+                    className={`flex items-center gap-1.5 rounded-full border py-1 pl-2.5 pr-1.5 text-xs font-medium ${
+                      is_chip_disabled
+                        ? "border-gray-200 bg-gray-100 text-gray-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-400"
+                        : "border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300"
+                    }`}
                   >
-                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-brand-200 text-[9px] font-bold text-brand-700 dark:bg-brand-500/30 dark:text-brand-300">
+                    <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold ${
+                      is_chip_disabled
+                        ? "bg-gray-200 text-gray-500 dark:bg-gray-600 dark:text-gray-400"
+                        : "bg-brand-200 text-brand-700 dark:bg-brand-500/30 dark:text-brand-300"
+                    }`}>
                       {client.name.charAt(0).toUpperCase()}
                     </span>
                     <span className="max-w-[140px] truncate">{client.name}</span>
+                    {is_chip_disabled && (
+                      <span className="text-[9px] text-gray-400 dark:text-gray-500">(disabled)</span>
+                    )}
                     <button
                       type="button"
                       onClick={() => removeClient(client.id)}
@@ -661,7 +690,8 @@ function ClientAssignmentSection({
                       </svg>
                     </button>
                   </span>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
