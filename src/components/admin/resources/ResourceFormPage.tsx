@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useDebounce } from "@/hooks/useDebounce";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type {
@@ -450,6 +451,8 @@ function ClientAssignmentSection({
   const [all_clients, setAllClients] = useState<AssignedClient[]>([]);
   const [is_loading_clients, setIsLoadingClients] = useState(true);
 
+  const debounced_search = useDebounce(search_query, 300);
+
   // Merge prop data and fetched list so chip names resolve before/after the API call
   const known_clients = useMemo(() => {
     const map = new Map<number, AssignedClient>();
@@ -459,12 +462,14 @@ function ClientAssignmentSection({
   }, [assigned_clients_data, all_clients]);
 
   useEffect(() => {
-    fetchAssignableClients("")
+    setIsLoadingClients(true);
+    fetchAssignableClients(debounced_search)
       .then((data) => setAllClients(data))
       .catch(() => {})
       .finally(() => setIsLoadingClients(false));
-  }, []);
+  }, [debounced_search]);
 
+  // Client-side filter provides instant feedback while the debounced API call is in-flight
   const filtered_clients = all_clients.filter((c) => {
     const q = search_query.toLowerCase().trim();
     if (!q) return true;
