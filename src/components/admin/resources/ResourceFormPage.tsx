@@ -140,6 +140,14 @@ function getFileTypeLabelFromExtension(name: string): string {
   return labels[ext] ?? ext.toUpperCase();
 }
 
+function getClientInitial(name: string): string {
+  return name.trim() ? name.trim().charAt(0).toUpperCase() : "?";
+}
+
+function getClientDisplayName(name: string): string {
+  return name.trim() || "(No name)";
+}
+
 // ── Form Input Components ────────────────────────────────────────────────────
 
 function Field({
@@ -615,13 +623,13 @@ function ClientAssignmentSection({
                           ? "bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500"
                           : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
                       }`}>
-                        {client.name.charAt(0).toUpperCase()}
+                        {getClientInitial(client.name)}
                       </span>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <p className={`truncate text-sm font-medium ${
                             is_disabled ? "text-gray-400 dark:text-gray-500" : "text-gray-800 dark:text-white"
-                          }`}>{client.name}</p>
+                          } ${!client.name.trim() ? "italic text-gray-400 dark:text-gray-500" : ""}`}>{getClientDisplayName(client.name)}</p>
                           {is_disabled && (
                             <span className="shrink-0 rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-400 dark:bg-gray-700 dark:text-gray-500">
                               Disabled
@@ -673,9 +681,9 @@ function ClientAssignmentSection({
                         ? "bg-gray-200 text-gray-500 dark:bg-gray-600 dark:text-gray-400"
                         : "bg-brand-200 text-brand-700 dark:bg-brand-500/30 dark:text-brand-300"
                     }`}>
-                      {client.name.charAt(0).toUpperCase()}
+                      {getClientInitial(client.name)}
                     </span>
-                    <span className="max-w-[140px] truncate">{client.name}</span>
+                    <span className={`max-w-[140px] truncate ${!client.name.trim() ? "italic" : ""}`}>{getClientDisplayName(client.name)}</span>
                     {is_chip_disabled && (
                       <span className="text-[9px] text-gray-400 dark:text-gray-500">(disabled)</span>
                     )}
@@ -683,7 +691,7 @@ function ClientAssignmentSection({
                       type="button"
                       onClick={() => removeClient(client.id)}
                       className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-brand-500 transition-colors hover:bg-brand-200 hover:text-brand-700 dark:text-brand-400 dark:hover:bg-brand-500/20"
-                      title={`Remove ${client.name}`}
+                      title={`Remove ${getClientDisplayName(client.name)}`}
                     >
                       <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
