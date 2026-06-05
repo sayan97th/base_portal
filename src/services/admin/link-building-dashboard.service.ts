@@ -165,7 +165,6 @@ function normalizeUrl(value: string): string {
 const URL_FIELDS: (keyof LinkBuildingOrderPayload)[] = [
   "landing_page",
   "partnership",
-  "article",
   "live_link",
 ];
 

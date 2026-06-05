@@ -456,20 +456,25 @@ function EditableCell({
   let display: React.ReactNode;
 
   if (col.type === "url" && value) {
-    const label = value.replace(/^https?:\/\//, "").slice(0, 28);
-    display = (
-      <a
-        href={value.startsWith("http") ? value : `https://${value}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-blue-500 hover:underline"
-        onClick={(e) => e.stopPropagation()}
-        title={value}
-      >
-        {label}
-        {value.replace(/^https?:\/\//, "").length > 28 ? "…" : ""}
-      </a>
-    );
+    const is_url = /^https?:\/\//i.test(value);
+    if (is_url) {
+      const label = value.replace(/^https?:\/\//, "").slice(0, 28);
+      display = (
+        <a
+          href={value}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-500 hover:underline"
+          onClick={(e) => e.stopPropagation()}
+          title={value}
+        >
+          {label}
+          {value.replace(/^https?:\/\//, "").length > 28 ? "…" : ""}
+        </a>
+      );
+    } else {
+      display = <span title={value}>{value}</span>;
+    }
   } else if (col.key === "estimated_delivery_date" && isDateOverdue(value)) {
     display = <span className="font-semibold text-red-500">{value}</span>;
   } else if (col.key === "status" && value) {
