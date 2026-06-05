@@ -482,7 +482,16 @@ function ClientAssignmentSection({
     .filter((c) => {
       const q = search_query.toLowerCase().trim();
       if (!q) return true;
-      return c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q);
+      const name = c.name.toLowerCase();
+      const email = c.email.toLowerCase();
+      // Exact substring match on full name or email
+      if (name.includes(q) || email.includes(q)) return true;
+      // Token-by-token: every space-separated word must appear somewhere in name
+      const tokens = q.split(/\s+/).filter(Boolean);
+      if (tokens.length > 1) {
+        return tokens.every((token) => name.includes(token));
+      }
+      return false;
     })
     .sort((a, b) => {
       const a_named = Boolean(a.name.trim());
