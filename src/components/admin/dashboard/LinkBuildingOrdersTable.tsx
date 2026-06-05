@@ -523,7 +523,7 @@ function EditableCell({
           : undefined
       }
       onClick={onStartEdit}
-      title={is_required_error ? `Required: ${col.label} must be filled to save this row` : "Click to edit · Hover for copy"}
+      title={is_required_error ? `Required: ${col.label} must be filled to save this row` : "Click to edit · Ctrl+C to copy cell value · Hover for copy icon"}
     >
       {show_row_floater && <RowPresenceFloater editors={row_editors} />}
       {has_cell_editors && <CellPresenceOverlay editors={cell_editors} />}
@@ -539,7 +539,7 @@ function EditableCell({
       </div>
       {onCopy && value && !is_required_error && (
         <button
-          className={`absolute right-0.5 top-1/2 -translate-y-1/2 rounded p-0.5 opacity-0 transition-all group-hover/cell:opacity-60 hover:!opacity-100 hover:bg-white dark:hover:bg-gray-700 ${just_copied ? "!opacity-100 text-green-500" : "text-gray-400"
+          className={`absolute right-0.5 top-1/2 -translate-y-1/2 rounded p-0.5 opacity-0 transition-all group-hover:opacity-20 group-hover/cell:opacity-70 hover:!opacity-100 hover:bg-white dark:hover:bg-gray-700 ${just_copied ? "!opacity-100 text-green-500" : "text-gray-400"
             }`}
           onClick={handleCopy}
           title="Copy cell value"
@@ -660,6 +660,13 @@ export default function LinkBuildingOrdersTable() {
   const new_row_ids_ref = useRef<Set<string>>(new Set());
   const drafts_restored_ref = useRef(false);
   const select_all_ref = useRef<HTMLInputElement>(null);
+
+  // Refs for keyboard shortcut handler (avoids stale closures)
+  const clipboard_cell_kbd_ref = useRef(clipboard_cell);
+  clipboard_cell_kbd_ref.current = clipboard_cell;
+
+  const selected_row_ids_kbd_ref = useRef(selected_row_ids);
+  selected_row_ids_kbd_ref.current = selected_row_ids;
 
   const debounced_search = useDebounce(search, 400);
   const debounced_client_filter = useDebounce(client_filter, 400);
@@ -1177,6 +1184,64 @@ export default function LinkBuildingOrdersTable() {
     }
   }, [clipboard_cell, selected_row_ids, clearSelection]);
 
+  // ── Global keyboard shortcuts: Ctrl+C = copy cell, Ctrl+V = paste to selected ──
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      const key = e.key.toLowerCase();
+
+      if (key === "c") {
+        const cell = editing_cell_ref.current;
+        if (!cell) return;
+
+        // If the user has text selected inside an input, let the browser handle it
+        const active_el = document.activeElement;
+        if (active_el instanceof HTMLInputElement || active_el instanceof HTMLTextAreaElement) {
+          const sel_len = (active_el.selectionEnd ?? 0) - (active_el.selectionStart ?? 0);
+          if (sel_len > 0) return;
+        }
+
+        const row = rows_ref.current.find((r) => r.id === cell.row_id);
+        if (!row) return;
+        const value = String(row[cell.col_key as keyof LinkBuildingOrderRow] ?? "");
+        const col_label = COLUMNS.find((c) => c.key === cell.col_key)?.label ?? cell.col_key;
+
+        setClipboardCell({ value, col_key: cell.col_key });
+        navigator.clipboard.writeText(value).catch(() => {});
+
+        const short = value.length > 28 ? value.slice(0, 28) + "…" : value;
+        const n_selected = selected_row_ids_kbd_ref.current.size;
+        setNotificationBanner(
+          n_selected > 0
+            ? `Copied "${short}" — press Ctrl+V to paste into "${col_label}" for ${n_selected} row${n_selected > 1 ? "s" : ""}`
+            : `Copied "${short}" from "${col_label}" — select rows, then press Ctrl+V to paste`
+        );
+        return;
+      }
+
+      if (key === "v") {
+        const clip = clipboard_cell_kbd_ref.current;
+        const selected = selected_row_ids_kbd_ref.current;
+        if (!clip || selected.size === 0) return;
+
+        // Do not override paste when the user is typing inside an input
+        const active_el = document.activeElement;
+        if (
+          active_el instanceof HTMLInputElement ||
+          active_el instanceof HTMLSelectElement ||
+          active_el instanceof HTMLTextAreaElement
+        ) return;
+
+        e.preventDefault();
+        handlePasteClipboard();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [handlePasteClipboard]);
+
   // ── Indeterminate state for select-all checkbox ─────────────────────────────
 
   useEffect(() => {
@@ -1335,6 +1400,33 @@ export default function LinkBuildingOrdersTable() {
               </span>
             )}
           </button>
+          {/* Clipboard badge — shows when a cell value has been copied */}
+          {clipboard_cell && (
+            <div
+              className="flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs text-indigo-700 dark:border-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-300"
+              title={`Clipboard: "${clipboard_cell.value}" (${COLUMNS.find((c) => c.key === clipboard_cell.col_key)?.label ?? clipboard_cell.col_key}) — select rows then press Ctrl+V to paste`}
+            >
+              <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+              <span className="font-semibold">{COLUMNS.find((c) => c.key === clipboard_cell.col_key)?.label ?? clipboard_cell.col_key}:</span>
+              <span className="max-w-[90px] overflow-hidden text-ellipsis whitespace-nowrap opacity-80">
+                {clipboard_cell.value || "—"}
+              </span>
+              <kbd className="rounded bg-indigo-100 px-1 py-0.5 font-mono text-[9px] text-indigo-500 dark:bg-indigo-800 dark:text-indigo-300">
+                Ctrl+V
+              </kbd>
+              <button
+                onClick={() => setClipboardCell(null)}
+                className="ml-0.5 rounded p-0.5 opacity-50 transition-opacity hover:opacity-100"
+                title="Clear clipboard"
+              >
+                <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          )}
           {/* Import CSV */}
           <button
             onClick={() => setShowImportModal(true)}
@@ -1543,17 +1635,27 @@ export default function LinkBuildingOrdersTable() {
                   onClick={handlePasteClipboard}
                   disabled={is_batch_saving}
                   className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
-                  title={`Paste "${clipboard_cell.value}" into "${paste_col_label}" for all selected rows`}
+                  title={`Paste "${clipboard_cell.value}" into "${paste_col_label}" for all selected rows (Ctrl+V)`}
                 >
                   <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                   </svg>
                   Paste &ldquo;{short_val}&rdquo; → {paste_col_label}
+                  <kbd className="ml-1 rounded bg-indigo-500 px-1 py-0.5 font-mono text-[9px] opacity-75">Ctrl+V</kbd>
                 </button>
                 <div className="h-4 w-px shrink-0 bg-indigo-200 dark:bg-indigo-800" />
               </>
             );
           })()}
+
+          {/* Copy hint — shown when no clipboard value yet */}
+          {!clipboard_cell && (
+            <span className="text-[11px] text-indigo-400 dark:text-indigo-500">
+              Click a cell to edit, then press{" "}
+              <kbd className="rounded bg-indigo-100 px-1 font-mono text-[9px] text-indigo-500 dark:bg-indigo-800 dark:text-indigo-400">Ctrl+C</kbd>{" "}
+              to copy its value here.
+            </span>
+          )}
 
           {/* Manual batch fill */}
           <div className="flex flex-wrap items-center gap-2">
