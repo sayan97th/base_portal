@@ -477,12 +477,19 @@ function ClientAssignmentSection({
       .finally(() => setIsLoadingClients(false));
   }, [debounced_search]);
 
-  // Client-side filter provides instant feedback while the debounced API call is in-flight
-  const filtered_clients = all_clients.filter((c) => {
-    const q = search_query.toLowerCase().trim();
-    if (!q) return true;
-    return c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q);
-  });
+  // Client-side filter + sort: unnamed clients always appear at the end
+  const filtered_clients = all_clients
+    .filter((c) => {
+      const q = search_query.toLowerCase().trim();
+      if (!q) return true;
+      return c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q);
+    })
+    .sort((a, b) => {
+      const a_named = Boolean(a.name.trim());
+      const b_named = Boolean(b.name.trim());
+      if (a_named === b_named) return 0;
+      return a_named ? -1 : 1;
+    });
 
   const selected_clients = known_clients.filter((c) => client_ids.includes(c.id));
 
