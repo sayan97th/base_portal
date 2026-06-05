@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { GroupIcon, DollarLineIcon, ListIcon, TaskIcon } from "@/icons/index";
@@ -212,6 +212,8 @@ export default function AdminDashboardContent() {
   const [is_loading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const widget_refresh_timer_ref = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const fetchDashboardData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -231,9 +233,35 @@ export default function AdminDashboardContent() {
     }
   }, []);
 
+  const scheduleWidgetRefresh = useCallback(() => {
+    if (widget_refresh_timer_ref.current) {
+      clearTimeout(widget_refresh_timer_ref.current);
+    }
+    widget_refresh_timer_ref.current = setTimeout(async () => {
+      try {
+        const [capacity_res, health_res] = await Promise.all([
+          getTeamCapacity(),
+          getTeamHealth(),
+        ]);
+        setCapacity(capacity_res.data);
+        setHealth(health_res.data);
+      } catch {
+        // silently ignore background refresh errors
+      }
+    }, 1500);
+  }, []);
+
   useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
+
+  useEffect(() => {
+    return () => {
+      if (widget_refresh_timer_ref.current) {
+        clearTimeout(widget_refresh_timer_ref.current);
+      }
+    };
+  }, []);
 
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -337,7 +365,7 @@ export default function AdminDashboardContent() {
       </div>
 
       {/* Link Building Orders — full-width editable tracking table */}
-      <LinkBuildingOrdersTable />
+      <LinkBuildingOrdersTable onOrderMutated={scheduleWidgetRefresh} />
 
     </div>
   );

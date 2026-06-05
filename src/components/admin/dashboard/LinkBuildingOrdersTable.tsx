@@ -611,7 +611,7 @@ function TableSkeleton() {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export default function LinkBuildingOrdersTable() {
+export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMutated?: () => void }) {
   const [rows, setRows] = useState<LinkBuildingOrderRow[]>([]);
   const [admin_users, setAdminUsers] = useState<AdminUserOption[]>([]);
   const [is_loading, setIsLoading] = useState(true);
@@ -684,6 +684,9 @@ export default function LinkBuildingOrdersTable() {
 
   const current_body_ref = useRef<LinkBuildingOrderSearchBody>({});
 
+  const on_order_mutated_ref = useRef(onOrderMutated);
+  on_order_mutated_ref.current = onOrderMutated;
+
   // ── Real-time collaboration ─────────────────────────────────────────────────
 
   const handleRemoteRowUpdated = useCallback(
@@ -703,6 +706,7 @@ export default function LinkBuildingOrdersTable() {
           return updated_row;
         })
       );
+      on_order_mutated_ref.current?.();
     },
     []
   );
@@ -716,6 +720,7 @@ export default function LinkBuildingOrdersTable() {
         return [new_row, ...prev];
       });
       setTotal((prev) => prev + 1);
+      on_order_mutated_ref.current?.();
     },
     []
   );
@@ -728,6 +733,7 @@ export default function LinkBuildingOrdersTable() {
       if (selected_row_id_ref.current === row_id) setSelectedRowId(null);
       setRows((prev) => prev.filter((r) => r.id !== row_id));
       setTotal((prev) => Math.max(0, prev - 1));
+      on_order_mutated_ref.current?.();
     },
     []
   );
@@ -889,6 +895,7 @@ export default function LinkBuildingOrdersTable() {
         (r) => new_row_ids_ref.current.has(r.id) && r.id !== row.id
       );
       saveDraftsToStorage(remaining);
+      on_order_mutated_ref.current?.();
     } catch {
       const all_drafts = rows_ref.current.filter((r) => new_row_ids_ref.current.has(r.id));
       saveDraftsToStorage(all_drafts);
@@ -920,6 +927,7 @@ export default function LinkBuildingOrdersTable() {
           setNotificationBanner("Order status updated — client email notification queued.");
         }
       }
+      on_order_mutated_ref.current?.();
     } catch {
       setSaveError(`Failed to save row "${row.order_id}". Changes may not have been saved.`);
     } finally {
@@ -1024,6 +1032,7 @@ export default function LinkBuildingOrdersTable() {
     try {
       await deleteLinkBuildingOrder(row_id);
       setRows((prev) => prev.filter((r) => r.id !== row_id));
+      on_order_mutated_ref.current?.();
     } catch {
       setSaveError("Failed to delete row. Please try again.");
     } finally {
