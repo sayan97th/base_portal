@@ -6,7 +6,17 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "pm2:testing": "pm2 start ecosystem/ecosystem.testing.config.js",
+    "pm2:staging": "pm2 start ecosystem/ecosystem.staging.config.js",
+    "pm2:production": "pm2 start ecosystem/ecosystem.production.config.js",
+    "pm2:stop": "pm2 stop base-portal",
+    "pm2:restart:testing": "pm2 restart ecosystem/ecosystem.testing.config.js",
+    "pm2:restart:staging": "pm2 restart ecosystem/ecosystem.staging.config.js",
+    "pm2:restart:production": "pm2 restart ecosystem/ecosystem.production.config.js",
+    "pm2:delete": "pm2 delete base-portal",
+    "pm2:logs": "pm2 logs base-portal",
+    "pm2:status": "pm2 status"
   },
   "dependencies": {
     "@fullcalendar/core": "^6.1.19",
