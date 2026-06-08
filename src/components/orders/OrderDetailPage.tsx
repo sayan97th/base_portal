@@ -27,6 +27,7 @@ import OrderProgressTimeline from "@/components/orders/OrderProgressTimeline";
 
 type GenericStatus =
   | "pending"
+  | "new_request"
   | "processing"
   | "completed"
   | "cancelled"
@@ -104,7 +105,8 @@ function getStatusConfig(status: string): {
 } {
   switch (status as GenericStatus) {
     case "pending":
-      return { color: "warning", label: "Pending", dot: "bg-warning-500" };
+    case "new_request":
+      return { color: "info", label: "New Request", dot: "bg-teal-500" };
     case "processing":
       return { color: "info", label: "Processing", dot: "bg-blue-light-500" };
     case "completed":

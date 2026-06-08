@@ -15,7 +15,7 @@ import type { PurchaseGroup } from "@/types/client/purchase-groups";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-type OrderStatus = "pending" | "processing" | "completed" | "cancelled" | "payment_pending";
+type OrderStatus = "pending" | "processing" | "completed" | "cancelled" | "payment_pending" | "new_request";
 type FilterTab = "all" | CartProductType;
 
 interface UnifiedOrder {
@@ -129,7 +129,8 @@ function getStatusConfig(status: string): {
 } {
   switch (status as OrderStatus) {
     case "pending":
-      return { color: "warning", label: "Pending", dot: "bg-warning-500" };
+    case "new_request":
+      return { color: "info", label: "New Request", dot: "bg-teal-500" };
     case "processing":
       return { color: "info", label: "Processing", dot: "bg-blue-light-500" };
     case "completed":
@@ -144,7 +145,7 @@ function getStatusConfig(status: string): {
 }
 
 function getGroupOverallStatus(orders: UnifiedOrder[]): string {
-  const priority: OrderStatus[] = ["payment_pending", "processing", "pending", "cancelled", "completed"];
+  const priority: OrderStatus[] = ["payment_pending", "processing", "pending", "new_request", "cancelled", "completed"];
   for (const s of priority) {
     if (orders.some((o) => o.status === s)) return s;
   }
@@ -339,7 +340,7 @@ interface OrderItemRowProps {
 
 function OrderItemRow({ order, is_last, compact = false }: OrderItemRowProps) {
   const status_config = getStatusConfig(order.status);
-  const is_active = order.status === "pending" || order.status === "processing";
+  const is_active = order.status === "pending" || order.status === "new_request" || order.status === "processing";
   const has_updates = (order.updates_count ?? 0) > 0;
   const type_config = PRODUCT_TYPE_CONFIG[order.product_type];
   const tracking_link = getTrackingLink(order);
@@ -358,12 +359,14 @@ function OrderItemRow({ order, is_last, compact = false }: OrderItemRowProps) {
         {/* Active pulse dot */}
         {is_active && (
           <div className="relative mt-1.5 flex h-2 w-2 shrink-0 sm:mt-0">
-            {order.status === "processing" && (
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-50" />
-            )}
+            <span
+              className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-50 ${
+                order.status === "processing" ? "bg-blue-400" : "bg-teal-400"
+              }`}
+            />
             <span
               className={`relative inline-flex h-2 w-2 rounded-full ${
-                order.status === "processing" ? "bg-blue-500" : "bg-warning-500"
+                order.status === "processing" ? "bg-blue-500" : "bg-teal-500"
               }`}
             />
           </div>

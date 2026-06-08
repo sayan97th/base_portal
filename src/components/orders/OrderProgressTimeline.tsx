@@ -8,7 +8,7 @@ import type { CartProductType } from "@/types/client/unified-cart";
 const VALID_STATUSES: OrderStatus[] = ["pending", "processing", "completed", "cancelled"];
 
 function resolveStatus(status: string): OrderStatus {
-  if (status === "payment_pending") return "pending";
+  if (status === "payment_pending" || status === "new_request") return "pending";
   return VALID_STATUSES.includes(status as OrderStatus)
     ? (status as OrderStatus)
     : "pending";
@@ -40,13 +40,13 @@ const STATUS_CONFIG: Record<
   { label: string; icon: React.ReactNode; ring: string; bg: string; text: string }
 > = {
   pending: {
-    label: "Pending",
-    ring: "ring-warning-400",
-    bg: "bg-warning-50 dark:bg-warning-500/10",
-    text: "text-warning-700 dark:text-warning-400",
+    label: "New Request",
+    ring: "ring-teal-400",
+    bg: "bg-teal-50 dark:bg-teal-500/10",
+    text: "text-teal-700 dark:text-teal-400",
     icon: (
       <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
       </svg>
     ),
   },
@@ -85,9 +85,9 @@ const STATUS_CONFIG: Record<
   },
   payment_pending: {
     label: "Payment Pending",
-    ring: "ring-warning-400",
-    bg: "bg-warning-50 dark:bg-warning-500/10",
-    text: "text-warning-700 dark:text-warning-400",
+    ring: "ring-amber-400",
+    bg: "bg-amber-50 dark:bg-amber-500/10",
+    text: "text-amber-700 dark:text-amber-400",
     icon: (
       <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -324,10 +324,10 @@ const OrderProgressTimeline: React.FC<OrderProgressTimelineProps> = ({
               </svg>
             </div>
             <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-              Your order is being reviewed
+              Your request has been received
             </p>
             <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-              Updates will appear here once our team starts processing your order.
+              Updates will appear here once our team begins working on your order.
             </p>
           </div>
         ) : (

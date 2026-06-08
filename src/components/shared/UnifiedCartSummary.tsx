@@ -410,11 +410,10 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
                             )
                           }
                           disabled={is_quantity_locked}
-                          className={`flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 text-gray-500 transition-colors dark:border-gray-600 dark:text-gray-400 ${
-                            is_quantity_locked
+                          className={`flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 text-gray-500 transition-colors dark:border-gray-600 dark:text-gray-400 ${is_quantity_locked
                               ? "cursor-not-allowed opacity-40"
                               : "hover:border-coral-400 hover:text-coral-500"
-                          }`}
+                            }`}
                           aria-label={`Decrease ${item.tier_name}`}
                         >
                           <svg width="8" height="2" viewBox="0 0 8 2" fill="none">
@@ -441,11 +440,10 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
                             )
                           }
                           disabled={is_quantity_locked}
-                          className={`flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 text-gray-500 transition-colors dark:border-gray-600 dark:text-gray-400 ${
-                            is_quantity_locked
+                          className={`flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 text-gray-500 transition-colors dark:border-gray-600 dark:text-gray-400 ${is_quantity_locked
                               ? "cursor-not-allowed opacity-40"
                               : "hover:border-coral-400 hover:text-coral-500"
-                          }`}
+                            }`}
                           aria-label={`Increase ${item.tier_name}`}
                         >
                           <svg
@@ -666,11 +664,10 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
                 handleCouponCodeChange(e.target.value.toUpperCase())
               }
               placeholder="PROMO CODE"
-              className={`flex-1 rounded-xl border px-3 py-2.5 text-xs font-mono uppercase tracking-widest bg-white dark:bg-gray-900/60 text-gray-900 dark:text-white placeholder-gray-300 dark:placeholder-gray-600 focus:outline-none focus:ring-2 transition-colors ${
-                coupon_error
+              className={`flex-1 rounded-xl border px-3 py-2.5 text-xs font-mono uppercase tracking-widest bg-white dark:bg-gray-900/60 text-gray-900 dark:text-white placeholder-gray-300 dark:placeholder-gray-600 focus:outline-none focus:ring-2 transition-colors ${coupon_error
                   ? "border-red-300 dark:border-red-500/60 focus:ring-red-400/40"
                   : "border-gray-200 dark:border-gray-700/80 focus:ring-brand-500/40 focus:border-brand-400 dark:focus:border-brand-500"
-              }`}
+                }`}
               onKeyDown={(e) => e.key === "Enter" && handleApplyCoupon()}
             />
             <button
@@ -780,36 +777,36 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
             {!is_applying_credits && (
               applied_coupons.length > 1
                 ? applied_coupons.map((applied) => (
-                    <div
-                      key={applied.code}
-                      className="flex items-center justify-between"
-                    >
-                      <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 truncate max-w-[60%]">
-                        {applied.coupon_name}
-                      </p>
-                      <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
-                        &minus;$
-                        {applied.discount_amount.toLocaleString("en-US", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </p>
-                    </div>
-                  ))
+                  <div
+                    key={applied.code}
+                    className="flex items-center justify-between"
+                  >
+                    <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 truncate max-w-[60%]">
+                      {applied.coupon_name}
+                    </p>
+                    <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                      &minus;$
+                      {applied.discount_amount.toLocaleString("en-US", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </p>
+                  </div>
+                ))
                 : total_discount > 0 && (
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                        Coupon Discount
-                      </p>
-                      <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
-                        &minus;$
-                        {total_discount.toLocaleString("en-US", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </p>
-                    </div>
-                  )
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                      Coupon Discount
+                    </p>
+                    <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                      &minus;$
+                      {total_discount.toLocaleString("en-US", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </p>
+                  </div>
+                )
             )}
 
             {!is_applying_credits && applied_coupons.length > 1 && (

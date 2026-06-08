@@ -20,7 +20,7 @@ import type { CartProductType } from "@/types/client/unified-cart";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type OrderStatus = "pending" | "processing" | "completed" | "cancelled" | "payment_pending";
+type OrderStatus = "pending" | "new_request" | "processing" | "completed" | "cancelled" | "payment_pending";
 
 interface ResolvedOrderSection {
   order_id: string;
@@ -74,9 +74,10 @@ function getStatusConfig(status: string): {
 } {
   switch (status as OrderStatus) {
     case "pending":
-      return { color: "warning", label: "Pending", dot: "bg-warning-500" };
+    case "new_request":
+      return { color: "info", label: "New Request", dot: "bg-teal-500" };
     case "payment_pending":
-      return { color: "warning", label: "Payment Pending", dot: "bg-warning-500" };
+      return { color: "warning", label: "Payment Pending", dot: "bg-amber-500" };
     case "processing":
       return { color: "info", label: "Processing", dot: "bg-blue-light-500" };
     case "completed":
