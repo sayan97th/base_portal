@@ -5,6 +5,7 @@ import AdminNotificationDropdown from "@/components/header/AdminNotificationDrop
 import UserDropdown from "@/components/header/UserDropdown";
 import { useSidebar } from "@/context/SidebarContext";
 import { useAuth } from "@/context/AuthContext";
+import { useBreadcrumb } from "@/hooks/useBreadcrumb";
 import Image from "next/image";
 import Link from "next/link";
 import React, { useState, useEffect, useRef } from "react";
@@ -14,6 +15,7 @@ const AppHeader: React.FC = () => {
 
   const { isMobileOpen, toggleSidebar, toggleMobileSidebar } = useSidebar();
   const { isStaff } = useAuth();
+  const page_title = useBreadcrumb();
 
   const handleToggle = () => {
     if (window.innerWidth >= 1024) {
@@ -128,13 +130,16 @@ const AppHeader: React.FC = () => {
           </button>
 
           {/* Breadcrumb */}
-          <div className="hidden lg:flex items-center gap-2 text-sm">
-            <span className="text-gray-500 dark:text-gray-400">
+          <div className="hidden lg:flex items-center gap-2 text-sm min-w-0">
+            <span className="shrink-0 text-gray-500 dark:text-gray-400">
               BASE Search Marketing
             </span>
-            <span className="text-gray-400 dark:text-gray-500">/</span>
-            <span className="font-medium text-gray-800 dark:text-white/90">
-              Dashboard
+            <span className="shrink-0 text-gray-400 dark:text-gray-500">/</span>
+            <span
+              className="font-medium text-gray-800 dark:text-white/90 truncate max-w-[260px]"
+              title={page_title}
+            >
+              {page_title}
             </span>
           </div>
 
