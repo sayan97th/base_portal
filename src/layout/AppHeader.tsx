@@ -176,7 +176,11 @@ const AppHeader: React.FC = () => {
             <ThemeToggleButton />
 
             {/* Settings Icon */}
-            <button className="relative flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 hover:text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:text-gray-300">
+            <Link
+              href={isStaff ? "/admin/profile" : "/profile"}
+              aria-label="Account settings"
+              className="relative flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 hover:text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:text-gray-300"
+            >
               <svg
                 width="20"
                 height="20"
@@ -191,7 +195,7 @@ const AppHeader: React.FC = () => {
                   fill="currentColor"
                 />
               </svg>
-            </button>
+            </Link>
 
             {isStaff ? <AdminNotificationDropdown /> : <NotificationDropdown />}
           </div>
