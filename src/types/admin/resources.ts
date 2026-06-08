@@ -71,6 +71,9 @@ export interface AdminResourceFilters {
   search?: string;
   category?: ResourceCategory | "all";
   status?: ResourceStatus | "all";
+  sort_order?: "asc" | "desc";
+  month?: number;
+  year?: number;
 }
 
 export interface AdminResourcePaginatedResponse {

@@ -14,6 +14,14 @@ import { useDebounce } from "@/hooks/useDebounce";
 
 const RESOURCES_PER_PAGE = 15;
 
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+const CURRENT_YEAR = new Date().getFullYear();
+const YEAR_OPTIONS = Array.from({ length: CURRENT_YEAR - 2019 }, (_, i) => CURRENT_YEAR - i);
+
 const category_options: { label: string; value: ResourceCategory | "all" }[] = [
   { label: "All", value: "all" },
   { label: "PDF", value: "pdf" },
@@ -163,6 +171,137 @@ function ResourceIcon({ category }: { category: ResourceCategory }) {
   );
 }
 
+// ── Action Buttons (shared) ───────────────────────────────────────────────────
+
+interface ResourceActionsProps {
+  resource: AdminResource;
+  is_toggling: boolean;
+  onToggle: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}
+
+function ResourceActions({ resource, is_toggling, onToggle, onEdit, onDelete }: ResourceActionsProps) {
+  return (
+    <div className="flex items-center gap-2">
+      {/* Toggle status */}
+      <button
+        onClick={onToggle}
+        disabled={is_toggling}
+        title={resource.status === "published" ? "Set to Draft" : "Publish"}
+        className={`flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+          resource.status === "published"
+            ? "border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400"
+            : "border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400"
+        }`}
+      >
+        {is_toggling ? (
+          <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        ) : resource.status === "published" ? (
+          <>
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+            </svg>
+            Unpublish
+          </>
+        ) : (
+          <>
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            Publish
+          </>
+        )}
+      </button>
+
+      {/* Edit */}
+      <button
+        onClick={onEdit}
+        className="flex h-8 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 text-xs font-medium text-gray-700 transition-colors hover:border-gray-300 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+      >
+        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" />
+        </svg>
+        Edit
+      </button>
+
+      {/* Delete */}
+      <button
+        onClick={onDelete}
+        className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-400 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-500 dark:border-gray-600 dark:hover:border-red-500/40 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+      >
+        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+// ── Grid Card ─────────────────────────────────────────────────────────────────
+
+interface ResourceGridCardProps {
+  resource: AdminResource;
+  is_toggling: boolean;
+  onToggle: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}
+
+function ResourceGridCard({ resource, is_toggling, onToggle, onEdit, onDelete }: ResourceGridCardProps) {
+  return (
+    <div className="flex flex-col rounded-2xl border border-gray-200 bg-white p-5 transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800">
+      {/* Header */}
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <div className="flex items-start gap-3 min-w-0">
+          <ResourceIcon category={resource.category} />
+          <div className="min-w-0">
+            <CategoryBadge category={resource.category} />
+            <h3 className="mt-1 line-clamp-2 text-sm font-semibold text-gray-800 dark:text-white">
+              {resource.title}
+            </h3>
+          </div>
+        </div>
+        <div className="shrink-0 mt-0.5">
+          <StatusBadge status={resource.status} />
+        </div>
+      </div>
+
+      {/* Description */}
+      {resource.description && (
+        <p className="mb-3 line-clamp-2 flex-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+          {resource.description}
+        </p>
+      )}
+      {!resource.description && <div className="flex-1" />}
+
+      {/* Org + meta */}
+      <p className="mb-3 truncate text-xs text-gray-400 dark:text-gray-500">
+        {resource.organization ? resource.organization.name : "All organizations"}
+        {" · "}
+        {resource.files.length} {resource.files.length === 1 ? "file" : "files"}
+        {" · "}
+        {formatDate(resource.created_at)}
+      </p>
+
+      {/* Actions */}
+      <div className="border-t border-gray-100 pt-3 dark:border-gray-700">
+        <ResourceActions
+          resource={resource}
+          is_toggling={is_toggling}
+          onToggle={onToggle}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
+      </div>
+    </div>
+  );
+}
+
 // ── Skeleton ──────────────────────────────────────────────────────────────────
 
 function RowSkeleton() {
@@ -179,6 +318,33 @@ function RowSkeleton() {
       <div className="flex gap-2">
         <div className="h-7 w-16 rounded-lg bg-gray-100 dark:bg-gray-800" />
         <div className="h-7 w-16 rounded-lg bg-gray-100 dark:bg-gray-800" />
+      </div>
+    </div>
+  );
+}
+
+function GridSkeleton() {
+  return (
+    <div className="animate-pulse rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
+      <div className="mb-3 flex items-start gap-3">
+        <div className="h-9 w-9 rounded-lg bg-gray-100 dark:bg-gray-700" />
+        <div className="flex-1 space-y-1.5">
+          <div className="h-3 w-16 rounded-full bg-gray-100 dark:bg-gray-700" />
+          <div className="h-4 w-3/4 rounded bg-gray-100 dark:bg-gray-700" />
+        </div>
+        <div className="h-5 w-20 rounded-full bg-gray-100 dark:bg-gray-700" />
+      </div>
+      <div className="mb-3 space-y-1.5">
+        <div className="h-3 rounded bg-gray-100 dark:bg-gray-700" />
+        <div className="h-3 w-4/5 rounded bg-gray-100 dark:bg-gray-700" />
+      </div>
+      <div className="h-3 w-2/3 rounded bg-gray-100 dark:bg-gray-700" />
+      <div className="mt-3 border-t border-gray-100 pt-3 dark:border-gray-700">
+        <div className="flex gap-2">
+          <div className="h-8 w-24 rounded-lg bg-gray-100 dark:bg-gray-700" />
+          <div className="h-8 w-14 rounded-lg bg-gray-100 dark:bg-gray-700" />
+          <div className="h-8 w-8 rounded-lg bg-gray-100 dark:bg-gray-700" />
+        </div>
       </div>
     </div>
   );
@@ -202,15 +368,10 @@ function DeleteModal({ resource, is_deleting, onConfirm, onCancel }: DeleteModal
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
           </svg>
         </div>
-        <h3 className="mb-1 text-lg font-semibold text-gray-900 dark:text-white">
-          Delete resource?
-        </h3>
+        <h3 className="mb-1 text-lg font-semibold text-gray-900 dark:text-white">Delete resource?</h3>
         <p className="mb-1 text-sm text-gray-500 dark:text-gray-400">
           You are about to delete{" "}
-          <span className="font-medium text-gray-700 dark:text-gray-300">
-            &ldquo;{resource.title}&rdquo;
-          </span>
-          .
+          <span className="font-medium text-gray-700 dark:text-gray-300">&ldquo;{resource.title}&rdquo;</span>.
         </p>
         <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">
           This will also permanently delete all{" "}
@@ -357,6 +518,11 @@ function Pagination({
   );
 }
 
+// ── Select helpers ────────────────────────────────────────────────────────────
+
+const select_class =
+  "rounded-xl border border-gray-200 bg-gray-50 py-2 pl-3 pr-8 text-sm text-gray-700 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300";
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function AdminResourcesContent() {
@@ -368,15 +534,16 @@ export default function AdminResourcesContent() {
   const [search, setSearch] = useState("");
   const [category_filter, setCategoryFilter] = useState<ResourceCategory | "all">("all");
   const [status_filter, setStatusFilter] = useState<"all" | "published" | "draft">("all");
+  const [sort_order, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [filter_month, setFilterMonth] = useState<number | "">("");
+  const [filter_year, setFilterYear] = useState<number | "">("");
+  const [view_mode, setViewMode] = useState<"list" | "grid">("list");
   const [current_page, setCurrentPage] = useState(1);
   const [last_page, setLastPage] = useState(1);
   const [total, setTotal] = useState(0);
 
-  // Delete state
   const [confirm_delete, setConfirmDelete] = useState<AdminResource | null>(null);
   const [is_deleting, setIsDeleting] = useState(false);
-
-  // Toggle status loading set
   const [toggling_ids, setTogglingIds] = useState<Set<number>>(new Set());
 
   const debounced_search = useDebounce(search, 400);
@@ -391,6 +558,9 @@ export default function AdminResourcesContent() {
         search: debounced_search || undefined,
         category: category_filter,
         status: status_filter,
+        sort_order,
+        month: filter_month !== "" ? filter_month : undefined,
+        year: filter_year !== "" ? filter_year : undefined,
       });
       setResources(result.data);
       setLastPage(result.last_page);
@@ -400,7 +570,7 @@ export default function AdminResourcesContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [current_page, debounced_search, category_filter, status_filter]);
+  }, [current_page, debounced_search, category_filter, status_filter, sort_order, filter_month, filter_year]);
 
   useEffect(() => {
     fetchResources();
@@ -421,10 +591,28 @@ export default function AdminResourcesContent() {
     setCurrentPage(1);
   };
 
+  const handleSortChange = (value: "asc" | "desc") => {
+    setSortOrder(value);
+    setCurrentPage(1);
+  };
+
+  const handleMonthChange = (value: string) => {
+    setFilterMonth(value === "" ? "" : Number(value));
+    setCurrentPage(1);
+  };
+
+  const handleYearChange = (value: string) => {
+    setFilterYear(value === "" ? "" : Number(value));
+    setCurrentPage(1);
+  };
+
   const clearFilters = () => {
     setSearch("");
     setCategoryFilter("all");
     setStatusFilter("all");
+    setSortOrder("desc");
+    setFilterMonth("");
+    setFilterYear("");
     setCurrentPage(1);
   };
 
@@ -437,9 +625,7 @@ export default function AdminResourcesContent() {
     setTogglingIds((prev) => new Set(prev).add(resource.id));
     try {
       const updated = await toggleAdminResourceStatus(resource.id, new_status);
-      setResources((prev) =>
-        prev.map((r) => (r.id === updated.id ? updated : r))
-      );
+      setResources((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
     } catch {
       // Leave state unchanged on error
     } finally {
@@ -466,7 +652,13 @@ export default function AdminResourcesContent() {
     }
   };
 
-  const is_filtered = search !== "" || category_filter !== "all" || status_filter !== "all";
+  const is_filtered =
+    search !== "" ||
+    category_filter !== "all" ||
+    status_filter !== "all" ||
+    sort_order !== "desc" ||
+    filter_month !== "" ||
+    filter_year !== "";
 
   return (
     <div className="space-y-6">
@@ -491,9 +683,10 @@ export default function AdminResourcesContent() {
 
       {/* ── Filters Card ────────────────────────────────────────────────────── */}
       <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        {/* Row 1: Search + Status + Sort + Month + Year + Clear */}
+        <div className="flex flex-wrap gap-2">
           {/* Search */}
-          <div className="relative flex-1">
+          <div className="relative min-w-0 flex-1">
             <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400">
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
@@ -522,11 +715,49 @@ export default function AdminResourcesContent() {
           <select
             value={status_filter}
             onChange={(e) => handleStatusChange(e.target.value as "all" | "published" | "draft")}
-            className="rounded-xl border border-gray-200 bg-gray-50 py-2 pl-3 pr-8 text-sm text-gray-700 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
+            className={select_class}
           >
             <option value="all">All statuses</option>
             <option value="published">Published</option>
             <option value="draft">Draft</option>
+          </select>
+
+          {/* Sort order */}
+          <select
+            value={sort_order}
+            onChange={(e) => handleSortChange(e.target.value as "asc" | "desc")}
+            className={select_class}
+          >
+            <option value="desc">Newest first</option>
+            <option value="asc">Oldest first</option>
+          </select>
+
+          {/* Month filter */}
+          <select
+            value={filter_month}
+            onChange={(e) => handleMonthChange(e.target.value)}
+            className={select_class}
+          >
+            <option value="">All months</option>
+            {MONTH_NAMES.map((name, idx) => (
+              <option key={idx + 1} value={idx + 1}>
+                {name}
+              </option>
+            ))}
+          </select>
+
+          {/* Year filter */}
+          <select
+            value={filter_year}
+            onChange={(e) => handleYearChange(e.target.value)}
+            className={select_class}
+          >
+            <option value="">All years</option>
+            {YEAR_OPTIONS.map((year) => (
+              <option key={year} value={year}>
+                {year}
+              </option>
+            ))}
           </select>
 
           {/* Clear filters */}
@@ -543,21 +774,56 @@ export default function AdminResourcesContent() {
           )}
         </div>
 
-        {/* Category tabs */}
-        <div className="mt-3 flex flex-wrap gap-2">
-          {category_options.map((opt) => (
+        {/* Row 2: Category tabs + view toggle */}
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <div className="flex flex-wrap gap-2">
+            {category_options.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => handleCategoryChange(opt.value)}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                  category_filter === opt.value
+                    ? "bg-brand-500 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          {/* View mode toggle */}
+          <div className="flex shrink-0 items-center gap-1 rounded-xl border border-gray-200 p-1 dark:border-gray-600">
             <button
-              key={opt.value}
-              onClick={() => handleCategoryChange(opt.value)}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                category_filter === opt.value
+              onClick={() => setViewMode("list")}
+              title="List view"
+              className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${
+                view_mode === "list"
                   ? "bg-brand-500 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
               }`}
             >
-              {opt.label}
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M1 3h12M1 7h12M1 11h12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+              </svg>
             </button>
-          ))}
+            <button
+              onClick={() => setViewMode("grid")}
+              title="Grid view"
+              className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${
+                view_mode === "grid"
+                  ? "bg-brand-500 text-white"
+                  : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              }`}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <rect x="1" y="1" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" fill="none" />
+                <rect x="8" y="1" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" fill="none" />
+                <rect x="1" y="8" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" fill="none" />
+                <rect x="8" y="8" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" fill="none" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -574,150 +840,132 @@ export default function AdminResourcesContent() {
         </div>
       )}
 
-      {/* ── Resources Table ───────────────────────────────────────────────────── */}
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-        {/* Table header */}
-        <div className="hidden border-b border-gray-100 bg-gray-50/80 px-6 py-3 dark:border-gray-700 dark:bg-gray-800/50 sm:grid sm:grid-cols-[auto_1fr_auto_auto_auto_auto] sm:items-center sm:gap-4">
-          <div className="w-9" />
-          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Resource</p>
-          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Category</p>
-          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Status</p>
-          <p className="hidden text-xs font-semibold uppercase tracking-wider text-gray-400 lg:block dark:text-gray-500">Files</p>
-          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Actions</p>
-        </div>
+      {/* ── List View ─────────────────────────────────────────────────────────── */}
+      {view_mode === "list" && (
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+          {/* Table header */}
+          <div className="hidden border-b border-gray-100 bg-gray-50/80 px-6 py-3 dark:border-gray-700 dark:bg-gray-800/50 sm:grid sm:grid-cols-[auto_1fr_auto_auto_auto_auto] sm:items-center sm:gap-4">
+            <div className="w-9" />
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Resource</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Category</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Status</p>
+            <p className="hidden text-xs font-semibold uppercase tracking-wider text-gray-400 lg:block dark:text-gray-500">Files</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Actions</p>
+          </div>
 
-        {/* Rows */}
-        <div className="divide-y divide-gray-100 dark:divide-gray-700">
-          {is_loading ? (
-            Array.from({ length: 5 }).map((_, i) => <RowSkeleton key={i} />)
-          ) : resources.length === 0 ? (
-            <EmptyState
-              search_term={search}
-              onClearFilters={clearFilters}
-              onNew={() => router.push("/admin/resources/new")}
+          <div className="divide-y divide-gray-100 dark:divide-gray-700">
+            {is_loading ? (
+              Array.from({ length: 5 }).map((_, i) => <RowSkeleton key={i} />)
+            ) : resources.length === 0 ? (
+              <EmptyState
+                search_term={search}
+                onClearFilters={clearFilters}
+                onNew={() => router.push("/admin/resources/new")}
+              />
+            ) : (
+              resources.map((resource) => {
+                const is_toggling = toggling_ids.has(resource.id);
+                return (
+                  <div
+                    key={resource.id}
+                    className="flex flex-col gap-3 px-6 py-4 transition-colors hover:bg-gray-50/50 sm:grid sm:grid-cols-[auto_1fr_auto_auto_auto_auto] sm:items-center sm:gap-4 dark:hover:bg-white/[0.02]"
+                  >
+                    <ResourceIcon category={resource.category} />
+
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-gray-800 dark:text-white">
+                        {resource.title}
+                      </p>
+                      <p className="mt-0.5 truncate text-xs text-gray-400 dark:text-gray-500">
+                        {resource.organization ? resource.organization.name : "All organizations"}
+                        {resource.description && (
+                          <>
+                            {" · "}
+                            <span className="italic">
+                              {resource.description.slice(0, 60)}
+                              {resource.description.length > 60 ? "…" : ""}
+                            </span>
+                          </>
+                        )}
+                      </p>
+                    </div>
+
+                    <CategoryBadge category={resource.category} />
+                    <StatusBadge status={resource.status} />
+
+                    <div className="hidden items-center gap-1.5 lg:flex">
+                      <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
+                      </svg>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        {resource.files.length} {resource.files.length === 1 ? "file" : "files"}
+                      </span>
+                    </div>
+
+                    <ResourceActions
+                      resource={resource}
+                      is_toggling={is_toggling}
+                      onToggle={() => handleToggleStatus(resource)}
+                      onEdit={() => handleEdit(resource.id)}
+                      onDelete={() => setConfirmDelete(resource)}
+                    />
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {!is_loading && resources.length > 0 && (
+            <Pagination
+              current_page={current_page}
+              last_page={last_page}
+              total={total}
+              per_page={RESOURCES_PER_PAGE}
+              onPageChange={setCurrentPage}
             />
-          ) : (
-            resources.map((resource) => {
-              const is_toggling = toggling_ids.has(resource.id);
-              return (
-                <div
-                  key={resource.id}
-                  className="flex flex-col gap-3 px-6 py-4 transition-colors hover:bg-gray-50/50 sm:grid sm:grid-cols-[auto_1fr_auto_auto_auto_auto] sm:items-center sm:gap-4 dark:hover:bg-white/[0.02]"
-                >
-                  {/* Icon */}
-                  <ResourceIcon category={resource.category} />
-
-                  {/* Title + org */}
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-gray-800 dark:text-white">
-                      {resource.title}
-                    </p>
-                    <p className="mt-0.5 truncate text-xs text-gray-400 dark:text-gray-500">
-                      {resource.organization
-                        ? resource.organization.name
-                        : "All organizations"}
-                      {resource.description && (
-                        <>
-                          {" · "}
-                          <span className="italic">
-                            {resource.description.slice(0, 60)}
-                            {resource.description.length > 60 ? "…" : ""}
-                          </span>
-                        </>
-                      )}
-                    </p>
-                  </div>
-
-                  {/* Category */}
-                  <CategoryBadge category={resource.category} />
-
-                  {/* Status */}
-                  <StatusBadge status={resource.status} />
-
-                  {/* File count */}
-                  <div className="hidden items-center gap-1.5 lg:flex">
-                    <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
-                    </svg>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                      {resource.files.length} {resource.files.length === 1 ? "file" : "files"}
-                    </span>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-2">
-                    {/* Toggle status */}
-                    <button
-                      onClick={() => handleToggleStatus(resource)}
-                      disabled={is_toggling}
-                      title={resource.status === "published" ? "Set to Draft" : "Publish"}
-                      className={`flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-                        resource.status === "published"
-                          ? "border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400"
-                          : "border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400"
-                      }`}
-                    >
-                      {is_toggling ? (
-                        <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
-                      ) : resource.status === "published" ? (
-                        <>
-                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
-                          </svg>
-                          Unpublish
-                        </>
-                      ) : (
-                        <>
-                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                          Publish
-                        </>
-                      )}
-                    </button>
-
-                    {/* Edit */}
-                    <button
-                      onClick={() => handleEdit(resource.id)}
-                      className="flex h-8 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 text-xs font-medium text-gray-700 transition-colors hover:border-gray-300 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                    >
-                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" />
-                      </svg>
-                      Edit
-                    </button>
-
-                    {/* Delete */}
-                    <button
-                      onClick={() => setConfirmDelete(resource)}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-400 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-500 dark:border-gray-600 dark:hover:border-red-500/40 dark:hover:bg-red-500/10 dark:hover:text-red-400"
-                    >
-                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              );
-            })
           )}
         </div>
+      )}
 
-        {/* Pagination */}
-        {!is_loading && resources.length > 0 && (
-          <Pagination
-            current_page={current_page}
-            last_page={last_page}
-            total={total}
-            per_page={RESOURCES_PER_PAGE}
-            onPageChange={setCurrentPage}
-          />
-        )}
-      </div>
+      {/* ── Grid View ─────────────────────────────────────────────────────────── */}
+      {view_mode === "grid" && (
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {is_loading ? (
+              Array.from({ length: 6 }).map((_, i) => <GridSkeleton key={i} />)
+            ) : resources.length === 0 ? (
+              <div className="col-span-full">
+                <EmptyState
+                  search_term={search}
+                  onClearFilters={clearFilters}
+                  onNew={() => router.push("/admin/resources/new")}
+                />
+              </div>
+            ) : (
+              resources.map((resource) => (
+                <ResourceGridCard
+                  key={resource.id}
+                  resource={resource}
+                  is_toggling={toggling_ids.has(resource.id)}
+                  onToggle={() => handleToggleStatus(resource)}
+                  onEdit={() => handleEdit(resource.id)}
+                  onDelete={() => setConfirmDelete(resource)}
+                />
+              ))
+            )}
+          </div>
+
+          {!is_loading && resources.length > 0 && (
+            <Pagination
+              current_page={current_page}
+              last_page={last_page}
+              total={total}
+              per_page={RESOURCES_PER_PAGE}
+              onPageChange={setCurrentPage}
+            />
+          )}
+        </>
+      )}
 
       {/* ── Stats Summary ─────────────────────────────────────────────────────── */}
       {!is_loading && !error && total > 0 && (

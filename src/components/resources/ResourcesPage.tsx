@@ -11,6 +11,14 @@ import { useDebounce } from "@/hooks/useDebounce";
 
 const RESOURCES_PER_PAGE = 12;
 
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+const CURRENT_YEAR = new Date().getFullYear();
+const YEAR_OPTIONS = Array.from({ length: CURRENT_YEAR - 2019 }, (_, i) => CURRENT_YEAR - i);
+
 const category_filters: { label: string; value: ResourceCategory | "all" }[] = [
   { label: "All", value: "all" },
   { label: "PDF", value: "pdf" },
@@ -30,13 +38,6 @@ function formatDate(date_string: string): string {
     day: "numeric",
     year: "numeric",
   });
-}
-
-function formatFileSize(bytes?: number): string {
-  if (!bytes) return "";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 // ── Resource Icon ────────────────────────────────────────────────────────────
@@ -144,7 +145,7 @@ function getCategoryLabel(category: ResourceCategory): string {
   return labels[category] ?? category;
 }
 
-// ── Skeleton ─────────────────────────────────────────────────────────────────
+// ── Skeletons ─────────────────────────────────────────────────────────────────
 
 function ResourceCardSkeleton() {
   return (
@@ -168,14 +169,30 @@ function ResourceCardSkeleton() {
   );
 }
 
-// ── Resource Card ─────────────────────────────────────────────────────────────
+function ResourceListItemSkeleton() {
+  return (
+    <div className="flex animate-pulse items-center gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-white/3">
+      <div className="h-10 w-10 shrink-0 rounded-xl bg-gray-100 dark:bg-gray-800" />
+      <div className="min-w-0 flex-1 space-y-1.5">
+        <div className="h-3 w-16 rounded bg-gray-100 dark:bg-gray-800" />
+        <div className="h-4 w-2/3 rounded bg-gray-100 dark:bg-gray-800" />
+      </div>
+      <div className="hidden items-center gap-4 sm:flex">
+        <div className="h-3 w-14 rounded bg-gray-100 dark:bg-gray-800" />
+        <div className="h-3 w-20 rounded bg-gray-100 dark:bg-gray-800" />
+      </div>
+      <div className="h-8 w-16 rounded-lg bg-gray-100 dark:bg-gray-800" />
+    </div>
+  );
+}
+
+// ── Resource Card (grid) ──────────────────────────────────────────────────────
 
 function ResourceCard({ resource }: { resource: Resource }) {
   const file_count = resource.files?.length ?? 0;
 
   return (
     <div className="group flex flex-col rounded-2xl border border-gray-200 bg-white p-5 transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-white/3 dark:hover:border-gray-700">
-      {/* Header */}
       <div className="mb-3 flex items-start gap-3">
         <ResourceCategoryIcon category={resource.category} />
         <div className="min-w-0 flex-1">
@@ -190,7 +207,6 @@ function ResourceCard({ resource }: { resource: Resource }) {
         </div>
       </div>
 
-      {/* Description */}
       {resource.description && (
         <p className="mb-4 line-clamp-2 flex-1 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
           {resource.description}
@@ -198,7 +214,6 @@ function ResourceCard({ resource }: { resource: Resource }) {
       )}
       {!resource.description && <div className="flex-1" />}
 
-      {/* Footer */}
       <div className="mt-auto flex items-center justify-between border-t border-gray-100 pt-3 dark:border-gray-800">
         <div className="flex items-center gap-3">
           {file_count > 0 && (
@@ -228,34 +243,78 @@ function ResourceCard({ resource }: { resource: Resource }) {
   );
 }
 
+// ── Resource List Item (list view) ────────────────────────────────────────────
+
+function ResourceListItem({ resource }: { resource: Resource }) {
+  const file_count = resource.files?.length ?? 0;
+
+  return (
+    <div className="flex items-center gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 transition-shadow hover:shadow-sm dark:border-gray-800 dark:bg-white/3 dark:hover:border-gray-700">
+      <div className="shrink-0">
+        <ResourceCategoryIcon category={resource.category} />
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <span
+          className={`mb-0.5 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${category_badge_styles[resource.category]}`}
+        >
+          {getCategoryLabel(resource.category)}
+        </span>
+        <h3 className="truncate text-sm font-semibold text-gray-800 dark:text-white/90">
+          {resource.title}
+        </h3>
+        {resource.description && (
+          <p className="mt-0.5 truncate text-xs text-gray-400 dark:text-gray-500">
+            {resource.description}
+          </p>
+        )}
+      </div>
+
+      <div className="hidden shrink-0 items-center gap-4 sm:flex">
+        {file_count > 0 && (
+          <span className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M2 1.5h8v9H2V1.5z" stroke="currentColor" strokeWidth="1.2" fill="none" />
+              <path d="M4 4h4M4 6h3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+            </svg>
+            {file_count} {file_count === 1 ? "file" : "files"}
+          </span>
+        )}
+        <span className="text-xs text-gray-400 dark:text-gray-500">
+          {formatDate(resource.created_at)}
+        </span>
+      </div>
+
+      <Link
+        href={`/resources/${resource.id}`}
+        className="shrink-0 flex items-center gap-1 rounded-lg bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-500 transition-colors hover:bg-brand-100 dark:bg-brand-500/10 dark:text-brand-400 dark:hover:bg-brand-500/20"
+      >
+        View
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <path d="M2 6h8M6.5 3.5L9 6l-2.5 2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </Link>
+    </div>
+  );
+}
+
 // ── Empty State ───────────────────────────────────────────────────────────────
 
-function EmptyState({ search_term }: { search_term: string }) {
+function EmptyState({ has_filters }: { has_filters: boolean }) {
   return (
-    <div className="col-span-full flex flex-col items-center justify-center py-20 text-center">
+    <div className="flex flex-col items-center justify-center py-20 text-center">
       <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-100 dark:bg-gray-800">
         <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-          <path
-            d="M5 5h18v18H5V5z"
-            stroke="#9CA3AF"
-            strokeWidth="1.5"
-            fill="none"
-            strokeLinecap="round"
-          />
-          <path
-            d="M9 9h10M9 13h7M9 17h5"
-            stroke="#9CA3AF"
-            strokeWidth="1.3"
-            strokeLinecap="round"
-          />
+          <path d="M5 5h18v18H5V5z" stroke="#9CA3AF" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+          <path d="M9 9h10M9 13h7M9 17h5" stroke="#9CA3AF" strokeWidth="1.3" strokeLinecap="round" />
         </svg>
       </div>
       <h3 className="mb-1 text-base font-semibold text-gray-700 dark:text-gray-300">
-        {search_term ? "No results found" : "No resources yet"}
+        {has_filters ? "No results found" : "No resources yet"}
       </h3>
       <p className="text-sm text-gray-400 dark:text-gray-500">
-        {search_term
-          ? `We couldn't find anything matching "${search_term}".`
+        {has_filters
+          ? "Try adjusting your search or filter criteria."
           : "Resources shared with you will appear here."}
       </p>
     </div>
@@ -343,6 +402,11 @@ function Pagination({
   );
 }
 
+// ── Select helpers ────────────────────────────────────────────────────────────
+
+const select_class =
+  "rounded-xl border border-gray-200 bg-gray-50 py-2 pl-3 pr-8 text-sm text-gray-700 placeholder-gray-400 transition-colors focus:border-brand-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-gray-700 dark:bg-white/5 dark:text-gray-300 dark:focus:border-brand-500/50 dark:focus:ring-brand-500/10";
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function ResourcesPage() {
@@ -351,6 +415,10 @@ export default function ResourcesPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [active_category, setActiveCategory] = useState<ResourceCategory | "all">("all");
+  const [sort_order, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [filter_month, setFilterMonth] = useState<number | "">("");
+  const [filter_year, setFilterYear] = useState<number | "">("");
+  const [view_mode, setViewMode] = useState<"grid" | "list">("grid");
   const [current_page, setCurrentPage] = useState(1);
   const [last_page, setLastPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -366,6 +434,9 @@ export default function ResourcesPage() {
         per_page: RESOURCES_PER_PAGE,
         search: debounced_search || undefined,
         category: active_category,
+        sort_order,
+        month: filter_month !== "" ? filter_month : undefined,
+        year: filter_year !== "" ? filter_year : undefined,
       });
       setResources(result.data);
       setLastPage(result.last_page);
@@ -376,7 +447,7 @@ export default function ResourcesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [current_page, debounced_search, active_category]);
+  }, [current_page, debounced_search, active_category, sort_order, filter_month, filter_year]);
 
   useEffect(() => {
     loadResources();
@@ -392,57 +463,152 @@ export default function ResourcesPage() {
     setCurrentPage(1);
   };
 
+  const handleSortChange = (value: "asc" | "desc") => {
+    setSortOrder(value);
+    setCurrentPage(1);
+  };
+
+  const handleMonthChange = (value: string) => {
+    setFilterMonth(value === "" ? "" : Number(value));
+    setCurrentPage(1);
+  };
+
+  const handleYearChange = (value: string) => {
+    setFilterYear(value === "" ? "" : Number(value));
+    setCurrentPage(1);
+  };
+
+  const has_filters =
+    search !== "" ||
+    active_category !== "all" ||
+    filter_month !== "" ||
+    filter_year !== "";
+
   return (
     <div className="space-y-6">
       {/* Client profile navigation */}
       <ClientProfile />
 
-      
-
       {/* Search & Filters */}
       <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/3">
-        {/* Search Input */}
-        <div className="relative mb-4">
-          <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
-              <path d="M11 11l2.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </span>
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            placeholder="Search resources..."
-            className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-4 text-sm text-gray-700 placeholder-gray-400 transition-colors focus:border-brand-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-gray-700 dark:bg-white/5 dark:text-gray-300 dark:placeholder-gray-600 dark:focus:border-brand-500/50 dark:focus:bg-white/3 dark:focus:ring-brand-500/10"
-          />
-          {search && (
-            <button
-              onClick={() => handleSearchChange("")}
-              className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        {/* Row 1: Search + Sort + Month + Year */}
+        <div className="mb-3 flex flex-wrap gap-2">
+          {/* Search */}
+          <div className="relative min-w-0 flex-1">
+            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M11 11l2.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
-            </button>
-          )}
+            </span>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Search resources..."
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-4 text-sm text-gray-700 placeholder-gray-400 transition-colors focus:border-brand-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-gray-700 dark:bg-white/5 dark:text-gray-300 dark:placeholder-gray-600 dark:focus:border-brand-500/50 dark:focus:bg-white/3 dark:focus:ring-brand-500/10"
+            />
+            {search && (
+              <button
+                onClick={() => handleSearchChange("")}
+                className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </button>
+            )}
+          </div>
+
+          {/* Sort order */}
+          <select
+            value={sort_order}
+            onChange={(e) => handleSortChange(e.target.value as "asc" | "desc")}
+            className={select_class}
+          >
+            <option value="desc">Newest first</option>
+            <option value="asc">Oldest first</option>
+          </select>
+
+          {/* Month filter */}
+          <select
+            value={filter_month}
+            onChange={(e) => handleMonthChange(e.target.value)}
+            className={select_class}
+          >
+            <option value="">All months</option>
+            {MONTH_NAMES.map((name, idx) => (
+              <option key={idx + 1} value={idx + 1}>
+                {name}
+              </option>
+            ))}
+          </select>
+
+          {/* Year filter */}
+          <select
+            value={filter_year}
+            onChange={(e) => handleYearChange(e.target.value)}
+            className={select_class}
+          >
+            <option value="">All years</option>
+            {YEAR_OPTIONS.map((year) => (
+              <option key={year} value={year}>
+                {year}
+              </option>
+            ))}
+          </select>
         </div>
 
-        {/* Category Filters */}
-        <div className="flex flex-wrap gap-2">
-          {category_filters.map((filter) => (
+        {/* Row 2: Category pills + view toggle */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap gap-2">
+            {category_filters.map((filter) => (
+              <button
+                key={filter.value}
+                onClick={() => handleCategoryChange(filter.value)}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                  active_category === filter.value
+                    ? "bg-brand-500 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-white/5 dark:text-gray-400 dark:hover:bg-white/10"
+                }`}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+
+          {/* View mode toggle */}
+          <div className="flex shrink-0 items-center gap-1 rounded-xl border border-gray-200 p-1 dark:border-gray-700">
             <button
-              key={filter.value}
-              onClick={() => handleCategoryChange(filter.value)}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                active_category === filter.value
+              onClick={() => setViewMode("grid")}
+              title="Grid view"
+              className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${
+                view_mode === "grid"
                   ? "bg-brand-500 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-white/5 dark:text-gray-400 dark:hover:bg-white/10"
+                  : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
               }`}
             >
-              {filter.label}
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <rect x="1" y="1" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" fill="none" />
+                <rect x="8" y="1" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" fill="none" />
+                <rect x="1" y="8" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" fill="none" />
+                <rect x="8" y="8" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" fill="none" />
+              </svg>
             </button>
-          ))}
+            <button
+              onClick={() => setViewMode("list")}
+              title="List view"
+              className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${
+                view_mode === "list"
+                  ? "bg-brand-500 text-white"
+                  : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              }`}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M1 3h12M1 7h12M1 11h12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -472,16 +638,28 @@ export default function ResourcesPage() {
         </div>
       )}
 
-      {/* Resources Grid */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {is_loading
-          ? Array.from({ length: 6 }).map((_, i) => <ResourceCardSkeleton key={i} />)
-          : resources.length > 0
-          ? resources.map((resource) => (
-              <ResourceCard key={resource.id} resource={resource} />
-            ))
-          : !error && <EmptyState search_term={search} />}
-      </div>
+      {/* Resources Grid / List */}
+      {view_mode === "grid" ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {is_loading
+            ? Array.from({ length: 6 }).map((_, i) => <ResourceCardSkeleton key={i} />)
+            : resources.length > 0
+            ? resources.map((resource) => (
+                <ResourceCard key={resource.id} resource={resource} />
+              ))
+            : !error && <EmptyState has_filters={has_filters} />}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {is_loading
+            ? Array.from({ length: 6 }).map((_, i) => <ResourceListItemSkeleton key={i} />)
+            : resources.length > 0
+            ? resources.map((resource) => (
+                <ResourceListItem key={resource.id} resource={resource} />
+              ))
+            : !error && <EmptyState has_filters={has_filters} />}
+        </div>
+      )}
 
       {/* Pagination */}
       {!is_loading && resources.length > 0 && (

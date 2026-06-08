@@ -16,13 +16,16 @@ import type {
 export async function listAdminResources(
   filters: AdminResourceFilters = {}
 ): Promise<AdminResourcePaginatedResponse> {
-  const { page = 1, per_page = 15, search, category, status } = filters;
+  const { page = 1, per_page = 15, search, category, status, sort_order, month, year } = filters;
   const params = new URLSearchParams();
   params.set("page", String(page));
   params.set("per_page", String(per_page));
   if (search?.trim()) params.set("search", search.trim());
   if (category && category !== "all") params.set("category", category);
   if (status && status !== "all") params.set("status", status);
+  if (sort_order) params.set("sort_order", sort_order);
+  if (month) params.set("month", String(month));
+  if (year) params.set("year", String(year));
 
   return apiClient.get<AdminResourcePaginatedResponse>(
     `/api/admin/resources?${params.toString()}`

@@ -47,6 +47,9 @@ export interface ResourceListFilters {
   per_page?: number;
   search?: string;
   category?: ResourceCategory | "all";
+  sort_order?: "asc" | "desc";
+  month?: number;
+  year?: number;
 }
 
 export type ResourceListResponse = ClientPaginatedResponse<Resource>;

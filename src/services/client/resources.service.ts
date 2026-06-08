@@ -7,12 +7,15 @@ export const resourcesService = {
    * Hits GET /api/resources
    */
   async fetchResources(filters: ResourceListFilters = {}): Promise<ResourceListResponse> {
-    const { page = 1, per_page = 12, search, category } = filters;
+    const { page = 1, per_page = 12, search, category, sort_order, month, year } = filters;
     const params = new URLSearchParams();
     params.set("page", String(page));
     params.set("per_page", String(per_page));
     if (search?.trim()) params.set("search", search.trim());
     if (category && category !== "all") params.set("category", category);
+    if (sort_order) params.set("sort_order", sort_order);
+    if (month) params.set("month", String(month));
+    if (year) params.set("year", String(year));
 
     return apiClient.get<ResourceListResponse>(`/api/resources?${params.toString()}`);
   },
