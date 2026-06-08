@@ -6,7 +6,6 @@ export type ResourceCategory =
   | "document"
   | "presentation"
   | "image"
-  | "blog_post"
   | "other";
 
 export type ResourceFileType =

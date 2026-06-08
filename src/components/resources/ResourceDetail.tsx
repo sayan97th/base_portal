@@ -181,7 +181,6 @@ const category_badge_styles: Record<ResourceCategory, string> = {
   document: "bg-blue-light-50 text-blue-light-600 dark:bg-blue-light-500/10 dark:text-blue-light-400",
   presentation: "bg-warning-50 text-warning-600 dark:bg-warning-500/10 dark:text-warning-400",
   image: "bg-purple-50 text-purple-600 dark:bg-purple-500/10 dark:text-purple-400",
-  blog_post: "bg-brand-50 text-brand-500 dark:bg-brand-500/10 dark:text-brand-400",
   other: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
 };
 
@@ -192,7 +191,6 @@ function getCategoryLabel(category: ResourceCategory): string {
     document: "Document",
     presentation: "Presentation",
     image: "Image",
-    blog_post: "Blog Post",
     other: "Other",
   };
   return labels[category] ?? category;

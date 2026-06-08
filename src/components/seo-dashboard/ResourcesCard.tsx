@@ -29,7 +29,6 @@ function getCategoryLabel(category: ResourceCategory): string {
     document: "Document",
     presentation: "Presentation",
     image: "Image",
-    blog_post: "Blog Post",
     other: "File",
   };
   return labels[category] ?? "File";

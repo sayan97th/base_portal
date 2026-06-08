@@ -45,7 +45,6 @@ const CATEGORY_OPTIONS: { label: string; value: ResourceCategory }[] = [
   { label: "Document", value: "document" },
   { label: "Presentation", value: "presentation" },
   { label: "Image", value: "image" },
-  { label: "Blog Post", value: "blog_post" },
   { label: "Other", value: "other" },
 ];
 

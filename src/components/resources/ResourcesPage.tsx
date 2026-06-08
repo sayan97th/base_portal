@@ -26,7 +26,6 @@ const category_filters: { label: string; value: ResourceCategory | "all" }[] = [
   { label: "Document", value: "document" },
   { label: "Presentation", value: "presentation" },
   { label: "Image", value: "image" },
-  { label: "Blog Post", value: "blog_post" },
   { label: "Other", value: "other" },
 ];
 
@@ -99,15 +98,6 @@ export function ResourceCategoryIcon({
           </svg>
         </span>
       );
-    case "blog_post":
-      return (
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-100 dark:bg-brand-500/20">
-          <svg width={s} height={s} viewBox="0 0 20 20" fill="none">
-            <path d="M4 4h12v2H4zM4 8h12v1.5H4zM4 11.5h8v1.5H4z" fill="#EC3C89" />
-            <rect x="3" y="2" width="14" height="16" rx="2" stroke="#EC3C89" strokeWidth="1.3" fill="none" />
-          </svg>
-        </span>
-      );
     default:
       return (
         <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-800">
@@ -128,7 +118,6 @@ const category_badge_styles: Record<ResourceCategory, string> = {
   document: "bg-blue-light-50 text-blue-light-600 dark:bg-blue-light-500/10 dark:text-blue-light-400",
   presentation: "bg-warning-50 text-warning-600 dark:bg-warning-500/10 dark:text-warning-400",
   image: "bg-purple-50 text-purple-600 dark:bg-purple-500/10 dark:text-purple-400",
-  blog_post: "bg-brand-50 text-brand-500 dark:bg-brand-500/10 dark:text-brand-400",
   other: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
 };
 
@@ -139,7 +128,6 @@ function getCategoryLabel(category: ResourceCategory): string {
     document: "Document",
     presentation: "Presentation",
     image: "Image",
-    blog_post: "Blog Post",
     other: "Other",
   };
   return labels[category] ?? category;

@@ -29,7 +29,6 @@ const category_options: { label: string; value: ResourceCategory | "all" }[] = [
   { label: "Document", value: "document" },
   { label: "Presentation", value: "presentation" },
   { label: "Image", value: "image" },
-  { label: "Blog Post", value: "blog_post" },
   { label: "Other", value: "other" },
 ];
 
@@ -50,7 +49,6 @@ function getCategoryLabel(category: ResourceCategory): string {
     document: "Document",
     presentation: "Presentation",
     image: "Image",
-    blog_post: "Blog Post",
     other: "Other",
   };
   return labels[category] ?? category;
@@ -65,7 +63,6 @@ function CategoryBadge({ category }: { category: ResourceCategory }) {
     document: "bg-blue-50 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:ring-blue-500/30",
     presentation: "bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/30",
     image: "bg-purple-50 text-purple-700 ring-1 ring-purple-200 dark:bg-purple-500/10 dark:text-purple-400 dark:ring-purple-500/30",
-    blog_post: "bg-pink-50 text-pink-700 ring-1 ring-pink-200 dark:bg-pink-500/10 dark:text-pink-400 dark:ring-pink-500/30",
     other: "bg-gray-100 text-gray-600 ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:ring-gray-700",
   };
   return (
@@ -139,15 +136,6 @@ function ResourceIcon({ category }: { category: ResourceCategory }) {
           <rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" strokeWidth="1.5" fill="none" />
           <circle cx="7" cy="8.5" r="1.5" stroke="currentColor" strokeWidth="1.2" />
           <path d="M2 13l4-4 3 3 2-2 5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      ),
-    },
-    blog_post: {
-      bg: "bg-pink-500/10",
-      content: (
-        <svg className="h-5 w-5 text-pink-500" fill="none" viewBox="0 0 20 20">
-          <rect x="3" y="2" width="14" height="16" rx="2" stroke="currentColor" strokeWidth="1.3" fill="none" />
-          <path d="M6 6h8M6 9h8M6 12h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
         </svg>
       ),
     },
