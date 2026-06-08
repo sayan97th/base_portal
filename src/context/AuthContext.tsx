@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { authService } from "@/services/auth.service";
-import { getToken } from "@/lib/api-client";
+import { getToken, getTokenExpiry, isRemembered } from "@/lib/api-client";
 import { resetEcho } from "@/lib/echo";
 import { getPrimaryRole, isStaffRole, setPrimaryRoleCookie } from "@/lib/roles";
 import type { RoleName } from "@/lib/roles";
@@ -26,7 +26,7 @@ type AuthContextType = {
   /** Returns true when the user has ALL of the given permissions. */
   hasPermission: (...perms: string[]) => boolean;
   login: (credentials: LoginCredentials) => Promise<LoginResult>;
-  loginWithTwoFactor: (two_factor_token: string, code: string) => Promise<void>;
+  loginWithTwoFactor: (two_factor_token: string, code: string, remember_me?: boolean) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -70,7 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const scheduleRefresh = useCallback(() => {
     if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
 
-    const expiresAt = localStorage.getItem("token_expires_at");
+    const expiresAt = getTokenExpiry();
     if (!expiresAt) return;
 
     const expiresIn = parseInt(expiresAt) - Date.now();
@@ -102,8 +102,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const data = await authService.getMe();
       setUser(data.user);
       setPermissions(data.permissions);
-      // Ensure the role cookie is always in sync on page load.
-      setPrimaryRoleCookie(getPrimaryRole(data.user.roles));
+      // Keep the role cookie lifetime in sync with the remember-me preference.
+      setPrimaryRoleCookie(getPrimaryRole(data.user.roles), isRemembered());
       scheduleRefresh();
     } catch {
       setUser(null);
@@ -142,8 +142,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { requires_two_factor: false };
   };
 
-  const loginWithTwoFactor = async (two_factor_token: string, code: string): Promise<void> => {
-    const data = await authService.loginWithTwoFactor({ two_factor_token, code });
+  const loginWithTwoFactor = async (two_factor_token: string, code: string, remember_me?: boolean): Promise<void> => {
+    const data = await authService.loginWithTwoFactor({ two_factor_token, code, remember_me });
     setUser(data.user);
     try {
       const meData = await authService.getMe();
@@ -171,7 +171,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const data = await authService.getMe();
       setUser(data.user);
       setPermissions(data.permissions);
-      setPrimaryRoleCookie(getPrimaryRole(data.user.roles));
+      setPrimaryRoleCookie(getPrimaryRole(data.user.roles), isRemembered());
     } catch {
       // keep current state if refresh fails
     }

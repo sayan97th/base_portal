@@ -62,11 +62,14 @@ export function getPrimaryRole(
 
 /**
  * Sets the primary role cookie (readable by Next.js middleware).
+ * Pass persistent=true to match a "remember me" session (30-day lifetime),
+ * or omit/false for a session cookie that expires when the browser closes.
  */
-export function setPrimaryRoleCookie(role: RoleName | null): void {
+export function setPrimaryRoleCookie(role: RoleName | null, persistent: boolean = false): void {
   if (typeof document === "undefined") return;
   if (role) {
-    document.cookie = `${ROLE_COOKIE_NAME}=${role}; path=/; SameSite=Lax`;
+    const max_age = persistent ? `; max-age=${60 * 60 * 24 * 30}` : "";
+    document.cookie = `${ROLE_COOKIE_NAME}=${role}; path=/; SameSite=Lax${max_age}`;
   } else {
     document.cookie = `${ROLE_COOKIE_NAME}=; path=/; max-age=0`;
   }
