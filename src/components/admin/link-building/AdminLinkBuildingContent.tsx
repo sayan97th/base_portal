@@ -37,9 +37,7 @@ type LinkBuildingTab = {
 
 const LINK_BUILDING_TABS: LinkBuildingTab[] = [
   { id: "link_building", label: "Link Building", category: "link_building", available: true },
-  { id: "link_building_addons", label: "Link Building Add-ons", category: "link_building_addons", available: true },
-  { id: "content", label: "Content", category: "content", available: false },
-  { id: "seo", label: "SEO", category: "seo", available: false },
+  { id: "link_building_addons", label: "Content Refresh", category: "link_building_addons", available: true },
 ];
 
 // ── Summary stat strip ─────────────────────────────────────────────────────────
