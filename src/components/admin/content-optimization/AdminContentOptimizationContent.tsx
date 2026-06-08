@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
+import { useAuth } from "@/context/AuthContext";
 import type {
   AdminContentOptimizationTier,
   CreateContentOptimizationTierPayload,
@@ -102,6 +103,7 @@ function DeleteConfirmModal({ tier, is_deleting, onConfirm, onCancel }: DeleteCo
 }
 
 export default function AdminContentOptimizationContent() {
+  const { isAdmin } = useAuth();
   const [tiers, setTiers] = useState<AdminContentOptimizationTier[]>([]);
   const [is_loading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -252,21 +254,23 @@ export default function AdminContentOptimizationContent() {
               </div>
             </div>
           </div>
-          <button
-            onClick={openAdd}
-            className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-violet-500 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-violet-600"
-          >
-            <svg
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2.5}
+          {isAdmin && (
+            <button
+              onClick={openAdd}
+              className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-violet-500 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-violet-600"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
-            Add Tier
-          </button>
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2.5}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              Add Tier
+            </button>
+          )}
         </div>
 
         {error && (
@@ -356,7 +360,7 @@ export default function AdminContentOptimizationContent() {
                 ? "Try adjusting your search or filter."
                 : "Add your first optimization tier to get started."}
             </p>
-            {!search_query && status_filter === "all" && (
+            {isAdmin && !search_query && status_filter === "all" && (
               <button
                 onClick={openAdd}
                 className="mt-4 inline-flex items-center gap-2 rounded-xl bg-violet-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-600"

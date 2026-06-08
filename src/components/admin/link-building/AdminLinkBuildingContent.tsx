@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+import { useAuth } from "@/context/AuthContext";
 import type { AdminDrTier, CreateDrTierPayload, UpdateDrTierPayload } from "@/types/admin/link-building";
 import type {
   AdminContentRefreshTier,
@@ -83,6 +84,7 @@ function ComingSoonTab({ label }: { label: string }) {
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function AdminLinkBuildingContent() {
+  const { isAdmin } = useAuth();
   const [active_tab, setActiveTab] = useState("link_building");
 
   // ── DR Tiers state ─────────────────────────────────────────────────────────
@@ -278,7 +280,7 @@ export default function AdminLinkBuildingContent() {
               Manage Link Building service offerings and pricing.
             </p>
           </div>
-          {active_tab === "link_building" && (
+          {isAdmin && active_tab === "link_building" && (
             <button
               onClick={openAdd}
               className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-brand-600"
@@ -289,7 +291,7 @@ export default function AdminLinkBuildingContent() {
               Add DR Tier
             </button>
           )}
-          {active_tab === "link_building_addons" && (
+          {isAdmin && active_tab === "link_building_addons" && (
             <button
               onClick={openCrAdd}
               className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-brand-600"
@@ -393,15 +395,17 @@ export default function AdminLinkBuildingContent() {
                     <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                       Add your first tier to show it on the Link Building page.
                     </p>
-                    <button
-                      onClick={openCrAdd}
-                      className="mt-4 inline-flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600"
-                    >
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                      </svg>
-                      Add First Tier
-                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={openCrAdd}
+                        className="mt-4 inline-flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600"
+                      >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                        </svg>
+                        Add First Tier
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
@@ -488,7 +492,7 @@ export default function AdminLinkBuildingContent() {
                         ? "Try adjusting your search or filter."
                         : "Add your first DR tier to get started."}
                     </p>
-                    {!search_query && status_filter === "all" && (
+                    {isAdmin && !search_query && status_filter === "all" && (
                       <button
                         onClick={openAdd}
                         className="mt-4 inline-flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600"
