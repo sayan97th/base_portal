@@ -29,6 +29,67 @@ interface KeywordEntryStepProps {
 const input_class =
   "h-9 w-full border-0 bg-transparent px-3 py-2 text-sm text-gray-700 placeholder:text-gray-300 focus:outline-none dark:text-white/80 dark:placeholder:text-white/20";
 
+const EXACT_MATCH_TOOLTIP =
+  "Exact match uses your target keyword word-for-word as the anchor text, while non-exact match uses a variation, partial phrase, or natural language alternative. A healthy link profile typically includes a mix of both.";
+
+const ExactMatchTooltip: React.FC = () => {
+  const [visible, setVisible] = React.useState(false);
+  const [coords, setCoords] = React.useState({ top: 0, left: 0 });
+  const ref = React.useRef<HTMLSpanElement>(null);
+
+  const showTooltip = () => {
+    if (ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      const tooltip_width = 256; // w-64
+      const centered = rect.left + rect.width / 2;
+      const clamped = Math.min(
+        Math.max(centered, tooltip_width / 2 + 10),
+        window.innerWidth - tooltip_width / 2 - 10
+      );
+      setCoords({ top: rect.top, left: clamped });
+    }
+    setVisible(true);
+  };
+
+  return (
+    <>
+      <span
+        ref={ref}
+        onMouseEnter={showTooltip}
+        onMouseLeave={() => setVisible(false)}
+        className="inline-flex cursor-default"
+      >
+        <svg
+          className="h-3.5 w-3.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+          fill="currentColor"
+          viewBox="0 0 20 20"
+        >
+          <path
+            fillRule="evenodd"
+            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z"
+            clipRule="evenodd"
+          />
+        </svg>
+      </span>
+      {visible && (
+        <div
+          style={{
+            position: "fixed",
+            top: coords.top - 8,
+            left: coords.left,
+            transform: "translate(-50%, -100%)",
+            zIndex: 9999,
+          }}
+          className="pointer-events-none w-64 rounded-lg bg-gray-900 px-3 py-2 text-[11px] font-normal normal-case leading-relaxed tracking-normal text-white shadow-lg whitespace-normal dark:bg-gray-700"
+        >
+          {EXACT_MATCH_TOOLTIP}
+          <span className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-gray-900 dark:border-t-gray-700" />
+        </div>
+      )}
+    </>
+  );
+};
+
 const KeywordEntryStep: React.FC<KeywordEntryStepProps> = ({
   selected_items,
   keyword_data,
@@ -81,7 +142,7 @@ const KeywordEntryStep: React.FC<KeywordEntryStepProps> = ({
                 <col className="w-8" />
                 <col />
                 <col />
-                <col className="w-28" />
+                <col className="w-36" />
               </colgroup>
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/60">
@@ -95,7 +156,10 @@ const KeywordEntryStep: React.FC<KeywordEntryStepProps> = ({
                     Landing Page
                   </th>
                   <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    Exact Match
+                    <span className="flex items-center gap-1 whitespace-nowrap">
+                      Exact Match
+                      <ExactMatchTooltip />
+                    </span>
                   </th>
                 </tr>
               </thead>
