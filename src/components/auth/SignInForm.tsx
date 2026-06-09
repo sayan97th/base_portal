@@ -122,7 +122,7 @@ export default function SignInForm() {
     setIsSubmitting(true);
 
     try {
-      const result = await login({ email, password });
+      const result = await login({ email, password, keep_me_logged_in: is_checked });
 
       if (result.requires_two_factor) {
         setTwoFactorToken(result.two_factor_token);
@@ -158,7 +158,7 @@ export default function SignInForm() {
     setIsVerifying(true);
 
     try {
-      await loginWithTwoFactor(two_factor_token, clean_code);
+      await loginWithTwoFactor(two_factor_token, clean_code, is_checked);
       const redirect_url = getValidRedirectUrl(search_params.get("callbackUrl"));
       window.location.href = redirect_url;
     } catch (err: unknown) {

@@ -69,6 +69,7 @@ export type LoginResponse = AuthResponse | LoginChallengeResponse;
 export interface TwoFactorChallengeData {
   two_factor_token: string;
   code: string;
+  keep_me_logged_in?: boolean;
 }
 
 export interface MeResponse {
@@ -79,6 +80,7 @@ export interface MeResponse {
 export interface LoginCredentials {
   email: string;
   password: string;
+  keep_me_logged_in?: boolean;
 }
 
 export interface RegisterData {

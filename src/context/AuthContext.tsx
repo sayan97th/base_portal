@@ -26,7 +26,7 @@ type AuthContextType = {
   /** Returns true when the user has ALL of the given permissions. */
   hasPermission: (...perms: string[]) => boolean;
   login: (credentials: LoginCredentials) => Promise<LoginResult>;
-  loginWithTwoFactor: (two_factor_token: string, code: string) => Promise<void>;
+  loginWithTwoFactor: (two_factor_token: string, code: string, keep_me_logged_in?: boolean) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -142,8 +142,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { requires_two_factor: false };
   };
 
-  const loginWithTwoFactor = async (two_factor_token: string, code: string): Promise<void> => {
-    const data = await authService.loginWithTwoFactor({ two_factor_token, code });
+  const loginWithTwoFactor = async (two_factor_token: string, code: string, keep_me_logged_in?: boolean): Promise<void> => {
+    const data = await authService.loginWithTwoFactor({ two_factor_token, code, keep_me_logged_in });
     setUser(data.user);
     try {
       const meData = await authService.getMe();

@@ -14,7 +14,7 @@ import type {
 } from "@/types/auth";
 
 function persistSession(data: AuthResponse): void {
-  setToken(data.access_token);
+  setToken(data.access_token, data.expires_in);
   const expiresAt = Date.now() + data.expires_in * 1000;
   localStorage.setItem("token_expires_at", expiresAt.toString());
   const primary_role = getPrimaryRole(data.user.roles);

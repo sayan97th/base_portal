@@ -10,9 +10,9 @@ function getToken(): string | null {
   return localStorage.getItem("access_token");
 }
 
-function setToken(token: string): void {
+function setToken(token: string, expires_in: number = 3600): void {
   localStorage.setItem("access_token", token);
-  document.cookie = `access_token=${token}; path=/; max-age=${60 * 60}; SameSite=Lax`;
+  document.cookie = `access_token=${token}; path=/; max-age=${expires_in}; SameSite=Lax`;
 }
 
 function removeToken(): void {
@@ -46,7 +46,7 @@ async function tryRefreshToken(): Promise<string | null> {
       if (!response.ok) return null;
 
       const data = await response.json();
-      setToken(data.access_token);
+      setToken(data.access_token, data.expires_in);
       const expiresAt = Date.now() + data.expires_in * 1000;
       localStorage.setItem("token_expires_at", expiresAt.toString());
       return data.access_token as string;
