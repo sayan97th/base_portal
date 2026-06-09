@@ -13,10 +13,11 @@ const order_status_config: Record<
   OrderStatus,
   { label: string; color: "success" | "error" | "warning" | "info" | "light"; dot: string }
 > = {
-  pending: { label: "Pending", color: "warning", dot: "bg-warning-500" },
-  processing: { label: "Processing", color: "info", dot: "bg-blue-500" },
-  completed: { label: "Completed", color: "success", dot: "bg-success-500" },
-  cancelled: { label: "Cancelled", color: "error", dot: "bg-error-500" },
+  new_request:     { label: "New Request", color: "info", dot: "bg-teal-500" },
+  pending:         { label: "New Request", color: "info", dot: "bg-teal-500" },
+  processing:      { label: "Processing", color: "info", dot: "bg-blue-500" },
+  completed:       { label: "Completed", color: "success", dot: "bg-success-500" },
+  cancelled:       { label: "Cancelled", color: "error", dot: "bg-error-500" },
   payment_pending: { label: "Payment Pending", color: "light", dot: "bg-gray-400" },
 };
 

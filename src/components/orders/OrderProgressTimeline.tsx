@@ -39,6 +39,17 @@ const STATUS_CONFIG: Record<
   OrderStatus,
   { label: string; icon: React.ReactNode; ring: string; bg: string; text: string }
 > = {
+  new_request: {
+    label: "New Request",
+    ring: "ring-teal-400",
+    bg: "bg-teal-50 dark:bg-teal-500/10",
+    text: "text-teal-700 dark:text-teal-400",
+    icon: (
+      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+      </svg>
+    ),
+  },
   pending: {
     label: "New Request",
     ring: "ring-teal-400",

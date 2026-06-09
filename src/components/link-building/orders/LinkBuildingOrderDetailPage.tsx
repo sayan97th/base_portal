@@ -46,8 +46,9 @@ function getStatusConfig(status: OrderStatus): {
   dot: string;
 } {
   switch (status) {
+    case "new_request":
     case "pending":
-      return { color: "warning", label: "Pending", dot: "bg-warning-500" };
+      return { color: "info", label: "New Request", dot: "bg-teal-500" };
     case "processing":
       return { color: "info", label: "Processing", dot: "bg-blue-light-500" };
     case "completed":
@@ -380,7 +381,7 @@ const LinkBuildingOrderDetailPage: React.FC<
 
   const status_config = order ? getStatusConfig(order.status) : null;
 
-  const is_new_order = order?.status === "pending";
+  const is_new_order = order?.status === "new_request" || order?.status === "pending";
 
   return (
     <div className="space-y-6">

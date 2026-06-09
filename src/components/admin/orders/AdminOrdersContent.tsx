@@ -100,7 +100,8 @@ function DatePickerInput({
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const STATUS_STYLES: Record<OrderStatus, string> = {
-  pending:         "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400",
+  new_request:     "bg-teal-50 text-teal-700 dark:bg-teal-500/10 dark:text-teal-400",
+  pending:         "bg-teal-50 text-teal-700 dark:bg-teal-500/10 dark:text-teal-400",
   processing:      "bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400",
   completed:       "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400",
   cancelled:       "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400",
@@ -108,7 +109,8 @@ const STATUS_STYLES: Record<OrderStatus, string> = {
 };
 
 const STATUS_DOT: Record<OrderStatus, string> = {
-  pending:         "bg-warning-500",
+  new_request:     "bg-teal-500",
+  pending:         "bg-teal-500",
   processing:      "bg-brand-500",
   completed:       "bg-success-500",
   cancelled:       "bg-error-500",
@@ -116,7 +118,8 @@ const STATUS_DOT: Record<OrderStatus, string> = {
 };
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
-  pending:         "Pending",
+  new_request:     "New Request",
+  pending:         "New Request",
   processing:      "Processing",
   completed:       "Completed",
   cancelled:       "Cancelled",
@@ -184,11 +187,11 @@ function getItemLabel(item: OrderItem, _product_type?: AdminOrderProductType | n
 }
 
 function getGroupOverallStatus(orders: AdminOrder[]): OrderStatus {
-  const priority: OrderStatus[] = ["payment_pending", "processing", "pending", "cancelled", "completed"];
+  const priority: OrderStatus[] = ["payment_pending", "processing", "new_request", "pending", "cancelled", "completed"];
   for (const s of priority) {
     if (orders.some((o) => o.status === s)) return s;
   }
-  return orders[0]?.status ?? "pending";
+  return orders[0]?.status ?? "new_request";
 }
 
 function getOrderItemsCount(order: AdminOrder): number {
@@ -407,10 +410,13 @@ function OrderRow({ order, is_last, compact = false }: OrderRowProps) {
       <div className="flex flex-col gap-2 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-start gap-3 sm:items-center">
           {/* Active pulse dot */}
-          {(order.status === "processing" || order.status === "pending") && (
+          {(order.status === "processing" || order.status === "new_request" || order.status === "pending") && (
             <div className="relative mt-1.5 flex h-2 w-2 shrink-0 sm:mt-0">
               {order.status === "processing" && (
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-400 opacity-50" />
+              )}
+              {(order.status === "new_request" || order.status === "pending") && (
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-teal-400 opacity-50" />
               )}
               <span className={`relative inline-flex h-2 w-2 rounded-full ${STATUS_DOT[order.status]}`} />
             </div>
@@ -545,10 +551,13 @@ function SingleOrderCard({ group }: { group: AdminOrderGroup }) {
         {/* Left: title + meta */}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            {(order.status === "processing" || order.status === "pending") && (
+            {(order.status === "processing" || order.status === "new_request" || order.status === "pending") && (
               <span className="relative flex h-2 w-2 shrink-0">
                 {order.status === "processing" && (
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-400 opacity-50" />
+                )}
+                {(order.status === "new_request" || order.status === "pending") && (
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-teal-400 opacity-50" />
                 )}
                 <span className={`relative inline-flex h-2 w-2 rounded-full ${STATUS_DOT[order.status]}`} />
               </span>

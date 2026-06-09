@@ -145,11 +145,11 @@ function getStatusConfig(status: string): {
 }
 
 function getGroupOverallStatus(orders: UnifiedOrder[]): string {
-  const priority: OrderStatus[] = ["payment_pending", "processing", "pending", "new_request", "cancelled", "completed"];
+  const priority: OrderStatus[] = ["payment_pending", "processing", "new_request", "pending", "cancelled", "completed"];
   for (const s of priority) {
     if (orders.some((o) => o.status === s)) return s;
   }
-  return orders[0]?.status ?? "pending";
+  return orders[0]?.status ?? "new_request";
 }
 
 function getDetailLink(order: UnifiedOrder): string {

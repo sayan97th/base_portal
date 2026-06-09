@@ -60,11 +60,11 @@ const SORT_OPTIONS: SortOption[] = [
 ];
 
 const STATUS_OPTIONS: { value: OrderStatus | ""; label: string; dot_class: string }[] = [
-  { value: "", label: "All", dot_class: "bg-gray-400" },
-  { value: "pending", label: "Pending", dot_class: "bg-warning-500" },
-  { value: "processing", label: "Processing", dot_class: "bg-brand-500" },
-  { value: "completed", label: "Completed", dot_class: "bg-success-500" },
-  { value: "cancelled", label: "Cancelled", dot_class: "bg-error-500" },
+  { value: "",            label: "All",          dot_class: "bg-gray-400" },
+  { value: "new_request", label: "New Request",  dot_class: "bg-teal-500" },
+  { value: "processing",  label: "Processing",   dot_class: "bg-brand-500" },
+  { value: "completed",   label: "Completed",    dot_class: "bg-success-500" },
+  { value: "cancelled",   label: "Cancelled",    dot_class: "bg-error-500" },
 ];
 
 // ── Props ─────────────────────────────────────────────────────────────────────

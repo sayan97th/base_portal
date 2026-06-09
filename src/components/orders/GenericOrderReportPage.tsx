@@ -80,8 +80,9 @@ function getStatusConfig(status: string): {
   dot: string;
 } {
   switch (status) {
+    case "new_request":
     case "pending":
-      return { color: "warning", label: "Pending", dot: "bg-warning-500" };
+      return { color: "info", label: "New Request", dot: "bg-teal-500" };
     case "processing":
       return { color: "info", label: "Processing", dot: "bg-blue-light-500" };
     case "completed":

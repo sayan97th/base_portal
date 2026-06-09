@@ -86,11 +86,17 @@ const PRODUCT_TYPE_CFG: Record<AdminOrderProductType, { label: string; badge: st
 // ─── Status config ─────────────────────────────────────────────────────────────
 
 const STATUS_CFG: Record<OrderStatus, { label: string; dot: string; badge: string; border_l: string }> = {
+  new_request: {
+    label: "New Request",
+    dot: "bg-teal-500",
+    badge: "bg-teal-50 text-teal-700 ring-teal-200 dark:bg-teal-500/10 dark:text-teal-400 dark:ring-teal-500/20",
+    border_l: "border-l-teal-400",
+  },
   pending: {
-    label: "Pending",
-    dot: "bg-warning-500",
-    badge: "bg-warning-50 text-warning-700 ring-warning-200 dark:bg-warning-500/10 dark:text-warning-400 dark:ring-warning-500/20",
-    border_l: "border-l-warning-400",
+    label: "New Request",
+    dot: "bg-teal-500",
+    badge: "bg-teal-50 text-teal-700 ring-teal-200 dark:bg-teal-500/10 dark:text-teal-400 dark:ring-teal-500/20",
+    border_l: "border-l-teal-400",
   },
   processing: {
     label: "Processing",
@@ -118,7 +124,7 @@ const STATUS_CFG: Record<OrderStatus, { label: string; dot: string; badge: strin
   },
 };
 
-const UPDATE_STATUS_OPTS: OrderStatus[] = ["pending", "processing", "completed", "cancelled"];
+const UPDATE_STATUS_OPTS: OrderStatus[] = ["new_request", "processing", "completed", "cancelled"];
 const FINALIZED_STATUSES: OrderStatus[] = ["completed", "cancelled"];
 
 // ─── Icons ─────────────────────────────────────────────────────────────────────

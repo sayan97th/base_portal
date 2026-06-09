@@ -34,11 +34,17 @@ const STATUS_CONFIG: Record<
   OrderStatus,
   { label: string; dot: string; bg: string; text: string }
 > = {
+  new_request: {
+    label: "New Request",
+    dot: "bg-teal-500",
+    bg: "bg-teal-50 dark:bg-teal-500/10",
+    text: "text-teal-700 dark:text-teal-400",
+  },
   pending: {
-    label: "Pending",
-    dot: "bg-warning-500",
-    bg: "bg-warning-50 dark:bg-warning-500/10",
-    text: "text-warning-700 dark:text-warning-400",
+    label: "New Request",
+    dot: "bg-teal-500",
+    bg: "bg-teal-50 dark:bg-teal-500/10",
+    text: "text-teal-700 dark:text-teal-400",
   },
   processing: {
     label: "Processing",
@@ -68,7 +74,7 @@ const STATUS_CONFIG: Record<
 
 const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
   { value: "", label: "All" },
-  { value: "pending", label: "Pending" },
+  { value: "new_request", label: "New Request" },
   { value: "processing", label: "Processing" },
   { value: "completed", label: "Completed" },
   { value: "cancelled", label: "Cancelled" },

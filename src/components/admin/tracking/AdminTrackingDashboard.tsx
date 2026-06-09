@@ -83,10 +83,15 @@ const PRODUCT_TABS: { key: ProductFilterKey; label: string }[] = [
 // ─── Status config ─────────────────────────────────────────────────────────────
 
 const STATUS_CFG: Record<OrderStatus, { label: string; dot: string; badge: string }> = {
+  new_request: {
+    label: "New Request",
+    dot: "bg-teal-500",
+    badge: "bg-teal-50 text-teal-700 ring-teal-200 dark:bg-teal-500/10 dark:text-teal-400 dark:ring-teal-500/20",
+  },
   pending: {
-    label: "Pending",
-    dot: "bg-warning-500",
-    badge: "bg-warning-50 text-warning-700 ring-warning-200 dark:bg-warning-500/10 dark:text-warning-400 dark:ring-warning-500/20",
+    label: "New Request",
+    dot: "bg-teal-500",
+    badge: "bg-teal-50 text-teal-700 ring-teal-200 dark:bg-teal-500/10 dark:text-teal-400 dark:ring-teal-500/20",
   },
   processing: {
     label: "Processing",
@@ -110,12 +115,12 @@ const STATUS_CFG: Record<OrderStatus, { label: string; dot: string; badge: strin
   },
 };
 
-const ALL_STATUSES: OrderStatus[] = ["pending", "processing", "completed", "cancelled", "payment_pending"];
+const ALL_STATUSES: OrderStatus[] = ["new_request", "pending", "processing", "completed", "cancelled", "payment_pending"];
 
 const STATUS_FILTER_OPTIONS: { key: StatusFilterKey; label: string }[] = [
   { key: "all",             label: "All Statuses" },
   { key: "needs_update",    label: "Needs Update" },
-  { key: "pending",         label: "Pending" },
+  { key: "new_request",     label: "New Request" },
   { key: "processing",      label: "Processing" },
   { key: "completed",       label: "Completed" },
   { key: "cancelled",       label: "Cancelled" },
@@ -293,6 +298,11 @@ const StatusCell: React.FC<StatusCellProps> = ({ order, onRequestChange }) => {
           <span className="relative flex h-1.5 w-1.5">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-60" />
             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-500" />
+          </span>
+        ) : (order.status === "new_request" || order.status === "pending") ? (
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-teal-400 opacity-60" />
+            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-teal-500" />
           </span>
         ) : (
           <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
@@ -523,7 +533,7 @@ const AdminTrackingDashboard: React.FC = () => {
 
   // ── Needs-update count ───────────────────────────────────────────────────────
 
-  const needs_update_count = orders.filter((o) => o.updates_count === 0).length;
+  const needs_update_count = orders.filter((o) => o.updates_count === 0 && (o.status === "new_request" || o.status === "pending" || o.status === "processing")).length;
 
   return (
     <>

@@ -44,8 +44,9 @@ function getStatusConfig(status: OrderStatus): {
   dot: string;
 } {
   switch (status) {
+    case "new_request":
     case "pending":
-      return { color: "warning", label: "Pending", dot: "bg-warning-500" };
+      return { color: "info", label: "New Request", dot: "bg-teal-500" };
     case "processing":
       return { color: "info", label: "Processing", dot: "bg-blue-light-500" };
     case "completed":
@@ -637,7 +638,7 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
     load();
   }, [order_id, initial_session_id]);
 
-  const effective_status = current_status ?? order?.status ?? "pending";
+  const effective_status = current_status ?? order?.status ?? "new_request";
   const status_config = order ? getStatusConfig(effective_status) : null;
   const product_type_cfg = order?.product_type ? PRODUCT_TYPE_CONFIG[order.product_type] : null;
   const is_session_view = session_orders.length > 1;
@@ -921,12 +922,13 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
                     />
                   )}
                   <InfoRow label="Status" value={
-                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
-                      effective_status === "pending" ? "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400" :
+                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                      (effective_status === "new_request" || effective_status === "pending") ? "bg-teal-50 text-teal-700 dark:bg-teal-500/10 dark:text-teal-400" :
                       effective_status === "processing" ? "bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400" :
                       effective_status === "completed" ? "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400" :
+                      effective_status === "payment_pending" ? "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400" :
                       "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400"
-                    }`}>{effective_status}</span>
+                    }`}>{status_config?.label ?? effective_status}</span>
                   } />
                   <InfoRow label="Items" value={`${order.items.length} item${order.items.length !== 1 ? "s" : ""}`} />
                   <InfoRow label="Placed" value={formatDate(order.created_at)} />

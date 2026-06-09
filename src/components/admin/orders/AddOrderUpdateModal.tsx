@@ -13,10 +13,10 @@ interface AddOrderUpdateModalProps {
 }
 
 const STATUS_OPTIONS: { value: OrderStatus; label: string; color: string }[] = [
-  { value: "pending", label: "Pending", color: "text-warning-600 dark:text-warning-400" },
-  { value: "processing", label: "Processing", color: "text-blue-600 dark:text-blue-400" },
-  { value: "completed", label: "Completed", color: "text-success-600 dark:text-success-400" },
-  { value: "cancelled", label: "Cancelled", color: "text-error-600 dark:text-error-400" },
+  { value: "new_request", label: "New Request", color: "text-teal-600 dark:text-teal-400" },
+  { value: "processing",  label: "Processing",  color: "text-blue-600 dark:text-blue-400" },
+  { value: "completed",   label: "Completed",   color: "text-success-600 dark:text-success-400" },
+  { value: "cancelled",   label: "Cancelled",   color: "text-error-600 dark:text-error-400" },
 ];
 
 const XIcon = () => (

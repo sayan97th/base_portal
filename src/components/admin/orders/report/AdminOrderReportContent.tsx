@@ -73,11 +73,17 @@ const AddTableIcon = () => (
 // ── Status badge config ───────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<OrderStatus, { label: string; bg: string; text: string; dot: string }> = {
+  new_request: {
+    label: "New Request",
+    bg: "bg-teal-50 dark:bg-teal-500/10",
+    text: "text-teal-700 dark:text-teal-400",
+    dot: "bg-teal-500",
+  },
   pending: {
-    label: "Pending",
-    bg: "bg-warning-50 dark:bg-warning-500/10",
-    text: "text-warning-700 dark:text-warning-400",
-    dot: "bg-warning-500",
+    label: "New Request",
+    bg: "bg-teal-50 dark:bg-teal-500/10",
+    text: "text-teal-700 dark:text-teal-400",
+    dot: "bg-teal-500",
   },
   processing: {
     label: "Processing",

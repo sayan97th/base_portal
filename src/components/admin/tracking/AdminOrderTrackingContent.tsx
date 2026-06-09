@@ -63,20 +63,23 @@ type StatusConfig = {
   icon: React.ReactNode;
 };
 
-const STATUS_STAGES: OrderStatus[] = ["pending", "processing", "completed"];
+const STATUS_STAGES: OrderStatus[] = ["new_request", "processing", "completed"];
+
+const NEW_REQUEST_CONFIG: StatusConfig = {
+  label: "New Request",
+  dot: "bg-teal-500",
+  badge: "bg-teal-50 text-teal-700 ring-teal-200 dark:bg-teal-500/10 dark:text-teal-400 dark:ring-teal-500/20",
+  border: "border-teal-200 dark:border-teal-500/30",
+  icon: (
+    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z" />
+    </svg>
+  ),
+};
 
 const STATUS_CONFIG: Record<OrderStatus, StatusConfig> = {
-  pending: {
-    label: "Pending",
-    dot: "bg-warning-500",
-    badge: "bg-warning-50 text-warning-700 ring-warning-200 dark:bg-warning-500/10 dark:text-warning-400 dark:ring-warning-500/20",
-    border: "border-warning-200 dark:border-warning-500/30",
-    icon: (
-      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
-  },
+  new_request: NEW_REQUEST_CONFIG,
+  pending: NEW_REQUEST_CONFIG,
   processing: {
     label: "Processing",
     dot: "bg-blue-500",
@@ -168,7 +171,8 @@ interface ProgressStepsProps {
 }
 
 const ProgressSteps: React.FC<ProgressStepsProps> = ({ status }) => {
-  const current_idx = STATUS_STAGES.indexOf(status);
+  const normalized_status: OrderStatus = status === "pending" ? "new_request" : status;
+  const current_idx = STATUS_STAGES.indexOf(normalized_status);
   const is_cancelled = status === "cancelled";
 
   if (is_cancelled) {
@@ -369,10 +373,10 @@ const UpdateCard: React.FC<UpdateCardProps> = ({ update, index, total, on_delete
 // ─── Add Update Form (right panel) ───────────────────────────────────────────
 
 const STATUS_OPTS: { value: OrderStatus; label: string }[] = [
-  { value: "pending", label: "Pending" },
-  { value: "processing", label: "Processing" },
-  { value: "completed", label: "Completed" },
-  { value: "cancelled", label: "Cancelled" },
+  { value: "new_request", label: "New Request" },
+  { value: "processing",  label: "Processing" },
+  { value: "completed",   label: "Completed" },
+  { value: "cancelled",   label: "Cancelled" },
 ];
 
 interface AddUpdateFormProps {
@@ -555,7 +559,7 @@ interface AdminOrderTrackingContentProps {
 const AdminOrderTrackingContent: React.FC<AdminOrderTrackingContentProps> = ({ order_id }) => {
   const [order, setOrder] = useState<AdminOrder | null>(null);
   const [updates, setUpdates] = useState<OrderUpdate[]>([]);
-  const [current_status, setCurrentStatus] = useState<OrderStatus>("pending");
+  const [current_status, setCurrentStatus] = useState<OrderStatus>("new_request");
   const [is_loading, setIsLoading] = useState(true);
   const [is_submitting, setIsSubmitting] = useState(false);
   const [deleting_id, setDeletingId] = useState<string | null>(null);

@@ -102,11 +102,12 @@ export type DisplayStatus =
   | "Cancelled";
 
 const api_to_display_status: Record<OrderStatus, DisplayStatus> = {
-  pending: "New request",
+  new_request:     "New request",
+  pending:         "New request",
   payment_pending: "New request",
-  processing: "Writing article",
-  completed: "Live",
-  cancelled: "Cancelled",
+  processing:      "Writing article",
+  completed:       "Live",
+  cancelled:       "Cancelled",
 };
 
 export const mapOrderStatus = (api_status: OrderStatus): DisplayStatus =>
