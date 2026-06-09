@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import AdminOrderTrackingContent from "@/components/admin/orders/AdminOrderTrackingContent";
+import AdminOrderTrackingContent from "@/components/admin/tracking/AdminOrderTrackingContent";
 
 interface TrackingPageParams {
   params: Promise<{ order_id: string }>;

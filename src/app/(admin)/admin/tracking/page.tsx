@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import AdminTrackingDashboard from "@/components/admin/orders/AdminTrackingDashboard";
+import AdminTrackingDashboard from "@/components/admin/tracking/AdminTrackingDashboard";
 
 export const metadata: Metadata = {
   title: "Order Tracking | BASE Admin Portal",
