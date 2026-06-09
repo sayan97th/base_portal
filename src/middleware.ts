@@ -3,8 +3,9 @@ import type { NextRequest } from "next/server";
 import { ROLE_COOKIE_NAME, isStaffRole } from "@/lib/roles";
 
 const auth_routes = ["/signin", "/signup"];
-const invitation_routes = ["/accept-invitation"];
+const invitation_routes = ["/accept-invitation", "/client-invitation"];
 const password_reset_routes = ["/reset-password"];
+const google_callback_route = "/auth/google/callback";
 
 /**
  * Returns true when the pathname starts with any of the given prefixes.
@@ -33,7 +34,7 @@ export function middleware(request: NextRequest) {
 
   if (!token) {
     // Allow access to auth pages, invitation acceptance, password reset, and public invoice views.
-    if (is_auth_route || is_invitation_route || is_password_reset_route || is_public_invoice_route) {
+    if (is_auth_route || is_invitation_route || is_password_reset_route || is_public_invoice_route || pathname === google_callback_route) {
       return NextResponse.next();
     }
     // Everything else requires authentication.
