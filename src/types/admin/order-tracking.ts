@@ -1,4 +1,4 @@
-import type { OrderStatus, OrderUser } from "@/types/admin";
+import type { AdminOrderProductType, OrderStatus, OrderUser } from "@/types/admin";
 
 export interface UpdateAuthor {
   id: number;
@@ -31,6 +31,7 @@ export interface OrderUpdatesResponse {
 
 export interface TrackingOrderSummary {
   id: string;
+  product_type: AdminOrderProductType;
   order_title: string | null;
   total_amount: number;
   status: OrderStatus;

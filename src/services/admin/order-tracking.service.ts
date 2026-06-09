@@ -5,21 +5,23 @@ import type {
   CreateOrderUpdatePayload,
   TrackingOrdersResponse,
 } from "@/types/admin";
-import type { OrderStatus } from "@/types/admin";
+import type { AdminOrderProductType, OrderStatus } from "@/types/admin";
 
 /**
- * List orders with tracking metadata.
+ * List orders with tracking metadata across all product types.
  * - Pass `status` to filter by order status.
- * - Pass `needs_update: true` to return only orders with zero tracking updates (any status).
+ * - Pass `needs_update: true` to return only orders with zero tracking updates.
+ * - Pass `product_type` to filter by a specific product (link_building, new_content, content_optimization, content_brief).
  * Returns updates_count and last_update_at per order, sorted by urgency.
  * Roles allowed: super_admin, admin, staff.
  */
 export async function listTrackingOrders(
-  filter?: { status?: OrderStatus; needs_update?: boolean }
+  filter?: { status?: OrderStatus; needs_update?: boolean; product_type?: AdminOrderProductType }
 ): Promise<TrackingOrdersResponse> {
   const params = new URLSearchParams();
   if (filter?.status) params.set("status", filter.status);
   if (filter?.needs_update) params.set("needs_update", "true");
+  if (filter?.product_type) params.set("product_type", filter.product_type);
   const query = params.toString();
   return apiClient.get<TrackingOrdersResponse>(
     query ? `/api/admin/tracking/orders?${query}` : `/api/admin/tracking/orders`

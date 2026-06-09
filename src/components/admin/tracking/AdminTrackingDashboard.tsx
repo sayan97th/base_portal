@@ -8,9 +8,9 @@ import type {
   CreateOrderUpdatePayload,
   OrderStatus,
 } from "@/types/admin";
+import type { AdminOrderProductType } from "@/types/admin";
 import {
   listTrackingOrders,
-  listNeedsUpdateOrders,
   listOrderUpdates,
   createOrderUpdate,
   deleteOrderUpdate,
@@ -19,7 +19,7 @@ import {
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
-const PER_PAGE = 10;
+const PER_PAGE = 12;
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -54,6 +54,64 @@ function formatFullDate(iso: string): string {
 function getDaysSince(iso: string): number {
   return Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
 }
+
+// ─── Product type config ───────────────────────────────────────────────────────
+
+type ProductTypeKey = AdminOrderProductType | "all";
+
+interface ProductTypeCfg {
+  label: string;
+  short_label: string;
+  badge: string;
+  dot: string;
+  full_view_url: (id: string) => string;
+}
+
+const PRODUCT_TYPE_CFG: Record<AdminOrderProductType, ProductTypeCfg> = {
+  link_building: {
+    label: "Link Building",
+    short_label: "Link Building",
+    badge: "bg-brand-50 text-brand-700 ring-brand-200 dark:bg-brand-500/10 dark:text-brand-400 dark:ring-brand-500/20",
+    dot: "bg-brand-500",
+    full_view_url: (id) => `/admin/orders/${id}/tracking`,
+  },
+  new_content: {
+    label: "New Content",
+    short_label: "New Content",
+    badge: "bg-purple-50 text-purple-700 ring-purple-200 dark:bg-purple-500/10 dark:text-purple-400 dark:ring-purple-500/20",
+    dot: "bg-purple-500",
+    full_view_url: (id) => `/admin/new-content/orders/${id}`,
+  },
+  content_optimization: {
+    label: "Content Refresh",
+    short_label: "Content Refresh",
+    badge: "bg-teal-50 text-teal-700 ring-teal-200 dark:bg-teal-500/10 dark:text-teal-400 dark:ring-teal-500/20",
+    dot: "bg-teal-500",
+    full_view_url: (id) => `/admin/content-optimization/orders/${id}`,
+  },
+  content_brief: {
+    label: "SME Content",
+    short_label: "SME Content",
+    badge: "bg-orange-50 text-orange-700 ring-orange-200 dark:bg-orange-500/10 dark:text-orange-400 dark:ring-orange-500/20",
+    dot: "bg-orange-500",
+    full_view_url: (id) => `/admin/content-briefs/orders/${id}`,
+  },
+  content_refresh: {
+    label: "Content Refresh",
+    short_label: "Content Refresh",
+    badge: "bg-teal-50 text-teal-700 ring-teal-200 dark:bg-teal-500/10 dark:text-teal-400 dark:ring-teal-500/20",
+    dot: "bg-teal-500",
+    full_view_url: (id) => `/admin/content-refresh/orders/${id}`,
+  },
+};
+
+const PRODUCT_TYPE_TABS: { key: ProductTypeKey; label: string }[] = [
+  { key: "all",                label: "All Products" },
+  { key: "link_building",      label: "Link Building" },
+  { key: "new_content",        label: "New Content" },
+  { key: "content_optimization", label: "Content Refresh" },
+  { key: "content_brief",      label: "SME Content" },
+];
 
 // ─── Status config ─────────────────────────────────────────────────────────────
 
@@ -90,13 +148,9 @@ const STATUS_CFG: Record<OrderStatus, { label: string; dot: string; badge: strin
   },
 };
 
-const UPDATE_STATUS_OPTS: OrderStatus[] = ["pending", "processing", "completed", "cancelled"];
-
-// ─── Tab config ────────────────────────────────────────────────────────────────
-
 type TrackingTab = OrderStatus | "needs_update";
 
-const TRACKING_TABS: { key: TrackingTab; label: string }[] = [
+const STATUS_TABS: { key: TrackingTab; label: string }[] = [
   { key: "needs_update", label: "Needs Update" },
   { key: "pending",      label: "Pending" },
   { key: "processing",   label: "Processing" },
@@ -105,6 +159,7 @@ const TRACKING_TABS: { key: TrackingTab; label: string }[] = [
 ];
 
 const FINALIZED_STATUSES: OrderStatus[] = ["completed", "cancelled"];
+const UPDATE_STATUS_OPTS: OrderStatus[] = ["pending", "processing", "completed", "cancelled"];
 
 // ─── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -175,13 +230,7 @@ interface StatusChangeDialogProps {
 }
 
 const StatusChangeDialog: React.FC<StatusChangeDialogProps> = ({
-  is_open,
-  order_title,
-  current_status,
-  new_status,
-  is_loading,
-  onConfirm,
-  onCancel,
+  is_open, order_title, current_status, new_status, is_loading, onConfirm, onCancel,
 }) => {
   const [notify_user, setNotifyUser] = useState(false);
 
@@ -192,51 +241,31 @@ const StatusChangeDialog: React.FC<StatusChangeDialogProps> = ({
   if (!is_open) return null;
 
   const from_cfg = STATUS_CFG[current_status];
-  const to_cfg = STATUS_CFG[new_status];
+  const to_cfg   = STATUS_CFG[new_status];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={!is_loading ? onCancel : undefined}
-      />
-
-      {/* Modal */}
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={!is_loading ? onCancel : undefined} />
       <div className="relative w-full max-w-sm rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-gray-700 dark:bg-gray-900">
-        {/* Warning icon */}
         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-warning-50 text-warning-600 dark:bg-warning-500/10 dark:text-warning-400">
           <AlertIcon />
         </div>
-
-        {/* Title */}
-        <h3 className="mb-1 text-base font-bold text-gray-900 dark:text-white">
-          Change order status
-        </h3>
+        <h3 className="mb-1 text-base font-bold text-gray-900 dark:text-white">Change order status</h3>
         <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
           You are about to change the status of{" "}
-          <span className="font-semibold text-gray-700 dark:text-gray-200">
-            {order_title || "this order"}
-          </span>
-          .
+          <span className="font-semibold text-gray-700 dark:text-gray-200">{order_title || "this order"}</span>.
         </p>
-
-        {/* Status transition */}
         <div className="mb-5 flex items-center gap-2 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-gray-800/50">
           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${from_cfg.badge}`}>
-            <span className={`h-1.5 w-1.5 rounded-full ${from_cfg.dot}`} />
-            {from_cfg.label}
+            <span className={`h-1.5 w-1.5 rounded-full ${from_cfg.dot}`} />{from_cfg.label}
           </span>
           <svg className="h-4 w-4 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
           </svg>
           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${to_cfg.badge}`}>
-            <span className={`h-1.5 w-1.5 rounded-full ${to_cfg.dot}`} />
-            {to_cfg.label}
+            <span className={`h-1.5 w-1.5 rounded-full ${to_cfg.dot}`} />{to_cfg.label}
           </span>
         </div>
-
-        {/* Notify checkbox */}
         <label className="mb-5 flex cursor-pointer items-start gap-3">
           <input
             type="checkbox"
@@ -246,29 +275,17 @@ const StatusChangeDialog: React.FC<StatusChangeDialogProps> = ({
             className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 disabled:opacity-60"
           />
           <div>
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
-              Notify client of this change
-            </span>
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Notify client of this change</span>
             <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
               An email will be sent to the client informing them of the status change.
             </p>
           </div>
         </label>
-
-        {/* Actions */}
         <div className="flex gap-2">
-          <button
-            onClick={onCancel}
-            disabled={is_loading}
-            className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-60 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
-          >
+          <button onClick={onCancel} disabled={is_loading} className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-60 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">
             Cancel
           </button>
-          <button
-            onClick={() => onConfirm(notify_user)}
-            disabled={is_loading}
-            className="flex-1 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-brand-500/25 transition hover:bg-brand-600 disabled:opacity-60"
-          >
+          <button onClick={() => onConfirm(notify_user)} disabled={is_loading} className="flex-1 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-brand-500/25 transition hover:bg-brand-600 disabled:opacity-60">
             {is_loading ? (
               <span className="flex items-center justify-center gap-1.5">
                 <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -277,9 +294,7 @@ const StatusChangeDialog: React.FC<StatusChangeDialogProps> = ({
                 </svg>
                 Updating…
               </span>
-            ) : (
-              "Confirm change"
-            )}
+            ) : "Confirm change"}
           </button>
         </div>
       </div>
@@ -297,39 +312,20 @@ interface PaginationProps {
   onChange: (page: number) => void;
 }
 
-const Pagination: React.FC<PaginationProps> = ({
-  current_page,
-  total_pages,
-  total_items,
-  per_page,
-  onChange,
-}) => {
+const Pagination: React.FC<PaginationProps> = ({ current_page, total_pages, total_items, per_page, onChange }) => {
   if (total_pages <= 1) return null;
-
   const from = (current_page - 1) * per_page + 1;
-  const to = Math.min(current_page * per_page, total_items);
+  const to   = Math.min(current_page * per_page, total_items);
 
   return (
     <div className="flex items-center justify-between border-t border-gray-100 px-4 py-2.5 dark:border-gray-800">
-      <span className="text-[11px] text-gray-400 dark:text-gray-500">
-        {from}–{to} of {total_items}
-      </span>
+      <span className="text-[11px] text-gray-400 dark:text-gray-500">{from}–{to} of {total_items}</span>
       <div className="flex items-center gap-1">
-        <button
-          onClick={() => onChange(current_page - 1)}
-          disabled={current_page === 1}
-          className="flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-        >
+        <button onClick={() => onChange(current_page - 1)} disabled={current_page === 1} className="flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 dark:hover:bg-gray-800 dark:hover:text-gray-300">
           <ChevronLeftIcon />
         </button>
-        <span className="min-w-12 text-center text-[11px] font-medium text-gray-600 dark:text-gray-300">
-          {current_page} / {total_pages}
-        </span>
-        <button
-          onClick={() => onChange(current_page + 1)}
-          disabled={current_page === total_pages}
-          className="flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-        >
+        <span className="min-w-12 text-center text-[11px] font-medium text-gray-600 dark:text-gray-300">{current_page} / {total_pages}</span>
+        <button onClick={() => onChange(current_page + 1)} disabled={current_page === total_pages} className="flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 dark:hover:bg-gray-800 dark:hover:text-gray-300">
           <ChevronRightIcon />
         </button>
       </div>
@@ -346,7 +342,8 @@ interface OrderCardProps {
 }
 
 const OrderCard: React.FC<OrderCardProps> = ({ order, is_selected, onClick }) => {
-  const cfg = STATUS_CFG[order.status];
+  const status_cfg  = STATUS_CFG[order.status];
+  const product_cfg = PRODUCT_TYPE_CFG[order.product_type];
   const needs_update = order.updates_count === 0;
   const days = getDaysSince(order.created_at);
   const initials = `${order.user.first_name[0]}${order.user.last_name[0]}`.toUpperCase();
@@ -356,43 +353,45 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, is_selected, onClick }) =>
       onClick={onClick}
       className={`group w-full border-l-2 text-left transition-all ${
         is_selected
-          ? `${cfg.border_l} bg-brand-50 dark:bg-brand-500/10`
-          : `border-l-transparent hover:border-l-gray-300 hover:bg-gray-50 dark:hover:bg-white/3`
+          ? `${status_cfg.border_l} bg-brand-50 dark:bg-brand-500/10`
+          : `border-l-transparent hover:border-l-gray-300 hover:bg-gray-50 dark:hover:bg-white/[0.03]`
       }`}
     >
       <div className="px-4 py-3.5">
-        <div className="mb-2 flex items-start justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-1.5">
-            {/* Status */}
-            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${cfg.badge}`}>
-              {order.status === "processing" ? (
-                <span className="relative flex h-1.5 w-1.5">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-60" />
-                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-500" />
-                </span>
-              ) : (
-                <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
-              )}
-              {cfg.label}
-            </span>
-
-            {/* Update count badge */}
-            {needs_update ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-600 ring-1 ring-red-200 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/20">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
-                No updates
+        {/* Top row: status + product type + update badge */}
+        <div className="mb-2 flex flex-wrap items-center gap-1.5">
+          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${status_cfg.badge}`}>
+            {order.status === "processing" ? (
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-60" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-500" />
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400">
-                {order.updates_count} update{order.updates_count !== 1 ? "s" : ""}
-              </span>
+              <span className={`h-1.5 w-1.5 rounded-full ${status_cfg.dot}`} />
             )}
-          </div>
+            {status_cfg.label}
+          </span>
+
+          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${product_cfg.badge}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${product_cfg.dot}`} />
+            {product_cfg.short_label}
+          </span>
+
+          {needs_update ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-600 ring-1 ring-red-200 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/20">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
+              No updates
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+              {order.updates_count} update{order.updates_count !== 1 ? "s" : ""}
+            </span>
+          )}
         </div>
 
         {/* Order title */}
         <p className={`truncate text-sm font-semibold ${is_selected ? "text-brand-700 dark:text-brand-300" : "text-gray-900 dark:text-white"}`}>
-          {order.order_title || "Link Building Order"}
+          {order.order_title || product_cfg.label + " Order"}
         </p>
 
         {/* Customer + meta */}
@@ -429,11 +428,11 @@ interface UpdateFormProps {
 }
 
 const UpdateForm: React.FC<UpdateFormProps> = ({ current_status, is_submitting, onSubmit }) => {
-  const [title, setTitle] = useState("");
-  const [message, setMessage] = useState("");
+  const [title, setTitle]               = useState("");
+  const [message, setMessage]           = useState("");
   const [status_change, setStatusChange] = useState<OrderStatus>(current_status);
-  const [send_email, setSendEmail] = useState(true);
-  const [errors, setErrors] = useState<{ title?: string; message?: string }>({});
+  const [send_email, setSendEmail]       = useState(true);
+  const [errors, setErrors]             = useState<{ title?: string; message?: string }>({});
 
   useEffect(() => { setStatusChange(current_status); }, [current_status]);
 
@@ -483,7 +482,6 @@ const UpdateForm: React.FC<UpdateFormProps> = ({ current_status, is_submitting, 
         {errors.message && <p className="mt-0.5 text-xs text-error-500">{errors.message}</p>}
       </div>
 
-      {/* Status selector */}
       <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
         {UPDATE_STATUS_OPTS.map((s) => {
           const c = STATUS_CFG[s];
@@ -507,7 +505,6 @@ const UpdateForm: React.FC<UpdateFormProps> = ({ current_status, is_submitting, 
         })}
       </div>
 
-      {/* Email + submit row */}
       <div className="flex items-center justify-between gap-3">
         <label className="flex cursor-pointer items-center gap-2">
           <input
@@ -537,10 +534,7 @@ const UpdateForm: React.FC<UpdateFormProps> = ({ current_status, is_submitting, 
               Posting…
             </>
           ) : (
-            <>
-              <PlusIcon />
-              Post Update
-            </>
+            <><PlusIcon />Post Update</>
           )}
         </button>
       </div>
@@ -559,7 +553,7 @@ interface TimelineItemProps {
 
 const TimelineItem: React.FC<TimelineItemProps> = ({ update, is_last, on_delete, is_deleting }) => {
   const [confirm, setConfirm] = useState(false);
-  const cfg = update.status_change ? STATUS_CFG[update.status_change] : null;
+  const cfg      = update.status_change ? STATUS_CFG[update.status_change] : null;
   const initials = `${update.created_by.first_name[0]}${update.created_by.last_name[0]}`.toUpperCase();
 
   return (
@@ -567,14 +561,11 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ update, is_last, on_delete,
       {!is_last && (
         <div className="absolute left-[15px] top-8 bottom-0 w-px bg-gray-100 dark:bg-gray-800" />
       )}
-      {/* Avatar */}
-      <div className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-brand-400 to-brand-600 text-xs font-bold text-white shadow-sm ring-2 ring-white dark:ring-gray-900">
+      <div className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-xs font-bold text-white shadow-sm ring-2 ring-white dark:ring-gray-900">
         {initials}
       </div>
-
-      {/* Body */}
       <div className={`flex-1 ${is_last ? "" : "pb-5"}`}>
-        <div className="rounded-xl border border-gray-100 bg-white p-3.5 dark:border-gray-800 dark:bg-white/3">
+        <div className="rounded-xl border border-gray-100 bg-white p-3.5 dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="mb-1.5 flex flex-wrap items-start justify-between gap-1.5">
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-xs font-semibold text-gray-900 dark:text-white">{update.title}</span>
@@ -586,8 +577,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ update, is_last, on_delete,
               )}
               {update.send_email && (
                 <span className="inline-flex items-center gap-0.5 rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-600 ring-1 ring-sky-100 dark:bg-sky-500/10 dark:text-sky-400 dark:ring-sky-500/20">
-                  <MailIcon />
-                  sent
+                  <MailIcon />sent
                 </span>
               )}
             </div>
@@ -618,7 +608,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ update, is_last, on_delete,
   );
 };
 
-// ─── Standalone status changer (for finalized orders) ─────────────────────────
+// ─── Status changer (for finalized orders) ────────────────────────────────────
 
 interface StatusChangerProps {
   current_status: OrderStatus;
@@ -633,11 +623,9 @@ const StatusChanger: React.FC<StatusChangerProps> = ({ current_status, onRequest
   const other_statuses = UPDATE_STATUS_OPTS.filter((s) => s !== current_status);
 
   return (
-    <div className="rounded-xl border border-warning-200 bg-warning-50/60 p-4 dark:border-warning-500/20 dark:bg-warning-500/6">
+    <div className="rounded-xl border border-warning-200 bg-warning-50/60 p-4 dark:border-warning-500/20 dark:bg-warning-500/[0.06]">
       <div className="mb-3 flex items-center gap-2">
-        <span className="text-warning-600 dark:text-warning-400">
-          <AlertIcon />
-        </span>
+        <span className="text-warning-600 dark:text-warning-400"><AlertIcon /></span>
         <p className="text-xs font-semibold text-warning-800 dark:text-warning-300">
           This order is{" "}
           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ring-1 ${STATUS_CFG[current_status].badge}`}>
@@ -647,7 +635,6 @@ const StatusChanger: React.FC<StatusChangerProps> = ({ current_status, onRequest
           . You can reopen it by changing the status.
         </p>
       </div>
-
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs text-gray-500 dark:text-gray-400">Change to:</span>
         <div className="flex flex-wrap gap-1.5">
@@ -664,8 +651,7 @@ const StatusChanger: React.FC<StatusChangerProps> = ({ current_status, onRequest
                     : "border-gray-200 bg-white text-gray-500 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
                 }`}
               >
-                <span className={`h-2 w-2 rounded-full ${c.dot}`} />
-                {c.label}
+                <span className={`h-2 w-2 rounded-full ${c.dot}`} />{c.label}
               </button>
             );
           })}
@@ -687,30 +673,26 @@ const StatusChanger: React.FC<StatusChangerProps> = ({ current_status, onRequest
 
 interface OrderDetailPanelProps {
   order: TrackingOrderSummary;
-  active_tab: TrackingTab;
+  active_status_tab: TrackingTab;
   onStatusChange: (id: string, status: OrderStatus) => void;
   onUpdatesCountChange: (id: string, count: number, last_at: string | null) => void;
 }
 
 const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
-  order,
-  active_tab,
-  onStatusChange,
-  onUpdatesCountChange,
+  order, active_status_tab, onStatusChange, onUpdatesCountChange,
 }) => {
-  const [updates, setUpdates] = useState<OrderUpdate[]>([]);
+  const [updates, setUpdates]               = useState<OrderUpdate[]>([]);
   const [current_status, setCurrentStatus] = useState<OrderStatus>(order.status);
-  const [is_loading, setIsLoading] = useState(true);
-  const [is_submitting, setIsSubmitting] = useState(false);
-  const [deleting_id, setDeletingId] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<{ type: "success" | "error"; msg: string } | null>(null);
-
-  // Dialog state
-  const [dialog_open, setDialogOpen] = useState(false);
+  const [is_loading, setIsLoading]         = useState(true);
+  const [is_submitting, setIsSubmitting]   = useState(false);
+  const [deleting_id, setDeletingId]       = useState<string | null>(null);
+  const [feedback, setFeedback]             = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  const [dialog_open, setDialogOpen]       = useState(false);
   const [dialog_new_status, setDialogNewStatus] = useState<OrderStatus>("pending");
   const [dialog_loading, setDialogLoading] = useState(false);
 
-  const is_finalized = active_tab !== "needs_update" && FINALIZED_STATUSES.includes(active_tab as OrderStatus);
+  const product_cfg  = PRODUCT_TYPE_CFG[order.product_type];
+  const is_finalized = active_status_tab !== "needs_update" && FINALIZED_STATUSES.includes(active_status_tab as OrderStatus);
 
   useEffect(() => {
     setCurrentStatus(order.status);
@@ -726,7 +708,7 @@ const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
     setIsSubmitting(true);
     setFeedback(null);
     try {
-      const new_update = await createOrderUpdate(order.id, payload);
+      const new_update  = await createOrderUpdate(order.id, payload);
       const next_updates = [new_update, ...updates];
       setUpdates(next_updates);
       if (payload.status_change && payload.status_change !== current_status) {
@@ -789,7 +771,7 @@ const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
     <>
       <StatusChangeDialog
         is_open={dialog_open}
-        order_title={order.order_title || "Link Building Order"}
+        order_title={order.order_title || product_cfg.label + " Order"}
         current_status={current_status}
         new_status={dialog_new_status}
         is_loading={dialog_loading}
@@ -804,7 +786,7 @@ const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="truncate text-base font-bold text-gray-900 dark:text-white">
-                  {order.order_title || "Link Building Order"}
+                  {order.order_title || product_cfg.label + " Order"}
                 </h2>
                 <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${cfg.badge}`}>
                   {current_status === "processing" ? (
@@ -817,6 +799,10 @@ const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
                   )}
                   {cfg.label}
                 </span>
+                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${product_cfg.badge}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${product_cfg.dot}`} />
+                  {product_cfg.label}
+                </span>
               </div>
               <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                 <span className="font-mono">#{order.id.slice(0, 8).toUpperCase()}</span>
@@ -827,8 +813,8 @@ const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
               <div className="hidden items-center gap-3 sm:flex">
                 {[
                   { label: "updates", value: updates.length },
-                  { label: "links", value: order.items_count },
-                  { label: "total", value: formatCurrency(order.total_amount) },
+                  { label: "items",   value: order.items_count },
+                  { label: "total",   value: formatCurrency(order.total_amount) },
                 ].map((s) => (
                   <div key={s.label} className="rounded-lg border border-gray-100 bg-gray-50 px-2.5 py-1 text-center dark:border-gray-800 dark:bg-gray-800/50">
                     <div className="text-xs font-bold text-gray-800 dark:text-white">{s.value}</div>
@@ -837,7 +823,7 @@ const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
                 ))}
               </div>
               <Link
-                href={`/admin/orders/${order.id}/tracking`}
+                href={product_cfg.full_view_url(order.id)}
                 target="_blank"
                 className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-500 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
               >
@@ -848,21 +834,15 @@ const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
           </div>
         </div>
 
-        {/* Scrollable body */}
+        {/* Body */}
         <div className="flex flex-1 flex-col gap-0 overflow-hidden">
-          {/* Form section */}
+          {/* Update form */}
           <div className="border-b border-gray-100 bg-gray-50/50 p-5 dark:border-gray-800 dark:bg-gray-900/50">
-
-            {/* Status changer — only for finalized orders */}
             {is_finalized && (
               <div className="mb-4">
-                <StatusChanger
-                  current_status={current_status}
-                  onRequestChange={handleRequestStatusChange}
-                />
+                <StatusChanger current_status={current_status} onRequestChange={handleRequestStatusChange} />
               </div>
             )}
-
             <div className="mb-3 flex items-center gap-2">
               <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-brand-500 text-white">
                 <PlusIcon />
@@ -871,7 +851,6 @@ const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
                 Post New Update
               </h3>
             </div>
-
             {feedback && (
               <div className={`mb-3 rounded-xl border px-3.5 py-2.5 text-xs font-medium ${
                 feedback.type === "success"
@@ -881,12 +860,7 @@ const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
                 {feedback.msg}
               </div>
             )}
-
-            <UpdateForm
-              current_status={current_status}
-              is_submitting={is_submitting}
-              onSubmit={handleSubmit}
-            />
+            <UpdateForm current_status={current_status} is_submitting={is_submitting} onSubmit={handleSubmit} />
           </div>
 
           {/* Timeline */}
@@ -930,7 +904,6 @@ const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
                     is_deleting={deleting_id === u.id}
                   />
                 ))}
-                {/* Order placed anchor */}
                 <div className="mt-2 flex gap-3">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-gray-200 bg-white text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-600">
                     <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -954,33 +927,34 @@ const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
 // ─── Main dashboard ───────────────────────────────────────────────────────────
 
 const AdminTrackingDashboard: React.FC = () => {
-  const [orders, setOrders] = useState<TrackingOrderSummary[]>([]);
-  const [tab_counts, setTabCounts] = useState<Partial<Record<TrackingTab, number>>>({});
-  const [is_loading, setIsLoading] = useState(true);
-  const [load_error, setLoadError] = useState<string | null>(null);
-  const [selected_id, setSelectedId] = useState<string | null>(null);
-  const [active_tab, setActiveTab] = useState<TrackingTab>("needs_update");
-  const [current_page, setCurrentPage] = useState(1);
-  const [nav_toast, setNavToast] = useState<string | null>(null);
+  const [orders, setOrders]               = useState<TrackingOrderSummary[]>([]);
+  const [tab_counts, setTabCounts]         = useState<Partial<Record<TrackingTab, number>>>({});
+  const [is_loading, setIsLoading]         = useState(true);
+  const [load_error, setLoadError]         = useState<string | null>(null);
+  const [selected_id, setSelectedId]       = useState<string | null>(null);
+  const [product_tab, setProductTab]       = useState<ProductTypeKey>("all");
+  const [status_tab, setStatusTab]         = useState<TrackingTab>("needs_update");
+  const [current_page, setCurrentPage]     = useState(1);
+  const [nav_toast, setNavToast]           = useState<string | null>(null);
   const list_ref = useRef<HTMLDivElement>(null);
-  // Holds the order ID that should be auto-selected after a programmatic tab switch
   const pending_select_id_ref = useRef<string | null>(null);
 
-  const loadOrders = useCallback(async (tab: TrackingTab) => {
+  const loadOrders = useCallback(async (status: TrackingTab, product: ProductTypeKey) => {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const res = tab === "needs_update"
-        ? await listNeedsUpdateOrders()
-        : await listTrackingOrders({ status: tab as OrderStatus });
+      const product_type = product === "all" ? undefined : product as AdminOrderProductType;
+      const res = status === "needs_update"
+        ? await listTrackingOrders({ needs_update: true, product_type })
+        : await listTrackingOrders({ status: status as OrderStatus, product_type });
+
       const sorted = [...res.data].sort((a, b) => {
         const a_time = a.last_update_at ? new Date(a.last_update_at).getTime() : 0;
         const b_time = b.last_update_at ? new Date(b.last_update_at).getTime() : 0;
         return a_time - b_time;
       });
       setOrders(sorted);
-      setTabCounts((prev) => ({ ...prev, [tab]: sorted.length }));
-      // Prefer the order that triggered the tab switch; fall back to first in list
+      setTabCounts((prev) => ({ ...prev, [status]: sorted.length }));
       const pending_id = pending_select_id_ref.current;
       pending_select_id_ref.current = null;
       if (pending_id && sorted.some((o) => o.id === pending_id)) {
@@ -996,54 +970,58 @@ const AdminTrackingDashboard: React.FC = () => {
     }
   }, []);
 
-  // Pre-load all tab counts in parallel so badges are visible on first render
-  const loadAllTabCounts = useCallback(async () => {
-    const [needs_update_res, pending_res, processing_res, completed_res, cancelled_res] =
+  const loadAllTabCounts = useCallback(async (product: ProductTypeKey) => {
+    const product_type = product === "all" ? undefined : product as AdminOrderProductType;
+    const [needs_res, pending_res, processing_res, completed_res, cancelled_res] =
       await Promise.allSettled([
-        listNeedsUpdateOrders(),
-        listTrackingOrders({ status: "pending" }),
-        listTrackingOrders({ status: "processing" }),
-        listTrackingOrders({ status: "completed" }),
-        listTrackingOrders({ status: "cancelled" }),
+        listTrackingOrders({ needs_update: true, product_type }),
+        listTrackingOrders({ status: "pending",    product_type }),
+        listTrackingOrders({ status: "processing", product_type }),
+        listTrackingOrders({ status: "completed",  product_type }),
+        listTrackingOrders({ status: "cancelled",  product_type }),
       ]);
-    setTabCounts((prev) => ({
-      ...prev,
-      ...(needs_update_res.status === "fulfilled" && { needs_update: needs_update_res.value.data.length }),
-      ...(pending_res.status === "fulfilled"      && { pending:      pending_res.value.data.length }),
-      ...(processing_res.status === "fulfilled"   && { processing:   processing_res.value.data.length }),
-      ...(completed_res.status === "fulfilled"    && { completed:    completed_res.value.data.length }),
-      ...(cancelled_res.status === "fulfilled"    && { cancelled:    cancelled_res.value.data.length }),
-    }));
+    setTabCounts({
+      ...(needs_res.status      === "fulfilled" && { needs_update: needs_res.value.data.length }),
+      ...(pending_res.status    === "fulfilled" && { pending:      pending_res.value.data.length }),
+      ...(processing_res.status === "fulfilled" && { processing:   processing_res.value.data.length }),
+      ...(completed_res.status  === "fulfilled" && { completed:    completed_res.value.data.length }),
+      ...(cancelled_res.status  === "fulfilled" && { cancelled:    cancelled_res.value.data.length }),
+    });
   }, []);
 
-  // Load on mount and on tab change
   useEffect(() => {
-    loadOrders(active_tab);
-  }, [active_tab]); // eslint-disable-line react-hooks/exhaustive-deps
+    loadOrders(status_tab, product_tab);
+  }, [status_tab, product_tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Pre-load all tab counts once on mount (non-blocking)
   useEffect(() => {
-    void loadAllTabCounts();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    void loadAllTabCounts(product_tab);
+  }, [product_tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function switchTab(tab: TrackingTab) {
-    if (tab === active_tab) return;
+  function switchProductTab(tab: ProductTypeKey) {
+    if (tab === product_tab) return;
     pending_select_id_ref.current = null;
-    setActiveTab(tab);
+    setProductTab(tab);
+    setTabCounts({});
     setCurrentPage(1);
     setSelectedId(null);
   }
 
-  // Pagination
-  const total_pages = Math.ceil(orders.length / PER_PAGE);
+  function switchStatusTab(tab: TrackingTab) {
+    if (tab === status_tab) return;
+    pending_select_id_ref.current = null;
+    setStatusTab(tab);
+    setCurrentPage(1);
+    setSelectedId(null);
+  }
+
+  const total_pages      = Math.ceil(orders.length / PER_PAGE);
   const paginated_orders = orders.slice((current_page - 1) * PER_PAGE, current_page * PER_PAGE);
+  const selected_order   = orders.find((o) => o.id === selected_id) ?? null;
 
-  const selected_order = orders.find((o) => o.id === selected_id) ?? null;
-
-  function navigateToTab(tab: TrackingTab, order_id: string, toast_msg: string) {
+  function navigateToStatusTab(tab: TrackingTab, order_id: string, toast_msg: string) {
     pending_select_id_ref.current = order_id;
     setOrders((prev) => prev.filter((o) => o.id !== order_id));
-    setActiveTab(tab);
+    setStatusTab(tab);
     setCurrentPage(1);
     setNavToast(toast_msg);
     setTimeout(() => setNavToast(null), 4000);
@@ -1056,8 +1034,7 @@ const AdminTrackingDashboard: React.FC = () => {
     const status_actually_changed = old_order.status !== new_status;
 
     if (status_actually_changed) {
-      if (active_tab === "needs_update") {
-        // Order was in needs_update (pending + 0 updates); decrement both needs_update and pending
+      if (status_tab === "needs_update") {
         setTabCounts((prev) => ({
           ...prev,
           needs_update: Math.max(0, (prev.needs_update ?? 0) - 1),
@@ -1073,10 +1050,8 @@ const AdminTrackingDashboard: React.FC = () => {
       }
     }
 
-    const target_tab: TrackingTab = new_status;
-    if (active_tab !== target_tab) {
-      const label = STATUS_CFG[new_status].label;
-      navigateToTab(target_tab, order_id, `Order moved to ${label}`);
+    if (status_tab !== (new_status as TrackingTab)) {
+      navigateToStatusTab(new_status as TrackingTab, order_id, `Order moved to ${STATUS_CFG[new_status].label}`);
     } else {
       setOrders((prev) => prev.map((o) => o.id === order_id ? { ...o, status: new_status } : o));
     }
@@ -1084,16 +1059,13 @@ const AdminTrackingDashboard: React.FC = () => {
 
   function handleUpdatesCountChange(order_id: string, count: number, last_at: string | null) {
     const old_order = orders.find((o) => o.id === order_id);
-    // When the very first update is posted the order leaves the "needs_update" bucket
     if (old_order && old_order.updates_count === 0 && count > 0) {
       setTabCounts((prev) => ({
         ...prev,
         needs_update: Math.max(0, (prev.needs_update ?? 0) - 1),
       }));
-      // If we are on the needs_update tab and no status-change navigation is already
-      // in flight, move the order over to the "pending" tab
-      if (active_tab === "needs_update" && !pending_select_id_ref.current) {
-        navigateToTab("pending", order_id, "Order moved to Pending");
+      if (status_tab === "needs_update" && !pending_select_id_ref.current) {
+        navigateToStatusTab("pending", order_id, "Order moved to Pending");
         return;
       }
     }
@@ -1101,6 +1073,21 @@ const AdminTrackingDashboard: React.FC = () => {
       prev.map((o) => o.id === order_id ? { ...o, updates_count: count, last_update_at: last_at } : o)
     );
   }
+
+  const total_orders_label = () => {
+    if (is_loading) return "Loading orders…";
+    const count = orders.length;
+    const product_label = product_tab === "all" ? "" : ` ${PRODUCT_TYPE_CFG[product_tab as AdminOrderProductType].label}`;
+    const status_label = status_tab === "needs_update"
+      ? "order" + (count !== 1 ? "s" : "") + " without updates"
+      : `${STATUS_CFG[status_tab as OrderStatus].label.toLowerCase()} order${count !== 1 ? "s" : ""}`;
+    return (
+      <>
+        <span className="font-medium text-gray-700 dark:text-gray-300">{count}</span>
+        {product_label} {status_label}
+      </>
+    );
+  };
 
   return (
     <div className="flex h-[calc(100vh-6rem)] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
@@ -1115,20 +1102,13 @@ const AdminTrackingDashboard: React.FC = () => {
           </div>
           <div>
             <h1 className="text-base font-bold text-gray-900 dark:text-white">Order Tracking</h1>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {is_loading ? "Loading orders…" : (
-                <>
-                  <span className="font-medium text-gray-700 dark:text-gray-300">{orders.length}</span>{" "}
-                  {active_tab === "needs_update" ? "order" : STATUS_CFG[active_tab].label.toLowerCase() + " order"}{orders.length !== 1 ? "s" : ""}{active_tab === "needs_update" ? " without updates" : ""}
-                </>
-              )}
-            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">{total_orders_label()}</p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => { void loadOrders(active_tab); }}
+            onClick={() => { void loadOrders(status_tab, product_tab); }}
             disabled={is_loading}
             className="rounded-lg border border-gray-200 p-2 text-gray-400 transition hover:bg-gray-50 hover:text-gray-600 disabled:opacity-50 dark:border-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-300"
             title="Refresh"
@@ -1147,6 +1127,34 @@ const AdminTrackingDashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* ── Product type tabs ────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-0 overflow-x-auto border-b border-gray-100 bg-gray-50/50 px-4 dark:border-gray-800 dark:bg-gray-900/50">
+        {PRODUCT_TYPE_TABS.map((tab) => {
+          const is_active = product_tab === tab.key;
+          const product_cfg = tab.key !== "all" ? PRODUCT_TYPE_CFG[tab.key as AdminOrderProductType] : null;
+
+          return (
+            <button
+              key={tab.key}
+              onClick={() => switchProductTab(tab.key)}
+              className={`relative flex shrink-0 items-center gap-1.5 px-3.5 py-2.5 text-xs font-medium transition-colors ${
+                is_active
+                  ? "text-brand-600 dark:text-brand-400"
+                  : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              }`}
+            >
+              {is_active && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-brand-500" />
+              )}
+              {product_cfg && (
+                <span className={`h-2 w-2 rounded-full ${product_cfg.dot}`} />
+              )}
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* ── Navigation toast ────────────────────────────────────────────────── */}
       {nav_toast && (
         <div className="flex items-center gap-2 border-b border-success-200 bg-success-50 px-6 py-2 text-xs font-medium text-success-700 dark:border-success-500/20 dark:bg-success-500/10 dark:text-success-400">
@@ -1159,36 +1167,31 @@ const AdminTrackingDashboard: React.FC = () => {
 
       {/* ── Status tabs ─────────────────────────────────────────────────────── */}
       <div className="flex gap-0 border-b border-gray-100 bg-white px-6 dark:border-gray-800 dark:bg-gray-900">
-        {TRACKING_TABS.map((tab) => {
-          const count = tab_counts[tab.key];
-          const is_active = active_tab === tab.key;
-          const is_needs_update = tab.key === "needs_update";
+        {STATUS_TABS.map((tab) => {
+          const count      = tab_counts[tab.key];
+          const is_active  = status_tab === tab.key;
+          const is_needs   = tab.key === "needs_update";
 
           return (
             <button
               key={tab.key}
-              onClick={() => switchTab(tab.key)}
+              onClick={() => switchStatusTab(tab.key)}
               className={`relative flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium transition-colors ${
                 is_active
-                  ? is_needs_update
-                    ? "text-red-600 dark:text-red-400"
-                    : "text-brand-600 dark:text-brand-400"
+                  ? is_needs ? "text-red-600 dark:text-red-400" : "text-brand-600 dark:text-brand-400"
                   : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               }`}
             >
               {is_active && (
-                <span className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-full ${is_needs_update ? "bg-red-500" : "bg-brand-500"}`} />
+                <span className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-full ${is_needs ? "bg-red-500" : "bg-brand-500"}`} />
               )}
               {tab.label}
               {count !== undefined && count > 0 && (
                 <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
-                  is_active && is_needs_update
-                    ? "bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400"
-                    : is_active
-                    ? "bg-brand-100 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400"
-                    : is_needs_update
-                    ? "bg-red-50 text-red-500 dark:bg-red-500/10 dark:text-red-400"
-                    : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+                  is_active && is_needs   ? "bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400"
+                  : is_active             ? "bg-brand-100 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400"
+                  : is_needs              ? "bg-red-50 text-red-500 dark:bg-red-500/10 dark:text-red-400"
+                  :                         "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
                 }`}>
                   {count}
                 </span>
@@ -1203,7 +1206,7 @@ const AdminTrackingDashboard: React.FC = () => {
         <div className="flex flex-1 items-center justify-center p-8">
           <div className="text-center">
             <p className="text-sm text-error-600 dark:text-error-400">{load_error}</p>
-            <button onClick={() => { void loadOrders(active_tab); }} className="mt-2 text-sm font-medium text-brand-500 underline hover:text-brand-600">
+            <button onClick={() => { void loadOrders(status_tab, product_tab); }} className="mt-2 text-sm font-medium text-brand-500 underline hover:text-brand-600">
               Retry
             </button>
           </div>
@@ -1211,15 +1214,15 @@ const AdminTrackingDashboard: React.FC = () => {
       ) : (
         <div className="flex flex-1 overflow-hidden">
 
-          {/* ── Left: order list ──────────────────────────────────────────── */}
-          <div className="flex w-[300px] shrink-0 flex-col border-r border-gray-100 dark:border-gray-800 xl:w-[340px]">
+          {/* ── Order list ───────────────────────────────────────────────── */}
+          <div className="flex w-[320px] shrink-0 flex-col border-r border-gray-100 dark:border-gray-800 xl:w-[360px]">
             <div ref={list_ref} className="flex-1 overflow-y-auto">
               {is_loading ? (
                 Array.from({ length: 6 }).map((_, i) => (
                   <div key={i} className="border-b border-gray-50 px-4 py-3.5 dark:border-gray-800">
                     <div className="mb-2 flex gap-1.5">
                       <Sk className="h-5 w-16 rounded-full" />
-                      <Sk className="h-5 w-14 rounded-full" />
+                      <Sk className="h-5 w-20 rounded-full" />
                     </div>
                     <Sk className="mb-1.5 h-4 w-40" />
                     <Sk className="h-3 w-28" />
@@ -1230,9 +1233,9 @@ const AdminTrackingDashboard: React.FC = () => {
                   <EmptyInboxIcon />
                   <p className="mt-3 text-sm font-medium text-gray-500 dark:text-gray-400">No orders found</p>
                   <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
-                    {active_tab === "needs_update"
+                    {status_tab === "needs_update"
                       ? "All orders have at least one update — great work!"
-                      : `No ${STATUS_CFG[active_tab].label.toLowerCase()} orders at the moment.`}
+                      : `No ${STATUS_CFG[status_tab as OrderStatus].label.toLowerCase()} orders at the moment.`}
                   </p>
                 </div>
               ) : (
@@ -1248,7 +1251,6 @@ const AdminTrackingDashboard: React.FC = () => {
               )}
             </div>
 
-            {/* Pagination */}
             {!is_loading && (
               <Pagination
                 current_page={current_page}
@@ -1263,7 +1265,7 @@ const AdminTrackingDashboard: React.FC = () => {
             )}
           </div>
 
-          {/* ── Right: detail panel ───────────────────────────────────────── */}
+          {/* ── Detail panel ─────────────────────────────────────────────── */}
           <div className="flex flex-1 flex-col overflow-hidden">
             {!selected_order ? (
               <div className="flex flex-1 flex-col items-center justify-center text-center">
@@ -1274,14 +1276,14 @@ const AdminTrackingDashboard: React.FC = () => {
                 </div>
                 <p className="text-sm font-semibold text-gray-600 dark:text-gray-400">Select an order</p>
                 <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                  Choose an order from the list to view or post updates.
+                  Choose an order from the list to view details or post updates.
                 </p>
               </div>
             ) : (
               <OrderDetailPanel
                 key={selected_order.id}
                 order={selected_order}
-                active_tab={active_tab}
+                active_status_tab={status_tab}
                 onStatusChange={handleStatusChange}
                 onUpdatesCountChange={handleUpdatesCountChange}
               />
