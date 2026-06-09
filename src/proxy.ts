@@ -7,9 +7,6 @@ const invitation_routes = ["/accept-invitation", "/client-invitation"];
 const password_reset_routes = ["/reset-password"];
 const google_callback_route = "/auth/google/callback";
 
-/**
- * Returns true when the pathname starts with any of the given prefixes.
- */
 function matchesAny(pathname: string, prefixes: string[]): boolean {
   return prefixes.some((p) => pathname === p || pathname.startsWith(p + "/"));
 }
@@ -19,7 +16,7 @@ function isPublicInvoiceRoute(pathname: string): boolean {
   return /^\/invoices\/[^/]+(\/view|\/pay)$/.test(pathname);
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const token = request.cookies.get("access_token")?.value;
   const primary_role = request.cookies.get(ROLE_COOKIE_NAME)?.value;
   const { pathname } = request.nextUrl;
@@ -34,7 +31,13 @@ export function middleware(request: NextRequest) {
 
   if (!token) {
     // Allow access to auth pages, invitation acceptance, password reset, and public invoice views.
-    if (is_auth_route || is_invitation_route || is_password_reset_route || is_public_invoice_route || pathname === google_callback_route) {
+    if (
+      is_auth_route ||
+      is_invitation_route ||
+      is_password_reset_route ||
+      is_public_invoice_route ||
+      pathname === google_callback_route
+    ) {
       return NextResponse.next();
     }
     // Everything else requires authentication.
