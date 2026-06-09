@@ -69,7 +69,6 @@ export type LoginResponse = AuthResponse | LoginChallengeResponse;
 export interface TwoFactorChallengeData {
   two_factor_token: string;
   code: string;
-  remember_me?: boolean;
 }
 
 export interface MeResponse {
@@ -80,7 +79,6 @@ export interface MeResponse {
 export interface LoginCredentials {
   email: string;
   password: string;
-  remember_me?: boolean;
 }
 
 export interface RegisterData {
