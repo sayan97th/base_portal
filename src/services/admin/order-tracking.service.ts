@@ -93,6 +93,18 @@ export async function listNeedsUpdateOrders(): Promise<TrackingOrdersResponse> {
 }
 
 /**
+ * Fetch a single order tracking summary by ID, searching across all product types.
+ * Roles allowed: super_admin, admin, staff.
+ */
+export async function getTrackingOrder(
+  order_id: string
+): Promise<{ data: import("@/types/admin").TrackingOrderSummary }> {
+  return apiClient.get<{ data: import("@/types/admin").TrackingOrderSummary }>(
+    `/api/admin/tracking/orders/${order_id}`
+  );
+}
+
+/**
  * Update the status of an order directly (without creating a tracking entry).
  * Pass notify_user: true to trigger an email notification to the client.
  * Roles allowed: super_admin, admin, staff.

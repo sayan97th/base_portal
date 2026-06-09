@@ -1,25 +1,18 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
-import type {
-  TrackingOrderSummary,
-  OrderUpdate,
-  CreateOrderUpdatePayload,
-  OrderStatus,
-} from "@/types/admin";
+import type { TrackingOrderSummary, OrderStatus } from "@/types/admin";
 import type { AdminOrderProductType } from "@/types/admin";
-import {
-  listTrackingOrders,
-  listOrderUpdates,
-  createOrderUpdate,
-  deleteOrderUpdate,
-  updateOrderStatus,
-} from "@/services/admin/order-tracking.service";
+import { listTrackingOrders, updateOrderStatus } from "@/services/admin/order-tracking.service";
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
-const PER_PAGE = 12;
+const PER_PAGE = 50;
+
+type ProductFilterKey = AdminOrderProductType | "all";
+type StatusFilterKey = OrderStatus | "needs_update" | "all";
+type SortKey = "created_at" | "last_update_at" | "status" | "product_type" | "updates_count";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -44,158 +37,124 @@ function formatRelativeTime(iso: string): string {
   return formatShortDate(iso);
 }
 
-function formatFullDate(iso: string): string {
-  return new Date(iso).toLocaleString("en-US", {
-    month: "short", day: "numeric", year: "numeric",
-    hour: "numeric", minute: "2-digit",
-  });
-}
-
-function getDaysSince(iso: string): number {
-  return Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-}
-
 // ─── Product type config ───────────────────────────────────────────────────────
 
-type ProductTypeKey = AdminOrderProductType | "all";
-
-interface ProductTypeCfg {
-  label: string;
-  short_label: string;
-  badge: string;
-  dot: string;
-  full_view_url: (id: string) => string;
-}
-
-const PRODUCT_TYPE_CFG: Record<AdminOrderProductType, ProductTypeCfg> = {
+const PRODUCT_TYPE_CFG: Record<AdminOrderProductType, { label: string; badge: string; dot: string; full_view_url: (id: string) => string }> = {
   link_building: {
     label: "Link Building",
-    short_label: "Link Building",
     badge: "bg-brand-50 text-brand-700 ring-brand-200 dark:bg-brand-500/10 dark:text-brand-400 dark:ring-brand-500/20",
     dot: "bg-brand-500",
     full_view_url: (id) => `/admin/orders/${id}/tracking`,
   },
   new_content: {
     label: "New Content",
-    short_label: "New Content",
     badge: "bg-purple-50 text-purple-700 ring-purple-200 dark:bg-purple-500/10 dark:text-purple-400 dark:ring-purple-500/20",
     dot: "bg-purple-500",
     full_view_url: (id) => `/admin/new-content/orders/${id}`,
   },
   content_optimization: {
     label: "Content Refresh",
-    short_label: "Content Refresh",
     badge: "bg-teal-50 text-teal-700 ring-teal-200 dark:bg-teal-500/10 dark:text-teal-400 dark:ring-teal-500/20",
     dot: "bg-teal-500",
     full_view_url: (id) => `/admin/content-optimization/orders/${id}`,
   },
   content_brief: {
     label: "SME Content",
-    short_label: "SME Content",
     badge: "bg-orange-50 text-orange-700 ring-orange-200 dark:bg-orange-500/10 dark:text-orange-400 dark:ring-orange-500/20",
     dot: "bg-orange-500",
     full_view_url: (id) => `/admin/content-briefs/orders/${id}`,
   },
   content_refresh: {
     label: "Content Refresh",
-    short_label: "Content Refresh",
     badge: "bg-teal-50 text-teal-700 ring-teal-200 dark:bg-teal-500/10 dark:text-teal-400 dark:ring-teal-500/20",
     dot: "bg-teal-500",
     full_view_url: (id) => `/admin/content-refresh/orders/${id}`,
   },
 };
 
-const PRODUCT_TYPE_TABS: { key: ProductTypeKey; label: string }[] = [
-  { key: "all",                label: "All Products" },
-  { key: "link_building",      label: "Link Building" },
-  { key: "new_content",        label: "New Content" },
+const PRODUCT_TABS: { key: ProductFilterKey; label: string }[] = [
+  { key: "all",                  label: "All Products" },
+  { key: "link_building",        label: "Link Building" },
+  { key: "new_content",          label: "New Content" },
   { key: "content_optimization", label: "Content Refresh" },
-  { key: "content_brief",      label: "SME Content" },
+  { key: "content_brief",        label: "SME Content" },
 ];
 
 // ─── Status config ─────────────────────────────────────────────────────────────
 
-const STATUS_CFG: Record<OrderStatus, { label: string; dot: string; badge: string; border_l: string }> = {
+const STATUS_CFG: Record<OrderStatus, { label: string; dot: string; badge: string }> = {
   pending: {
     label: "Pending",
     dot: "bg-warning-500",
     badge: "bg-warning-50 text-warning-700 ring-warning-200 dark:bg-warning-500/10 dark:text-warning-400 dark:ring-warning-500/20",
-    border_l: "border-l-warning-400",
   },
   processing: {
     label: "Processing",
     dot: "bg-blue-500",
     badge: "bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:ring-blue-500/20",
-    border_l: "border-l-blue-400",
   },
   completed: {
     label: "Completed",
     dot: "bg-success-500",
     badge: "bg-success-50 text-success-700 ring-success-200 dark:bg-success-500/10 dark:text-success-400 dark:ring-success-500/20",
-    border_l: "border-l-success-400",
   },
   cancelled: {
     label: "Cancelled",
     dot: "bg-error-500",
     badge: "bg-error-50 text-error-700 ring-error-200 dark:bg-error-500/10 dark:text-error-400 dark:ring-error-500/20",
-    border_l: "border-l-error-400",
   },
   payment_pending: {
     label: "Payment Pending",
     dot: "bg-amber-500",
     badge: "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
-    border_l: "border-l-amber-400",
   },
 };
 
-type TrackingTab = OrderStatus | "needs_update";
+const ALL_STATUSES: OrderStatus[] = ["pending", "processing", "completed", "cancelled", "payment_pending"];
 
-const STATUS_TABS: { key: TrackingTab; label: string }[] = [
-  { key: "needs_update", label: "Needs Update" },
-  { key: "pending",      label: "Pending" },
-  { key: "processing",   label: "Processing" },
-  { key: "completed",    label: "Completed" },
-  { key: "cancelled",    label: "Cancelled" },
+const STATUS_FILTER_OPTIONS: { key: StatusFilterKey; label: string }[] = [
+  { key: "all",             label: "All Statuses" },
+  { key: "needs_update",    label: "Needs Update" },
+  { key: "pending",         label: "Pending" },
+  { key: "processing",      label: "Processing" },
+  { key: "completed",       label: "Completed" },
+  { key: "cancelled",       label: "Cancelled" },
+  { key: "payment_pending", label: "Payment Pending" },
 ];
-
-const FINALIZED_STATUSES: OrderStatus[] = ["completed", "cancelled"];
-const UPDATE_STATUS_OPTS: OrderStatus[] = ["pending", "processing", "completed", "cancelled"];
 
 // ─── Icons ─────────────────────────────────────────────────────────────────────
 
-const PlusIcon = () => (
-  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+const RefreshIcon = ({ spinning }: { spinning?: boolean }) => (
+  <svg className={`h-4 w-4 ${spinning ? "animate-spin" : ""}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
   </svg>
 );
 
-const MailIcon = () => (
-  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+const ChevronUpDownIcon = () => (
+  <svg className="h-3 w-3 opacity-50" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
   </svg>
 );
 
-const TrashIcon = () => (
-  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-  </svg>
-);
-
-const ExternalLinkIcon = () => (
-  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-  </svg>
-);
-
-const EmptyInboxIcon = () => (
-  <svg className="h-10 w-10 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 13.5h3.86a2.25 2.25 0 012.012 1.244l.256.512a2.25 2.25 0 002.013 1.244h3.218a2.25 2.25 0 002.013-1.244l.256-.512a2.25 2.25 0 012.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 00-2.15-1.588H6.911a2.25 2.25 0 00-2.15 1.588L2.35 13.177a2.235 2.235 0 00-.1.661z" />
+const SortIcon = ({ dir }: { dir?: "asc" | "desc" | null }) => (
+  <svg className={`ml-1 inline h-3 w-3 ${dir ? "opacity-80" : "opacity-30"}`} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+    {dir === "asc"
+      ? <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+      : dir === "desc"
+      ? <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+      : <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 15L12 18.75 15.75 15M8.25 9L12 5.25l3.75 3.75" />}
   </svg>
 );
 
 const AlertIcon = () => (
   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+  </svg>
+);
+
+const EmptyIcon = () => (
+  <svg className="h-10 w-10 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 13.5h3.86a2.25 2.25 0 012.012 1.244l.256.512a2.25 2.25 0 002.013 1.244h3.218a2.25 2.25 0 002.013-1.244l.256-.512a2.25 2.25 0 012.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 00-2.15-1.588H6.911a2.25 2.25 0 00-2.15 1.588L2.35 13.177a2.235 2.235 0 00-.1.661z" />
   </svg>
 );
 
@@ -211,10 +170,10 @@ const ChevronRightIcon = () => (
   </svg>
 );
 
-// ─── Skeleton ─────────────────────────────────────────────────────────────────
+// ─── Skeleton ──────────────────────────────────────────────────────────────────
 
 const Sk = ({ className }: { className?: string }) => (
-  <div className={`animate-pulse rounded bg-gray-100 dark:bg-gray-800 ${className}`} />
+  <div className={`animate-pulse rounded bg-gray-100 dark:bg-gray-800 ${className ?? ""}`} />
 );
 
 // ─── Status Change Dialog ──────────────────────────────────────────────────────
@@ -302,6 +261,81 @@ const StatusChangeDialog: React.FC<StatusChangeDialogProps> = ({
   );
 };
 
+// ─── Status Cell with Quick-Change Popover ─────────────────────────────────────
+
+interface StatusCellProps {
+  order: TrackingOrderSummary;
+  onRequestChange: (order: TrackingOrderSummary, new_status: OrderStatus) => void;
+}
+
+const StatusCell: React.FC<StatusCellProps> = ({ order, onRequestChange }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const cfg = STATUS_CFG[order.status];
+
+  useEffect(() => {
+    if (!open) return;
+    const handleOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative inline-block">
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+        className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 transition hover:brightness-95 ${cfg.badge}`}
+        title="Click to change status"
+      >
+        {order.status === "processing" ? (
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-60" />
+            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-500" />
+          </span>
+        ) : (
+          <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
+        )}
+        {cfg.label}
+        <ChevronUpDownIcon />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-30 mt-1 w-44 rounded-xl border border-gray-200 bg-white py-1 shadow-xl dark:border-gray-700 dark:bg-gray-900">
+          <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+            Change status to
+          </p>
+          {ALL_STATUSES.map((s) => {
+            const c = STATUS_CFG[s];
+            const is_current = s === order.status;
+            return (
+              <button
+                key={s}
+                disabled={is_current}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpen(false);
+                  onRequestChange(order, s);
+                }}
+                className={`flex w-full items-center gap-2 px-3 py-1.5 text-xs transition ${
+                  is_current
+                    ? "cursor-default opacity-40"
+                    : "hover:bg-gray-50 dark:hover:bg-gray-800"
+                }`}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${c.dot}`} />
+                <span className="text-gray-700 dark:text-gray-200">{c.label}</span>
+                {is_current && <span className="ml-auto text-[10px] text-gray-400">current</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── Pagination ────────────────────────────────────────────────────────────────
 
 interface PaginationProps {
@@ -318,14 +352,26 @@ const Pagination: React.FC<PaginationProps> = ({ current_page, total_pages, tota
   const to   = Math.min(current_page * per_page, total_items);
 
   return (
-    <div className="flex items-center justify-between border-t border-gray-100 px-4 py-2.5 dark:border-gray-800">
-      <span className="text-[11px] text-gray-400 dark:text-gray-500">{from}–{to} of {total_items}</span>
+    <div className="flex items-center justify-between border-t border-gray-100 px-5 py-3 dark:border-gray-800">
+      <span className="text-xs text-gray-400 dark:text-gray-500">
+        {from}–{to} of {total_items} orders
+      </span>
       <div className="flex items-center gap-1">
-        <button onClick={() => onChange(current_page - 1)} disabled={current_page === 1} className="flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 dark:hover:bg-gray-800 dark:hover:text-gray-300">
+        <button
+          onClick={() => onChange(current_page - 1)}
+          disabled={current_page === 1}
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+        >
           <ChevronLeftIcon />
         </button>
-        <span className="min-w-12 text-center text-[11px] font-medium text-gray-600 dark:text-gray-300">{current_page} / {total_pages}</span>
-        <button onClick={() => onChange(current_page + 1)} disabled={current_page === total_pages} className="flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 dark:hover:bg-gray-800 dark:hover:text-gray-300">
+        <span className="min-w-16 text-center text-xs font-medium text-gray-600 dark:text-gray-300">
+          {current_page} / {total_pages}
+        </span>
+        <button
+          onClick={() => onChange(current_page + 1)}
+          disabled={current_page === total_pages}
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+        >
           <ChevronRightIcon />
         </button>
       </div>
@@ -333,965 +379,504 @@ const Pagination: React.FC<PaginationProps> = ({ current_page, total_pages, tota
   );
 };
 
-// ─── Order list card ──────────────────────────────────────────────────────────
+// ─── Main dashboard ───────────────────────────────────────────────────────────
 
-interface OrderCardProps {
+interface DialogState {
   order: TrackingOrderSummary;
-  is_selected: boolean;
-  onClick: () => void;
+  new_status: OrderStatus;
+  is_loading: boolean;
 }
 
-const OrderCard: React.FC<OrderCardProps> = ({ order, is_selected, onClick }) => {
-  const status_cfg  = STATUS_CFG[order.status];
-  const product_cfg = PRODUCT_TYPE_CFG[order.product_type];
-  const needs_update = order.updates_count === 0;
-  const days = getDaysSince(order.created_at);
-  const initials = `${order.user.first_name[0]}${order.user.last_name[0]}`.toUpperCase();
+const AdminTrackingDashboard: React.FC = () => {
+  const [orders, setOrders]           = useState<TrackingOrderSummary[]>([]);
+  const [is_loading, setIsLoading]    = useState(true);
+  const [load_error, setLoadError]    = useState<string | null>(null);
+  const [search, setSearch]           = useState("");
+  const [product_tab, setProductTab]  = useState<ProductFilterKey>("all");
+  const [status_filter, setStatusFilter] = useState<StatusFilterKey>("all");
+  const [sort_key, setSortKey]        = useState<SortKey>("created_at");
+  const [sort_dir, setSortDir]        = useState<"asc" | "desc">("desc");
+  const [current_page, setCurrentPage] = useState(1);
+  const [dialog, setDialog]           = useState<DialogState | null>(null);
+  const [toast, setToast]             = useState<string | null>(null);
 
-  return (
-    <button
-      onClick={onClick}
-      className={`group w-full border-l-2 text-left transition-all ${
-        is_selected
-          ? `${status_cfg.border_l} bg-brand-50 dark:bg-brand-500/10`
-          : `border-l-transparent hover:border-l-gray-300 hover:bg-gray-50 dark:hover:bg-white/[0.03]`
-      }`}
-    >
-      <div className="px-4 py-3.5">
-        {/* Top row: status + product type + update badge */}
-        <div className="mb-2 flex flex-wrap items-center gap-1.5">
-          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${status_cfg.badge}`}>
-            {order.status === "processing" ? (
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-60" />
-                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-500" />
-              </span>
-            ) : (
-              <span className={`h-1.5 w-1.5 rounded-full ${status_cfg.dot}`} />
-            )}
-            {status_cfg.label}
-          </span>
+  const loadOrders = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      const product_type = product_tab === "all" ? undefined : product_tab as AdminOrderProductType;
+      const res = await listTrackingOrders({ product_type });
+      setOrders(res.data);
+    } catch {
+      setLoadError("Failed to load orders. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [product_tab]);
 
-          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${product_cfg.badge}`}>
-            <span className={`h-1.5 w-1.5 rounded-full ${product_cfg.dot}`} />
-            {product_cfg.short_label}
-          </span>
+  useEffect(() => {
+    void loadOrders();
+  }, [loadOrders]);
 
-          {needs_update ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-600 ring-1 ring-red-200 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/20">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
-              No updates
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400">
-              {order.updates_count} update{order.updates_count !== 1 ? "s" : ""}
-            </span>
-          )}
-        </div>
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 4000);
+  }, []);
 
-        {/* Order title */}
-        <p className={`truncate text-sm font-semibold ${is_selected ? "text-brand-700 dark:text-brand-300" : "text-gray-900 dark:text-white"}`}>
-          {order.order_title || product_cfg.label + " Order"}
-        </p>
+  // ── Derived filtered + sorted list ─────────────────────────────────────────
 
-        {/* Customer + meta */}
-        <div className="mt-1.5 flex items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-bold text-gray-600 dark:bg-gray-700 dark:text-gray-300">
-              {initials}
-            </div>
-            <span className="truncate text-xs text-gray-500 dark:text-gray-400">
-              {order.user.first_name} {order.user.last_name}
-            </span>
-          </div>
-          <div className="flex shrink-0 items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
-            <span>{days === 0 ? "today" : `${days}d`}</span>
-            {order.last_update_at && (
-              <>
-                <span className="text-gray-300 dark:text-gray-600">·</span>
-                <span>{formatRelativeTime(order.last_update_at)}</span>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    </button>
-  );
-};
+  const filtered_orders = useMemo(() => {
+    let list = orders;
 
-// ─── Update form ──────────────────────────────────────────────────────────────
+    if (status_filter === "needs_update") {
+      list = list.filter((o) => o.updates_count === 0);
+    } else if (status_filter !== "all") {
+      list = list.filter((o) => o.status === status_filter);
+    }
 
-interface UpdateFormProps {
-  current_status: OrderStatus;
-  is_submitting: boolean;
-  onSubmit: (payload: CreateOrderUpdatePayload) => Promise<void>;
-}
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter((o) =>
+        (o.order_title ?? "").toLowerCase().includes(q) ||
+        o.user.first_name.toLowerCase().includes(q) ||
+        o.user.last_name.toLowerCase().includes(q) ||
+        o.user.email.toLowerCase().includes(q)
+      );
+    }
 
-const UpdateForm: React.FC<UpdateFormProps> = ({ current_status, is_submitting, onSubmit }) => {
-  const [title, setTitle]               = useState("");
-  const [message, setMessage]           = useState("");
-  const [status_change, setStatusChange] = useState<OrderStatus>(current_status);
-  const [send_email, setSendEmail]       = useState(true);
-  const [errors, setErrors]             = useState<{ title?: string; message?: string }>({});
+    list = [...list].sort((a, b) => {
+      let cmp = 0;
+      if (sort_key === "created_at") {
+        cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      } else if (sort_key === "last_update_at") {
+        const ta = a.last_update_at ? new Date(a.last_update_at).getTime() : 0;
+        const tb = b.last_update_at ? new Date(b.last_update_at).getTime() : 0;
+        cmp = ta - tb;
+      } else if (sort_key === "status") {
+        cmp = a.status.localeCompare(b.status);
+      } else if (sort_key === "product_type") {
+        cmp = a.product_type.localeCompare(b.product_type);
+      } else if (sort_key === "updates_count") {
+        cmp = a.updates_count - b.updates_count;
+      }
+      return sort_dir === "asc" ? cmp : -cmp;
+    });
 
-  useEffect(() => { setStatusChange(current_status); }, [current_status]);
+    return list;
+  }, [orders, status_filter, search, sort_key, sort_dir]);
 
-  function validate(): boolean {
-    const e: typeof errors = {};
-    if (!title.trim()) e.title = "Required";
-    if (!message.trim()) e.message = "Required";
-    setErrors(e);
-    return !Object.keys(e).length;
+  const total_pages      = Math.ceil(filtered_orders.length / PER_PAGE);
+  const paginated_orders = filtered_orders.slice((current_page - 1) * PER_PAGE, current_page * PER_PAGE);
+
+  // ── Sorting ─────────────────────────────────────────────────────────────────
+
+  function toggleSort(key: SortKey) {
+    if (sort_key === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("desc");
+    }
+    setCurrentPage(1);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!validate()) return;
-    await onSubmit({ title: title.trim(), message: message.trim(), status_change, send_email });
-    setTitle("");
-    setMessage("");
+  function sortDirFor(key: SortKey): "asc" | "desc" | null {
+    return sort_key === key ? sort_dir : null;
   }
 
-  return (
-    <form onSubmit={handleSubmit} className="space-y-3">
-      <div>
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => { setTitle(e.target.value); if (errors.title) setErrors(p => ({ ...p, title: undefined })); }}
-          placeholder="Update title…"
-          disabled={is_submitting}
-          className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:opacity-60 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500 ${
-            errors.title ? "border-error-300 dark:border-error-500" : "border-gray-200 focus:border-brand-400 dark:border-gray-700"
-          }`}
-        />
-        {errors.title && <p className="mt-0.5 text-xs text-error-500">{errors.title}</p>}
-      </div>
+  // ── Tab switching ────────────────────────────────────────────────────────────
 
-      <div>
-        <textarea
-          rows={4}
-          value={message}
-          onChange={(e) => { setMessage(e.target.value); if (errors.message) setErrors(p => ({ ...p, message: undefined })); }}
-          placeholder="Describe what's happening with this order…"
-          disabled={is_submitting}
-          className={`w-full resize-none rounded-xl border px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:opacity-60 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500 ${
-            errors.message ? "border-error-300 dark:border-error-500" : "border-gray-200 focus:border-brand-400 dark:border-gray-700"
-          }`}
-        />
-        {errors.message && <p className="mt-0.5 text-xs text-error-500">{errors.message}</p>}
-      </div>
+  function switchProductTab(tab: ProductFilterKey) {
+    setProductTab(tab);
+    setCurrentPage(1);
+  }
 
-      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-        {UPDATE_STATUS_OPTS.map((s) => {
-          const c = STATUS_CFG[s];
-          return (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setStatusChange(s)}
-              disabled={is_submitting}
-              className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition disabled:opacity-60 ${
-                status_change === s
-                  ? `${c.badge} ring-1 border-transparent`
-                  : "border-gray-100 bg-gray-50 text-gray-500 hover:bg-white dark:border-gray-800 dark:bg-gray-800/50 dark:text-gray-400 dark:hover:bg-gray-800"
-              }`}
-            >
-              <span className={`h-2 w-2 rounded-full ${c.dot}`} />
-              {c.label}
-              {s === current_status && <span className="ml-auto text-[9px] opacity-50">now</span>}
-            </button>
-          );
-        })}
-      </div>
+  function switchStatusFilter(val: StatusFilterKey) {
+    setStatusFilter(val);
+    setCurrentPage(1);
+  }
 
-      <div className="flex items-center justify-between gap-3">
-        <label className="flex cursor-pointer items-center gap-2">
-          <input
-            type="checkbox"
-            checked={send_email}
-            onChange={(e) => setSendEmail(e.target.checked)}
-            disabled={is_submitting}
-            className="h-3.5 w-3.5 rounded border-gray-300 text-brand-600 focus:ring-brand-500 disabled:opacity-60"
-          />
-          <span className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-            <MailIcon />
-            Notify client
-          </span>
-        </label>
+  // ── Status change ────────────────────────────────────────────────────────────
 
-        <button
-          type="submit"
-          disabled={is_submitting}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-brand-500 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-brand-500/25 transition hover:bg-brand-600 disabled:opacity-60"
-        >
-          {is_submitting ? (
-            <>
-              <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              Posting…
-            </>
-          ) : (
-            <><PlusIcon />Post Update</>
-          )}
-        </button>
-      </div>
-    </form>
-  );
-};
+  function handleRequestStatusChange(order: TrackingOrderSummary, new_status: OrderStatus) {
+    setDialog({ order, new_status, is_loading: false });
+  }
 
-// ─── Timeline item ────────────────────────────────────────────────────────────
+  async function handleConfirmStatusChange(notify_user: boolean) {
+    if (!dialog) return;
+    setDialog((d) => d ? { ...d, is_loading: true } : null);
+    try {
+      await updateOrderStatus(dialog.order.id, dialog.new_status, notify_user);
+      setOrders((prev) =>
+        prev.map((o) => o.id === dialog.order.id ? { ...o, status: dialog.new_status } : o)
+      );
+      showToast(
+        notify_user
+          ? `Status changed to ${STATUS_CFG[dialog.new_status].label} — client notified.`
+          : `Status changed to ${STATUS_CFG[dialog.new_status].label}.`
+      );
+      setDialog(null);
+    } catch {
+      setDialog((d) => d ? { ...d, is_loading: false } : null);
+    }
+  }
 
-interface TimelineItemProps {
-  update: OrderUpdate;
-  is_last: boolean;
-  on_delete: (id: string) => void;
-  is_deleting: boolean;
-}
+  // ── Needs-update count ───────────────────────────────────────────────────────
 
-const TimelineItem: React.FC<TimelineItemProps> = ({ update, is_last, on_delete, is_deleting }) => {
-  const [confirm, setConfirm] = useState(false);
-  const cfg      = update.status_change ? STATUS_CFG[update.status_change] : null;
-  const initials = `${update.created_by.first_name[0]}${update.created_by.last_name[0]}`.toUpperCase();
+  const needs_update_count = orders.filter((o) => o.updates_count === 0).length;
 
   return (
-    <div className="group relative flex gap-3">
-      {!is_last && (
-        <div className="absolute left-[15px] top-8 bottom-0 w-px bg-gray-100 dark:bg-gray-800" />
+    <>
+      {dialog && (
+        <StatusChangeDialog
+          is_open
+          order_title={dialog.order.order_title ?? PRODUCT_TYPE_CFG[dialog.order.product_type].label + " Order"}
+          current_status={dialog.order.status}
+          new_status={dialog.new_status}
+          is_loading={dialog.is_loading}
+          onConfirm={handleConfirmStatusChange}
+          onCancel={() => setDialog(null)}
+        />
       )}
-      <div className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-xs font-bold text-white shadow-sm ring-2 ring-white dark:ring-gray-900">
-        {initials}
-      </div>
-      <div className={`flex-1 ${is_last ? "" : "pb-5"}`}>
-        <div className="rounded-xl border border-gray-100 bg-white p-3.5 dark:border-gray-800 dark:bg-white/[0.03]">
-          <div className="mb-1.5 flex flex-wrap items-start justify-between gap-1.5">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-xs font-semibold text-gray-900 dark:text-white">{update.title}</span>
-              {cfg && (
-                <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ring-1 ${cfg.badge}`}>
-                  <span className={`h-1 w-1 rounded-full ${update.status_change ? STATUS_CFG[update.status_change].dot : ""}`} />
-                  {cfg.label}
-                </span>
-              )}
-              {update.send_email && (
-                <span className="inline-flex items-center gap-0.5 rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-600 ring-1 ring-sky-100 dark:bg-sky-500/10 dark:text-sky-400 dark:ring-sky-500/20">
-                  <MailIcon />sent
-                </span>
-              )}
+
+      <div className="flex h-[calc(100vh-6rem)] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+
+        {/* ── Top bar ─────────────────────────────────────────────────────────── */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4 dark:border-gray-800">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-500 text-white shadow-md shadow-brand-500/30">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+              </svg>
             </div>
-            <div className="flex shrink-0 items-center gap-1.5">
-              <time title={formatFullDate(update.created_at)} className="text-[10px] text-gray-400 dark:text-gray-500">
-                {formatRelativeTime(update.created_at)}
-              </time>
-              {!confirm ? (
-                <button
-                  onClick={() => setConfirm(true)}
-                  className="hidden rounded p-0.5 text-gray-300 hover:bg-error-50 hover:text-error-500 group-hover:block dark:text-gray-700 dark:hover:bg-error-500/10 dark:hover:text-error-400"
-                >
-                  <TrashIcon />
-                </button>
-              ) : (
-                <div className="flex items-center gap-1">
-                  <button onClick={() => on_delete(update.id)} disabled={is_deleting} className="text-[10px] font-semibold text-error-500 hover:underline disabled:opacity-60">Yes</button>
-                  <span className="text-gray-300">/</span>
-                  <button onClick={() => setConfirm(false)} className="text-[10px] text-gray-400 hover:underline">No</button>
-                </div>
-              )}
+            <div>
+              <h1 className="text-base font-bold text-gray-900 dark:text-white">Order Tracking</h1>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {is_loading
+                  ? "Loading orders…"
+                  : `${filtered_orders.length} order${filtered_orders.length !== 1 ? "s" : ""}${search ? " matching search" : ""}`}
+              </p>
             </div>
           </div>
-          <p className="text-xs leading-relaxed text-gray-600 dark:text-gray-400">{update.message}</p>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Search */}
+            <div className="relative">
+              <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Search orders or clients…"
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+                className="h-8 rounded-lg border border-gray-200 bg-gray-50 pl-8 pr-3 text-xs outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-500"
+                style={{ width: 220 }}
+              />
+            </div>
+
+            {/* Status filter */}
+            <select
+              value={status_filter}
+              onChange={(e) => switchStatusFilter(e.target.value as StatusFilterKey)}
+              className="h-8 rounded-lg border border-gray-200 bg-gray-50 px-2 text-xs outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+            >
+              {STATUS_FILTER_OPTIONS.map((opt) => (
+                <option key={opt.key} value={opt.key}>{opt.label}</option>
+              ))}
+            </select>
+
+            {/* Refresh */}
+            <button
+              onClick={() => { void loadOrders(); }}
+              disabled={is_loading}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-400 transition hover:bg-gray-50 hover:text-gray-600 disabled:opacity-50 dark:border-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+              title="Refresh"
+            >
+              <RefreshIcon spinning={is_loading} />
+            </button>
+          </div>
         </div>
-      </div>
-    </div>
-  );
-};
 
-// ─── Status changer (for finalized orders) ────────────────────────────────────
-
-interface StatusChangerProps {
-  current_status: OrderStatus;
-  onRequestChange: (new_status: OrderStatus) => void;
-}
-
-const StatusChanger: React.FC<StatusChangerProps> = ({ current_status, onRequestChange }) => {
-  const [selected, setSelected] = useState<OrderStatus>(current_status);
-
-  useEffect(() => { setSelected(current_status); }, [current_status]);
-
-  const other_statuses = UPDATE_STATUS_OPTS.filter((s) => s !== current_status);
-
-  return (
-    <div className="rounded-xl border border-warning-200 bg-warning-50/60 p-4 dark:border-warning-500/20 dark:bg-warning-500/[0.06]">
-      <div className="mb-3 flex items-center gap-2">
-        <span className="text-warning-600 dark:text-warning-400"><AlertIcon /></span>
-        <p className="text-xs font-semibold text-warning-800 dark:text-warning-300">
-          This order is{" "}
-          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ring-1 ${STATUS_CFG[current_status].badge}`}>
-            <span className={`h-1.5 w-1.5 rounded-full ${STATUS_CFG[current_status].dot}`} />
-            {STATUS_CFG[current_status].label}
-          </span>
-          . You can reopen it by changing the status.
-        </p>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-gray-500 dark:text-gray-400">Change to:</span>
-        <div className="flex flex-wrap gap-1.5">
-          {other_statuses.map((s) => {
-            const c = STATUS_CFG[s];
+        {/* ── Product type tabs ────────────────────────────────────────────────── */}
+        <div className="flex items-center gap-0 overflow-x-auto border-b border-gray-100 bg-gray-50/50 px-4 dark:border-gray-800 dark:bg-gray-900/50">
+          {PRODUCT_TABS.map((tab) => {
+            const is_active = product_tab === tab.key;
+            const product_cfg = tab.key !== "all" ? PRODUCT_TYPE_CFG[tab.key as AdminOrderProductType] : null;
             return (
               <button
-                key={s}
-                type="button"
-                onClick={() => setSelected(s)}
-                className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
-                  selected === s
-                    ? `${c.badge} ring-1 border-transparent`
-                    : "border-gray-200 bg-white text-gray-500 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+                key={tab.key}
+                onClick={() => switchProductTab(tab.key)}
+                className={`relative flex shrink-0 items-center gap-1.5 px-3.5 py-2.5 text-xs font-medium transition-colors ${
+                  is_active
+                    ? "text-brand-600 dark:text-brand-400"
+                    : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                 }`}
               >
-                <span className={`h-2 w-2 rounded-full ${c.dot}`} />{c.label}
+                {is_active && <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-brand-500" />}
+                {product_cfg && <span className={`h-2 w-2 rounded-full ${product_cfg.dot}`} />}
+                {tab.label}
               </button>
             );
           })}
         </div>
-        <button
-          type="button"
-          onClick={() => onRequestChange(selected)}
-          disabled={selected === current_status}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm shadow-brand-500/25 transition hover:bg-brand-600 disabled:opacity-40"
-        >
-          Apply change
-        </button>
-      </div>
-    </div>
-  );
-};
 
-// ─── Order detail panel ───────────────────────────────────────────────────────
+        {/* ── Toast ───────────────────────────────────────────────────────────── */}
+        {toast && (
+          <div className="flex items-center gap-2 border-b border-success-200 bg-success-50 px-5 py-2 text-xs font-medium text-success-700 dark:border-success-500/20 dark:bg-success-500/10 dark:text-success-400">
+            <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {toast}
+          </div>
+        )}
 
-interface OrderDetailPanelProps {
-  order: TrackingOrderSummary;
-  active_status_tab: TrackingTab;
-  onStatusChange: (id: string, status: OrderStatus) => void;
-  onUpdatesCountChange: (id: string, count: number, last_at: string | null) => void;
-}
+        {/* ── Needs-update alert banner ────────────────────────────────────────── */}
+        {!is_loading && needs_update_count > 0 && status_filter !== "needs_update" && (
+          <div className="flex items-center justify-between gap-3 border-b border-red-100 bg-red-50 px-5 py-2 dark:border-red-500/20 dark:bg-red-500/[0.06]">
+            <div className="flex items-center gap-2 text-xs font-medium text-red-700 dark:text-red-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
+              {needs_update_count} order{needs_update_count !== 1 ? "s" : ""} without any updates yet
+            </div>
+            <button
+              onClick={() => switchStatusFilter("needs_update")}
+              className="text-xs font-semibold text-red-600 underline-offset-2 hover:underline dark:text-red-400"
+            >
+              View them
+            </button>
+          </div>
+        )}
 
-const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
-  order, active_status_tab, onStatusChange, onUpdatesCountChange,
-}) => {
-  const [updates, setUpdates]               = useState<OrderUpdate[]>([]);
-  const [current_status, setCurrentStatus] = useState<OrderStatus>(order.status);
-  const [is_loading, setIsLoading]         = useState(true);
-  const [is_submitting, setIsSubmitting]   = useState(false);
-  const [deleting_id, setDeletingId]       = useState<string | null>(null);
-  const [feedback, setFeedback]             = useState<{ type: "success" | "error"; msg: string } | null>(null);
-  const [dialog_open, setDialogOpen]       = useState(false);
-  const [dialog_new_status, setDialogNewStatus] = useState<OrderStatus>("pending");
-  const [dialog_loading, setDialogLoading] = useState(false);
+        {/* ── Table area ──────────────────────────────────────────────────────── */}
+        {load_error ? (
+          <div className="flex flex-1 items-center justify-center p-8">
+            <div className="text-center">
+              <p className="text-sm text-error-600 dark:text-error-400">{load_error}</p>
+              <button onClick={() => { void loadOrders(); }} className="mt-2 text-sm font-medium text-brand-500 underline hover:text-brand-600">
+                Retry
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-1 flex-col overflow-hidden">
+            <div className="flex-1 overflow-auto">
+              <table className="min-w-full border-collapse text-xs">
+                <thead className="sticky top-0 z-10">
+                  {/* Group header row */}
+                  <tr>
+                    <th className="border-b border-r border-gray-200 bg-gray-100 px-3 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400" colSpan={4}>
+                      Order Details
+                    </th>
+                    <th className="border-b border-r border-purple-200 bg-purple-50 px-3 py-1.5 text-center text-[10px] font-semibold uppercase tracking-wider text-purple-600 dark:border-purple-700 dark:bg-purple-900/20 dark:text-purple-400" colSpan={2}>
+                      Status &amp; Updates
+                    </th>
+                    <th className="border-b border-r border-amber-200 bg-amber-50 px-3 py-1.5 text-center text-[10px] font-semibold uppercase tracking-wider text-amber-600 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-400" colSpan={2}>
+                      Dates
+                    </th>
+                    <th className="border-b border-gray-200 bg-gray-100 px-3 py-1.5 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+                      Actions
+                    </th>
+                  </tr>
+                  {/* Column headers */}
+                  <tr className="bg-white dark:bg-gray-900">
+                    <th className="border-b border-r border-gray-100 px-3 py-2 text-left font-semibold text-gray-600 dark:border-gray-800 dark:text-gray-300" style={{ minWidth: 40 }}>
+                      #
+                    </th>
+                    <th
+                      className="cursor-pointer border-b border-r border-gray-100 px-3 py-2 text-left font-semibold text-gray-600 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800/50"
+                      style={{ minWidth: 130 }}
+                      onClick={() => toggleSort("product_type")}
+                    >
+                      Product<SortIcon dir={sortDirFor("product_type")} />
+                    </th>
+                    <th className="border-b border-r border-gray-100 px-3 py-2 text-left font-semibold text-gray-600 dark:border-gray-800 dark:text-gray-300" style={{ minWidth: 220 }}>
+                      Order Title
+                    </th>
+                    <th className="border-b border-r border-gray-100 px-3 py-2 text-left font-semibold text-gray-600 dark:border-gray-800 dark:text-gray-300" style={{ minWidth: 160 }}>
+                      Client
+                    </th>
+                    <th
+                      className="cursor-pointer border-b border-r border-gray-100 px-3 py-2 text-left font-semibold text-gray-600 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800/50"
+                      style={{ minWidth: 150 }}
+                      onClick={() => toggleSort("status")}
+                    >
+                      Status<SortIcon dir={sortDirFor("status")} />
+                    </th>
+                    <th
+                      className="cursor-pointer border-b border-r border-gray-100 px-3 py-2 text-center font-semibold text-gray-600 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800/50"
+                      style={{ minWidth: 90 }}
+                      onClick={() => toggleSort("updates_count")}
+                    >
+                      Updates<SortIcon dir={sortDirFor("updates_count")} />
+                    </th>
+                    <th
+                      className="cursor-pointer border-b border-r border-gray-100 px-3 py-2 text-left font-semibold text-gray-600 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800/50"
+                      style={{ minWidth: 110 }}
+                      onClick={() => toggleSort("last_update_at")}
+                    >
+                      Last Activity<SortIcon dir={sortDirFor("last_update_at")} />
+                    </th>
+                    <th
+                      className="cursor-pointer border-b border-r border-gray-100 px-3 py-2 text-left font-semibold text-gray-600 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800/50"
+                      style={{ minWidth: 100 }}
+                      onClick={() => toggleSort("created_at")}
+                    >
+                      Created<SortIcon dir={sortDirFor("created_at")} />
+                    </th>
+                    <th className="border-b border-gray-100 px-3 py-2 text-center font-semibold text-gray-600 dark:border-gray-800 dark:text-gray-300" style={{ minWidth: 80 }}>
+                      View
+                    </th>
+                  </tr>
+                </thead>
 
-  const product_cfg  = PRODUCT_TYPE_CFG[order.product_type];
-  const is_finalized = active_status_tab !== "needs_update" && FINALIZED_STATUSES.includes(active_status_tab as OrderStatus);
-
-  useEffect(() => {
-    setCurrentStatus(order.status);
-    setIsLoading(true);
-    setFeedback(null);
-    listOrderUpdates(order.id)
-      .then((res) => setUpdates(res.data))
-      .catch(() => setFeedback({ type: "error", msg: "Could not load updates." }))
-      .finally(() => setIsLoading(false));
-  }, [order.id, order.status]);
-
-  async function handleSubmit(payload: CreateOrderUpdatePayload) {
-    setIsSubmitting(true);
-    setFeedback(null);
-    try {
-      const new_update  = await createOrderUpdate(order.id, payload);
-      const next_updates = [new_update, ...updates];
-      setUpdates(next_updates);
-      if (payload.status_change && payload.status_change !== current_status) {
-        setCurrentStatus(payload.status_change);
-        onStatusChange(order.id, payload.status_change);
-      }
-      onUpdatesCountChange(order.id, next_updates.length, new_update.created_at);
-      setFeedback({ type: "success", msg: payload.send_email ? "Update posted — client notified." : "Update posted." });
-      setTimeout(() => setFeedback(null), 4000);
-    } catch {
-      setFeedback({ type: "error", msg: "Failed to post update. Try again." });
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function handleDelete(update_id: string) {
-    setDeletingId(update_id);
-    try {
-      await deleteOrderUpdate(order.id, update_id);
-      const next = updates.filter((u) => u.id !== update_id);
-      setUpdates(next);
-      onUpdatesCountChange(order.id, next.length, next[0]?.created_at ?? null);
-    } catch {
-      setFeedback({ type: "error", msg: "Could not delete update." });
-    } finally {
-      setDeletingId(null);
-    }
-  }
-
-  function handleRequestStatusChange(new_status: OrderStatus) {
-    setDialogNewStatus(new_status);
-    setDialogOpen(true);
-  }
-
-  async function handleConfirmStatusChange(notify_user: boolean) {
-    setDialogLoading(true);
-    try {
-      await updateOrderStatus(order.id, dialog_new_status, notify_user);
-      setCurrentStatus(dialog_new_status);
-      onStatusChange(order.id, dialog_new_status);
-      setDialogOpen(false);
-      setFeedback({
-        type: "success",
-        msg: notify_user
-          ? `Status changed to ${STATUS_CFG[dialog_new_status].label} — client notified.`
-          : `Status changed to ${STATUS_CFG[dialog_new_status].label}.`,
-      });
-      setTimeout(() => setFeedback(null), 4000);
-    } catch {
-      setFeedback({ type: "error", msg: "Failed to update status. Try again." });
-    } finally {
-      setDialogLoading(false);
-    }
-  }
-
-  const cfg = STATUS_CFG[current_status];
-
-  return (
-    <>
-      <StatusChangeDialog
-        is_open={dialog_open}
-        order_title={order.order_title || product_cfg.label + " Order"}
-        current_status={current_status}
-        new_status={dialog_new_status}
-        is_loading={dialog_loading}
-        onConfirm={handleConfirmStatusChange}
-        onCancel={() => setDialogOpen(false)}
-      />
-
-      <div className="flex h-full flex-col">
-        {/* Order header */}
-        <div className="border-b border-gray-100 bg-white px-5 py-4 dark:border-gray-800 dark:bg-gray-900">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="truncate text-base font-bold text-gray-900 dark:text-white">
-                  {order.order_title || product_cfg.label + " Order"}
-                </h2>
-                <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${cfg.badge}`}>
-                  {current_status === "processing" ? (
-                    <span className="relative flex h-1.5 w-1.5">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-60" />
-                      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-500" />
-                    </span>
+                <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
+                  {is_loading ? (
+                    Array.from({ length: 10 }).map((_, i) => (
+                      <tr key={i}>
+                        {[40, 130, 220, 160, 150, 90, 110, 100, 80].map((w, j) => (
+                          <td key={j} className="px-3 py-2.5" style={{ minWidth: w }}>
+                            <Sk className="h-3.5 w-full rounded" />
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : paginated_orders.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="py-20 text-center">
+                        <div className="flex flex-col items-center gap-3">
+                          <EmptyIcon />
+                          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">No orders found</p>
+                          <p className="text-xs text-gray-400 dark:text-gray-500">
+                            {search ? "Try adjusting your search or filters." : "No orders match the current filter."}
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
                   ) : (
-                    <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
+                    paginated_orders.map((order, idx) => {
+                      const product_cfg = PRODUCT_TYPE_CFG[order.product_type];
+                      const needs_update = order.updates_count === 0;
+                      const global_idx = (current_page - 1) * PER_PAGE + idx + 1;
+
+                      return (
+                        <tr
+                          key={order.id}
+                          className={`group transition-colors ${
+                            needs_update
+                              ? "bg-red-50/30 hover:bg-red-50/60 dark:bg-red-500/[0.03] dark:hover:bg-red-500/[0.06]"
+                              : "hover:bg-gray-50/80 dark:hover:bg-white/[0.02]"
+                          }`}
+                        >
+                          {/* Row number */}
+                          <td className="border-r border-gray-50 px-3 py-2.5 text-gray-400 dark:border-gray-800 dark:text-gray-600">
+                            {global_idx}
+                          </td>
+
+                          {/* Product type */}
+                          <td className="border-r border-gray-50 px-3 py-2.5 dark:border-gray-800">
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${product_cfg.badge}`}>
+                              <span className={`h-1.5 w-1.5 rounded-full ${product_cfg.dot}`} />
+                              {product_cfg.label}
+                            </span>
+                          </td>
+
+                          {/* Order title */}
+                          <td className="border-r border-gray-50 px-3 py-2.5 dark:border-gray-800">
+                            <span
+                              className="block max-w-[240px] truncate font-medium text-gray-800 dark:text-gray-100"
+                              title={order.order_title ?? ""}
+                            >
+                              {order.order_title || <span className="italic text-gray-400">{product_cfg.label} Order</span>}
+                            </span>
+                            <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                              #{order.id.slice(0, 8).toUpperCase()} · {order.items_count} item{order.items_count !== 1 ? "s" : ""} · {formatCurrency(order.total_amount)}
+                            </span>
+                          </td>
+
+                          {/* Client */}
+                          <td className="border-r border-gray-50 px-3 py-2.5 dark:border-gray-800">
+                            <div className="flex items-center gap-2">
+                              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-[10px] font-bold text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                                {order.user.first_name[0]}{order.user.last_name[0]}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="truncate font-medium text-gray-700 dark:text-gray-200">
+                                  {order.user.first_name} {order.user.last_name}
+                                </p>
+                                <p className="truncate text-[10px] text-gray-400 dark:text-gray-500 max-w-[130px]">
+                                  {order.user.email}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Status — quick change */}
+                          <td className="border-r border-gray-50 px-3 py-2.5 dark:border-gray-800">
+                            <StatusCell order={order} onRequestChange={handleRequestStatusChange} />
+                          </td>
+
+                          {/* Updates count */}
+                          <td className="border-r border-gray-50 px-3 py-2.5 text-center dark:border-gray-800">
+                            {needs_update ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-600 dark:bg-red-500/10 dark:text-red-400">
+                                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
+                                None
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center justify-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                                {order.updates_count}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Last activity */}
+                          <td className="border-r border-gray-50 px-3 py-2.5 dark:border-gray-800">
+                            {order.last_update_at ? (
+                              <span className="text-gray-600 dark:text-gray-400" title={new Date(order.last_update_at).toLocaleString()}>
+                                {formatRelativeTime(order.last_update_at)}
+                              </span>
+                            ) : (
+                              <span className="text-gray-300 dark:text-gray-600">—</span>
+                            )}
+                          </td>
+
+                          {/* Created */}
+                          <td className="border-r border-gray-50 px-3 py-2.5 dark:border-gray-800">
+                            <span className="text-gray-600 dark:text-gray-400">
+                              {formatShortDate(order.created_at)}
+                            </span>
+                          </td>
+
+                          {/* Actions */}
+                          <td className="px-3 py-2.5 text-center">
+                            <Link
+                              href={`/admin/tracking/${order.id}`}
+                              className="inline-flex items-center gap-1 rounded-lg border border-brand-200 bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700 transition hover:bg-brand-100 dark:border-brand-700 dark:bg-brand-900/20 dark:text-brand-400 dark:hover:bg-brand-900/40"
+                            >
+                              View
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
-                  {cfg.label}
-                </span>
-                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${product_cfg.badge}`}>
-                  <span className={`h-1.5 w-1.5 rounded-full ${product_cfg.dot}`} />
-                  {product_cfg.label}
-                </span>
-              </div>
-              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                <span className="font-mono">#{order.id.slice(0, 8).toUpperCase()}</span>
-                {" · "}{order.user.first_name} {order.user.last_name}{" · "}{order.user.email}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="hidden items-center gap-3 sm:flex">
-                {[
-                  { label: "updates", value: updates.length },
-                  { label: "items",   value: order.items_count },
-                  { label: "total",   value: formatCurrency(order.total_amount) },
-                ].map((s) => (
-                  <div key={s.label} className="rounded-lg border border-gray-100 bg-gray-50 px-2.5 py-1 text-center dark:border-gray-800 dark:bg-gray-800/50">
-                    <div className="text-xs font-bold text-gray-800 dark:text-white">{s.value}</div>
-                    <div className="text-[10px] text-gray-400 dark:text-gray-500">{s.label}</div>
-                  </div>
-                ))}
-              </div>
-              <Link
-                href={product_cfg.full_view_url(order.id)}
-                target="_blank"
-                className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-500 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
-              >
-                <ExternalLinkIcon />
-                Full view
-              </Link>
-            </div>
-          </div>
-        </div>
-
-        {/* Body */}
-        <div className="flex flex-1 flex-col gap-0 overflow-hidden">
-          {/* Update form */}
-          <div className="border-b border-gray-100 bg-gray-50/50 p-5 dark:border-gray-800 dark:bg-gray-900/50">
-            {is_finalized && (
-              <div className="mb-4">
-                <StatusChanger current_status={current_status} onRequestChange={handleRequestStatusChange} />
-              </div>
-            )}
-            <div className="mb-3 flex items-center gap-2">
-              <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-brand-500 text-white">
-                <PlusIcon />
-              </div>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">
-                Post New Update
-              </h3>
-            </div>
-            {feedback && (
-              <div className={`mb-3 rounded-xl border px-3.5 py-2.5 text-xs font-medium ${
-                feedback.type === "success"
-                  ? "border-success-200 bg-success-50 text-success-700 dark:border-success-500/20 dark:bg-success-500/10 dark:text-success-400"
-                  : "border-error-200 bg-error-50 text-error-600 dark:border-error-500/20 dark:bg-error-500/10 dark:text-error-400"
-              }`}>
-                {feedback.msg}
-              </div>
-            )}
-            <UpdateForm current_status={current_status} is_submitting={is_submitting} onSubmit={handleSubmit} />
-          </div>
-
-          {/* Timeline */}
-          <div className="flex-1 overflow-y-auto p-5">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                Activity Log
-              </h3>
-              {updates.length > 0 && (
-                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400">
-                  {updates.length}
-                </span>
-              )}
-            </div>
-
-            {is_loading ? (
-              <div className="space-y-4">
-                {[1, 2].map((i) => (
-                  <div key={i} className="flex gap-3">
-                    <Sk className="h-8 w-8 shrink-0 rounded-full" />
-                    <Sk className="h-20 flex-1 rounded-xl" />
-                  </div>
-                ))}
-              </div>
-            ) : updates.length === 0 ? (
-              <div className="flex flex-col items-center py-10 text-center">
-                <EmptyInboxIcon />
-                <p className="mt-3 text-sm font-medium text-gray-500 dark:text-gray-400">No updates yet</p>
-                <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
-                  Post the first update to keep the client informed.
-                </p>
-              </div>
-            ) : (
-              <div>
-                {updates.map((u, idx) => (
-                  <TimelineItem
-                    key={u.id}
-                    update={u}
-                    is_last={idx === updates.length - 1}
-                    on_delete={handleDelete}
-                    is_deleting={deleting_id === u.id}
-                  />
-                ))}
-                <div className="mt-2 flex gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-gray-200 bg-white text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-600">
-                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
-                    </svg>
-                  </div>
-                  <div className="flex-1 rounded-xl border border-dashed border-gray-100 bg-gray-50/60 px-3.5 py-2.5 dark:border-gray-800 dark:bg-gray-800/30">
-                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Order placed</p>
-                    <p className="text-[11px] text-gray-400 dark:text-gray-500">{formatFullDate(order.created_at)}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </>
-  );
-};
-
-// ─── Main dashboard ───────────────────────────────────────────────────────────
-
-const AdminTrackingDashboard: React.FC = () => {
-  const [orders, setOrders]               = useState<TrackingOrderSummary[]>([]);
-  const [tab_counts, setTabCounts]         = useState<Partial<Record<TrackingTab, number>>>({});
-  const [is_loading, setIsLoading]         = useState(true);
-  const [load_error, setLoadError]         = useState<string | null>(null);
-  const [selected_id, setSelectedId]       = useState<string | null>(null);
-  const [product_tab, setProductTab]       = useState<ProductTypeKey>("all");
-  const [status_tab, setStatusTab]         = useState<TrackingTab>("needs_update");
-  const [current_page, setCurrentPage]     = useState(1);
-  const [nav_toast, setNavToast]           = useState<string | null>(null);
-  const list_ref = useRef<HTMLDivElement>(null);
-  const pending_select_id_ref = useRef<string | null>(null);
-
-  const loadOrders = useCallback(async (status: TrackingTab, product: ProductTypeKey) => {
-    setIsLoading(true);
-    setLoadError(null);
-    try {
-      const product_type = product === "all" ? undefined : product as AdminOrderProductType;
-      const res = status === "needs_update"
-        ? await listTrackingOrders({ needs_update: true, product_type })
-        : await listTrackingOrders({ status: status as OrderStatus, product_type });
-
-      const sorted = [...res.data].sort((a, b) => {
-        const a_time = a.last_update_at ? new Date(a.last_update_at).getTime() : 0;
-        const b_time = b.last_update_at ? new Date(b.last_update_at).getTime() : 0;
-        return a_time - b_time;
-      });
-      setOrders(sorted);
-      setTabCounts((prev) => ({ ...prev, [status]: sorted.length }));
-      const pending_id = pending_select_id_ref.current;
-      pending_select_id_ref.current = null;
-      if (pending_id && sorted.some((o) => o.id === pending_id)) {
-        setSelectedId(pending_id);
-      } else {
-        setSelectedId(sorted[0]?.id ?? null);
-      }
-    } catch {
-      pending_select_id_ref.current = null;
-      setLoadError("Failed to load orders.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const loadAllTabCounts = useCallback(async (product: ProductTypeKey) => {
-    const product_type = product === "all" ? undefined : product as AdminOrderProductType;
-    const [needs_res, pending_res, processing_res, completed_res, cancelled_res] =
-      await Promise.allSettled([
-        listTrackingOrders({ needs_update: true, product_type }),
-        listTrackingOrders({ status: "pending",    product_type }),
-        listTrackingOrders({ status: "processing", product_type }),
-        listTrackingOrders({ status: "completed",  product_type }),
-        listTrackingOrders({ status: "cancelled",  product_type }),
-      ]);
-    setTabCounts({
-      ...(needs_res.status      === "fulfilled" && { needs_update: needs_res.value.data.length }),
-      ...(pending_res.status    === "fulfilled" && { pending:      pending_res.value.data.length }),
-      ...(processing_res.status === "fulfilled" && { processing:   processing_res.value.data.length }),
-      ...(completed_res.status  === "fulfilled" && { completed:    completed_res.value.data.length }),
-      ...(cancelled_res.status  === "fulfilled" && { cancelled:    cancelled_res.value.data.length }),
-    });
-  }, []);
-
-  useEffect(() => {
-    loadOrders(status_tab, product_tab);
-  }, [status_tab, product_tab]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    void loadAllTabCounts(product_tab);
-  }, [product_tab]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  function switchProductTab(tab: ProductTypeKey) {
-    if (tab === product_tab) return;
-    pending_select_id_ref.current = null;
-    setProductTab(tab);
-    setTabCounts({});
-    setCurrentPage(1);
-    setSelectedId(null);
-  }
-
-  function switchStatusTab(tab: TrackingTab) {
-    if (tab === status_tab) return;
-    pending_select_id_ref.current = null;
-    setStatusTab(tab);
-    setCurrentPage(1);
-    setSelectedId(null);
-  }
-
-  const total_pages      = Math.ceil(orders.length / PER_PAGE);
-  const paginated_orders = orders.slice((current_page - 1) * PER_PAGE, current_page * PER_PAGE);
-  const selected_order   = orders.find((o) => o.id === selected_id) ?? null;
-
-  function navigateToStatusTab(tab: TrackingTab, order_id: string, toast_msg: string) {
-    pending_select_id_ref.current = order_id;
-    setOrders((prev) => prev.filter((o) => o.id !== order_id));
-    setStatusTab(tab);
-    setCurrentPage(1);
-    setNavToast(toast_msg);
-    setTimeout(() => setNavToast(null), 4000);
-  }
-
-  function handleStatusChange(order_id: string, new_status: OrderStatus) {
-    const old_order = orders.find((o) => o.id === order_id);
-    if (!old_order) return;
-
-    const status_actually_changed = old_order.status !== new_status;
-
-    if (status_actually_changed) {
-      if (status_tab === "needs_update") {
-        setTabCounts((prev) => ({
-          ...prev,
-          needs_update: Math.max(0, (prev.needs_update ?? 0) - 1),
-          [old_order.status]: Math.max(0, (prev[old_order.status] ?? 0) - 1),
-          [new_status]: (prev[new_status] ?? 0) + 1,
-        }));
-      } else {
-        setTabCounts((prev) => ({
-          ...prev,
-          [old_order.status]: Math.max(0, (prev[old_order.status] ?? 0) - 1),
-          [new_status]: (prev[new_status] ?? 0) + 1,
-        }));
-      }
-    }
-
-    if (status_tab !== (new_status as TrackingTab)) {
-      navigateToStatusTab(new_status as TrackingTab, order_id, `Order moved to ${STATUS_CFG[new_status].label}`);
-    } else {
-      setOrders((prev) => prev.map((o) => o.id === order_id ? { ...o, status: new_status } : o));
-    }
-  }
-
-  function handleUpdatesCountChange(order_id: string, count: number, last_at: string | null) {
-    const old_order = orders.find((o) => o.id === order_id);
-    if (old_order && old_order.updates_count === 0 && count > 0) {
-      setTabCounts((prev) => ({
-        ...prev,
-        needs_update: Math.max(0, (prev.needs_update ?? 0) - 1),
-      }));
-      if (status_tab === "needs_update" && !pending_select_id_ref.current) {
-        navigateToStatusTab("pending", order_id, "Order moved to Pending");
-        return;
-      }
-    }
-    setOrders((prev) =>
-      prev.map((o) => o.id === order_id ? { ...o, updates_count: count, last_update_at: last_at } : o)
-    );
-  }
-
-  const total_orders_label = () => {
-    if (is_loading) return "Loading orders…";
-    const count = orders.length;
-    const product_label = product_tab === "all" ? "" : ` ${PRODUCT_TYPE_CFG[product_tab as AdminOrderProductType].label}`;
-    const status_label = status_tab === "needs_update"
-      ? "order" + (count !== 1 ? "s" : "") + " without updates"
-      : `${STATUS_CFG[status_tab as OrderStatus].label.toLowerCase()} order${count !== 1 ? "s" : ""}`;
-    return (
-      <>
-        <span className="font-medium text-gray-700 dark:text-gray-300">{count}</span>
-        {product_label} {status_label}
-      </>
-    );
-  };
-
-  return (
-    <div className="flex h-[calc(100vh-6rem)] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-
-      {/* ── Top bar ─────────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 bg-white px-6 py-4 dark:border-gray-800 dark:bg-gray-900">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-500 text-white shadow-md shadow-brand-500/30">
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
-            </svg>
-          </div>
-          <div>
-            <h1 className="text-base font-bold text-gray-900 dark:text-white">Order Tracking</h1>
-            <p className="text-xs text-gray-500 dark:text-gray-400">{total_orders_label()}</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => { void loadOrders(status_tab, product_tab); }}
-            disabled={is_loading}
-            className="rounded-lg border border-gray-200 p-2 text-gray-400 transition hover:bg-gray-50 hover:text-gray-600 disabled:opacity-50 dark:border-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-            title="Refresh"
-          >
-            <svg className={`h-4 w-4 ${is_loading ? "animate-spin" : ""}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-            </svg>
-          </button>
-          <Link
-            href="/admin/orders"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-500 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
-          >
-            All orders
-            <ExternalLinkIcon />
-          </Link>
-        </div>
-      </div>
-
-      {/* ── Product type tabs ────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-0 overflow-x-auto border-b border-gray-100 bg-gray-50/50 px-4 dark:border-gray-800 dark:bg-gray-900/50">
-        {PRODUCT_TYPE_TABS.map((tab) => {
-          const is_active = product_tab === tab.key;
-          const product_cfg = tab.key !== "all" ? PRODUCT_TYPE_CFG[tab.key as AdminOrderProductType] : null;
-
-          return (
-            <button
-              key={tab.key}
-              onClick={() => switchProductTab(tab.key)}
-              className={`relative flex shrink-0 items-center gap-1.5 px-3.5 py-2.5 text-xs font-medium transition-colors ${
-                is_active
-                  ? "text-brand-600 dark:text-brand-400"
-                  : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-              }`}
-            >
-              {is_active && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-brand-500" />
-              )}
-              {product_cfg && (
-                <span className={`h-2 w-2 rounded-full ${product_cfg.dot}`} />
-              )}
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ── Navigation toast ────────────────────────────────────────────────── */}
-      {nav_toast && (
-        <div className="flex items-center gap-2 border-b border-success-200 bg-success-50 px-6 py-2 text-xs font-medium text-success-700 dark:border-success-500/20 dark:bg-success-500/10 dark:text-success-400">
-          <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          {nav_toast}
-        </div>
-      )}
-
-      {/* ── Status tabs ─────────────────────────────────────────────────────── */}
-      <div className="flex gap-0 border-b border-gray-100 bg-white px-6 dark:border-gray-800 dark:bg-gray-900">
-        {STATUS_TABS.map((tab) => {
-          const count      = tab_counts[tab.key];
-          const is_active  = status_tab === tab.key;
-          const is_needs   = tab.key === "needs_update";
-
-          return (
-            <button
-              key={tab.key}
-              onClick={() => switchStatusTab(tab.key)}
-              className={`relative flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium transition-colors ${
-                is_active
-                  ? is_needs ? "text-red-600 dark:text-red-400" : "text-brand-600 dark:text-brand-400"
-                  : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-              }`}
-            >
-              {is_active && (
-                <span className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-full ${is_needs ? "bg-red-500" : "bg-brand-500"}`} />
-              )}
-              {tab.label}
-              {count !== undefined && count > 0 && (
-                <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
-                  is_active && is_needs   ? "bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400"
-                  : is_active             ? "bg-brand-100 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400"
-                  : is_needs              ? "bg-red-50 text-red-500 dark:bg-red-500/10 dark:text-red-400"
-                  :                         "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
-                }`}>
-                  {count}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ── Main split ──────────────────────────────────────────────────────── */}
-      {load_error ? (
-        <div className="flex flex-1 items-center justify-center p-8">
-          <div className="text-center">
-            <p className="text-sm text-error-600 dark:text-error-400">{load_error}</p>
-            <button onClick={() => { void loadOrders(status_tab, product_tab); }} className="mt-2 text-sm font-medium text-brand-500 underline hover:text-brand-600">
-              Retry
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-1 overflow-hidden">
-
-          {/* ── Order list ───────────────────────────────────────────────── */}
-          <div className="flex w-[320px] shrink-0 flex-col border-r border-gray-100 dark:border-gray-800 xl:w-[360px]">
-            <div ref={list_ref} className="flex-1 overflow-y-auto">
-              {is_loading ? (
-                Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="border-b border-gray-50 px-4 py-3.5 dark:border-gray-800">
-                    <div className="mb-2 flex gap-1.5">
-                      <Sk className="h-5 w-16 rounded-full" />
-                      <Sk className="h-5 w-20 rounded-full" />
-                    </div>
-                    <Sk className="mb-1.5 h-4 w-40" />
-                    <Sk className="h-3 w-28" />
-                  </div>
-                ))
-              ) : paginated_orders.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <EmptyInboxIcon />
-                  <p className="mt-3 text-sm font-medium text-gray-500 dark:text-gray-400">No orders found</p>
-                  <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
-                    {status_tab === "needs_update"
-                      ? "All orders have at least one update — great work!"
-                      : `No ${STATUS_CFG[status_tab as OrderStatus].label.toLowerCase()} orders at the moment.`}
-                  </p>
-                </div>
-              ) : (
-                paginated_orders.map((order) => (
-                  <div key={order.id} className="border-b border-gray-50 dark:border-gray-800/80">
-                    <OrderCard
-                      order={order}
-                      is_selected={order.id === selected_id}
-                      onClick={() => setSelectedId(order.id)}
-                    />
-                  </div>
-                ))
-              )}
+                </tbody>
+              </table>
             </div>
 
             {!is_loading && (
               <Pagination
                 current_page={current_page}
                 total_pages={total_pages}
-                total_items={orders.length}
+                total_items={filtered_orders.length}
                 per_page={PER_PAGE}
-                onChange={(page) => {
-                  setCurrentPage(page);
-                  list_ref.current?.scrollTo({ top: 0, behavior: "smooth" });
-                }}
+                onChange={setCurrentPage}
               />
             )}
           </div>
-
-          {/* ── Detail panel ─────────────────────────────────────────────── */}
-          <div className="flex flex-1 flex-col overflow-hidden">
-            {!selected_order ? (
-              <div className="flex flex-1 flex-col items-center justify-center text-center">
-                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-100 dark:bg-gray-800">
-                  <svg className="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.042 21.672L13.684 16.6m0 0l-2.51 2.225.569-9.47 5.227 7.917-3.286-.672zM12 2.25V4.5m5.834.166l-1.591 1.591M20.25 10.5H18M7.757 14.743l-1.59 1.59M6 10.5H3.75m4.007-4.243l-1.59-1.59" />
-                  </svg>
-                </div>
-                <p className="text-sm font-semibold text-gray-600 dark:text-gray-400">Select an order</p>
-                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                  Choose an order from the list to view details or post updates.
-                </p>
-              </div>
-            ) : (
-              <OrderDetailPanel
-                key={selected_order.id}
-                order={selected_order}
-                active_status_tab={status_tab}
-                onStatusChange={handleStatusChange}
-                onUpdatesCountChange={handleUpdatesCountChange}
-              />
-            )}
-          </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </>
   );
 };
 
