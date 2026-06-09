@@ -36,9 +36,9 @@ function GoogleCallbackHandler() {
     authService.getMe().then((data) => {
       const primary_role = getPrimaryRole(data.user.roles);
       setPrimaryRoleCookie(primary_role);
-      router.replace("/");
+      window.location.replace("/");
     }).catch(() => {
-      router.replace("/");
+      window.location.replace("/");
     });
   }, [search_params, router]);
 
