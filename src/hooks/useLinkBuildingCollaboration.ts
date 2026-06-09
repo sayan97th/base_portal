@@ -81,7 +81,12 @@ const CHANNEL_NAME = "link-building-orders";
  */
 const local_session_id = (() => {
   if (typeof window === "undefined") return crypto.randomUUID();
-  const key = "lbo_session_id";
+  // Use the same key as api-client.ts ("bo_session_id") so that the X-Session-Id
+  // header sent with HTTP requests matches the session ID used here for filtering
+  // WebSocket broadcasts. Without this alignment the self-filter check
+  // (by_session_id === local_session_id) never matches and the current user's own
+  // row-creation broadcasts slip through, producing duplicate React keys.
+  const key = "bo_session_id";
   const stored = sessionStorage.getItem(key);
   if (stored) return stored;
   const id = crypto.randomUUID();

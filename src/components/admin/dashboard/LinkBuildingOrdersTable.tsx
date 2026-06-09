@@ -890,7 +890,14 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     try {
       const res = await createLinkBuildingOrder(buildLboPayload(row));
       new_row_ids_ref.current.delete(row.id);
-      replaceRow(row.id, res.data);
+      // Atomic replace: remove any row that already carries the new real UUID
+      // (it may have been prepended by a WebSocket broadcast that arrived before
+      // this response completed) then swap the temp row for the real one.
+      setRows((prev) =>
+        prev
+          .filter((r) => r.id !== res.data.id)
+          .map((r) => (r.id === row.id ? res.data : r))
+      );
       const remaining = rows_ref.current.filter(
         (r) => new_row_ids_ref.current.has(r.id) && r.id !== row.id
       );
