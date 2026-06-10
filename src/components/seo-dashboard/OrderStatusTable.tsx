@@ -61,10 +61,6 @@ function formatDate(iso: string): string {
   });
 }
 
-function shortId(id: string): string {
-  return id.length > 8 ? id.slice(0, 8).toUpperCase() : id.toUpperCase();
-}
-
 function TableSkeleton({ rows_count }: { rows_count: number }) {
   return (
     <>
@@ -241,7 +237,7 @@ export default function OrderStatusTable({
                       }
                       className="hover:text-coral-500 hover:underline"
                     >
-                      {shortId(row.order_id)}
+                      {row.display_order_id || row.order_id}
                     </Link>
                   </TableCell>
 

@@ -159,8 +159,10 @@ export const mapOrderStatus = (api_status: string): DisplayStatus => {
 export interface DashboardTableRow {
   /** Placement UUID — used to navigate to /link-building/placements/{id} for admin_assigned rows. */
   id: string;
-  /** Short display ID (UUID for purchased orders, BL-xxx for admin-assigned). */
+  /** Raw order ID — UUID for purchased rows (used for /orders/{id} navigation), BL-XXXXX for admin-assigned. */
   order_id: string;
+  /** Human-readable BL-XXXXX display ID, always present regardless of order source. */
+  display_order_id: string;
   /** ISO date string from order.created_at */
   start_date: string;
   /** e.g. "DR 40+", "DR 60+" from the DR tier */
