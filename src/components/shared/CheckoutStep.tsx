@@ -689,21 +689,30 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
       setIsProcessing(true);
       onProcessingChange?.(true);
       reportStripeError(null);
-      try {
-        const result = await creditsService.payWithCredits({
-          amount: credits_to_apply,
-          description: "Order payment via account credits",
-        });
-        if (onPayWithCredits) {
+
+      if (onPayWithCredits) {
+        // Legacy override path (e.g. invoice payment): pre-deduct credits and let
+        // the caller handle the rest. Rollback responsibility belongs to the caller.
+        try {
+          await creditsService.payWithCredits({
+            amount: credits_to_apply,
+            description: "Order payment via account credits",
+          });
           onPayWithCredits();
-        } else {
-          onComplete(`credits_${result.transaction_id}`, false);
+        } catch (err: unknown) {
+          const message =
+            err instanceof Error
+              ? err.message
+              : "Failed to process credit payment. Please try again.";
+          reportStripeError(message);
+          setIsProcessing(false);
+          onProcessingChange?.(false);
         }
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : "Failed to process credit payment. Please try again.";
-        reportStripeError(message);
-        setIsProcessing(false);
-        onProcessingChange?.(false);
+      } else {
+        // Atomic path: the backend deducts credits and creates all orders inside a
+        // single DB transaction. If order creation fails, the credits deduction is
+        // rolled back automatically — credits can never be lost on a backend error.
+        onComplete(`credits_pay_${credits_to_apply}`, false);
       }
       return;
     }
