@@ -112,6 +112,8 @@ export interface UnifiedCheckoutBilling {
 export interface UnifiedCheckoutPayload {
   payment_method_id: string;
   total_amount: number;
+  /** Credits applied toward this order (hybrid payments: card covers the rest). */
+  credits_amount?: number;
   session_id?: string;
   coupon_ids?: string[] | null;
   billing: UnifiedCheckoutBilling;

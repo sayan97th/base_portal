@@ -644,11 +644,12 @@ const DashboardProducts: React.FC = () => {
   }, [saved_billing_address]);
 
   const handlePaymentComplete = useCallback(
-    async (payment_intent_id: string, is_using_saved_method: boolean) => {
+    async (payment_intent_id: string, is_using_saved_method: boolean, credits_amount?: number) => {
       await executeCheckout(
         payment_intent_id,
         is_using_saved_method,
-        billing_address
+        billing_address,
+        credits_amount
       );
     },
     [executeCheckout, billing_address]

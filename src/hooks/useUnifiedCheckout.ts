@@ -73,7 +73,8 @@ export interface UseUnifiedCheckoutReturn {
   handleComplete: (
     payment_intent_id: string,
     is_using_saved_method: boolean,
-    billing_address: BillingAddress
+    billing_address: BillingAddress,
+    credits_amount?: number
   ) => Promise<void>;
   handlePayLater: () => Promise<void>;
 }
@@ -103,7 +104,8 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
     async (
       payment_intent_id: string,
       is_using_saved_method: boolean,
-      billing_address: BillingAddress
+      billing_address: BillingAddress,
+      credits_amount?: number
     ) => {
       setIsSubmitting(true);
       setSubmitError(null);
@@ -153,6 +155,7 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
         const result = await unifiedCartService.checkout({
           payment_method_id: payment_intent_id,
           total_amount: total,
+          ...(credits_amount && credits_amount > 0 ? { credits_amount } : {}),
           session_id: purchase_group_id,
           coupon_ids,
           billing,

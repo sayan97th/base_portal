@@ -34,7 +34,7 @@ interface CheckoutStepProps {
   billing_address: BillingAddress;
   onBillingChange: (field: keyof BillingAddress, value: string) => void;
   onPrevious: () => void;
-  onComplete: (payment_intent_id: string, is_using_saved_method: boolean) => void;
+  onComplete: (payment_intent_id: string, is_using_saved_method: boolean, credits_amount?: number) => void;
   onPayLater?: () => void;
   onPayWithCredits?: () => void;
   is_loading?: boolean;
@@ -741,17 +741,10 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
           if (!is_using_saved && save_for_future && paymentIntent.payment_method) {
             await trySaveCard(paymentIntent.payment_method as string | { id: string });
           }
-          // Deduct credits after successful card charge
-          try {
-            await creditsService.applyCreditsDiscount({
-              amount: credits_to_apply,
-              payment_intent_id: paymentIntent.id,
-              description: `Credit discount applied at checkout`,
-            });
-          } catch {
-            // Backend reconciliation will handle this if it fails
-          }
-          onComplete(paymentIntent.id, is_using_saved);
+          // Credits are deducted atomically on the backend during order creation.
+          // Passing credits_to_apply lets the server verify the card charge amount
+          // and deduct the credits as part of the same DB transaction.
+          onComplete(paymentIntent.id, is_using_saved, credits_to_apply);
         } else {
           reportStripeError("Payment could not be completed. Please try again.");
           setIsProcessing(false);
