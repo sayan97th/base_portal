@@ -4,6 +4,7 @@ import type {
   LinkBuildingOrderSummary,
   OrderPlacementFilters,
   OrderStatus,
+  PlacementStatus,
 } from "@/types/client/link-building";
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
@@ -94,14 +95,26 @@ export const getMonthlyBreakdown = (
 // ── Status Mapping ────────────────────────────────────────────────────────────
 
 export type DisplayStatus =
+  // Mapped from order-level statuses (legacy + purchased orders)
   | "Live"
   | "Pending with publisher"
   | "Writing article"
   | "Choosing domain"
   | "New request"
-  | "Cancelled";
+  | "Cancelled"
+  // Admin placement statuses shown directly to the client
+  | "Reviewing"
+  | "Ordered"
+  | "Pending"
+  | "Quality Control"
+  | "Partnership Check"
+  | "Approved"
+  | "Not Approved"
+  | "Ready"
+  | "Rejected"
+  | "Scheduled";
 
-const api_to_display_status: Record<OrderStatus, DisplayStatus> = {
+const order_status_to_display: Record<OrderStatus, DisplayStatus> = {
   new_request:     "New request",
   pending:         "New request",
   payment_pending: "New request",
@@ -110,8 +123,31 @@ const api_to_display_status: Record<OrderStatus, DisplayStatus> = {
   cancelled:       "Cancelled",
 };
 
-export const mapOrderStatus = (api_status: OrderStatus): DisplayStatus =>
-  api_to_display_status[api_status] ?? "New request";
+const placement_status_to_display: Record<PlacementStatus, DisplayStatus> = {
+  "New Request":      "New request",
+  "Reviewing":        "Reviewing",
+  "Ordered":          "Ordered",
+  "Pending":          "Pending",
+  "Live":             "Live",
+  "Quality Control":  "Quality Control",
+  "Cancelled":        "Cancelled",
+  "Partnership Check":"Partnership Check",
+  "Approved":         "Approved",
+  "Not Approved":     "Not Approved",
+  "Ready":            "Ready",
+  "Rejected":         "Rejected",
+  "Scheduled":        "Scheduled",
+};
+
+export const mapOrderStatus = (api_status: string): DisplayStatus => {
+  if (api_status in order_status_to_display) {
+    return order_status_to_display[api_status as OrderStatus];
+  }
+  if (api_status in placement_status_to_display) {
+    return placement_status_to_display[api_status as PlacementStatus];
+  }
+  return "New request";
+};
 
 // ── Dashboard Table Rows ──────────────────────────────────────────────────────
 

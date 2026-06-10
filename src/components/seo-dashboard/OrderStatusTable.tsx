@@ -32,12 +32,24 @@ const status_badge_color: Record<
   DisplayStatus,
   "success" | "error" | "warning" | "info" | "primary"
 > = {
+  // Order-level mapped statuses
   Live: "success",
   "Pending with publisher": "error",
   "Writing article": "warning",
   "Choosing domain": "info",
   "New request": "warning",
   Cancelled: "error",
+  // Admin placement statuses
+  Reviewing: "info",
+  Ordered: "warning",
+  Pending: "warning",
+  "Quality Control": "info",
+  "Partnership Check": "warning",
+  Approved: "success",
+  "Not Approved": "error",
+  Ready: "success",
+  Rejected: "error",
+  Scheduled: "primary",
 };
 
 function formatDate(iso: string): string {
@@ -266,7 +278,7 @@ export default function OrderStatusTable({
 
                   {/* Status */}
                   <TableCell className="whitespace-nowrap py-3">
-                    <Badge size="sm" color={status_badge_color[row.status]}>
+                    <Badge size="sm" color={status_badge_color[row.status] ?? "info"}>
                       {row.status}
                     </Badge>
                   </TableCell>

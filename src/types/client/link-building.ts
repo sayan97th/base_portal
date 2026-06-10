@@ -56,6 +56,22 @@ export interface CreateOrderPayload {
 
 export type OrderStatus = "new_request" | "pending" | "processing" | "completed" | "cancelled" | "payment_pending";
 
+/** Admin-side placement statuses set directly on LinkBuildingOrderPlacement records. */
+export type PlacementStatus =
+  | "New Request"
+  | "Reviewing"
+  | "Ordered"
+  | "Pending"
+  | "Live"
+  | "Quality Control"
+  | "Cancelled"
+  | "Partnership Check"
+  | "Approved"
+  | "Not Approved"
+  | "Ready"
+  | "Rejected"
+  | "Scheduled";
+
 export interface LinkBuildingOrderSummary {
   id: string;
   order_title: string | null;
@@ -148,7 +164,7 @@ export interface OrderPlacementFilters {
   page?: number;
   per_page?: number;
   search?: string;
-  status?: OrderStatus;
+  status?: OrderStatus | PlacementStatus;
 }
 
 /**
@@ -162,7 +178,8 @@ export interface OrderPlacementRow {
   dr_type: string;
   keyword: string | null;
   landing_page: string | null;
-  status: OrderStatus;
+  /** May be an order-level status or a direct admin placement status. */
+  status: OrderStatus | PlacementStatus;
   live_link: string;
   completed_date: string;
   dr: number | null;
