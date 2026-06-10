@@ -14,7 +14,9 @@ import {
   exportLinkBuildingOrders,
   batchUpdateLinkBuildingOrders,
   listAdminUsersForSelect,
+  listClientUsersForSelect,
   type AdminUserOption,
+  type ClientUserOption,
 } from "@/services/admin/link-building-dashboard.service";
 import LinkBuildingOrderImportModal from "./LinkBuildingOrderImportModal";
 import type { LinkBuildingOrderSearchBody, ColumnFilterPayload } from "@/types/admin/link-building-order";
@@ -309,6 +311,85 @@ function UserAssignCell({
           )}
           <span className="font-medium text-gray-700 dark:text-gray-200">
             {selected_user.name}
+          </span>
+        </span>
+      ) : (
+        <span className="text-gray-300 dark:text-gray-600">— Unassigned —</span>
+      )}
+    </td>
+  );
+}
+
+// ── Client assign cell ─────────────────────────────────────────────────────────
+
+interface ClientAssignCellProps {
+  user_id: number | null | undefined;
+  client_users: ClientUserOption[];
+  is_editing: boolean;
+  onStartEdit: () => void;
+  onAssignClient: (value: string) => void;
+  onCancelEdit: () => void;
+}
+
+function ClientAssignCell({
+  user_id,
+  client_users,
+  is_editing,
+  onStartEdit,
+  onAssignClient,
+  onCancelEdit,
+}: ClientAssignCellProps) {
+  const selected_client = client_users.find(
+    (u) => user_id != null && u.id === Number(user_id)
+  );
+
+  if (is_editing) {
+    return (
+      <td className="p-0" style={{ minWidth: 200 }}>
+        <select
+          autoFocus
+          value={user_id ?? ""}
+          onChange={(e) => onAssignClient(e.target.value)}
+          onBlur={onCancelEdit}
+          className="h-full w-full border-2 border-teal-500 bg-white px-2 py-1.5 text-xs outline-none dark:bg-gray-800 dark:text-white"
+          style={{ minWidth: 200 }}
+        >
+          <option value="">— Unassigned —</option>
+          {client_users.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.name} ({u.email})
+            </option>
+          ))}
+        </select>
+      </td>
+    );
+  }
+
+  return (
+    <td
+      className="cursor-pointer whitespace-nowrap px-2 py-1.5 text-xs hover:bg-teal-50 dark:hover:bg-teal-900/20"
+      style={{ minWidth: 200 }}
+      onClick={onStartEdit}
+      title="Click to assign a client account"
+    >
+      {selected_client ? (
+        <span className="inline-flex items-center gap-1.5">
+          {selected_client.avatar_url ? (
+            <img
+              src={selected_client.avatar_url}
+              alt={selected_client.name}
+              className="h-5 w-5 rounded-full object-cover"
+            />
+          ) : (
+            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-teal-600 text-[10px] font-bold text-white">
+              {selected_client.name.charAt(0).toUpperCase()}
+            </span>
+          )}
+          <span className="font-medium text-gray-700 dark:text-gray-200">
+            {selected_client.name}
+          </span>
+          <span className="text-[10px] text-gray-400 dark:text-gray-500">
+            {selected_client.email}
           </span>
         </span>
       ) : (
@@ -614,6 +695,7 @@ function TableSkeleton() {
 export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMutated?: () => void }) {
   const [rows, setRows] = useState<LinkBuildingOrderRow[]>([]);
   const [admin_users, setAdminUsers] = useState<AdminUserOption[]>([]);
+  const [client_users, setClientUsers] = useState<ClientUserOption[]>([]);
   const [is_loading, setIsLoading] = useState(true);
   const [save_error, setSaveError] = useState<string | null>(null);
   const [notification_banner, setNotificationBanner] = useState<string | null>(null);
@@ -797,10 +879,11 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     prev_activity_ref.current = { editing: editing_cell, selected: selected_row_id };
   }, [editing_cell, selected_row_id, sendRowFocus, sendRowBlur, sendRowSelect]);
 
-  // ── Fetch admin users for assign-user dropdown ──────────────────────────────
+  // ── Fetch admin users and client users for dropdowns ───────────────────────
 
   useEffect(() => {
     listAdminUsersForSelect().then(setAdminUsers).catch(() => {/* non-critical */ });
+    listClientUsersForSelect().then(setClientUsers).catch(() => {/* non-critical */ });
   }, []);
 
   // ── Fetch ───────────────────────────────────────────────────────────────────
@@ -1070,6 +1153,26 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   const cancelAssignEdit = useCallback(() => {
     setEditingCell(null);
   }, []);
+
+  // ── Assign client ────────────────────────────────────────────────────────────
+
+  const handleAssignClientChange = useCallback((row_id: string, str_value: string) => {
+    const numeric_val: number | null = str_value === "" ? null : Number(str_value);
+
+    const base_row = rows_ref.current.find((r) => r.id === row_id);
+    if (!base_row) return;
+
+    const updated_row: LinkBuildingOrderRow = { ...base_row, user_id: numeric_val };
+
+    setRows((prev) => prev.map((r) => (r.id === row_id ? updated_row : r)));
+    setEditingCell(null);
+
+    if (new_row_ids_ref.current.has(row_id)) {
+      persistNewRow(updated_row);
+    } else {
+      persistRowUpdate(updated_row, "user_id");
+    }
+  }, [persistNewRow, persistRowUpdate]);
 
   // ── Column visibility ───────────────────────────────────────────────────────
 
@@ -1958,6 +2061,12 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                   );
                 })}
                 <th
+                  className="border border-gray-700/30 bg-teal-700 px-2 py-1.5 text-left text-xs font-semibold text-white"
+                  style={{ minWidth: 200 }}
+                >
+                  Client Account
+                </th>
+                <th
                   className="border border-gray-700/30 bg-indigo-700 px-2 py-1.5 text-left text-xs font-semibold text-white"
                   style={{ minWidth: 180 }}
                 >
@@ -2061,7 +2170,16 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                           />
                         );
                       })}
-                      {/* Assign user cell */}
+                      {/* Client account assign cell */}
+                      <ClientAssignCell
+                        user_id={row.user_id}
+                        client_users={client_users}
+                        is_editing={editing_cell?.row_id === row.id && editing_cell?.col_key === "user_id"}
+                        onStartEdit={() => startEditing(row.id, "user_id")}
+                        onAssignClient={(val) => handleAssignClientChange(row.id, val)}
+                        onCancelEdit={cancelAssignEdit}
+                      />
+                      {/* Assign admin user cell */}
                       <UserAssignCell
                         assigned_admin_user_id={row.assigned_admin_user_id}
                         admin_users={admin_users}

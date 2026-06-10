@@ -84,6 +84,24 @@ export async function listAdminUsersForSelect(): Promise<AdminUserOption[]> {
   return res.data;
 }
 
+// ── Client users for client-account dropdown ──────────────────────────────────
+
+export interface ClientUserOption {
+  id: number;
+  name: string;
+  email: string;
+  avatar_url: string | null;
+}
+
+/**
+ * GET /api/admin/link-building-orders/assignable-clients
+ * Returns client-role users for the "Client Account" dropdown.
+ */
+export async function listClientUsersForSelect(): Promise<ClientUserOption[]> {
+  const res = await apiClient.get<{ data: ClientUserOption[] }>("/api/admin/link-building-orders/assignable-clients");
+  return res.data;
+}
+
 // ── Link Building Orders Dashboard ────────────────────────────────────────────
 
 /**
