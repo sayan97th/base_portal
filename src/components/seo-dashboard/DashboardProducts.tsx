@@ -378,6 +378,7 @@ const DashboardProducts: React.FC = () => {
   const [checkout_is_processing, setCheckoutIsProcessing] = useState(false);
   const [credits_to_apply, setCreditsToApply] = useState(0);
   const [is_applying_credits, setIsApplyingCredits] = useState(false);
+  const [stripe_payment_error, setStripePaymentError] = useState<string | null>(null);
   const [keyword_step_error, setKeywordStepError] = useState<string | null>(
     null
   );
@@ -998,6 +999,7 @@ const DashboardProducts: React.FC = () => {
                 }
                 onProcessingChange={setCheckoutIsProcessing}
                 onCreditsChange={handleCreditsChange}
+                onStripeError={setStripePaymentError}
               />
             </Elements>
           )}
@@ -1032,6 +1034,7 @@ const DashboardProducts: React.FC = () => {
                 }}
                 is_applying_credits={is_applying_credits}
                 credits_to_apply={credits_to_apply}
+                payment_error={stripe_payment_error ?? submit_error}
               />
             )}
           </div>

@@ -45,6 +45,10 @@ interface CheckoutStepProps {
   back_label?: string;
   onProcessingChange?: (is_processing: boolean) => void;
   onCreditsChange?: (is_applying: boolean, credits_to_apply: number) => void;
+  /** Called whenever a Stripe-level payment error occurs or is cleared. Used by
+   *  the parent to surface the error in the order summary panel next to the
+   *  checkout button so the user sees it regardless of scroll position. */
+  onStripeError?: (error: string | null) => void;
 }
 
 interface StripeElementErrors {
@@ -406,6 +410,7 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
   back_label = "Back to Keywords",
   onProcessingChange,
   onCreditsChange,
+  onStripeError,
 }, ref) {
   const stripe = useStripe();
   const elements = useElements();
@@ -422,6 +427,11 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
   // Payment processing state
   const [is_processing, setIsProcessing] = useState(false);
   const [stripe_error, setStripeError] = useState<string | null>(null);
+
+  const reportStripeError = useCallback((msg: string | null) => {
+    setStripeError(msg);
+    onStripeError?.(msg);
+  }, [onStripeError]);
 
   // Saved payment profiles
   const [payment_profiles, setPaymentProfiles] = useState<PaymentProfile[]>([]);
@@ -678,7 +688,7 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
     if (is_fully_paid_by_credits) {
       setIsProcessing(true);
       onProcessingChange?.(true);
-      setStripeError(null);
+      reportStripeError(null);
       try {
         const result = await creditsService.payWithCredits({
           amount: credits_to_apply,
@@ -691,7 +701,7 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
         }
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Failed to process credit payment. Please try again.";
-        setStripeError(message);
+        reportStripeError(message);
         setIsProcessing(false);
         onProcessingChange?.(false);
       }
@@ -705,14 +715,14 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
 
       setIsProcessing(true);
       onProcessingChange?.(true);
-      setStripeError(null);
+      reportStripeError(null);
 
       try {
         const amount_cents = Math.round(amount_after_credits * 100);
         const { error, paymentIntent } = await chargeCard(amount_cents);
 
         if (error) {
-          setStripeError(error.message ?? "Payment failed. Please try again.");
+          reportStripeError(error.message ?? "Payment failed. Please try again.");
           setIsProcessing(false);
           onProcessingChange?.(false);
           return;
@@ -734,13 +744,13 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
           }
           onComplete(paymentIntent.id, is_using_saved);
         } else {
-          setStripeError("Payment could not be completed. Please try again.");
+          reportStripeError("Payment could not be completed. Please try again.");
           setIsProcessing(false);
           onProcessingChange?.(false);
         }
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "An unexpected error occurred.";
-        setStripeError(message);
+        reportStripeError(message);
         setIsProcessing(false);
         onProcessingChange?.(false);
       }
@@ -757,14 +767,14 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
 
     setIsProcessing(true);
     onProcessingChange?.(true);
-    setStripeError(null);
+    reportStripeError(null);
 
     try {
       const amount_cents = Math.round(total_amount * 100);
       const { error, paymentIntent } = await chargeCard(amount_cents);
 
       if (error) {
-        setStripeError(error.message ?? "Payment failed. Please try again.");
+        reportStripeError(error.message ?? "Payment failed. Please try again.");
         setIsProcessing(false);
         onProcessingChange?.(false);
         return;
@@ -776,13 +786,13 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
         }
         onComplete(paymentIntent.id, is_using_saved);
       } else {
-        setStripeError("Payment could not be completed. Please try again.");
+        reportStripeError("Payment could not be completed. Please try again.");
         setIsProcessing(false);
         onProcessingChange?.(false);
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "An unexpected error occurred.";
-      setStripeError(message);
+      reportStripeError(message);
       setIsProcessing(false);
       onProcessingChange?.(false);
     }
@@ -791,7 +801,7 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
     is_fully_paid_by_credits, credits_to_apply, onPayWithCredits, onComplete,
     is_applying_credits, amount_after_credits, stripe, elements, is_using_saved,
     validateNewCardFields, chargeCard, save_for_future, trySaveCard,
-    total_amount, onProcessingChange,
+    total_amount, onProcessingChange, reportStripeError,
     no_payment_method_selected,
   ]);
 

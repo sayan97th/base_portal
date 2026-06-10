@@ -79,6 +79,10 @@ interface UnifiedCartSummaryProps {
   is_quantity_locked?: boolean;
   on_back?: () => void;
   back_label?: string;
+  /** Payment error surfaced from Stripe or the backend. Shown as a prominent
+   *  banner above the checkout button so the user sees it next to the button
+   *  regardless of scroll position. */
+  payment_error?: string | null;
 }
 
 const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
@@ -92,6 +96,7 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
   is_quantity_locked = false,
   on_back,
   back_label = "Back",
+  payment_error,
 }) => {
   const {
     items,
@@ -895,6 +900,30 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
           </div>
         )}
       </div>
+
+      {/* Payment error banner — shown above the checkout button when a Stripe
+          or backend error occurs so the user sees it next to the button */}
+      {checkout_action && payment_error && (
+        <div className="mb-4 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-3.5 dark:border-red-500/25 dark:bg-red-500/10">
+          <svg
+            className="mt-0.5 h-4 w-4 shrink-0 text-red-500 dark:text-red-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008z"
+            />
+          </svg>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold text-red-700 dark:text-red-400">Payment failed</p>
+            <p className="mt-0.5 text-xs text-red-600 dark:text-red-400">{payment_error}</p>
+          </div>
+        </div>
+      )}
 
       {/* Action button */}
       {checkout_action ? (

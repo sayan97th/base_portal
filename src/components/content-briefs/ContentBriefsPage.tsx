@@ -52,6 +52,7 @@ const ContentBriefsPage: React.FC = () => {
   const checkout_ref = useRef<CheckoutStepHandle>(null);
   const intake_step_ref = useRef<UnifiedIntakeStepHandle>(null);
   const [checkout_is_processing, setCheckoutIsProcessing] = useState(false);
+  const [stripe_payment_error, setStripePaymentError] = useState<string | null>(null);
   const [credits_to_apply, setCreditsToApply] = useState(0);
   const [is_applying_credits, setIsApplyingCredits] = useState(false);
 
@@ -263,6 +264,7 @@ const ContentBriefsPage: React.FC = () => {
                 back_label={back_label_for_checkout}
                 onProcessingChange={setCheckoutIsProcessing}
                 onCreditsChange={handleCreditsChange}
+                onStripeError={setStripePaymentError}
               />
             </div>
 
@@ -279,6 +281,7 @@ const ContentBriefsPage: React.FC = () => {
                 is_quantity_locked
                 on_back={handlePrevious}
                 back_label={back_label_for_checkout}
+                payment_error={stripe_payment_error ?? submit_error}
               />
             </div>
           </div>

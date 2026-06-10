@@ -58,6 +58,7 @@ const NewContentPage: React.FC = () => {
   const checkout_ref = useRef<CheckoutStepHandle>(null);
   const intake_step_ref = useRef<UnifiedIntakeStepHandle>(null);
   const [checkout_is_processing, setCheckoutIsProcessing] = useState(false);
+  const [stripe_payment_error, setStripePaymentError] = useState<string | null>(null);
   const [credits_to_apply, setCreditsToApply] = useState(0);
   const [is_applying_credits, setIsApplyingCredits] = useState(false);
 
@@ -294,6 +295,7 @@ const NewContentPage: React.FC = () => {
                   }
                   onProcessingChange={setCheckoutIsProcessing}
                   onCreditsChange={handleCreditsChange}
+                  onStripeError={setStripePaymentError}
                 />
               </div>
 
@@ -310,6 +312,7 @@ const NewContentPage: React.FC = () => {
                   is_quantity_locked
                   on_back={handlePrevious}
                   back_label={has_intake_items ? "Back to Order Review" : "Back to Selection"}
+                  payment_error={stripe_payment_error ?? submit_error}
                 />
               </div>
             </div>
