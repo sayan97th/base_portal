@@ -358,7 +358,7 @@ export default function AdminContentOptimizationIntakeDataContent({
     <div className="space-y-6">
       {/* Back link */}
       <Link
-        href={`/admin/content-optimization/orders/${order_id}`}
+        href={`/admin/orders/${order_id}`}
         className="inline-flex items-center gap-1.5 text-sm text-gray-400 transition-colors hover:text-gray-200"
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -446,7 +446,7 @@ export default function AdminContentOptimizationIntakeDataContent({
                 </p>
               </div>
               <Link
-                href={`/admin/content-optimization/orders/${order_id}`}
+                href={`/admin/orders/${order_id}`}
                 className="mt-2 inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-white/4 dark:text-gray-300"
               >
                 Back to order
