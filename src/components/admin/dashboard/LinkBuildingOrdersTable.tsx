@@ -2086,7 +2086,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
               {filtered_rows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={visible_columns.length + 3}
+                    colSpan={visible_columns.length + 4}
                     className="px-6 py-14 text-center text-sm text-gray-400 dark:text-gray-500"
                   >
                     {search || status_filter || link_type_filter || client_filter
