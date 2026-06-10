@@ -176,6 +176,8 @@ export interface OrderPlacementRow {
   /** Placement UUID — used to route to the placement detail page for admin_assigned rows. */
   id: string;
   order_id: string;
+  /** Human-readable BL-XXXXX display ID, always present regardless of order source. */
+  display_order_id: string;
   start_date: string;
   dr_type: string;
   keyword: string | null;
