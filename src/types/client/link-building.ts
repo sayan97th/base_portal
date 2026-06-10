@@ -173,6 +173,8 @@ export interface OrderPlacementFilters {
  * The backend builds this by joining orders → items (with dr_tier) → placements.
  */
 export interface OrderPlacementRow {
+  /** Placement UUID — used to route to the placement detail page for admin_assigned rows. */
+  id: string;
   order_id: string;
   start_date: string;
   dr_type: string;
@@ -183,6 +185,33 @@ export interface OrderPlacementRow {
   live_link: string;
   completed_date: string;
   dr: number | null;
+  /** Distinguishes client-purchased orders from admin-assigned standalone placements. */
+  source: "purchased" | "admin_assigned";
+}
+
+/**
+ * Detail of a single admin-assigned placement returned by
+ * GET /api/link-building/order-placements/{id}.
+ * These records exist outside of the normal purchase flow and are created
+ * directly by administrators in the Link Building Orders dashboard.
+ */
+export interface AdminAssignedPlacementDetail {
+  id: string;
+  /** Admin-side BL-xxx identifier shown to the client for reference. */
+  order_id: string | null;
+  status: PlacementStatus;
+  link_type: string;
+  keyword: string | null;
+  landing_page: string | null;
+  exact_match: boolean;
+  notes: string | null;
+  live_link: string | null;
+  live_link_date: string | null;
+  dr_lbs: string | null;
+  request_date: string | null;
+  estimated_delivery_date: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 // ── Order Tracking ─────────────────────────────────────────────────────────────

@@ -233,7 +233,11 @@ export default function OrderStatusTable({
                   {/* Order ID */}
                   <TableCell className="whitespace-nowrap py-3 font-mono text-xs font-medium text-gray-700 dark:text-gray-300">
                     <Link
-                      href={`/orders/${row.order_id}`}
+                      href={
+                        row.source === "admin_assigned"
+                          ? `/link-building/placements/${row.id}`
+                          : `/orders/${row.order_id}`
+                      }
                       className="hover:text-coral-500 hover:underline"
                     >
                       {shortId(row.order_id)}
@@ -313,7 +317,11 @@ export default function OrderStatusTable({
                   {/* Actions */}
                   <TableCell className="whitespace-nowrap py-3">
                     <Link
-                      href={`/orders/${row.order_id}`}
+                      href={
+                        row.source === "admin_assigned"
+                          ? `/link-building/placements/${row.id}`
+                          : `/orders/${row.order_id}`
+                      }
                       className="inline-flex items-center gap-1.5 rounded-lg border border-coral-200 bg-coral-50 px-3 py-1.5 text-xs font-medium text-coral-600 transition-colors hover:bg-coral-500 hover:text-white dark:border-coral-500/30 dark:bg-coral-500/10 dark:text-coral-400 dark:hover:bg-coral-500 dark:hover:text-white"
                     >
                       <svg width="12" height="12" viewBox="0 0 12 12" fill="none">

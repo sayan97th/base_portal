@@ -157,7 +157,9 @@ export const mapOrderStatus = (api_status: string): DisplayStatus => {
  * status is already mapped to a human-readable display value.
  */
 export interface DashboardTableRow {
-  /** Short display ID derived from the order UUID */
+  /** Placement UUID — used to navigate to /link-building/placements/{id} for admin_assigned rows. */
+  id: string;
+  /** Short display ID (UUID for purchased orders, BL-xxx for admin-assigned). */
   order_id: string;
   /** ISO date string from order.created_at */
   start_date: string;
@@ -175,6 +177,8 @@ export interface DashboardTableRow {
   completed_date: string;
   /** Actual DR score of the live link (populated from future tracking data) */
   dr: number | null;
+  /** Row origin: client-purchased order or admin-created standalone placement. */
+  source: "purchased" | "admin_assigned";
 }
 
 /**

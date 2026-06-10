@@ -1,5 +1,6 @@
 import { apiClient } from "@/lib/api-client";
 import type {
+  AdminAssignedPlacementDetail,
   CartPayload,
   CartResponse,
   ClientPaginatedResponse,
@@ -123,6 +124,20 @@ export const linkBuildingService = {
    * Query params forwarded to the backend:
    *   page, per_page, search (order_id / keyword / status), status
    */
+  /**
+   * Fetches the detail of a single admin-assigned placement.
+   * Hits GET /api/link-building/order-placements/{placement_id}.
+   * Only succeeds for placements linked directly to the authenticated user via user_id.
+   */
+  async fetchAssignedPlacementDetail(
+    placement_id: string
+  ): Promise<AdminAssignedPlacementDetail> {
+    const response = await apiClient.get<{ data: AdminAssignedPlacementDetail }>(
+      `/api/link-building/order-placements/${placement_id}`
+    );
+    return response.data;
+  },
+
   async fetchMyOrderPlacements(
     filters: OrderPlacementFilters = {}
   ): Promise<ClientPaginatedResponse<OrderPlacementRow>> {
