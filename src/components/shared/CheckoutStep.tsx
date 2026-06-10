@@ -630,7 +630,13 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
       });
     }
 
-    const { client_secret } = await createPaymentIntent({ amount_cents });
+    // When saving for future use: pass save_for_future so the PI route creates
+    // a Stripe Customer and sets setup_future_usage, making the resulting PM
+    // attachable and reusable for subsequent purchases.
+    const { client_secret } = await createPaymentIntent({
+      amount_cents,
+      ...(save_for_future ? { save_for_future: true } : {}),
+    });
     const card_element = elements.getElement(CardNumberElement)!;
     const country_code = country_code_map[billing_address.country] ?? "US";
     return stripe.confirmCardPayment(client_secret, {
@@ -648,7 +654,7 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
         },
       },
     });
-  }, [stripe, elements, is_using_saved, payment_profiles, selected_profile_id, billing_address, name_on_card]);
+  }, [stripe, elements, is_using_saved, payment_profiles, selected_profile_id, billing_address, name_on_card, save_for_future]);
 
   const trySaveCard = useCallback(async (payment_method_id: string | { id: string }) => {
     try {
