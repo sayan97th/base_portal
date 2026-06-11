@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 export interface UserFilterOption {
@@ -35,17 +35,25 @@ export default function UserSelectFilterDropdown({
   useLayoutEffect(() => {
     if (!anchor_el || !dropdown_ref.current) return;
 
-    const anchor_rect = anchor_el.getBoundingClientRect();
-    const dropdown_rect = dropdown_ref.current.getBoundingClientRect();
-    const viewport_w = window.innerWidth;
+    const anchor_rect  = anchor_el.getBoundingClientRect();
+    const dropdown_h   = dropdown_ref.current.offsetHeight;
+    const dropdown_w   = dropdown_ref.current.offsetWidth || 256;
+    const viewport_w   = window.innerWidth;
+    const viewport_h   = window.innerHeight;
 
-    let top = anchor_rect.bottom + window.scrollY + 4;
-    let left = anchor_rect.left + window.scrollX;
-
-    if (left + dropdown_rect.width > viewport_w - 8) {
-      left = viewport_w - dropdown_rect.width - 8;
+    // Horizontal: align with anchor's left edge, clamped inside viewport
+    let left = anchor_rect.left;
+    if (left + dropdown_w > viewport_w - 8) {
+      left = viewport_w - dropdown_w - 8;
     }
     if (left < 8) left = 8;
+
+    // Vertical: below anchor unless there's not enough room → flip above
+    let top = anchor_rect.bottom + 4;
+    if (top + dropdown_h > viewport_h - 8) {
+      top = anchor_rect.top - dropdown_h - 4;
+    }
+    if (top < 8) top = 8;
 
     setPosition({ top, left });
   }, [anchor_el]);
