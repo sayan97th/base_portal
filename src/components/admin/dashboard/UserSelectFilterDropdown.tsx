@@ -41,8 +41,8 @@ export default function UserSelectFilterDropdown({
     const viewport_w   = window.innerWidth;
     const viewport_h   = window.innerHeight;
 
-    // Horizontal: align with anchor's left edge, clamped inside viewport
-    let left = anchor_rect.left;
+    // Horizontal: right-align dropdown to anchor's right edge, clamped inside viewport
+    let left = anchor_rect.right - dropdown_w;
     if (left + dropdown_w > viewport_w - 8) {
       left = viewport_w - dropdown_w - 8;
     }
