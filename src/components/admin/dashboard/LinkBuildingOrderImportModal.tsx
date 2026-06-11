@@ -7,6 +7,7 @@ import {
   type ImportStatus,
   type ImportOptions,
 } from "@/services/admin/link-building-dashboard.service";
+import FilterDatePicker from "@/components/admin/users/FilterDatePicker";
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
@@ -582,24 +583,26 @@ export default function LinkBuildingOrderImportModal({ is_open, onClose, onImpor
                         <div className="ml-5 mt-2 grid grid-cols-2 gap-3">
                           <div className="space-y-1">
                             <label className="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                              From
+                              Start Date
                             </label>
-                            <input
-                              type="date"
+                            <FilterDatePicker
+                              id="import_date_from"
+                              placeholder="Start date"
                               value={custom_date_from}
-                              onChange={(e) => setCustomDateFrom(e.target.value)}
-                              className="h-8 w-full rounded-lg border border-gray-200 bg-white px-2 text-xs outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                              max_date={custom_date_to || undefined}
+                              on_change={setCustomDateFrom}
                             />
                           </div>
                           <div className="space-y-1">
                             <label className="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                              To
+                              End Date
                             </label>
-                            <input
-                              type="date"
+                            <FilterDatePicker
+                              id="import_date_to"
+                              placeholder="End date"
                               value={custom_date_to}
-                              onChange={(e) => setCustomDateTo(e.target.value)}
-                              className="h-8 w-full rounded-lg border border-gray-200 bg-white px-2 text-xs outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                              min_date={custom_date_from || undefined}
+                              on_change={setCustomDateTo}
                             />
                           </div>
                         </div>
