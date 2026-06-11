@@ -19,6 +19,7 @@ import {
   type ClientUserOption,
 } from "@/services/admin/link-building-dashboard.service";
 import LinkBuildingOrderImportModal from "./LinkBuildingOrderImportModal";
+import UserSelectFilterDropdown from "./UserSelectFilterDropdown";
 import type { LinkBuildingOrderSearchBody, ColumnFilterPayload } from "@/types/admin/link-building-order";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useAuth } from "@/context/AuthContext";
@@ -706,6 +707,10 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   const [status_filter, setStatusFilter] = useState<string>("");
   const [client_filter, setClientFilter] = useState<string>("");
   const [link_type_filter, setLinkTypeFilter] = useState<string>("");
+  const [client_account_filter, setClientAccountFilter] = useState<number | null>(null);
+  const [assigned_user_id_filter, setAssignedUserIdFilter] = useState<number | null>(null);
+  const [open_special_filter, setOpenSpecialFilter] = useState<"client_account" | "assigned_to" | null>(null);
+  const [special_filter_anchor_el, setSpecialFilterAnchorEl] = useState<HTMLElement | null>(null);
   const [show_filter_panel, setShowFilterPanel] = useState(false);
   const [hidden_columns, setHiddenColumns] = useState<Set<string>>(new Set());
   const [current_page, setCurrentPage] = useState(1);
@@ -926,6 +931,8 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       status: status_filter || undefined,
       link_type: link_type_filter || undefined,
       client: debounced_client_filter.trim() || undefined,
+      client_user_id: client_account_filter ?? undefined,
+      assigned_user_id: assigned_user_id_filter ?? undefined,
       sort_rules: sort_rules.length > 0 ? sort_rules : undefined,
       column_filters: active_col_filters.length > 0 ? active_col_filters : undefined,
     };
@@ -938,6 +945,8 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     status_filter,
     link_type_filter,
     debounced_client_filter,
+    client_account_filter,
+    assigned_user_id_filter,
     sort_rules,
     column_filters,
     per_page,
@@ -1195,6 +1204,8 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     status_filter !== "" ||
     client_filter !== "" ||
     link_type_filter !== "" ||
+    client_account_filter !== null ||
+    assigned_user_id_filter !== null ||
     hidden_columns.size > 0 ||
     active_filter_count > 0 ||
     sort_rules.length > 0;
@@ -1204,6 +1215,8 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     setStatusFilter("");
     setClientFilter("");
     setLinkTypeFilter("");
+    setClientAccountFilter(null);
+    setAssignedUserIdFilter(null);
     setHiddenColumns(new Set());
     clearColumnFilters();
     clearSort();
@@ -2064,13 +2077,61 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                   className="border border-gray-700/30 bg-teal-700 px-2 py-1.5 text-left text-xs font-semibold text-white"
                   style={{ minWidth: 200 }}
                 >
-                  Client Account
+                  <div className="flex items-center gap-1">
+                    <span className="flex-1 whitespace-nowrap">Client Account</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (open_special_filter === "client_account") {
+                          setOpenSpecialFilter(null);
+                          setSpecialFilterAnchorEl(null);
+                        } else {
+                          setOpenSpecialFilter("client_account");
+                          setSpecialFilterAnchorEl(e.currentTarget);
+                        }
+                      }}
+                      title="Filter by client account"
+                      className={`shrink-0 rounded p-0.5 transition-opacity ${
+                        client_account_filter !== null
+                          ? "opacity-100 text-yellow-200"
+                          : "opacity-30 hover:opacity-80"
+                      }`}
+                    >
+                      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                      </svg>
+                    </button>
+                  </div>
                 </th>
                 <th
                   className="border border-gray-700/30 bg-indigo-700 px-2 py-1.5 text-left text-xs font-semibold text-white"
                   style={{ minWidth: 180 }}
                 >
-                  Assigned To
+                  <div className="flex items-center gap-1">
+                    <span className="flex-1 whitespace-nowrap">Assigned To</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (open_special_filter === "assigned_to") {
+                          setOpenSpecialFilter(null);
+                          setSpecialFilterAnchorEl(null);
+                        } else {
+                          setOpenSpecialFilter("assigned_to");
+                          setSpecialFilterAnchorEl(e.currentTarget);
+                        }
+                      }}
+                      title="Filter by assigned user"
+                      className={`shrink-0 rounded p-0.5 transition-opacity ${
+                        assigned_user_id_filter !== null
+                          ? "opacity-100 text-yellow-200"
+                          : "opacity-30 hover:opacity-80"
+                      }`}
+                    >
+                      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                      </svg>
+                    </button>
+                  </div>
                 </th>
                 <th
                   aria-label="Row actions"
@@ -2293,6 +2354,36 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
           onClose={() => {
             setOpenFilterCol(null);
             setFilterAnchorEl(null);
+          }}
+        />
+      )}
+
+      {/* Client Account column filter dropdown */}
+      {open_special_filter === "client_account" && (
+        <UserSelectFilterDropdown
+          label="Client Account"
+          users={client_users}
+          selected_user_id={client_account_filter}
+          anchor_el={special_filter_anchor_el}
+          onSelect={(user_id) => setClientAccountFilter(user_id)}
+          onClose={() => {
+            setOpenSpecialFilter(null);
+            setSpecialFilterAnchorEl(null);
+          }}
+        />
+      )}
+
+      {/* Assigned To column filter dropdown */}
+      {open_special_filter === "assigned_to" && (
+        <UserSelectFilterDropdown
+          label="Assigned To"
+          users={admin_users}
+          selected_user_id={assigned_user_id_filter}
+          anchor_el={special_filter_anchor_el}
+          onSelect={(user_id) => setAssignedUserIdFilter(user_id)}
+          onClose={() => {
+            setOpenSpecialFilter(null);
+            setSpecialFilterAnchorEl(null);
           }}
         />
       )}

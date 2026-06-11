@@ -137,6 +137,10 @@ export interface LinkBuildingOrderSearchBody {
   link_type?: string;
   client?: string;
   link_builder?: string;
+  /** Filter by assigned client account (user_id). */
+  client_user_id?: number | null;
+  /** Filter by assigned admin user (assigned_admin_user_id). */
+  assigned_user_id?: number | null;
   sort_rules?: SortRulePayload[];
   column_filters?: ColumnFilterPayload[];
 }
