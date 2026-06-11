@@ -238,6 +238,17 @@ export interface ImportStartResponse {
   total: number;
 }
 
+export interface ImportOptions {
+  /** When false, no date filtering is applied. Defaults to true. */
+  apply_date_filter: boolean;
+  /** Lower bound in MM/DD/YYYY format. Only used when apply_date_filter is true. */
+  date_from?: string;
+  /** Upper bound in MM/DD/YYYY format. Only used when apply_date_filter is true. */
+  date_to?: string;
+  /** Controls which link types are imported. Defaults to 'external_only'. */
+  link_type_filter: "external_only" | "internal_only" | "all";
+}
+
 /**
  * POST /api/admin/link-building-orders/import
  * Uploads a CSV file and starts a background batch-import job.
@@ -246,6 +257,7 @@ export interface ImportStartResponse {
  */
 export function importLinkBuildingOrders(
   file: File,
+  options: ImportOptions,
   onUploadProgress?: (percent: number) => void
 ): Promise<ImportStartResponse> {
   return new Promise((resolve, reject) => {
@@ -254,6 +266,14 @@ export function importLinkBuildingOrders(
 
     const form_data = new FormData();
     form_data.append("file", file);
+    form_data.append("apply_date_filter", options.apply_date_filter ? "1" : "0");
+    if (options.apply_date_filter && options.date_from) {
+      form_data.append("date_from", options.date_from);
+    }
+    if (options.apply_date_filter && options.date_to) {
+      form_data.append("date_to", options.date_to);
+    }
+    form_data.append("link_type_filter", options.link_type_filter);
 
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `${base}/api/admin/link-building-orders/import`);
