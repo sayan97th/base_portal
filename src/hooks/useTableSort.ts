@@ -42,11 +42,16 @@ export function useTableSort(default_rules: SortRulePayload[] = []) {
           return prev.filter((_, i) => i !== existing_idx);
         }
 
-        // Plain click: replace with a single sort rule (asc → desc → cleared)
+        // Plain click: replace with a single sort rule (asc → desc → reset to default)
         if (prev.length === 1 && existing_idx === 0) {
           if (prev[0].direction === "asc") return [{ key, direction: "desc", nulls_last: true }];
-          // Was desc — reset to default rather than clearing entirely
-          return default_rules_ref.current;
+
+          // Was desc — reset to default. If the default for this key is also desc,
+          // resetting would be a no-op, so cycle to asc instead so the user can toggle.
+          const next = default_rules_ref.current;
+          const stuck_at_desc =
+            next.length === 1 && next[0].key === key && next[0].direction === "desc";
+          return stuck_at_desc ? [{ key, direction: "asc", nulls_last: true }] : next;
         }
         return [{ key, direction: "asc", nulls_last: true }];
       });
