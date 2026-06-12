@@ -158,6 +158,12 @@ function FilterDatePicker({
   const input_ref = useRef<HTMLInputElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fp_ref = useRef<any>(null);
+  // Keep a ref to the latest onChange so the flatpickr callback (created once
+  // on mount) always calls the current version instead of a stale closure.
+  const onChange_ref = useRef(onChange);
+  useEffect(() => {
+    onChange_ref.current = onChange;
+  });
 
   useEffect(() => {
     if (!input_ref.current) return;
@@ -166,11 +172,10 @@ function FilterDatePicker({
       static: true,
       monthSelectorType: "static",
       disableMobile: true,
-      onChange: (_dates: Date[], dateStr: string) => onChange(dateStr),
+      onChange: (_dates: Date[], dateStr: string) => onChange_ref.current(dateStr),
     });
     fp_ref.current = Array.isArray(instance) ? instance[0] : instance;
     return () => fp_ref.current?.destroy();
-    // onChange identity intentionally excluded — picker is initialised once
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
