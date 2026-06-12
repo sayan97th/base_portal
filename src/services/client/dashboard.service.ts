@@ -211,6 +211,9 @@ export interface ExportOrderPlacementsOptions {
   format: ExportFormat;
   search?: string;
   status?: string;
+  date_from?: string;
+  date_to?: string;
+  source?: string;
   row_ids?: string[];
 }
 
@@ -230,13 +233,15 @@ function triggerFileDownload(blob: Blob, filename: string): void {
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 async function exportOrderPlacements(options: ExportOrderPlacementsOptions): Promise<void> {
-  const { format, search, status, row_ids } = options;
+  const { format, search, status, date_from, date_to, source, row_ids } = options;
   const token = getToken();
   const date_suffix = new Date().toISOString().slice(0, 10);
 
   const auth_headers: Record<string, string> = token
     ? { Authorization: `Bearer ${token}` }
     : {};
+
+  const filter_body = { search, status, date_from, date_to, source, row_ids };
 
   if (format === "csv") {
     const response = await fetch(`${BASE}/api/link-building/order-placements/export`, {
@@ -246,7 +251,7 @@ async function exportOrderPlacements(options: ExportOrderPlacementsOptions): Pro
         Accept: "text/csv",
         ...auth_headers,
       },
-      body: JSON.stringify({ format: "csv", search, status, row_ids }),
+      body: JSON.stringify({ format: "csv", ...filter_body }),
     });
 
     if (!response.ok) throw new Error("CSV export failed");
@@ -264,7 +269,7 @@ async function exportOrderPlacements(options: ExportOrderPlacementsOptions): Pro
       Accept: "application/json",
       ...auth_headers,
     },
-    body: JSON.stringify({ format: "json", search, status, row_ids }),
+    body: JSON.stringify({ format: "json", ...filter_body }),
   });
 
   if (!response.ok) throw new Error("Excel export failed");

@@ -35,6 +35,14 @@ export default function DashboardPage() {
   const [table_total, setTableTotal] = useState(0);
   const [is_exporting, setIsExporting] = useState(false);
 
+  // ── Table filters ──────────────────────────────────────────────────────────
+  const [table_filters, setTableFilters] = useState<{
+    status?: string;
+    date_from?: string;
+    date_to?: string;
+    source?: "purchased" | "admin_assigned";
+  }>({});
+
   // Debounce search — avoids hitting the API on every keystroke
   const debounced_search = useDebounce(table_search, 400);
 
@@ -59,6 +67,7 @@ export default function DashboardPage() {
         page: table_page,
         per_page: TABLE_PER_PAGE,
         search: debounced_search || undefined,
+        ...table_filters,
       });
       setTableRows(result.data);
       setTableLastPage(result.last_page);
@@ -69,7 +78,7 @@ export default function DashboardPage() {
     } finally {
       setIsLoadingTable(false);
     }
-  }, [table_page, debounced_search]);
+  }, [table_page, debounced_search, table_filters]);
 
   useEffect(() => {
     loadSummary();
@@ -93,6 +102,14 @@ export default function DashboardPage() {
     setTablePage(1);
   };
 
+  const handleFiltersChange = useCallback(
+    (updated: typeof table_filters) => {
+      setTableFilters(updated);
+      setTablePage(1);
+    },
+    []
+  );
+
   const handleExport = async (
     format: "csv" | "xlsx",
     row_ids?: string[]
@@ -104,6 +121,7 @@ export default function DashboardPage() {
         format,
         search: row_ids ? undefined : table_search || undefined,
         row_ids,
+        ...(row_ids ? {} : table_filters),
       });
     } catch {
       // Export failures are silent — the browser will show nothing downloaded
@@ -168,6 +186,8 @@ export default function DashboardPage() {
             onPageChange={setTablePage}
             onExport={handleExport}
             is_exporting={is_exporting}
+            filters={table_filters}
+            onFiltersChange={handleFiltersChange}
           />
 
           {/* Mid Row: Order History + News + Resources */}

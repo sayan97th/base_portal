@@ -15,6 +15,15 @@ import type {
   ExportFormat,
 } from "@/services/client/dashboard.service";
 
+// ── Filter types ─────────────────────────────────────────────────────────────
+
+export interface TableFilters {
+  status?: string;
+  date_from?: string;
+  date_to?: string;
+  source?: "purchased" | "admin_assigned";
+}
+
 interface Props {
   rows: DashboardTableRow[];
   is_loading: boolean;
@@ -27,7 +36,27 @@ interface Props {
   onPageChange: (page: number) => void;
   onExport: (format: ExportFormat, row_ids?: string[]) => void;
   is_exporting?: boolean;
+  filters: TableFilters;
+  onFiltersChange: (filters: TableFilters) => void;
 }
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: "Live", label: "Live" },
+  { value: "New Request", label: "New Request" },
+  { value: "Reviewing", label: "Reviewing" },
+  { value: "Ordered", label: "Ordered" },
+  { value: "Pending", label: "Pending" },
+  { value: "Quality Control", label: "Quality Control" },
+  { value: "Partnership Check", label: "Partnership Check" },
+  { value: "Approved", label: "Approved" },
+  { value: "Not Approved", label: "Not Approved" },
+  { value: "Ready", label: "Ready" },
+  { value: "Rejected", label: "Rejected" },
+  { value: "Scheduled", label: "Scheduled" },
+  { value: "Cancelled", label: "Cancelled" },
+];
 
 const status_badge_color: Record<
   DisplayStatus,
@@ -50,6 +79,8 @@ const status_badge_color: Record<
   Rejected: "error",
   Scheduled: "primary",
 };
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatDate(iso: string): string {
   if (!iso) return "—";
@@ -88,6 +119,15 @@ function buildPageButtons(current: number, last: number): (number | "...")[] {
   return pages;
 }
 
+// ── Select / input shared class ───────────────────────────────────────────────
+
+const FIELD_CLS =
+  "h-9 rounded-lg border border-gray-200 bg-transparent px-3 text-sm text-gray-700 " +
+  "focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 " +
+  "dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:placeholder:text-gray-500";
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export default function OrderStatusTable({
   rows,
   is_loading,
@@ -100,16 +140,32 @@ export default function OrderStatusTable({
   onPageChange,
   onExport,
   is_exporting = false,
+  filters,
+  onFiltersChange,
 }: Props) {
   const range_start = total === 0 ? 0 : (current_page - 1) * per_page + 1;
   const range_end = Math.min(current_page * per_page, total);
   const page_buttons = buildPageButtons(current_page, last_page);
 
-  // ── Row selection ───────────────────────────────────────────────────────────
+  // ── Active filter count ──────────────────────────────────────────────────────
+
+  const active_filters_count = [
+    filters.status,
+    filters.date_from,
+    filters.date_to,
+    filters.source,
+  ].filter(Boolean).length;
+
+  const has_active_filters = active_filters_count > 0;
+
+  // ── Filter panel visibility ──────────────────────────────────────────────────
+
+  const [show_filters, setShowFilters] = useState(false);
+
+  // ── Row selection ────────────────────────────────────────────────────────────
 
   const [selected_row_ids, setSelectedRowIds] = useState<Set<string>>(new Set());
 
-  // Clear selection when the page changes (rows change)
   useEffect(() => {
     setSelectedRowIds(new Set());
   }, [rows]);
@@ -143,7 +199,7 @@ export default function OrderStatusTable({
     }
   }, [some_selected]);
 
-  // ── Export dropdown ─────────────────────────────────────────────────────────
+  // ── Export dropdown ──────────────────────────────────────────────────────────
 
   const [show_export_menu, setShowExportMenu] = useState(false);
   const export_btn_ref = useRef<HTMLDivElement>(null);
@@ -177,10 +233,44 @@ export default function OrderStatusTable({
 
   const n_selected = selected_row_ids.size;
 
+  // ── Filter handlers ──────────────────────────────────────────────────────────
+
+  const handleFilterChange = useCallback(
+    (key: keyof TableFilters, value: string) => {
+      onFiltersChange({ ...filters, [key]: value || undefined });
+    },
+    [filters, onFiltersChange]
+  );
+
+  const clearAllFilters = useCallback(() => {
+    onFiltersChange({});
+  }, [onFiltersChange]);
+
+  // ── Active filter chips ──────────────────────────────────────────────────────
+
+  const filter_chips: { key: keyof TableFilters; label: string }[] = [];
+  if (filters.status) filter_chips.push({ key: "status", label: `Status: ${filters.status}` });
+  if (filters.source)
+    filter_chips.push({
+      key: "source",
+      label: `Source: ${filters.source === "purchased" ? "Purchased" : "Admin Assigned"}`,
+    });
+  if (filters.date_from) filter_chips.push({ key: "date_from", label: `From: ${filters.date_from}` });
+  if (filters.date_to) filter_chips.push({ key: "date_to", label: `To: ${filters.date_to}` });
+
+  const removeChip = useCallback(
+    (key: keyof TableFilters) => {
+      const next = { ...filters };
+      delete next[key];
+      onFiltersChange(next);
+    },
+    [filters, onFiltersChange]
+  );
+
   return (
     <div className="rounded-2xl border border-gray-200 bg-white px-4 pb-4 pt-4 dark:border-gray-800 dark:bg-white/3 sm:px-6 sm:pt-6">
-      {/* Header */}
-      <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      {/* ── Header ──────────────────────────────────────────────────────────── */}
+      <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
             Order Status
@@ -217,7 +307,7 @@ export default function OrderStatusTable({
             </span>
             <input
               type="text"
-              placeholder="Date, Keyword, DR"
+              placeholder="Search keyword, order ID…"
               value={search_term}
               onChange={(e) => onSearchChange(e.target.value)}
               className="h-10 rounded-lg border border-gray-200 bg-transparent py-2 pl-9 pr-3 text-sm text-gray-700 placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:placeholder:text-gray-500"
@@ -225,18 +315,16 @@ export default function OrderStatusTable({
             />
           </div>
 
-          {/* Attribute Select */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-400">Attribute</span>
-            <select className="h-10 rounded-lg border border-gray-200 bg-transparent px-3 text-sm text-gray-700 focus:border-brand-300 focus:outline-hidden dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-              <option value="Links">Links</option>
-              <option value="Content">Content</option>
-              <option value="PR">PR</option>
-            </select>
-          </div>
-
-          {/* Filter Icon */}
-          <button className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800">
+          {/* Filter toggle button */}
+          <button
+            onClick={() => setShowFilters((v) => !v)}
+            className={`relative flex h-10 w-10 items-center justify-center rounded-lg border transition-colors ${
+              show_filters || has_active_filters
+                ? "border-coral-400 bg-coral-50 text-coral-600 dark:border-coral-500/50 dark:bg-coral-500/10 dark:text-coral-400"
+                : "border-gray-200 text-gray-500 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+            }`}
+            title="Toggle filters"
+          >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
               <path
                 d="M1.5 3.75H16.5M4.5 9H13.5M7 14.25H11"
@@ -245,6 +333,11 @@ export default function OrderStatusTable({
                 strokeLinecap="round"
               />
             </svg>
+            {has_active_filters && (
+              <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-coral-500 text-[9px] font-bold text-white">
+                {active_filters_count}
+              </span>
+            )}
           </button>
 
           {/* Export dropdown */}
@@ -341,16 +434,125 @@ export default function OrderStatusTable({
         </div>
       </div>
 
-      {/* Table */}
+      {/* ── Filter panel ────────────────────────────────────────────────────── */}
+      {show_filters && (
+        <div className="mb-4 rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-gray-700/60 dark:bg-gray-800/40">
+          <div className="flex flex-wrap items-end gap-4">
+            {/* Status */}
+            <div className="flex flex-col gap-1 min-w-[160px]">
+              <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                Status
+              </label>
+              <select
+                value={filters.status ?? ""}
+                onChange={(e) => handleFilterChange("status", e.target.value)}
+                className={FIELD_CLS}
+              >
+                <option value="">All Statuses</option>
+                {STATUS_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Source */}
+            <div className="flex flex-col gap-1 min-w-[160px]">
+              <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                Source
+              </label>
+              <select
+                value={filters.source ?? ""}
+                onChange={(e) =>
+                  handleFilterChange("source", e.target.value)
+                }
+                className={FIELD_CLS}
+              >
+                <option value="">All Sources</option>
+                <option value="purchased">Purchased Orders</option>
+                <option value="admin_assigned">Admin Assigned</option>
+              </select>
+            </div>
+
+            {/* Date From */}
+            <div className="flex flex-col gap-1 min-w-[150px]">
+              <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                Start Date From
+              </label>
+              <input
+                type="date"
+                value={filters.date_from ?? ""}
+                onChange={(e) => handleFilterChange("date_from", e.target.value)}
+                className={FIELD_CLS}
+              />
+            </div>
+
+            {/* Date To */}
+            <div className="flex flex-col gap-1 min-w-[150px]">
+              <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                Start Date To
+              </label>
+              <input
+                type="date"
+                value={filters.date_to ?? ""}
+                onChange={(e) => handleFilterChange("date_to", e.target.value)}
+                className={FIELD_CLS}
+              />
+            </div>
+
+            {/* Clear all */}
+            {has_active_filters && (
+              <button
+                onClick={clearAllFilters}
+                className="flex h-9 items-center gap-1.5 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-500 transition-colors hover:border-coral-300 hover:bg-coral-50 hover:text-coral-600 dark:border-gray-600 dark:text-gray-400 dark:hover:border-coral-500/40 dark:hover:bg-coral-500/10 dark:hover:text-coral-400"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path d="M2 2l8 8M10 2L2 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+                Clear All
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Active filter chips ──────────────────────────────────────────────── */}
+      {!show_filters && filter_chips.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          {filter_chips.map((chip) => (
+            <span
+              key={chip.key}
+              className="inline-flex items-center gap-1.5 rounded-full border border-coral-200 bg-coral-50 px-2.5 py-0.5 text-xs font-medium text-coral-600 dark:border-coral-500/30 dark:bg-coral-500/10 dark:text-coral-400"
+            >
+              {chip.label}
+              <button
+                onClick={() => removeChip(chip.key)}
+                className="ml-0.5 rounded-full hover:text-coral-800 dark:hover:text-coral-200"
+                aria-label={`Remove ${chip.label} filter`}
+              >
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path d="M2 2l6 6M8 2L2 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </button>
+            </span>
+          ))}
+          <button
+            onClick={clearAllFilters}
+            className="text-xs text-gray-400 underline hover:text-coral-500 dark:text-gray-500 dark:hover:text-coral-400"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
+
+      {/* ── Table ───────────────────────────────────────────────────────────── */}
       <div className="max-w-full overflow-x-auto">
         <Table>
           <TableHeader className="border-y border-gray-100 dark:border-gray-800">
             <TableRow>
               {/* Select-all checkbox */}
-              <TableCell
-                isHeader
-                className="w-10 py-3 text-start"
-              >
+              <TableCell isHeader className="w-10 py-3 text-start">
                 <input
                   ref={select_all_ref}
                   type="checkbox"
@@ -393,9 +595,9 @@ export default function OrderStatusTable({
                   colSpan={11}
                   className="py-12 text-center text-sm text-gray-400 dark:text-gray-500"
                 >
-                  {total === 0 && !search_term
+                  {total === 0 && !search_term && !has_active_filters
                     ? "No orders yet. Place your first order to get started."
-                    : "No orders match your search."}
+                    : "No orders match your search or filters."}
                 </TableCell>
               </TableRow>
             ) : (
@@ -516,13 +718,7 @@ export default function OrderStatusTable({
                             stroke="currentColor"
                             strokeWidth="1.2"
                           />
-                          <circle
-                            cx="6"
-                            cy="6"
-                            r="1.5"
-                            stroke="currentColor"
-                            strokeWidth="1.2"
-                          />
+                          <circle cx="6" cy="6" r="1.5" stroke="currentColor" strokeWidth="1.2" />
                         </svg>
                         View
                       </Link>
@@ -535,7 +731,7 @@ export default function OrderStatusTable({
         </Table>
       </div>
 
-      {/* Pagination */}
+      {/* ── Pagination ──────────────────────────────────────────────────────── */}
       {!is_loading && last_page >= 1 && total > 0 && (
         <div className="flex flex-col gap-3 border-t border-gray-200 px-1 pt-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-gray-500 dark:text-gray-400">

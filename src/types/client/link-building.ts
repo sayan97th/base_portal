@@ -164,7 +164,13 @@ export interface OrderPlacementFilters {
   page?: number;
   per_page?: number;
   search?: string;
-  status?: OrderStatus | PlacementStatus;
+  status?: OrderStatus | PlacementStatus | string;
+  /** ISO date string YYYY-MM-DD — lower bound on placement start_date */
+  date_from?: string;
+  /** ISO date string YYYY-MM-DD — upper bound on placement start_date */
+  date_to?: string;
+  /** Filter by row origin: 'purchased' | 'admin_assigned' */
+  source?: "purchased" | "admin_assigned";
 }
 
 /**
