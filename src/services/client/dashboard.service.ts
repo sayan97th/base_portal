@@ -213,7 +213,7 @@ export interface ExportOrderPlacementsOptions {
   status?: string;
   date_from?: string;
   date_to?: string;
-  source?: string;
+  dr_type?: string;
   row_ids?: string[];
 }
 
@@ -233,7 +233,7 @@ function triggerFileDownload(blob: Blob, filename: string): void {
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 async function exportOrderPlacements(options: ExportOrderPlacementsOptions): Promise<void> {
-  const { format, search, status, date_from, date_to, source, row_ids } = options;
+  const { format, search, status, date_from, date_to, dr_type, row_ids } = options;
   const token = getToken();
   const date_suffix = new Date().toISOString().slice(0, 10);
 
@@ -241,7 +241,7 @@ async function exportOrderPlacements(options: ExportOrderPlacementsOptions): Pro
     ? { Authorization: `Bearer ${token}` }
     : {};
 
-  const filter_body = { search, status, date_from, date_to, source, row_ids };
+  const filter_body = { search, status, date_from, date_to, dr_type, row_ids };
 
   if (format === "csv") {
     const response = await fetch(`${BASE}/api/link-building/order-placements/export`, {

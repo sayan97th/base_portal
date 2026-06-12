@@ -40,7 +40,7 @@ export default function DashboardPage() {
     status?: string;
     date_from?: string;
     date_to?: string;
-    source?: "purchased" | "admin_assigned";
+    dr_type?: string;
   }>({});
 
   // Debounce search — avoids hitting the API on every keystroke

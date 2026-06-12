@@ -1,5 +1,7 @@
 "use client";
 import { useState, useRef, useEffect, useCallback } from "react";
+import flatpickr from "flatpickr";
+import "flatpickr/dist/flatpickr.css";
 import Link from "next/link";
 import {
   Table,
@@ -15,13 +17,13 @@ import type {
   ExportFormat,
 } from "@/services/client/dashboard.service";
 
-// ── Filter types ─────────────────────────────────────────────────────────────
+// ── Filter types ──────────────────────────────────────────────────────────────
 
 export interface TableFilters {
   status?: string;
   date_from?: string;
   date_to?: string;
-  source?: "purchased" | "admin_assigned";
+  dr_type?: string;
 }
 
 interface Props {
@@ -40,22 +42,30 @@ interface Props {
   onFiltersChange: (filters: TableFilters) => void;
 }
 
-// ── Constants ─────────────────────────────────────────────────────────────────
+// ── Filter options ────────────────────────────────────────────────────────────
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
-  { value: "Live", label: "Live" },
-  { value: "New Request", label: "New Request" },
-  { value: "Reviewing", label: "Reviewing" },
-  { value: "Ordered", label: "Ordered" },
-  { value: "Pending", label: "Pending" },
-  { value: "Quality Control", label: "Quality Control" },
+  { value: "Live",              label: "Live" },
+  { value: "New Request",       label: "New Request" },
+  { value: "Reviewing",         label: "Reviewing" },
+  { value: "Ordered",           label: "Ordered" },
+  { value: "Pending",           label: "Pending" },
+  { value: "Quality Control",   label: "Quality Control" },
   { value: "Partnership Check", label: "Partnership Check" },
-  { value: "Approved", label: "Approved" },
-  { value: "Not Approved", label: "Not Approved" },
-  { value: "Ready", label: "Ready" },
-  { value: "Rejected", label: "Rejected" },
-  { value: "Scheduled", label: "Scheduled" },
-  { value: "Cancelled", label: "Cancelled" },
+  { value: "Approved",          label: "Approved" },
+  { value: "Not Approved",      label: "Not Approved" },
+  { value: "Ready",             label: "Ready" },
+  { value: "Rejected",          label: "Rejected" },
+  { value: "Scheduled",         label: "Scheduled" },
+  { value: "Cancelled",         label: "Cancelled" },
+];
+
+const DR_OPTIONS: { value: string; label: string }[] = [
+  { value: "DR 30+", label: "DR 30+" },
+  { value: "DR 40+", label: "DR 40+" },
+  { value: "DR 50+", label: "DR 50+" },
+  { value: "DR 60+", label: "DR 60+" },
+  { value: "DR 70+", label: "DR 70+" },
 ];
 
 const status_badge_color: Record<
@@ -79,6 +89,19 @@ const status_badge_color: Record<
   Rejected: "error",
   Scheduled: "primary",
 };
+
+// ── Shared class strings ──────────────────────────────────────────────────────
+
+const SELECT_CLS =
+  "h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 " +
+  "focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 " +
+  "dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300";
+
+const DATE_INPUT_CLS =
+  "h-9 w-40 rounded-lg border border-gray-200 bg-white px-3 pr-8 text-sm text-gray-700 " +
+  "cursor-pointer placeholder:text-gray-400 " +
+  "focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 " +
+  "dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:placeholder:text-gray-500";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -119,14 +142,68 @@ function buildPageButtons(current: number, last: number): (number | "...")[] {
   return pages;
 }
 
-// ── Select / input shared class ───────────────────────────────────────────────
+// ── Compact flatpickr date picker for the filter panel ────────────────────────
 
-const FIELD_CLS =
-  "h-9 rounded-lg border border-gray-200 bg-transparent px-3 text-sm text-gray-700 " +
-  "focus:border-brand-300 focus:outline-hidden focus:ring-2 focus:ring-brand-500/10 " +
-  "dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:placeholder:text-gray-500";
+function FilterDatePicker({
+  id,
+  value,
+  placeholder,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  placeholder: string;
+  onChange: (val: string) => void;
+}) {
+  const input_ref = useRef<HTMLInputElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fp_ref = useRef<any>(null);
 
-// ── Component ─────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!input_ref.current) return;
+    const instance = flatpickr(input_ref.current, {
+      dateFormat: "Y-m-d",
+      static: true,
+      monthSelectorType: "static",
+      disableMobile: true,
+      onChange: (_dates: Date[], dateStr: string) => onChange(dateStr),
+    });
+    fp_ref.current = Array.isArray(instance) ? instance[0] : instance;
+    return () => fp_ref.current?.destroy();
+    // onChange identity intentionally excluded — picker is initialised once
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Sync external "clear all" resets back into the picker
+  useEffect(() => {
+    if (!fp_ref.current) return;
+    if (value) {
+      fp_ref.current.setDate(value, false);
+    } else {
+      fp_ref.current.clear();
+    }
+  }, [value]);
+
+  return (
+    <div className="relative">
+      <input
+        ref={input_ref}
+        id={id}
+        readOnly
+        placeholder={placeholder}
+        className={DATE_INPUT_CLS}
+      />
+      <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <rect x="1" y="2.5" width="12" height="10.5" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+          <path d="M4.5 1v3M9.5 1v3M1 6h12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+        </svg>
+      </span>
+    </div>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 
 export default function OrderStatusTable({
   rows,
@@ -147,22 +224,22 @@ export default function OrderStatusTable({
   const range_end = Math.min(current_page * per_page, total);
   const page_buttons = buildPageButtons(current_page, last_page);
 
-  // ── Active filter count ──────────────────────────────────────────────────────
+  // ── Active filter count ────────────────────────────────────────────────────
 
   const active_filters_count = [
     filters.status,
     filters.date_from,
     filters.date_to,
-    filters.source,
+    filters.dr_type,
   ].filter(Boolean).length;
 
   const has_active_filters = active_filters_count > 0;
 
-  // ── Filter panel visibility ──────────────────────────────────────────────────
+  // ── Filter panel visibility ────────────────────────────────────────────────
 
   const [show_filters, setShowFilters] = useState(false);
 
-  // ── Row selection ────────────────────────────────────────────────────────────
+  // ── Row selection ──────────────────────────────────────────────────────────
 
   const [selected_row_ids, setSelectedRowIds] = useState<Set<string>>(new Set());
 
@@ -199,7 +276,7 @@ export default function OrderStatusTable({
     }
   }, [some_selected]);
 
-  // ── Export dropdown ──────────────────────────────────────────────────────────
+  // ── Export dropdown ────────────────────────────────────────────────────────
 
   const [show_export_menu, setShowExportMenu] = useState(false);
   const export_btn_ref = useRef<HTMLDivElement>(null);
@@ -233,7 +310,7 @@ export default function OrderStatusTable({
 
   const n_selected = selected_row_ids.size;
 
-  // ── Filter handlers ──────────────────────────────────────────────────────────
+  // ── Filter handlers ────────────────────────────────────────────────────────
 
   const handleFilterChange = useCallback(
     (key: keyof TableFilters, value: string) => {
@@ -246,17 +323,13 @@ export default function OrderStatusTable({
     onFiltersChange({});
   }, [onFiltersChange]);
 
-  // ── Active filter chips ──────────────────────────────────────────────────────
+  // ── Active filter chips (shown when panel is collapsed) ────────────────────
 
   const filter_chips: { key: keyof TableFilters; label: string }[] = [];
-  if (filters.status) filter_chips.push({ key: "status", label: `Status: ${filters.status}` });
-  if (filters.source)
-    filter_chips.push({
-      key: "source",
-      label: `Source: ${filters.source === "purchased" ? "Purchased" : "Admin Assigned"}`,
-    });
+  if (filters.status)    filter_chips.push({ key: "status",    label: `Status: ${filters.status}` });
+  if (filters.dr_type)   filter_chips.push({ key: "dr_type",   label: `DR: ${filters.dr_type}` });
   if (filters.date_from) filter_chips.push({ key: "date_from", label: `From: ${filters.date_from}` });
-  if (filters.date_to) filter_chips.push({ key: "date_to", label: `To: ${filters.date_to}` });
+  if (filters.date_to)   filter_chips.push({ key: "date_to",   label: `To: ${filters.date_to}` });
 
   const removeChip = useCallback(
     (key: keyof TableFilters) => {
@@ -269,7 +342,8 @@ export default function OrderStatusTable({
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white px-4 pb-4 pt-4 dark:border-gray-800 dark:bg-white/3 sm:px-6 sm:pt-6">
-      {/* ── Header ──────────────────────────────────────────────────────────── */}
+
+      {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
@@ -294,15 +368,9 @@ export default function OrderStatusTable({
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path
                   d="M7.25 1.5C4.075 1.5 1.5 4.075 1.5 7.25C1.5 10.425 4.075 13 7.25 13C10.425 13 13 10.425 13 7.25C13 4.075 10.425 1.5 7.25 1.5Z"
-                  stroke="currentColor"
-                  strokeWidth="1.3"
+                  stroke="currentColor" strokeWidth="1.3"
                 />
-                <path
-                  d="M11.5 11.5L14.5 14.5"
-                  stroke="currentColor"
-                  strokeWidth="1.3"
-                  strokeLinecap="round"
-                />
+                <path d="M11.5 11.5L14.5 14.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
               </svg>
             </span>
             <input
@@ -315,7 +383,7 @@ export default function OrderStatusTable({
             />
           </div>
 
-          {/* Filter toggle button */}
+          {/* Filter toggle */}
           <button
             onClick={() => setShowFilters((v) => !v)}
             className={`relative flex h-10 w-10 items-center justify-center rounded-lg border transition-colors ${
@@ -326,12 +394,7 @@ export default function OrderStatusTable({
             title="Toggle filters"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <path
-                d="M1.5 3.75H16.5M4.5 9H13.5M7 14.25H11"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
+              <path d="M1.5 3.75H16.5M4.5 9H13.5M7 14.25H11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
             {has_active_filters && (
               <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-coral-500 text-[9px] font-bold text-white">
@@ -358,13 +421,7 @@ export default function OrderStatusTable({
               ) : (
                 <>
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                    <path
-                      d="M7 1v8M4 6l3 3 3-3M1.5 10.5v1a1 1 0 001 1h9a1 1 0 001-1v-1"
-                      stroke="currentColor"
-                      strokeWidth="1.4"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
+                    <path d="M7 1v8M4 6l3 3 3-3M1.5 10.5v1a1 1 0 001 1h9a1 1 0 001-1v-1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                   Export
                   <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
@@ -379,24 +436,12 @@ export default function OrderStatusTable({
                 <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                   Export All Rows
                 </div>
-                <button
-                  onClick={() => handleExportAll("csv")}
-                  className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700"
-                >
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                    <rect x="1" y="1" width="12" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
-                    <path d="M4 4h6M4 7h6M4 10h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-                  </svg>
+                <button onClick={() => handleExportAll("csv")} className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="12" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2" /><path d="M4 4h6M4 7h6M4 10h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg>
                   Download All — CSV
                 </button>
-                <button
-                  onClick={() => handleExportAll("xlsx")}
-                  className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700"
-                >
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                    <rect x="1" y="1" width="12" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
-                    <path d="M4 4l6 6M10 4L4 10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-                  </svg>
+                <button onClick={() => handleExportAll("xlsx")} className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="12" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2" /><path d="M4 4l6 6M10 4L4 10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg>
                   Download All — Excel
                 </button>
 
@@ -406,24 +451,12 @@ export default function OrderStatusTable({
                     <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                       Export Selected ({n_selected})
                     </div>
-                    <button
-                      onClick={() => handleExportSelected("csv")}
-                      className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                        <rect x="1" y="1" width="12" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
-                        <path d="M4 4h6M4 7h6M4 10h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-                      </svg>
+                    <button onClick={() => handleExportSelected("csv")} className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700">
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="12" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2" /><path d="M4 4h6M4 7h6M4 10h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg>
                       Selected Rows — CSV
                     </button>
-                    <button
-                      onClick={() => handleExportSelected("xlsx")}
-                      className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                        <rect x="1" y="1" width="12" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
-                        <path d="M4 4l6 6M10 4L4 10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-                      </svg>
+                    <button onClick={() => handleExportSelected("xlsx")} className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700">
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="12" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2" /><path d="M4 4l6 6M10 4L4 10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg>
                       Selected Rows — Excel
                     </button>
                   </>
@@ -434,70 +467,64 @@ export default function OrderStatusTable({
         </div>
       </div>
 
-      {/* ── Filter panel ────────────────────────────────────────────────────── */}
+      {/* ── Filter panel ──────────────────────────────────────────────────── */}
       {show_filters && (
         <div className="mb-4 rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-gray-700/60 dark:bg-gray-800/40">
           <div className="flex flex-wrap items-end gap-4">
+
             {/* Status */}
-            <div className="flex flex-col gap-1 min-w-[160px]">
-              <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                Status
-              </label>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Status</label>
               <select
                 value={filters.status ?? ""}
                 onChange={(e) => handleFilterChange("status", e.target.value)}
-                className={FIELD_CLS}
+                className={SELECT_CLS}
               >
                 <option value="">All Statuses</option>
-                {STATUS_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
+                {STATUS_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </select>
             </div>
 
-            {/* Source */}
-            <div className="flex flex-col gap-1 min-w-[160px]">
-              <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                Source
-              </label>
+            {/* DR Type */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-gray-500 dark:text-gray-400">DR Type</label>
               <select
-                value={filters.source ?? ""}
-                onChange={(e) =>
-                  handleFilterChange("source", e.target.value)
-                }
-                className={FIELD_CLS}
+                value={filters.dr_type ?? ""}
+                onChange={(e) => handleFilterChange("dr_type", e.target.value)}
+                className={SELECT_CLS}
               >
-                <option value="">All Sources</option>
-                <option value="purchased">Purchased Orders</option>
-                <option value="admin_assigned">Admin Assigned</option>
+                <option value="">All DR Types</option>
+                {DR_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
               </select>
             </div>
 
-            {/* Date From */}
-            <div className="flex flex-col gap-1 min-w-[150px]">
+            {/* Start Date From */}
+            <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
                 Start Date From
               </label>
-              <input
-                type="date"
+              <FilterDatePicker
+                id="filter-date-from"
                 value={filters.date_from ?? ""}
-                onChange={(e) => handleFilterChange("date_from", e.target.value)}
-                className={FIELD_CLS}
+                placeholder="Pick a date…"
+                onChange={(val) => handleFilterChange("date_from", val)}
               />
             </div>
 
-            {/* Date To */}
-            <div className="flex flex-col gap-1 min-w-[150px]">
+            {/* Start Date To */}
+            <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
                 Start Date To
               </label>
-              <input
-                type="date"
+              <FilterDatePicker
+                id="filter-date-to"
                 value={filters.date_to ?? ""}
-                onChange={(e) => handleFilterChange("date_to", e.target.value)}
-                className={FIELD_CLS}
+                placeholder="Pick a date…"
+                onChange={(val) => handleFilterChange("date_to", val)}
               />
             </div>
 
@@ -517,7 +544,7 @@ export default function OrderStatusTable({
         </div>
       )}
 
-      {/* ── Active filter chips ──────────────────────────────────────────────── */}
+      {/* ── Active filter chips (panel closed) ────────────────────────────── */}
       {!show_filters && filter_chips.length > 0 && (
         <div className="mb-4 flex flex-wrap items-center gap-2">
           {filter_chips.map((chip) => (
@@ -546,12 +573,11 @@ export default function OrderStatusTable({
         </div>
       )}
 
-      {/* ── Table ───────────────────────────────────────────────────────────── */}
+      {/* ── Table ─────────────────────────────────────────────────────────── */}
       <div className="max-w-full overflow-x-auto">
         <Table>
           <TableHeader className="border-y border-gray-100 dark:border-gray-800">
             <TableRow>
-              {/* Select-all checkbox */}
               <TableCell isHeader className="w-10 py-3 text-start">
                 <input
                   ref={select_all_ref}
@@ -562,24 +588,11 @@ export default function OrderStatusTable({
                   title={all_selected ? "Deselect all" : "Select all on this page"}
                 />
               </TableCell>
-
               {[
-                "Order ID",
-                "Start Date",
-                "DR Type",
-                "Keyword",
-                "Landing Page",
-                "Status",
-                "Live Link",
-                "Completed Date",
-                "DR",
-                "Actions",
+                "Order ID", "Start Date", "DR Type", "Keyword",
+                "Landing Page", "Status", "Live Link", "Completed Date", "DR", "Actions",
               ].map((col) => (
-                <TableCell
-                  key={col}
-                  isHeader
-                  className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
-                >
+                <TableCell key={col} isHeader className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
                   {col}
                 </TableCell>
               ))}
@@ -591,10 +604,7 @@ export default function OrderStatusTable({
               <TableSkeleton rows_count={per_page} />
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell
-                  colSpan={11}
-                  className="py-12 text-center text-sm text-gray-400 dark:text-gray-500"
-                >
+                <TableCell colSpan={11} className="py-12 text-center text-sm text-gray-400 dark:text-gray-500">
                   {total === 0 && !search_term && !has_active_filters
                     ? "No orders yet. Place your first order to get started."
                     : "No orders match your search or filters."}
@@ -608,7 +618,6 @@ export default function OrderStatusTable({
                     key={`${row.order_id}-${index}`}
                     className={is_checked ? "bg-coral-50/40 dark:bg-coral-500/5" : undefined}
                   >
-                    {/* Row checkbox */}
                     <TableCell className="w-10 py-3">
                       <input
                         type="checkbox"
@@ -618,49 +627,32 @@ export default function OrderStatusTable({
                       />
                     </TableCell>
 
-                    {/* Order ID */}
                     <TableCell className="whitespace-nowrap py-3 font-mono text-xs font-medium text-gray-700 dark:text-gray-300">
                       <Link
-                        href={
-                          row.source === "admin_assigned"
-                            ? `/link-building/placements/${row.id}`
-                            : `/orders/${row.order_id}`
-                        }
+                        href={row.source === "admin_assigned" ? `/link-building/placements/${row.id}` : `/orders/${row.order_id}`}
                         className="hover:text-coral-500 hover:underline"
                       >
                         {row.display_order_id || row.order_id}
                       </Link>
                     </TableCell>
 
-                    {/* Start Date */}
                     <TableCell className="whitespace-nowrap py-3 text-gray-500 text-theme-sm dark:text-gray-400">
                       {formatDate(row.start_date)}
                     </TableCell>
 
-                    {/* DR Type */}
                     <TableCell className="whitespace-nowrap py-3">
                       <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-700 dark:bg-gray-800 dark:text-gray-300">
                         {row.dr_type}
                       </span>
                     </TableCell>
 
-                    {/* Keyword */}
                     <TableCell className="whitespace-nowrap py-3 text-gray-500 text-theme-sm dark:text-gray-400">
-                      {row.keyword ?? (
-                        <span className="text-gray-300 dark:text-gray-600">—</span>
-                      )}
+                      {row.keyword ?? <span className="text-gray-300 dark:text-gray-600">—</span>}
                     </TableCell>
 
-                    {/* Landing Page */}
                     <TableCell className="py-3 text-theme-sm">
                       {row.landing_page ? (
-                        <a
-                          href={row.landing_page}
-                          className="block max-w-[200px] truncate text-blue-light-500 hover:underline"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title={row.landing_page}
-                        >
+                        <a href={row.landing_page} className="block max-w-[200px] truncate text-blue-light-500 hover:underline" target="_blank" rel="noopener noreferrer" title={row.landing_page}>
                           {row.landing_page}
                         </a>
                       ) : (
@@ -668,23 +660,15 @@ export default function OrderStatusTable({
                       )}
                     </TableCell>
 
-                    {/* Status */}
                     <TableCell className="whitespace-nowrap py-3">
                       <Badge size="sm" color={status_badge_color[row.status] ?? "info"}>
                         {row.status}
                       </Badge>
                     </TableCell>
 
-                    {/* Live Link */}
                     <TableCell className="py-3 text-theme-sm">
                       {row.live_link ? (
-                        <a
-                          href={row.live_link}
-                          className="block max-w-[200px] truncate text-blue-light-500 hover:underline"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title={row.live_link}
-                        >
+                        <a href={row.live_link} className="block max-w-[200px] truncate text-blue-light-500 hover:underline" target="_blank" rel="noopener noreferrer" title={row.live_link}>
                           {row.live_link}
                         </a>
                       ) : (
@@ -692,32 +676,21 @@ export default function OrderStatusTable({
                       )}
                     </TableCell>
 
-                    {/* Completed Date */}
                     <TableCell className="whitespace-nowrap py-3 text-gray-500 text-theme-sm dark:text-gray-400">
                       {row.completed_date ? formatDate(row.completed_date) : "—"}
                     </TableCell>
 
-                    {/* DR score */}
                     <TableCell className="whitespace-nowrap py-3 text-gray-500 text-theme-sm dark:text-gray-400">
                       {row.dr ?? "—"}
                     </TableCell>
 
-                    {/* Actions */}
                     <TableCell className="whitespace-nowrap py-3">
                       <Link
-                        href={
-                          row.source === "admin_assigned"
-                            ? `/link-building/placements/${row.id}`
-                            : `/orders/${row.order_id}`
-                        }
+                        href={row.source === "admin_assigned" ? `/link-building/placements/${row.id}` : `/orders/${row.order_id}`}
                         className="inline-flex items-center gap-1.5 rounded-lg border border-coral-200 bg-coral-50 px-3 py-1.5 text-xs font-medium text-coral-600 transition-colors hover:bg-coral-500 hover:text-white dark:border-coral-500/30 dark:bg-coral-500/10 dark:text-coral-400 dark:hover:bg-coral-500 dark:hover:text-white"
                       >
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                          <path
-                            d="M6 2.5C3.5 2.5 1.5 6 1.5 6C1.5 6 3.5 9.5 6 9.5C8.5 9.5 10.5 6 10.5 6C10.5 6 8.5 2.5 6 2.5Z"
-                            stroke="currentColor"
-                            strokeWidth="1.2"
-                          />
+                          <path d="M6 2.5C3.5 2.5 1.5 6 1.5 6C1.5 6 3.5 9.5 6 9.5C8.5 9.5 10.5 6 10.5 6C10.5 6 8.5 2.5 6 2.5Z" stroke="currentColor" strokeWidth="1.2" />
                           <circle cx="6" cy="6" r="1.5" stroke="currentColor" strokeWidth="1.2" />
                         </svg>
                         View
@@ -731,26 +704,18 @@ export default function OrderStatusTable({
         </Table>
       </div>
 
-      {/* ── Pagination ──────────────────────────────────────────────────────── */}
+      {/* ── Pagination ────────────────────────────────────────────────────── */}
       {!is_loading && last_page >= 1 && total > 0 && (
         <div className="flex flex-col gap-3 border-t border-gray-200 px-1 pt-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-gray-500 dark:text-gray-400">
             Showing{" "}
-            <span className="font-medium text-gray-700 dark:text-gray-300">
-              {range_start}–{range_end}
-            </span>{" "}
+            <span className="font-medium text-gray-700 dark:text-gray-300">{range_start}–{range_end}</span>{" "}
             of{" "}
-            <span className="font-medium text-gray-700 dark:text-gray-300">
-              {total}
-            </span>{" "}
+            <span className="font-medium text-gray-700 dark:text-gray-300">{total}</span>{" "}
             results &nbsp;·&nbsp; Page{" "}
-            <span className="font-medium text-gray-700 dark:text-gray-300">
-              {current_page}
-            </span>{" "}
+            <span className="font-medium text-gray-700 dark:text-gray-300">{current_page}</span>{" "}
             of{" "}
-            <span className="font-medium text-gray-700 dark:text-gray-300">
-              {last_page}
-            </span>
+            <span className="font-medium text-gray-700 dark:text-gray-300">{last_page}</span>
           </p>
 
           <div className="flex items-center gap-1">
@@ -760,25 +725,14 @@ export default function OrderStatusTable({
               className="flex h-8 items-center gap-1 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
             >
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path
-                  d="M7.5 2.5L4.5 6L7.5 9.5"
-                  stroke="currentColor"
-                  strokeWidth="1.4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
+                <path d="M7.5 2.5L4.5 6L7.5 9.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               Prev
             </button>
 
             {page_buttons.map((btn, i) =>
               btn === "..." ? (
-                <span
-                  key={`ellipsis-${i}`}
-                  className="flex h-8 w-8 items-center justify-center text-xs text-gray-400"
-                >
-                  …
-                </span>
+                <span key={`ellipsis-${i}`} className="flex h-8 w-8 items-center justify-center text-xs text-gray-400">…</span>
               ) : (
                 <button
                   key={btn}
@@ -801,13 +755,7 @@ export default function OrderStatusTable({
             >
               Next
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path
-                  d="M4.5 2.5L7.5 6L4.5 9.5"
-                  stroke="currentColor"
-                  strokeWidth="1.4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
+                <path d="M4.5 2.5L7.5 6L4.5 9.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
           </div>

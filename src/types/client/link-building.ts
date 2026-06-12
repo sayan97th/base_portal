@@ -169,8 +169,8 @@ export interface OrderPlacementFilters {
   date_from?: string;
   /** ISO date string YYYY-MM-DD — upper bound on placement start_date */
   date_to?: string;
-  /** Filter by row origin: 'purchased' | 'admin_assigned' */
-  source?: "purchased" | "admin_assigned";
+  /** Filter by DR tier label, e.g. "DR 50+" — backend applies a LIKE match */
+  dr_type?: string;
 }
 
 /**

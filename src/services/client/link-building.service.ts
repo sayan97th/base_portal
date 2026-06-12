@@ -141,7 +141,7 @@ export const linkBuildingService = {
   async fetchMyOrderPlacements(
     filters: OrderPlacementFilters = {}
   ): Promise<ClientPaginatedResponse<OrderPlacementRow>> {
-    const { page = 1, per_page = 10, search, status, date_from, date_to, source } = filters;
+    const { page = 1, per_page = 10, search, status, date_from, date_to, dr_type } = filters;
     const params = new URLSearchParams();
     params.set("page", String(page));
     params.set("per_page", String(per_page));
@@ -149,7 +149,7 @@ export const linkBuildingService = {
     if (status) params.set("status", status);
     if (date_from) params.set("date_from", date_from);
     if (date_to) params.set("date_to", date_to);
-    if (source) params.set("source", source);
+    if (dr_type) params.set("dr_type", dr_type);
 
     return apiClient.get<ClientPaginatedResponse<OrderPlacementRow>>(
       `/api/link-building/order-placements?${params.toString()}`
