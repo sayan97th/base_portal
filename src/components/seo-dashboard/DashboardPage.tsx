@@ -33,7 +33,7 @@ export default function DashboardPage() {
   const [table_page, setTablePage] = useState(1);
   const [table_last_page, setTableLastPage] = useState(1);
   const [table_total, setTableTotal] = useState(0);
-  const [is_downloading, setIsDownloading] = useState(false);
+  const [is_exporting, setIsExporting] = useState(false);
 
   // Debounce search — avoids hitting the API on every keystroke
   const debounced_search = useDebounce(table_search, 400);
@@ -93,15 +93,22 @@ export default function DashboardPage() {
     setTablePage(1);
   };
 
-  const handleDownload = async () => {
-    if (is_downloading) return;
-    setIsDownloading(true);
+  const handleExport = async (
+    format: "csv" | "xlsx",
+    row_ids?: string[]
+  ) => {
+    if (is_exporting) return;
+    setIsExporting(true);
     try {
-      await dashboardService.downloadOrderPlacements(table_search || undefined);
+      await dashboardService.exportOrderPlacements({
+        format,
+        search: row_ids ? undefined : table_search || undefined,
+        row_ids,
+      });
     } catch {
-      // Download failures are silent — the browser will show nothing downloaded
+      // Export failures are silent — the browser will show nothing downloaded
     } finally {
-      setIsDownloading(false);
+      setIsExporting(false);
     }
   };
 
@@ -159,8 +166,8 @@ export default function DashboardPage() {
             search_term={table_search}
             onSearchChange={handleSearchChange}
             onPageChange={setTablePage}
-            onDownload={handleDownload}
-            is_downloading={is_downloading}
+            onExport={handleExport}
+            is_exporting={is_exporting}
           />
 
           {/* Mid Row: Order History + News + Resources */}

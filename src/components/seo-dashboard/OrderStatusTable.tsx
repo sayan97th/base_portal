@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   Table,
@@ -12,36 +12,33 @@ import Badge from "../ui/badge/Badge";
 import type {
   DashboardTableRow,
   DisplayStatus,
+  ExportFormat,
 } from "@/services/client/dashboard.service";
 
 interface Props {
   rows: DashboardTableRow[];
   is_loading: boolean;
-  // Server-side pagination metadata
   current_page: number;
   last_page: number;
   total: number;
   per_page: number;
-  // Controlled inputs — owned by the parent
   search_term: string;
   onSearchChange: (value: string) => void;
   onPageChange: (page: number) => void;
-  onDownload: () => void;
-  is_downloading?: boolean;
+  onExport: (format: ExportFormat, row_ids?: string[]) => void;
+  is_exporting?: boolean;
 }
 
 const status_badge_color: Record<
   DisplayStatus,
   "success" | "error" | "warning" | "info" | "primary"
 > = {
-  // Order-level mapped statuses
   Live: "success",
   "Pending with publisher": "error",
   "Writing article": "warning",
   "Choosing domain": "info",
   "New request": "warning",
   Cancelled: "error",
-  // Admin placement statuses
   Reviewing: "info",
   Ordered: "warning",
   Pending: "warning",
@@ -68,7 +65,7 @@ function TableSkeleton({ rows_count }: { rows_count: number }) {
     <>
       {[...Array(rows_count)].map((_, i) => (
         <TableRow key={i}>
-          {[...Array(10)].map((__, j) => (
+          {[...Array(11)].map((__, j) => (
             <TableCell key={j} className="py-3">
               <div className="h-4 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
             </TableCell>
@@ -79,7 +76,6 @@ function TableSkeleton({ rows_count }: { rows_count: number }) {
   );
 }
 
-/** Generates the page number buttons to show around the current page. */
 function buildPageButtons(current: number, last: number): (number | "...")[] {
   if (last <= 7) return Array.from({ length: last }, (_, i) => i + 1);
   const pages: (number | "...")[] = [1];
@@ -102,12 +98,84 @@ export default function OrderStatusTable({
   search_term,
   onSearchChange,
   onPageChange,
-  onDownload,
-  is_downloading = false,
+  onExport,
+  is_exporting = false,
 }: Props) {
   const range_start = total === 0 ? 0 : (current_page - 1) * per_page + 1;
   const range_end = Math.min(current_page * per_page, total);
   const page_buttons = buildPageButtons(current_page, last_page);
+
+  // ── Row selection ───────────────────────────────────────────────────────────
+
+  const [selected_row_ids, setSelectedRowIds] = useState<Set<string>>(new Set());
+
+  // Clear selection when the page changes (rows change)
+  useEffect(() => {
+    setSelectedRowIds(new Set());
+  }, [rows]);
+
+  const toggleRowSelection = useCallback((id: string) => {
+    setSelectedRowIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const selectAllRows = useCallback(() => {
+    setSelectedRowIds(new Set(rows.map((r) => r.id)));
+  }, [rows]);
+
+  const clearSelection = useCallback(() => {
+    setSelectedRowIds(new Set());
+  }, []);
+
+  const all_selected =
+    rows.length > 0 && rows.every((r) => selected_row_ids.has(r.id));
+  const some_selected =
+    rows.some((r) => selected_row_ids.has(r.id)) && !all_selected;
+
+  const select_all_ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (select_all_ref.current) {
+      select_all_ref.current.indeterminate = some_selected;
+    }
+  }, [some_selected]);
+
+  // ── Export dropdown ─────────────────────────────────────────────────────────
+
+  const [show_export_menu, setShowExportMenu] = useState(false);
+  const export_btn_ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!show_export_menu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (export_btn_ref.current && !export_btn_ref.current.contains(e.target as Node)) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [show_export_menu]);
+
+  const handleExportAll = useCallback(
+    (format: ExportFormat) => {
+      setShowExportMenu(false);
+      onExport(format, undefined);
+    },
+    [onExport]
+  );
+
+  const handleExportSelected = useCallback(
+    (format: ExportFormat) => {
+      setShowExportMenu(false);
+      onExport(format, Array.from(selected_row_ids));
+    },
+    [onExport, selected_row_ids]
+  );
+
+  const n_selected = selected_row_ids.size;
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white px-4 pb-4 pt-4 dark:border-gray-800 dark:bg-white/3 sm:px-6 sm:pt-6">
@@ -120,6 +188,11 @@ export default function OrderStatusTable({
           {!is_loading && (
             <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-400">
               {total}
+            </span>
+          )}
+          {n_selected > 0 && (
+            <span className="rounded-full bg-coral-100 px-2.5 py-0.5 text-xs font-semibold text-coral-600 dark:bg-coral-500/20 dark:text-coral-400">
+              {n_selected} selected
             </span>
           )}
         </div>
@@ -155,9 +228,7 @@ export default function OrderStatusTable({
           {/* Attribute Select */}
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-400">Attribute</span>
-            <select
-              className="h-10 rounded-lg border border-gray-200 bg-transparent px-3 text-sm text-gray-700 focus:border-brand-300 focus:outline-hidden dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
-            >
+            <select className="h-10 rounded-lg border border-gray-200 bg-transparent px-3 text-sm text-gray-700 focus:border-brand-300 focus:outline-hidden dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
               <option value="Links">Links</option>
               <option value="Content">Content</option>
               <option value="PR">PR</option>
@@ -176,14 +247,97 @@ export default function OrderStatusTable({
             </svg>
           </button>
 
-          {/* Download */}
-          <button
-            onClick={onDownload}
-            disabled={is_downloading}
-            className="rounded-lg bg-coral-500 px-4 py-2 text-sm font-medium text-white hover:bg-coral-600 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {is_downloading ? "DOWNLOADING..." : "DOWNLOAD"}
-          </button>
+          {/* Export dropdown */}
+          <div ref={export_btn_ref} className="relative">
+            <button
+              onClick={() => setShowExportMenu((v) => !v)}
+              disabled={is_exporting}
+              className="flex h-10 items-center gap-2 rounded-lg bg-coral-500 px-4 text-sm font-medium text-white hover:bg-coral-600 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {is_exporting ? (
+                <>
+                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                  Exporting…
+                </>
+              ) : (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path
+                      d="M7 1v8M4 6l3 3 3-3M1.5 10.5v1a1 1 0 001 1h9a1 1 0 001-1v-1"
+                      stroke="currentColor"
+                      strokeWidth="1.4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  Export
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                    <path d="M2.5 3.5L5 6.5L7.5 3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </>
+              )}
+            </button>
+
+            {show_export_menu && (
+              <div className="absolute right-0 top-full z-20 mt-1 w-56 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800">
+                <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                  Export All Rows
+                </div>
+                <button
+                  onClick={() => handleExportAll("csv")}
+                  className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700"
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <rect x="1" y="1" width="12" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+                    <path d="M4 4h6M4 7h6M4 10h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                  </svg>
+                  Download All — CSV
+                </button>
+                <button
+                  onClick={() => handleExportAll("xlsx")}
+                  className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700"
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <rect x="1" y="1" width="12" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+                    <path d="M4 4l6 6M10 4L4 10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                  </svg>
+                  Download All — Excel
+                </button>
+
+                {n_selected > 0 && (
+                  <>
+                    <div className="mx-3 my-1 border-t border-gray-100 dark:border-gray-700" />
+                    <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                      Export Selected ({n_selected})
+                    </div>
+                    <button
+                      onClick={() => handleExportSelected("csv")}
+                      className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                        <rect x="1" y="1" width="12" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+                        <path d="M4 4h6M4 7h6M4 10h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                      </svg>
+                      Selected Rows — CSV
+                    </button>
+                    <button
+                      onClick={() => handleExportSelected("xlsx")}
+                      className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                        <rect x="1" y="1" width="12" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+                        <path d="M4 4l6 6M10 4L4 10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                      </svg>
+                      Selected Rows — Excel
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -192,6 +346,21 @@ export default function OrderStatusTable({
         <Table>
           <TableHeader className="border-y border-gray-100 dark:border-gray-800">
             <TableRow>
+              {/* Select-all checkbox */}
+              <TableCell
+                isHeader
+                className="w-10 py-3 text-start"
+              >
+                <input
+                  ref={select_all_ref}
+                  type="checkbox"
+                  checked={all_selected}
+                  onChange={(e) => (e.target.checked ? selectAllRows() : clearSelection())}
+                  className="h-4 w-4 cursor-pointer rounded border-gray-300 accent-coral-500 dark:border-gray-600"
+                  title={all_selected ? "Deselect all" : "Select all on this page"}
+                />
+              </TableCell>
+
               {[
                 "Order ID",
                 "Start Date",
@@ -221,7 +390,7 @@ export default function OrderStatusTable({
             ) : rows.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={10}
+                  colSpan={11}
                   className="py-12 text-center text-sm text-gray-400 dark:text-gray-500"
                 >
                   {total === 0 && !search_term
@@ -230,121 +399,137 @@ export default function OrderStatusTable({
                 </TableCell>
               </TableRow>
             ) : (
-              rows.map((row, index) => (
-                <TableRow key={`${row.order_id}-${index}`}>
-                  {/* Order ID */}
-                  <TableCell className="whitespace-nowrap py-3 font-mono text-xs font-medium text-gray-700 dark:text-gray-300">
-                    <Link
-                      href={
-                        row.source === "admin_assigned"
-                          ? `/link-building/placements/${row.id}`
-                          : `/orders/${row.order_id}`
-                      }
-                      className="hover:text-coral-500 hover:underline"
-                    >
-                      {row.display_order_id || row.order_id}
-                    </Link>
-                  </TableCell>
+              rows.map((row, index) => {
+                const is_checked = selected_row_ids.has(row.id);
+                return (
+                  <TableRow
+                    key={`${row.order_id}-${index}`}
+                    className={is_checked ? "bg-coral-50/40 dark:bg-coral-500/5" : undefined}
+                  >
+                    {/* Row checkbox */}
+                    <TableCell className="w-10 py-3">
+                      <input
+                        type="checkbox"
+                        checked={is_checked}
+                        onChange={() => toggleRowSelection(row.id)}
+                        className="h-4 w-4 cursor-pointer rounded border-gray-300 accent-coral-500 dark:border-gray-600"
+                      />
+                    </TableCell>
 
-                  {/* Start Date */}
-                  <TableCell className="whitespace-nowrap py-3 text-gray-500 text-theme-sm dark:text-gray-400">
-                    {formatDate(row.start_date)}
-                  </TableCell>
-
-                  {/* DR Type */}
-                  <TableCell className="whitespace-nowrap py-3">
-                    <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                      {row.dr_type}
-                    </span>
-                  </TableCell>
-
-                  {/* Keyword */}
-                  <TableCell className="whitespace-nowrap py-3 text-gray-500 text-theme-sm dark:text-gray-400">
-                    {row.keyword ?? (
-                      <span className="text-gray-300 dark:text-gray-600">—</span>
-                    )}
-                  </TableCell>
-
-                  {/* Landing Page */}
-                  <TableCell className="py-3 text-theme-sm">
-                    {row.landing_page ? (
-                      <a
-                        href={row.landing_page}
-                        className="block max-w-[200px] truncate text-blue-light-500 hover:underline"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={row.landing_page}
+                    {/* Order ID */}
+                    <TableCell className="whitespace-nowrap py-3 font-mono text-xs font-medium text-gray-700 dark:text-gray-300">
+                      <Link
+                        href={
+                          row.source === "admin_assigned"
+                            ? `/link-building/placements/${row.id}`
+                            : `/orders/${row.order_id}`
+                        }
+                        className="hover:text-coral-500 hover:underline"
                       >
-                        {row.landing_page}
-                      </a>
-                    ) : (
-                      <span className="text-gray-300 dark:text-gray-600">—</span>
-                    )}
-                  </TableCell>
+                        {row.display_order_id || row.order_id}
+                      </Link>
+                    </TableCell>
 
-                  {/* Status */}
-                  <TableCell className="whitespace-nowrap py-3">
-                    <Badge size="sm" color={status_badge_color[row.status] ?? "info"}>
-                      {row.status}
-                    </Badge>
-                  </TableCell>
+                    {/* Start Date */}
+                    <TableCell className="whitespace-nowrap py-3 text-gray-500 text-theme-sm dark:text-gray-400">
+                      {formatDate(row.start_date)}
+                    </TableCell>
 
-                  {/* Live Link */}
-                  <TableCell className="py-3 text-theme-sm">
-                    {row.live_link ? (
-                      <a
-                        href={row.live_link}
-                        className="block max-w-[200px] truncate text-blue-light-500 hover:underline"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={row.live_link}
+                    {/* DR Type */}
+                    <TableCell className="whitespace-nowrap py-3">
+                      <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                        {row.dr_type}
+                      </span>
+                    </TableCell>
+
+                    {/* Keyword */}
+                    <TableCell className="whitespace-nowrap py-3 text-gray-500 text-theme-sm dark:text-gray-400">
+                      {row.keyword ?? (
+                        <span className="text-gray-300 dark:text-gray-600">—</span>
+                      )}
+                    </TableCell>
+
+                    {/* Landing Page */}
+                    <TableCell className="py-3 text-theme-sm">
+                      {row.landing_page ? (
+                        <a
+                          href={row.landing_page}
+                          className="block max-w-[200px] truncate text-blue-light-500 hover:underline"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={row.landing_page}
+                        >
+                          {row.landing_page}
+                        </a>
+                      ) : (
+                        <span className="text-gray-300 dark:text-gray-600">—</span>
+                      )}
+                    </TableCell>
+
+                    {/* Status */}
+                    <TableCell className="whitespace-nowrap py-3">
+                      <Badge size="sm" color={status_badge_color[row.status] ?? "info"}>
+                        {row.status}
+                      </Badge>
+                    </TableCell>
+
+                    {/* Live Link */}
+                    <TableCell className="py-3 text-theme-sm">
+                      {row.live_link ? (
+                        <a
+                          href={row.live_link}
+                          className="block max-w-[200px] truncate text-blue-light-500 hover:underline"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={row.live_link}
+                        >
+                          {row.live_link}
+                        </a>
+                      ) : (
+                        <span className="text-gray-300 dark:text-gray-600">—</span>
+                      )}
+                    </TableCell>
+
+                    {/* Completed Date */}
+                    <TableCell className="whitespace-nowrap py-3 text-gray-500 text-theme-sm dark:text-gray-400">
+                      {row.completed_date ? formatDate(row.completed_date) : "—"}
+                    </TableCell>
+
+                    {/* DR score */}
+                    <TableCell className="whitespace-nowrap py-3 text-gray-500 text-theme-sm dark:text-gray-400">
+                      {row.dr ?? "—"}
+                    </TableCell>
+
+                    {/* Actions */}
+                    <TableCell className="whitespace-nowrap py-3">
+                      <Link
+                        href={
+                          row.source === "admin_assigned"
+                            ? `/link-building/placements/${row.id}`
+                            : `/orders/${row.order_id}`
+                        }
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-coral-200 bg-coral-50 px-3 py-1.5 text-xs font-medium text-coral-600 transition-colors hover:bg-coral-500 hover:text-white dark:border-coral-500/30 dark:bg-coral-500/10 dark:text-coral-400 dark:hover:bg-coral-500 dark:hover:text-white"
                       >
-                        {row.live_link}
-                      </a>
-                    ) : (
-                      <span className="text-gray-300 dark:text-gray-600">—</span>
-                    )}
-                  </TableCell>
-
-                  {/* Completed Date */}
-                  <TableCell className="whitespace-nowrap py-3 text-gray-500 text-theme-sm dark:text-gray-400">
-                    {row.completed_date ? formatDate(row.completed_date) : "—"}
-                  </TableCell>
-
-                  {/* DR score */}
-                  <TableCell className="whitespace-nowrap py-3 text-gray-500 text-theme-sm dark:text-gray-400">
-                    {row.dr ?? "—"}
-                  </TableCell>
-
-                  {/* Actions */}
-                  <TableCell className="whitespace-nowrap py-3">
-                    <Link
-                      href={
-                        row.source === "admin_assigned"
-                          ? `/link-building/placements/${row.id}`
-                          : `/orders/${row.order_id}`
-                      }
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-coral-200 bg-coral-50 px-3 py-1.5 text-xs font-medium text-coral-600 transition-colors hover:bg-coral-500 hover:text-white dark:border-coral-500/30 dark:bg-coral-500/10 dark:text-coral-400 dark:hover:bg-coral-500 dark:hover:text-white"
-                    >
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                        <path
-                          d="M6 2.5C3.5 2.5 1.5 6 1.5 6C1.5 6 3.5 9.5 6 9.5C8.5 9.5 10.5 6 10.5 6C10.5 6 8.5 2.5 6 2.5Z"
-                          stroke="currentColor"
-                          strokeWidth="1.2"
-                        />
-                        <circle
-                          cx="6"
-                          cy="6"
-                          r="1.5"
-                          stroke="currentColor"
-                          strokeWidth="1.2"
-                        />
-                      </svg>
-                      View
-                    </Link>
-                  </TableCell>
-                </TableRow>
-              ))
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                          <path
+                            d="M6 2.5C3.5 2.5 1.5 6 1.5 6C1.5 6 3.5 9.5 6 9.5C8.5 9.5 10.5 6 10.5 6C10.5 6 8.5 2.5 6 2.5Z"
+                            stroke="currentColor"
+                            strokeWidth="1.2"
+                          />
+                          <circle
+                            cx="6"
+                            cy="6"
+                            r="1.5"
+                            stroke="currentColor"
+                            strokeWidth="1.2"
+                          />
+                        </svg>
+                        View
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -353,7 +538,6 @@ export default function OrderStatusTable({
       {/* Pagination */}
       {!is_loading && last_page >= 1 && total > 0 && (
         <div className="flex flex-col gap-3 border-t border-gray-200 px-1 pt-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
-          {/* Range info */}
           <p className="text-xs text-gray-500 dark:text-gray-400">
             Showing{" "}
             <span className="font-medium text-gray-700 dark:text-gray-300">
@@ -373,9 +557,7 @@ export default function OrderStatusTable({
             </span>
           </p>
 
-          {/* Page buttons */}
           <div className="flex items-center gap-1">
-            {/* Previous */}
             <button
               onClick={() => onPageChange(current_page - 1)}
               disabled={current_page === 1}
@@ -393,7 +575,6 @@ export default function OrderStatusTable({
               Prev
             </button>
 
-            {/* Page numbers */}
             {page_buttons.map((btn, i) =>
               btn === "..." ? (
                 <span
@@ -417,7 +598,6 @@ export default function OrderStatusTable({
               )
             )}
 
-            {/* Next */}
             <button
               onClick={() => onPageChange(current_page + 1)}
               disabled={current_page === last_page}

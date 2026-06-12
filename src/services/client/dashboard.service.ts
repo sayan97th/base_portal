@@ -1,4 +1,4 @@
-import { apiClient } from "@/lib/api-client";
+import { getToken } from "@/lib/api-client";
 import { linkBuildingService } from "./link-building.service";
 import type {
   ClientPaginatedResponse,
@@ -203,26 +203,106 @@ const fetchPaginatedTableRows = async (
   };
 };
 
-// ── CSV Export ────────────────────────────────────────────────────────────────
+// ── Export ────────────────────────────────────────────────────────────────────
 
-const downloadOrderPlacements = async (search?: string, status?: string): Promise<void> => {
-  const params = new URLSearchParams();
-  if (search?.trim()) params.set("search", search.trim());
-  if (status) params.set("status", status);
+export type ExportFormat = "csv" | "xlsx";
 
-  const query = params.toString();
-  const endpoint = `/api/link-building/order-placements/export${query ? `?${query}` : ""}`;
+export interface ExportOrderPlacementsOptions {
+  format: ExportFormat;
+  search?: string;
+  status?: string;
+  row_ids?: string[];
+}
 
-  const blob = await apiClient.get<Blob>(endpoint, { responseType: "blob" });
+type ExportRow = Record<string, string | number | null>;
 
+function triggerFileDownload(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `order-placements-${new Date().toISOString().slice(0, 10)}.csv`;
+  anchor.download = filename;
   document.body.appendChild(anchor);
   anchor.click();
   document.body.removeChild(anchor);
   URL.revokeObjectURL(url);
+}
+
+const BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+
+async function exportOrderPlacements(options: ExportOrderPlacementsOptions): Promise<void> {
+  const { format, search, status, row_ids } = options;
+  const token = getToken();
+  const date_suffix = new Date().toISOString().slice(0, 10);
+
+  const auth_headers: Record<string, string> = token
+    ? { Authorization: `Bearer ${token}` }
+    : {};
+
+  if (format === "csv") {
+    const response = await fetch(`${BASE}/api/link-building/order-placements/export`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/csv",
+        ...auth_headers,
+      },
+      body: JSON.stringify({ format: "csv", search, status, row_ids }),
+    });
+
+    if (!response.ok) throw new Error("CSV export failed");
+
+    const blob = await response.blob();
+    triggerFileDownload(blob, `order-placements-${date_suffix}.csv`);
+    return;
+  }
+
+  // Excel: fetch JSON data then generate XLSX client-side
+  const response = await fetch(`${BASE}/api/link-building/order-placements/export`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      ...auth_headers,
+    },
+    body: JSON.stringify({ format: "json", search, status, row_ids }),
+  });
+
+  if (!response.ok) throw new Error("Excel export failed");
+
+  const { data } = (await response.json()) as { data: ExportRow[] };
+
+  const xlsx = await import("xlsx");
+
+  const header_row = [
+    "Order ID", "Start Date", "DR Type", "Keyword",
+    "Landing Page", "Status", "Live Link", "Completed Date", "DR",
+  ];
+
+  const data_rows = data.map((row) => [
+    row.display_order_id ?? "",
+    row.start_date        ?? "",
+    row.dr_type           ?? "",
+    row.keyword           ?? "",
+    row.landing_page      ?? "",
+    row.status            ?? "",
+    row.live_link         ?? "",
+    row.completed_date    ?? "",
+    row.dr                ?? "",
+  ]);
+
+  const ws = xlsx.utils.aoa_to_sheet([header_row, ...data_rows]);
+
+  // Set column widths
+  ws["!cols"] = [20, 20, 15, 30, 40, 20, 40, 20, 8].map((wch) => ({ wch }));
+
+  const wb = xlsx.utils.book_new();
+  xlsx.utils.book_append_sheet(wb, ws, "Order Placements");
+  xlsx.writeFile(wb, `order-placements-${date_suffix}.xlsx`);
+}
+
+// Legacy GET-based download (kept for backward compatibility)
+const downloadOrderPlacements = async (search?: string, status?: string): Promise<void> => {
+  return exportOrderPlacements({ format: "csv", search, status });
 };
 
 // ── Service Object ────────────────────────────────────────────────────────────
@@ -232,6 +312,7 @@ export const dashboardService = {
     return linkBuildingService.fetchAllOrders();
   },
   fetchPaginatedTableRows,
+  exportOrderPlacements,
   downloadOrderPlacements,
   computeStats,
   getMonthlyBreakdown,
