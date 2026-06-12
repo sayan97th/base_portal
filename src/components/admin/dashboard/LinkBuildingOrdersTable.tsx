@@ -20,7 +20,7 @@ import {
 } from "@/services/admin/link-building-dashboard.service";
 import LinkBuildingOrderImportModal from "./LinkBuildingOrderImportModal";
 import UserSelectFilterDropdown from "./UserSelectFilterDropdown";
-import type { LinkBuildingOrderSearchBody, ColumnFilterPayload } from "@/types/admin/link-building-order";
+import type { LinkBuildingOrderSearchBody, ColumnFilterPayload, SortRulePayload } from "@/types/admin/link-building-order";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useAuth } from "@/context/AuthContext";
 import { useLinkBuildingCollaboration } from "@/hooks/useLinkBuildingCollaboration";
@@ -691,6 +691,12 @@ function TableSkeleton() {
   );
 }
 
+// ── Default sort ───────────────────────────────────────────────────────────────
+
+const DEFAULT_SORT_RULES: SortRulePayload[] = [
+  { key: "request_date", direction: "desc", nulls_last: true },
+];
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMutated?: () => void }) {
@@ -735,7 +741,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   const [batch_value, setBatchValue] = useState<string>("");
   const [is_batch_saving, setIsBatchSaving] = useState(false);
 
-  const { sort_rules, toggleSort, clearSort } = useTableSort();
+  const { sort_rules, toggleSort, clearSort } = useTableSort(DEFAULT_SORT_RULES);
   const {
     column_filters,
     setFilter,
@@ -1199,6 +1205,14 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
   // ── Clear filters ───────────────────────────────────────────────────────────
 
+  const sort_is_non_default =
+    sort_rules.length !== DEFAULT_SORT_RULES.length ||
+    sort_rules.some(
+      (r, i) =>
+        r.key !== DEFAULT_SORT_RULES[i]?.key ||
+        r.direction !== DEFAULT_SORT_RULES[i]?.direction
+    );
+
   const has_active_filters =
     search.trim() !== "" ||
     status_filter !== "" ||
@@ -1208,7 +1222,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     assigned_user_id_filter !== null ||
     hidden_columns.size > 0 ||
     active_filter_count > 0 ||
-    sort_rules.length > 0;
+    sort_is_non_default;
 
   const clearAllFilters = useCallback(() => {
     setSearch("");

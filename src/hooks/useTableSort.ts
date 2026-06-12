@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import type { SortRulePayload } from "@/types/admin/backlink-order";
 
 /**
@@ -19,8 +19,9 @@ export type SortDirection = "asc" | "desc";
  * - Single click: set as the sole sort rule (asc → desc → cleared).
  * - Shift+click: add / cycle / remove from the multi-sort chain.
  */
-export function useTableSort() {
-  const [sort_rules, setSortRules] = useState<SortRulePayload[]>([]);
+export function useTableSort(default_rules: SortRulePayload[] = []) {
+  const default_rules_ref = useRef(default_rules);
+  const [sort_rules, setSortRules] = useState<SortRulePayload[]>(default_rules);
 
   const toggleSort = useCallback(
     (key: string, add_to_existing: boolean) => {
@@ -44,7 +45,8 @@ export function useTableSort() {
         // Plain click: replace with a single sort rule (asc → desc → cleared)
         if (prev.length === 1 && existing_idx === 0) {
           if (prev[0].direction === "asc") return [{ key, direction: "desc", nulls_last: true }];
-          return []; // clear
+          // Was desc — reset to default rather than clearing entirely
+          return default_rules_ref.current;
         }
         return [{ key, direction: "asc", nulls_last: true }];
       });
@@ -52,7 +54,7 @@ export function useTableSort() {
     []
   );
 
-  const clearSort = useCallback(() => setSortRules([]), []);
+  const clearSort = useCallback(() => setSortRules(default_rules_ref.current), []);
 
   return { sort_rules, toggleSort, clearSort };
 }
