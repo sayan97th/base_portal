@@ -32,12 +32,18 @@ interface LaravelErrorBody {
   errors?: Record<string, string[]>;
 }
 
-export function parseApiErrorMessage(err: unknown): string {
+export function parseApiErrorMessage(
+  err: unknown,
+  field_labels?: Record<string, string>
+): string {
   if (err && typeof err === "object") {
     const body = err as Partial<LaravelErrorBody>;
-    if (body.errors) {
+    if (body.errors && Object.keys(body.errors).length > 0) {
       const field_messages = Object.entries(body.errors)
-        .map(([field, msgs]) => `${field}: ${msgs.join(", ")}`)
+        .map(([field, msgs]) => {
+          const label = field_labels?.[field] ?? field.replace(/_/g, " ");
+          return `${label}: ${msgs.join(", ")}`;
+        })
         .join("; ");
       return field_messages;
     }

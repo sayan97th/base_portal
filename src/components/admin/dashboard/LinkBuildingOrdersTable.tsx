@@ -15,6 +15,7 @@ import {
   batchUpdateLinkBuildingOrders,
   listAdminUsersForSelect,
   listClientUsersForSelect,
+  parseApiErrorMessage,
   type AdminUserOption,
   type ClientUserOption,
 } from "@/services/admin/link-building-dashboard.service";
@@ -119,6 +120,10 @@ const COLUMNS: ColumnDef[] = [
   { key: "final_price", label: "Final Price", group: "pricing", min_width: 110, type: "text" },
   { key: "currency", label: "Currency", group: "pricing", min_width: 100, type: "select", options: ["USD", "EUR"] },
 ];
+
+const COLUMN_LABELS: Record<string, string> = Object.fromEntries(
+  COLUMNS.map((col) => [col.key, col.label])
+);
 
 // ── Group header styles ────────────────────────────────────────────────────────
 
@@ -1001,13 +1006,12 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       );
       saveDraftsToStorage(remaining);
       on_order_mutated_ref.current?.();
-    } catch {
+    } catch (err) {
       const all_drafts = rows_ref.current.filter((r) => new_row_ids_ref.current.has(r.id));
       saveDraftsToStorage(all_drafts);
       const row_label = row.client ? `"${row.client}"` : "the new row";
-      setSaveError(
-        `Could not save ${row_label} to the server — fill all required fields (Link Type, Client, Keyword, Landing Page) then click any cell to retry.`
-      );
+      const api_message = parseApiErrorMessage(err, COLUMN_LABELS);
+      setSaveError(`Could not save ${row_label}: ${api_message}`);
     } finally {
       unmarkSaving(row.id);
     }
@@ -1033,8 +1037,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         }
       }
       on_order_mutated_ref.current?.();
-    } catch {
-      setSaveError(`Failed to save row "${row.order_id}". Changes may not have been saved.`);
+    } catch (err) {
+      const api_message = parseApiErrorMessage(err, COLUMN_LABELS);
+      setSaveError(`Failed to save row "${row.order_id}": ${api_message}`);
     } finally {
       unmarkSaving(row.id);
     }
