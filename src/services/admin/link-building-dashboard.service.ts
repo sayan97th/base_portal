@@ -334,6 +334,26 @@ export async function getLinkBuildingImportStatus(
   );
 }
 
+export interface ResolveAssignmentsResult {
+  message: string;
+  resolved: number;
+  unchanged: number;
+}
+
+/**
+ * POST /api/admin/link-building-orders/resolve-assignments
+ *
+ * Scans all existing placements that have a link_builder value and tries to
+ * match each one to an admin-side user by name. Useful for mass-updating
+ * records imported before the auto-assign feature was introduced.
+ */
+export async function resolveAssignments(): Promise<ResolveAssignmentsResult> {
+  return apiClient.post<ResolveAssignmentsResult>(
+    "/api/admin/link-building-orders/resolve-assignments",
+    {}
+  );
+}
+
 /**
  * POST /api/admin/link-building-orders/export
  * Triggers a CSV file download in the browser.
