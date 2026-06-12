@@ -86,6 +86,7 @@ const default_form_data: ProfileData = {
   phone: "",
   timezone: "",
   interested_in: "",
+  google_studio_link: null,
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
