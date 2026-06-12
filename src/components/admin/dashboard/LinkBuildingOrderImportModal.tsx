@@ -117,13 +117,14 @@ function StatBadge({
 }: {
   count: number;
   label: string;
-  color: "green" | "blue" | "amber" | "red";
+  color: "green" | "blue" | "amber" | "red" | "purple";
 }) {
   const styles: Record<string, string> = {
-    green: "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800",
-    blue:  "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800",
-    amber: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800",
-    red:   "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800",
+    green:  "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800",
+    blue:   "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800",
+    amber:  "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800",
+    red:    "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800",
+    purple: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800",
   };
 
   return (
@@ -308,6 +309,7 @@ export default function LinkBuildingOrderImportModal({ is_open, onClose, onImpor
         created:   0,
         updated:   0,
         skipped:   0,
+        assigned:  0,
         errors:    [],
       });
       setPhase("processing");
@@ -782,10 +784,13 @@ export default function LinkBuildingOrderImportModal({ is_open, onClose, onImpor
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
-                <StatBadge count={status.created} label="Created"  color="green" />
-                <StatBadge count={status.updated} label="Updated"  color="blue"  />
-                <StatBadge count={status.skipped} label="Skipped"  color="amber" />
+              <div className={`grid gap-3 ${(status.assigned ?? 0) > 0 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"}`}>
+                <StatBadge count={status.created}           label="Created"       color="green"  />
+                <StatBadge count={status.updated}           label="Updated"       color="blue"   />
+                <StatBadge count={status.skipped}           label="Skipped"       color="amber"  />
+                {(status.assigned ?? 0) > 0 && (
+                  <StatBadge count={status.assigned ?? 0}   label="Auto-assigned" color="purple" />
+                )}
               </div>
 
               {status.errors.length > 0 && (

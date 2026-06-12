@@ -229,6 +229,8 @@ export interface ImportStatus {
   created: number;
   updated: number;
   skipped: number;
+  /** Number of rows whose "Link Builder" column matched an admin user and were auto-assigned. */
+  assigned?: number;
   errors: Array<{ order_id: string; message: string }>;
 }
 
