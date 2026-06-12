@@ -672,8 +672,10 @@ export default function LinkBuildingOrderImportModal({ is_open, onClose, onImpor
                   Rows are matched by <strong>Order ID</strong>. Existing records will be updated;
                   new Order IDs will create new entries. Rows outside the selected filters will be
                   counted as <strong>skipped</strong>. The <strong>Client</strong> column is
-                  automatically matched to a registered client account by company name — matching
-                  orders are linked to that account. Admin-only fields (notes, checks) are never
+                  automatically matched to a registered client account by company name. The{" "}
+                  <strong>Link Builder</strong> column is matched to an admin user by name —
+                  matched orders are automatically assigned to that user in the{" "}
+                  <strong>Assigned To</strong> column. Admin-only fields (notes, checks) are never
                   overwritten by the import.
                 </p>
               </div>
