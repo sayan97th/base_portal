@@ -315,6 +315,7 @@ export default function AdminProfileForm() {
         postal_code: "",
         company: "",
         interested_in: "",
+        google_studio_link: null,
       });
       await refreshUser();
       setSuccessMessage("Profile updated successfully.");
