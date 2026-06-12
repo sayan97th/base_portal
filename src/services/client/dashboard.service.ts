@@ -1,3 +1,4 @@
+import { apiClient } from "@/lib/api-client";
 import { linkBuildingService } from "./link-building.service";
 import type {
   ClientPaginatedResponse,
@@ -202,6 +203,28 @@ const fetchPaginatedTableRows = async (
   };
 };
 
+// ── CSV Export ────────────────────────────────────────────────────────────────
+
+const downloadOrderPlacements = async (search?: string, status?: string): Promise<void> => {
+  const params = new URLSearchParams();
+  if (search?.trim()) params.set("search", search.trim());
+  if (status) params.set("status", status);
+
+  const query = params.toString();
+  const endpoint = `/api/link-building/order-placements/export${query ? `?${query}` : ""}`;
+
+  const blob = await apiClient.get<Blob>(endpoint, { responseType: "blob" });
+
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `order-placements-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+};
+
 // ── Service Object ────────────────────────────────────────────────────────────
 
 export const dashboardService = {
@@ -209,6 +232,7 @@ export const dashboardService = {
     return linkBuildingService.fetchAllOrders();
   },
   fetchPaginatedTableRows,
+  downloadOrderPlacements,
   computeStats,
   getMonthlyBreakdown,
   mapOrderStatus,

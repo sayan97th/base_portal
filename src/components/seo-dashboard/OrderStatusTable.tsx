@@ -26,6 +26,8 @@ interface Props {
   search_term: string;
   onSearchChange: (value: string) => void;
   onPageChange: (page: number) => void;
+  onDownload: () => void;
+  is_downloading?: boolean;
 }
 
 const status_badge_color: Record<
@@ -100,6 +102,8 @@ export default function OrderStatusTable({
   search_term,
   onSearchChange,
   onPageChange,
+  onDownload,
+  is_downloading = false,
 }: Props) {
   const range_start = total === 0 ? 0 : (current_page - 1) * per_page + 1;
   const range_end = Math.min(current_page * per_page, total);
@@ -172,12 +176,13 @@ export default function OrderStatusTable({
             </svg>
           </button>
 
-          {/* Share & Download */}
-          <button className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
-            SHARE
-          </button>
-          <button className="rounded-lg bg-coral-500 px-4 py-2 text-sm font-medium text-white hover:bg-coral-600">
-            DOWNLOAD
+          {/* Download */}
+          <button
+            onClick={onDownload}
+            disabled={is_downloading}
+            className="rounded-lg bg-coral-500 px-4 py-2 text-sm font-medium text-white hover:bg-coral-600 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {is_downloading ? "DOWNLOADING..." : "DOWNLOAD"}
           </button>
         </div>
       </div>

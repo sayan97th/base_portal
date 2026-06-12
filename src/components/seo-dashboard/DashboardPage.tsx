@@ -33,6 +33,7 @@ export default function DashboardPage() {
   const [table_page, setTablePage] = useState(1);
   const [table_last_page, setTableLastPage] = useState(1);
   const [table_total, setTableTotal] = useState(0);
+  const [is_downloading, setIsDownloading] = useState(false);
 
   // Debounce search — avoids hitting the API on every keystroke
   const debounced_search = useDebounce(table_search, 400);
@@ -92,6 +93,18 @@ export default function DashboardPage() {
     setTablePage(1);
   };
 
+  const handleDownload = async () => {
+    if (is_downloading) return;
+    setIsDownloading(true);
+    try {
+      await dashboardService.downloadOrderPlacements(table_search || undefined);
+    } catch {
+      // Download failures are silent — the browser will show nothing downloaded
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Client Profile Header */}
@@ -146,6 +159,8 @@ export default function DashboardPage() {
             search_term={table_search}
             onSearchChange={handleSearchChange}
             onPageChange={setTablePage}
+            onDownload={handleDownload}
+            is_downloading={is_downloading}
           />
 
           {/* Mid Row: Order History + News + Resources */}
