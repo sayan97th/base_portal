@@ -43,6 +43,10 @@ export interface User {
   updated_at: string;
   roles: Role[] | string[];
   organization: Organization | null;
+  company: string | null;
+  google_studio_link: string | null;
+  referrer_id: string | null;
+  note: string | null;
 }
 
 export interface AuthResponse {
@@ -107,6 +111,7 @@ export interface ProfileData {
   state_province: string;
   postal_code: string;
   company: string;
+  google_studio_link: string | null;
 }
 
 /** Shape sent on PATCH /api/profile — partial update (only changed fields). */
@@ -132,6 +137,8 @@ export interface ProfileResponse {
   state_province: string | null;
   postal_code: string | null;
   company: string | null;
+  google_studio_link: string | null;
+  note: string | null;
   profile_photo_path: string | null;
   profile_photo_url: string | null;
 }

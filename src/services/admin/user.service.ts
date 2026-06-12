@@ -109,6 +109,32 @@ export async function createAdminClient(
   return apiClient.post<CreateClientResponse>(`/api/admin/clients`, data);
 }
 
+export interface UpdateAdminUserMetaPayload {
+  company?: string | null;
+  google_studio_link?: string | null;
+  referrer_id?: string | null;
+  note?: string | null;
+}
+
+export interface UpdateAdminUserMetaResponse {
+  message: string;
+  user: AdminUser;
+}
+
+/**
+ * Update user meta fields (company, google_studio_link, referrer_id, note).
+ * Roles allowed: super_admin, admin.
+ */
+export async function updateAdminUserMeta(
+  user_id: number,
+  data: UpdateAdminUserMetaPayload
+): Promise<UpdateAdminUserMetaResponse> {
+  return apiClient.patch<UpdateAdminUserMetaResponse>(
+    `/api/admin/users/${user_id}`,
+    data
+  );
+}
+
 /**
  * List orders belonging to a specific user (paginated).
  * Roles allowed: super_admin, admin, staff.
