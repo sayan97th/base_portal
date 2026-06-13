@@ -16,7 +16,6 @@ import {
   listAdminUsersForSelect,
   listClientUsersForSelect,
   parseApiErrorMessage,
-  resolveAssignments,
   type AdminUserOption,
   type ClientUserOption,
 } from "@/services/admin/link-building-dashboard.service";
@@ -1419,30 +1418,6 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     fetchRows(1, current_body_ref.current);
   }, [fetchRows]);
 
-  // ── Resolve link-builder assignments ────────────────────────────────────────
-
-  const [is_resolving, setIsResolving] = useState(false);
-
-  const handleResolveAssignments = useCallback(async () => {
-    setIsResolving(true);
-    setSaveError(null);
-    try {
-      const result = await resolveAssignments();
-      setNotificationBanner(
-        result.resolved > 0
-          ? `Auto-assigned ${result.resolved} order${result.resolved !== 1 ? "s" : ""} based on the Link Builder column.`
-          : "No new assignments found — all link builders are already matched or have no matching user."
-      );
-      if (result.resolved > 0) {
-        fetchRows(1, current_body_ref.current);
-      }
-    } catch {
-      setSaveError("Failed to resolve assignments. Please try again.");
-    } finally {
-      setIsResolving(false);
-    }
-  }, [fetchRows]);
-
   // ── Export ──────────────────────────────────────────────────────────────────
 
   const [show_export_menu, setShowExportMenu] = useState(false);
@@ -1611,25 +1586,6 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
               </button>
             </div>
           )}
-          {/* Re-resolve link-builder assignments */}
-          <button
-            onClick={handleResolveAssignments}
-            disabled={is_resolving}
-            title="Scan all orders and auto-assign the 'Assigned To' field based on the Link Builder column"
-            className="flex h-8 items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-400 dark:hover:bg-indigo-900/40"
-          >
-            {is_resolving ? (
-              <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-              </svg>
-            ) : (
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-              </svg>
-            )}
-            {is_resolving ? "Resolving…" : "Resolve Assignments"}
-          </button>
           {/* Import CSV */}
           <button
             onClick={() => setShowImportModal(true)}
