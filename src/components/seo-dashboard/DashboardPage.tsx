@@ -43,6 +43,10 @@ export default function DashboardPage() {
     dr_type?: string;
   }>({});
 
+  // ── Table sort ─────────────────────────────────────────────────────────────
+  const [table_sort_by, setTableSortBy] = useState<string | undefined>(undefined);
+  const [table_sort_direction, setTableSortDirection] = useState<"asc" | "desc">("asc");
+
   // Debounce search — avoids hitting the API on every keystroke
   const debounced_search = useDebounce(table_search, 400);
 
@@ -68,6 +72,8 @@ export default function DashboardPage() {
         per_page: TABLE_PER_PAGE,
         search: debounced_search || undefined,
         ...table_filters,
+        sort_by: table_sort_by,
+        sort_direction: table_sort_by ? table_sort_direction : undefined,
       });
       setTableRows(result.data);
       setTableLastPage(result.last_page);
@@ -78,7 +84,7 @@ export default function DashboardPage() {
     } finally {
       setIsLoadingTable(false);
     }
-  }, [table_page, debounced_search, table_filters]);
+  }, [table_page, debounced_search, table_filters, table_sort_by, table_sort_direction]);
 
   useEffect(() => {
     loadSummary();
@@ -105,6 +111,15 @@ export default function DashboardPage() {
   const handleFiltersChange = useCallback(
     (updated: typeof table_filters) => {
       setTableFilters(updated);
+      setTablePage(1);
+    },
+    []
+  );
+
+  const handleSortChange = useCallback(
+    (sort_by: string | undefined, sort_direction: "asc" | "desc") => {
+      setTableSortBy(sort_by);
+      setTableSortDirection(sort_direction);
       setTablePage(1);
     },
     []
@@ -188,6 +203,9 @@ export default function DashboardPage() {
             is_exporting={is_exporting}
             filters={table_filters}
             onFiltersChange={handleFiltersChange}
+            sort_by={table_sort_by}
+            sort_direction={table_sort_direction}
+            onSortChange={handleSortChange}
           />
 
           {/* Mid Row: Order History + News + Resources */}

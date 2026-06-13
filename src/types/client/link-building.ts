@@ -171,6 +171,10 @@ export interface OrderPlacementFilters {
   date_to?: string;
   /** Filter by DR tier label, e.g. "DR 50+" — backend applies a LIKE match */
   dr_type?: string;
+  /** Column key to sort by — backend applies ORDER BY on this column */
+  sort_by?: string;
+  /** Sort direction — defaults to asc when sort_by is set */
+  sort_direction?: "asc" | "desc";
 }
 
 /**

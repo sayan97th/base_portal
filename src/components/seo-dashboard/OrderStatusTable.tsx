@@ -40,6 +40,9 @@ interface Props {
   is_exporting?: boolean;
   filters: TableFilters;
   onFiltersChange: (filters: TableFilters) => void;
+  sort_by?: string;
+  sort_direction?: "asc" | "desc";
+  onSortChange?: (sort_by: string | undefined, sort_direction: "asc" | "desc") => void;
 }
 
 // ── Filter options ────────────────────────────────────────────────────────────
@@ -208,6 +211,41 @@ function FilterDatePicker({
   );
 }
 
+// ── Column sort keys ──────────────────────────────────────────────────────────
+
+const SORTABLE_COLUMN_MAP: Record<string, string> = {
+  "Order ID":       "display_order_id",
+  "Request Date":   "request_date",
+  "DR Type":        "dr_type",
+  "Keyword":        "keyword",
+  "Landing Page":   "landing_page",
+  "Status":         "status",
+  "Live Link":      "live_link",
+  "Completed Date": "completed_date",
+  "DR":             "dr",
+};
+
+// ── Sort indicator icon ───────────────────────────────────────────────────────
+
+function SortIcon({ active, direction }: { active: boolean; direction?: "asc" | "desc" }) {
+  if (!active) {
+    return (
+      <svg className="h-3.5 w-3.5 shrink-0 opacity-0 group-hover/sort:opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
+      </svg>
+    );
+  }
+  return (
+    <svg className="h-3.5 w-3.5 shrink-0 text-coral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+      {direction === "asc" ? (
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+      ) : (
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+      )}
+    </svg>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function OrderStatusTable({
@@ -224,6 +262,9 @@ export default function OrderStatusTable({
   is_exporting = false,
   filters,
   onFiltersChange,
+  sort_by,
+  sort_direction,
+  onSortChange,
 }: Props) {
   const range_start = total === 0 ? 0 : (current_page - 1) * per_page + 1;
   const range_end = Math.min(current_page * per_page, total);
@@ -314,6 +355,24 @@ export default function OrderStatusTable({
   );
 
   const n_selected = selected_row_ids.size;
+
+  // ── Sort handler ───────────────────────────────────────────────────────────
+
+  const handleSortToggle = useCallback(
+    (col_label: string) => {
+      const sort_key = SORTABLE_COLUMN_MAP[col_label];
+      if (!sort_key || !onSortChange) return;
+
+      if (sort_by !== sort_key) {
+        onSortChange(sort_key, "asc");
+      } else if (sort_direction === "asc") {
+        onSortChange(sort_key, "desc");
+      } else {
+        onSortChange(undefined, "asc");
+      }
+    },
+    [sort_by, sort_direction, onSortChange]
+  );
 
   // ── Filter handlers ────────────────────────────────────────────────────────
 
@@ -596,11 +655,34 @@ export default function OrderStatusTable({
               {[
                 "Order ID", "Request Date", "DR Type", "Keyword",
                 "Landing Page", "Status", "Live Link", "Completed Date", "DR", "Actions",
-              ].map((col) => (
-                <TableCell key={col} isHeader className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
-                  {col}
-                </TableCell>
-              ))}
+              ].map((col) => {
+                const sort_key = SORTABLE_COLUMN_MAP[col];
+                const is_sortable = !!sort_key && !!onSortChange;
+                const is_active = is_sortable && sort_by === sort_key;
+
+                return (
+                  <TableCell key={col} isHeader className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
+                    {is_sortable ? (
+                      <button
+                        onClick={() => handleSortToggle(col)}
+                        className="group/sort inline-flex items-center gap-1 whitespace-nowrap hover:text-gray-700 dark:hover:text-gray-200"
+                        title={
+                          is_active && sort_direction === "asc"
+                            ? "Sorted ascending — click for descending"
+                            : is_active && sort_direction === "desc"
+                              ? "Sorted descending — click to clear sort"
+                              : "Click to sort ascending"
+                        }
+                      >
+                        <span className={is_active ? "text-coral-500 dark:text-coral-400" : ""}>{col}</span>
+                        <SortIcon active={is_active} direction={sort_direction} />
+                      </button>
+                    ) : (
+                      col
+                    )}
+                  </TableCell>
+                );
+              })}
             </TableRow>
           </TableHeader>
 
