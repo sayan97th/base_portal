@@ -40,7 +40,6 @@ type TableColumn = SortableColumn | NonSortableColumn;
 
 const TABLE_COLUMNS: TableColumn[] = [
   { key: "first_name", label: "Client", sortable: true },
-  { key: "organization", label: "Organization", sortable: true },
   { key: "company", label: "Company", sortable: false },
   { key: "email_status", label: "Email Status", sortable: false },
   { key: "created_at", label: "Joined", sortable: true },
@@ -125,7 +124,7 @@ function SkeletonRows() {
               </div>
             </div>
           </td>
-          {Array.from({ length: 4 }).map((__, j) => (
+          {Array.from({ length: 3 }).map((__, j) => (
             <td key={j} className="px-5 py-3.5">
               <div className="h-3.5 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
             </td>
@@ -151,8 +150,8 @@ export default function AdminClientsContent() {
 
   // ── Filter state ─────────────────────────────────────────────────────────
   const [search_input, setSearchInput] = useState("");
-  const [sort_field, setSortField] = useState<ClientSortField | undefined>(undefined);
-  const [sort_direction, setSortDirection] = useState<SortDirection>("asc");
+  const [sort_field, setSortField] = useState<ClientSortField | undefined>("created_at");
+  const [sort_direction, setSortDirection] = useState<SortDirection>("desc");
   const [email_status, setEmailStatus] = useState<ClientEmailStatusFilter>("");
   const [account_status, setAccountStatus] = useState<ClientAccountStatusFilter>("");
   const [date_from, setDateFrom] = useState("");
@@ -233,8 +232,8 @@ export default function AdminClientsContent() {
 
   function handleClearAll() {
     setSearchInput("");
-    setSortField(undefined);
-    setSortDirection("asc");
+    setSortField("created_at");
+    setSortDirection("desc");
     setEmailStatus("");
     setAccountStatus("");
     setDateFrom("");
@@ -430,7 +429,7 @@ export default function AdminClientsContent() {
                 <SkeletonRows />
               ) : clients.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-16 text-center">
+                  <td colSpan={5} className="px-5 py-16 text-center">
                     <div className="flex flex-col items-center gap-2">
                       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
                         <svg
@@ -499,13 +498,6 @@ export default function AdminClientsContent() {
                           )}
                         </div>
                       </div>
-                    </td>
-
-                    {/* Organization column */}
-                    <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-400">
-                      {client.organization?.name ?? (
-                        <span className="text-gray-400 dark:text-gray-600">—</span>
-                      )}
                     </td>
 
                     {/* Company column */}
