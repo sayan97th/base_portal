@@ -23,6 +23,7 @@ import {
 import LinkBuildingOrderImportModal from "./LinkBuildingOrderImportModal";
 import UserSelectFilterDropdown from "./UserSelectFilterDropdown";
 import ClientSearchableSelect from "./ClientSearchableSelect";
+import AdminSearchableSelect from "./AdminSearchableSelect";
 import type { LinkBuildingOrderSearchBody, ColumnFilterPayload, SortRulePayload } from "@/types/admin/link-building-order";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useAuth } from "@/context/AuthContext";
@@ -273,58 +274,58 @@ function UserAssignCell({
   onAssignUser,
   onCancelEdit,
 }: UserAssignCellProps) {
+  const cell_ref = useRef<HTMLTableCellElement>(null);
   const selected_user = admin_users.find(
     (u) => assigned_admin_user_id != null && u.id === Number(assigned_admin_user_id)
   );
 
-  if (is_editing) {
-    return (
-      <td className="p-0" style={{ minWidth: 180 }}>
-        <select
-          autoFocus
-          value={assigned_admin_user_id ?? ""}
-          onChange={(e) => onAssignUser(e.target.value)}
-          onBlur={onCancelEdit}
-          className="h-full w-full border-2 border-brand-500 bg-white px-2 py-1.5 text-xs outline-none dark:bg-gray-800 dark:text-white"
-          style={{ minWidth: 180 }}
-        >
-          <option value="">— Unassigned —</option>
-          {admin_users.map((u) => (
-            <option key={u.id} value={u.id}>{u.name}</option>
-          ))}
-        </select>
-      </td>
-    );
-  }
-
   return (
-    <td
-      className="cursor-pointer whitespace-nowrap px-2 py-1.5 text-xs hover:bg-blue-50 dark:hover:bg-blue-900/20"
-      style={{ minWidth: 180 }}
-      onClick={onStartEdit}
-      title="Click to assign a user"
-    >
-      {selected_user ? (
-        <span className="inline-flex items-center gap-1.5">
-          {selected_user.avatar_url ? (
-            <img
-              src={selected_user.avatar_url}
-              alt={selected_user.name}
-              className="h-5 w-5 rounded-full object-cover"
-            />
-          ) : (
-            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-bold text-white">
-              {selected_user.name.charAt(0).toUpperCase()}
+    <>
+      <td
+        ref={cell_ref}
+        className={`cursor-pointer whitespace-nowrap px-2 py-1.5 text-xs transition-colors ${
+          is_editing
+            ? "bg-indigo-50 ring-2 ring-inset ring-indigo-400 dark:bg-indigo-900/20 dark:ring-indigo-600"
+            : "hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+        }`}
+        style={{ minWidth: 180 }}
+        onClick={!is_editing ? onStartEdit : undefined}
+        title="Click to assign a team member"
+      >
+        {selected_user ? (
+          <span className="inline-flex items-center gap-1.5">
+            {selected_user.avatar_url ? (
+              <img
+                src={selected_user.avatar_url}
+                alt={selected_user.name}
+                className="h-5 w-5 rounded-full object-cover"
+              />
+            ) : (
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-bold text-white">
+                {selected_user.name.charAt(0).toUpperCase()}
+              </span>
+            )}
+            <span className="font-medium text-gray-700 dark:text-gray-200">
+              {selected_user.name}
             </span>
-          )}
-          <span className="font-medium text-gray-700 dark:text-gray-200">
-            {selected_user.name}
+            <span className="text-[10px] text-gray-400 dark:text-gray-500">
+              {selected_user.email}
+            </span>
           </span>
-        </span>
-      ) : (
-        <span className="text-gray-300 dark:text-gray-600">— Unassigned —</span>
+        ) : (
+          <span className="text-gray-300 dark:text-gray-600">— Unassigned —</span>
+        )}
+      </td>
+      {is_editing && (
+        <AdminSearchableSelect
+          admin_users={admin_users}
+          selected_user_id={assigned_admin_user_id}
+          anchor_el={cell_ref.current}
+          onSelect={onAssignUser}
+          onClose={onCancelEdit}
+        />
       )}
-    </td>
+    </>
   );
 }
 
