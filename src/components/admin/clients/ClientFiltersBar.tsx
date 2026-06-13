@@ -210,7 +210,7 @@ export default function ClientFiltersBar({
             type="text"
             value={search_value}
             onChange={(e) => on_search_change(e.target.value)}
-            placeholder="Search by name, email, or organization…"
+            placeholder="Search by name, email, company, or organization…"
             className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-9 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500 dark:focus:border-brand-400 dark:focus:bg-gray-800"
           />
           {has_search && (
