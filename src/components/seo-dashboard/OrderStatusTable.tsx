@@ -122,7 +122,7 @@ function TableSkeleton({ rows_count }: { rows_count: number }) {
     <>
       {[...Array(rows_count)].map((_, i) => (
         <TableRow key={i}>
-          {[...Array(11)].map((__, j) => (
+          {[...Array(10)].map((__, j) => (
             <TableCell key={j} className="py-3">
               <div className="h-4 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
             </TableCell>
@@ -222,7 +222,6 @@ const SORTABLE_COLUMN_MAP: Record<string, string> = {
   "Status":         "status",
   "Live Link":      "live_link",
   "Completed Date": "completed_date",
-  "DR":             "dr",
 };
 
 // ── Sort indicator icon ───────────────────────────────────────────────────────
@@ -654,7 +653,7 @@ export default function OrderStatusTable({
               </TableCell>
               {[
                 "Order ID", "Request Date", "DR Type", "Keyword",
-                "Landing Page", "Status", "Live Link", "Completed Date", "DR", "Actions",
+                "Landing Page", "Status", "Live Link", "Completed Date", "Actions",
               ].map((col) => {
                 const sort_key = SORTABLE_COLUMN_MAP[col];
                 const is_sortable = !!sort_key && !!onSortChange;
@@ -691,7 +690,7 @@ export default function OrderStatusTable({
               <TableSkeleton rows_count={per_page} />
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="py-12 text-center text-sm text-gray-400 dark:text-gray-500">
+                <TableCell colSpan={10} className="py-12 text-center text-sm text-gray-400 dark:text-gray-500">
                   {total === 0 && !search_term && !has_active_filters
                     ? "No orders yet. Place your first order to get started."
                     : "No orders match your search or filters."}
@@ -765,10 +764,6 @@ export default function OrderStatusTable({
 
                     <TableCell className="whitespace-nowrap py-3 text-gray-500 text-theme-sm dark:text-gray-400">
                       {row.completed_date ? formatDate(row.completed_date) : "—"}
-                    </TableCell>
-
-                    <TableCell className="whitespace-nowrap py-3 text-gray-500 text-theme-sm dark:text-gray-400">
-                      {row.dr ?? "—"}
                     </TableCell>
 
                     <TableCell className="whitespace-nowrap py-3">
