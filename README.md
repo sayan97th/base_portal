@@ -34,13 +34,13 @@ Use the appropriate script depending on the target environment.
 
 ```bash
 # Testing
-npm run pm2:testing
+yarn run pm2:testing
 
 # Staging
-npm run pm2:staging
+yarn run pm2:staging
 
 # Production
-npm run pm2:production
+yarn run pm2:production
 ```
 
 Or use PM2 directly:
@@ -57,13 +57,13 @@ pm2 start ecosystem/ecosystem.production.config.js
 
 ```bash
 # Testing
-npm run pm2:restart:testing
+yarn run pm2:restart:testing
 
 # Staging
-npm run pm2:restart:staging
+yarn run pm2:restart:staging
 
 # Production
-npm run pm2:restart:production
+yarn run pm2:restart:production
 ```
 
 ---
@@ -72,10 +72,10 @@ npm run pm2:restart:production
 
 ```bash
 # Stop the process (keeps it in PM2 list)
-npm run pm2:stop
+yarn run pm2:stop
 
 # Remove the process from PM2 entirely
-npm run pm2:delete
+yarn run pm2:delete
 ```
 
 ---
@@ -84,10 +84,10 @@ npm run pm2:delete
 
 ```bash
 # View live logs
-npm run pm2:logs
+yarn run pm2:logs
 
 # View all PM2 process statuses
-npm run pm2:status
+yarn run pm2:status
 ```
 
 ---
