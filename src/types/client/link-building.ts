@@ -165,9 +165,9 @@ export interface OrderPlacementFilters {
   per_page?: number;
   search?: string;
   status?: OrderStatus | PlacementStatus | string;
-  /** ISO date string YYYY-MM-DD — lower bound on placement start_date */
+  /** ISO date string YYYY-MM-DD — lower bound on placement request_date */
   date_from?: string;
-  /** ISO date string YYYY-MM-DD — upper bound on placement start_date */
+  /** ISO date string YYYY-MM-DD — upper bound on placement request_date */
   date_to?: string;
   /** Filter by DR tier label, e.g. "DR 50+" — backend applies a LIKE match */
   dr_type?: string;

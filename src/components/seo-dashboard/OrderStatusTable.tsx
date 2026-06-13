@@ -119,7 +119,7 @@ function TableSkeleton({ rows_count }: { rows_count: number }) {
     <>
       {[...Array(rows_count)].map((_, i) => (
         <TableRow key={i}>
-          {[...Array(12)].map((__, j) => (
+          {[...Array(11)].map((__, j) => (
             <TableCell key={j} className="py-3">
               <div className="h-4 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
             </TableCell>
@@ -333,8 +333,8 @@ export default function OrderStatusTable({
   const filter_chips: { key: keyof TableFilters; label: string }[] = [];
   if (filters.status)    filter_chips.push({ key: "status",    label: `Status: ${filters.status}` });
   if (filters.dr_type)   filter_chips.push({ key: "dr_type",   label: `DR: ${filters.dr_type}` });
-  if (filters.date_from) filter_chips.push({ key: "date_from", label: `From: ${filters.date_from}` });
-  if (filters.date_to)   filter_chips.push({ key: "date_to",   label: `To: ${filters.date_to}` });
+  if (filters.date_from) filter_chips.push({ key: "date_from", label: `Request From: ${filters.date_from}` });
+  if (filters.date_to)   filter_chips.push({ key: "date_to",   label: `Request To: ${filters.date_to}` });
 
   const removeChip = useCallback(
     (key: keyof TableFilters) => {
@@ -507,10 +507,10 @@ export default function OrderStatusTable({
               </select>
             </div>
 
-            {/* Start Date From */}
+            {/* Request Date From */}
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                Start Date From
+                Request Date From
               </label>
               <FilterDatePicker
                 id="filter-date-from"
@@ -520,10 +520,10 @@ export default function OrderStatusTable({
               />
             </div>
 
-            {/* Start Date To */}
+            {/* Request Date To */}
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                Start Date To
+                Request Date To
               </label>
               <FilterDatePicker
                 id="filter-date-to"
@@ -594,7 +594,7 @@ export default function OrderStatusTable({
                 />
               </TableCell>
               {[
-                "Order ID", "Start Date", "Request Date", "DR Type", "Keyword",
+                "Order ID", "Request Date", "DR Type", "Keyword",
                 "Landing Page", "Status", "Live Link", "Completed Date", "DR", "Actions",
               ].map((col) => (
                 <TableCell key={col} isHeader className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
@@ -609,7 +609,7 @@ export default function OrderStatusTable({
               <TableSkeleton rows_count={per_page} />
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={12} className="py-12 text-center text-sm text-gray-400 dark:text-gray-500">
+                <TableCell colSpan={11} className="py-12 text-center text-sm text-gray-400 dark:text-gray-500">
                   {total === 0 && !search_term && !has_active_filters
                     ? "No orders yet. Place your first order to get started."
                     : "No orders match your search or filters."}
@@ -639,10 +639,6 @@ export default function OrderStatusTable({
                       >
                         {row.display_order_id || row.order_id}
                       </Link>
-                    </TableCell>
-
-                    <TableCell className="whitespace-nowrap py-3 text-gray-500 text-theme-sm dark:text-gray-400">
-                      {formatDate(row.start_date)}
                     </TableCell>
 
                     <TableCell className="whitespace-nowrap py-3 text-gray-500 text-theme-sm dark:text-gray-400">
