@@ -742,6 +742,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   const [batch_field, setBatchField] = useState<string>("");
   const [batch_value, setBatchValue] = useState<string>("");
   const [is_batch_saving, setIsBatchSaving] = useState(false);
+  const [batch_select_anchor_el, setBatchSelectAnchorEl] = useState<HTMLElement | null>(null);
 
   const { sort_rules, toggleSort, clearSort } = useTableSort(DEFAULT_SORT_RULES);
   const {
@@ -1269,7 +1270,14 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   }, []);
 
   const handleBatchApply = useCallback(async () => {
-    if (!batch_field || selected_row_ids.size === 0) return;
+    if (!batch_field || !batch_value || selected_row_ids.size === 0) return;
+
+    const is_user_field = batch_field === "user_id" || batch_field === "assigned_admin_user_id";
+    // "__unassign__" is a sentinel meaning explicitly clear the field (null)
+    const raw_value = batch_value === "__unassign__" ? "" : batch_value;
+    const api_value: string | number | null = is_user_field
+      ? (raw_value ? Number(raw_value) : null)
+      : (raw_value || null);
 
     setIsBatchSaving(true);
     setSaveError(null);
@@ -1280,29 +1288,47 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
       if (persisted_ids.length > 0) {
         await batchUpdateLinkBuildingOrders(persisted_ids, {
-          [batch_field]: batch_value || null,
+          [batch_field]: api_value,
         });
       }
 
       setRows((prev) =>
         prev.map((r) =>
-          selected_row_ids.has(r.id) ? { ...r, [batch_field]: batch_value } : r
+          selected_row_ids.has(r.id) ? { ...r, [batch_field]: api_value } : r
         )
       );
 
-      const col_label = COLUMNS.find((c) => c.key === batch_field)?.label ?? batch_field;
+      let display_value: string;
+      if (batch_value === "__unassign__") {
+        display_value = "Unassigned";
+      } else if (batch_field === "user_id") {
+        display_value = client_users.find((u) => u.id === Number(batch_value))?.name ?? batch_value;
+      } else if (batch_field === "assigned_admin_user_id") {
+        display_value = admin_users.find((u) => u.id === Number(batch_value))?.name ?? batch_value;
+      } else {
+        display_value = batch_value;
+      }
+
+      const col_label =
+        batch_field === "user_id"
+          ? "Client Account"
+          : batch_field === "assigned_admin_user_id"
+            ? "Assigned To"
+            : (COLUMNS.find((c) => c.key === batch_field)?.label ?? batch_field);
+
       setNotificationBanner(
-        `"${col_label}" set for ${selected_row_ids.size} row${selected_row_ids.size !== 1 ? "s" : ""}.`
+        `"${col_label}" set to "${display_value}" for ${selected_row_ids.size} row${selected_row_ids.size !== 1 ? "s" : ""}.`
       );
       clearSelection();
       setBatchField("");
       setBatchValue("");
+      setBatchSelectAnchorEl(null);
     } catch {
       setSaveError("Batch update failed. Please try again.");
     } finally {
       setIsBatchSaving(false);
     }
-  }, [batch_field, batch_value, selected_row_ids, clearSelection]);
+  }, [batch_field, batch_value, selected_row_ids, clearSelection, client_users, admin_users]);
 
   const handlePasteClipboard = useCallback(async () => {
     if (!clipboard_cell || selected_row_ids.size === 0) return;
@@ -1821,15 +1847,109 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
             <span className="text-xs text-indigo-600 dark:text-indigo-400">Fill field:</span>
             <select
               value={batch_field}
-              onChange={(e) => { setBatchField(e.target.value); setBatchValue(""); }}
+              onChange={(e) => { setBatchField(e.target.value); setBatchValue(""); setBatchSelectAnchorEl(null); }}
               className="h-7 rounded border border-indigo-200 bg-white px-2 text-xs outline-none focus:border-indigo-400 dark:border-indigo-800 dark:bg-gray-800 dark:text-gray-200"
             >
               <option value="">Choose column…</option>
               {COLUMNS.filter((c) => !c.locked).map((col) => (
                 <option key={col.key} value={col.key}>{col.label}</option>
               ))}
+              <option disabled>───────────────</option>
+              <option value="user_id">Client Account</option>
+              <option value="assigned_admin_user_id">Assigned To</option>
             </select>
             {batch_field && (() => {
+              // ── Special: Client Account ──────────────────────────────────────
+              if (batch_field === "user_id") {
+                const selected_client =
+                  batch_value && batch_value !== "__unassign__"
+                    ? client_users.find((u) => u.id === Number(batch_value))
+                    : null;
+                return (
+                  <>
+                    <button
+                      onClick={(e) => setBatchSelectAnchorEl(e.currentTarget)}
+                      className="flex h-7 min-w-[11rem] items-center gap-1.5 rounded border border-teal-300 bg-white px-2 text-xs text-left outline-none transition hover:border-teal-500 dark:border-teal-700 dark:bg-gray-800"
+                    >
+                      {batch_value === "__unassign__" ? (
+                        <span className="flex-1 text-gray-400 dark:text-gray-500">— Unassigned —</span>
+                      ) : selected_client ? (
+                        <>
+                          {selected_client.avatar_url ? (
+                            <img src={selected_client.avatar_url} alt={selected_client.name} className="h-4 w-4 shrink-0 rounded-full object-cover" />
+                          ) : (
+                            <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-teal-600 text-[8px] font-bold text-white">
+                              {selected_client.name.charAt(0).toUpperCase()}
+                            </span>
+                          )}
+                          <span className="flex-1 truncate font-medium text-gray-700 dark:text-gray-200">{selected_client.name}</span>
+                        </>
+                      ) : (
+                        <span className="flex-1 text-gray-400 dark:text-gray-500">Choose client…</span>
+                      )}
+                      <svg className="h-3 w-3 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                      </svg>
+                    </button>
+                    {batch_select_anchor_el && (
+                      <ClientSearchableSelect
+                        client_users={client_users}
+                        selected_user_id={batch_value && batch_value !== "__unassign__" ? Number(batch_value) : null}
+                        anchor_el={batch_select_anchor_el}
+                        onSelect={(val) => { setBatchValue(val === "" ? "__unassign__" : val); setBatchSelectAnchorEl(null); }}
+                        onClose={() => setBatchSelectAnchorEl(null)}
+                      />
+                    )}
+                  </>
+                );
+              }
+
+              // ── Special: Assigned To ─────────────────────────────────────────
+              if (batch_field === "assigned_admin_user_id") {
+                const selected_user =
+                  batch_value && batch_value !== "__unassign__"
+                    ? admin_users.find((u) => u.id === Number(batch_value))
+                    : null;
+                return (
+                  <>
+                    <button
+                      onClick={(e) => setBatchSelectAnchorEl(e.currentTarget)}
+                      className="flex h-7 min-w-[11rem] items-center gap-1.5 rounded border border-indigo-300 bg-white px-2 text-xs text-left outline-none transition hover:border-indigo-500 dark:border-indigo-700 dark:bg-gray-800"
+                    >
+                      {batch_value === "__unassign__" ? (
+                        <span className="flex-1 text-gray-400 dark:text-gray-500">— Unassigned —</span>
+                      ) : selected_user ? (
+                        <>
+                          {selected_user.avatar_url ? (
+                            <img src={selected_user.avatar_url} alt={selected_user.name} className="h-4 w-4 shrink-0 rounded-full object-cover" />
+                          ) : (
+                            <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-[8px] font-bold text-white">
+                              {selected_user.name.charAt(0).toUpperCase()}
+                            </span>
+                          )}
+                          <span className="flex-1 truncate font-medium text-gray-700 dark:text-gray-200">{selected_user.name}</span>
+                        </>
+                      ) : (
+                        <span className="flex-1 text-gray-400 dark:text-gray-500">Choose team member…</span>
+                      )}
+                      <svg className="h-3 w-3 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                      </svg>
+                    </button>
+                    {batch_select_anchor_el && (
+                      <AdminSearchableSelect
+                        admin_users={admin_users}
+                        selected_user_id={batch_value && batch_value !== "__unassign__" ? Number(batch_value) : null}
+                        anchor_el={batch_select_anchor_el}
+                        onSelect={(val) => { setBatchValue(val === "" ? "__unassign__" : val); setBatchSelectAnchorEl(null); }}
+                        onClose={() => setBatchSelectAnchorEl(null)}
+                      />
+                    )}
+                  </>
+                );
+              }
+
+              // ── Standard column types ────────────────────────────────────────
               const col_def = COLUMNS.find((c) => c.key === batch_field);
               if (!col_def) return null;
               if (col_def.type === "select" && col_def.options) {
