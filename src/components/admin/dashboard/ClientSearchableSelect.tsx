@@ -53,13 +53,22 @@ export default function ClientSearchableSelect({
     search_ref.current?.focus();
   }, []);
 
-  const filtered_users = search.trim()
-    ? client_users.filter(
-        (u) =>
-          u.name.toLowerCase().includes(search.toLowerCase()) ||
-          u.email.toLowerCase().includes(search.toLowerCase())
-      )
-    : client_users;
+  const filtered_users = (() => {
+    const list = search.trim()
+      ? client_users.filter(
+          (u) =>
+            u.name.toLowerCase().includes(search.toLowerCase()) ||
+            u.email.toLowerCase().includes(search.toLowerCase())
+        )
+      : [...client_users];
+
+    return list.sort((a, b) => {
+      const a_empty = !a.name.trim();
+      const b_empty = !b.name.trim();
+      if (a_empty === b_empty) return 0;
+      return a_empty ? 1 : -1;
+    });
+  })();
 
   useEffect(() => {
     setHighlightedIdx(-1);
