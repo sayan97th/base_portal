@@ -180,6 +180,8 @@ export interface DashboardTableRow {
   completed_date: string;
   /** Actual DR score of the live link (populated from future tracking data) */
   dr: number | null;
+  /** ISO date string of when the link building request was submitted */
+  request_date: string | null;
   /** Row origin: client-purchased order or admin-created standalone placement. */
   source: "purchased" | "admin_assigned";
 }
@@ -279,13 +281,14 @@ async function exportOrderPlacements(options: ExportOrderPlacementsOptions): Pro
   const xlsx = await import("xlsx");
 
   const header_row = [
-    "Order ID", "Start Date", "DR Type", "Keyword",
+    "Order ID", "Start Date", "Request Date", "DR Type", "Keyword",
     "Landing Page", "Status", "Live Link", "Completed Date", "DR",
   ];
 
   const data_rows = data.map((row) => [
     row.display_order_id ?? "",
     row.start_date        ?? "",
+    row.request_date      ?? "",
     row.dr_type           ?? "",
     row.keyword           ?? "",
     row.landing_page      ?? "",
@@ -298,7 +301,7 @@ async function exportOrderPlacements(options: ExportOrderPlacementsOptions): Pro
   const ws = xlsx.utils.aoa_to_sheet([header_row, ...data_rows]);
 
   // Set column widths
-  ws["!cols"] = [20, 20, 15, 30, 40, 20, 40, 20, 8].map((wch) => ({ wch }));
+  ws["!cols"] = [20, 20, 20, 15, 30, 40, 20, 40, 20, 8].map((wch) => ({ wch }));
 
   const wb = xlsx.utils.book_new();
   xlsx.utils.book_append_sheet(wb, ws, "Order Placements");

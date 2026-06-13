@@ -193,6 +193,8 @@ export interface OrderPlacementRow {
   live_link: string;
   completed_date: string;
   dr: number | null;
+  /** ISO date string of when the link building request was submitted */
+  request_date: string | null;
   /** Distinguishes client-purchased orders from admin-assigned standalone placements. */
   source: "purchased" | "admin_assigned";
 }

@@ -119,7 +119,7 @@ function TableSkeleton({ rows_count }: { rows_count: number }) {
     <>
       {[...Array(rows_count)].map((_, i) => (
         <TableRow key={i}>
-          {[...Array(11)].map((__, j) => (
+          {[...Array(12)].map((__, j) => (
             <TableCell key={j} className="py-3">
               <div className="h-4 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
             </TableCell>
@@ -594,7 +594,7 @@ export default function OrderStatusTable({
                 />
               </TableCell>
               {[
-                "Order ID", "Start Date", "DR Type", "Keyword",
+                "Order ID", "Start Date", "Request Date", "DR Type", "Keyword",
                 "Landing Page", "Status", "Live Link", "Completed Date", "DR", "Actions",
               ].map((col) => (
                 <TableCell key={col} isHeader className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
@@ -609,7 +609,7 @@ export default function OrderStatusTable({
               <TableSkeleton rows_count={per_page} />
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="py-12 text-center text-sm text-gray-400 dark:text-gray-500">
+                <TableCell colSpan={12} className="py-12 text-center text-sm text-gray-400 dark:text-gray-500">
                   {total === 0 && !search_term && !has_active_filters
                     ? "No orders yet. Place your first order to get started."
                     : "No orders match your search or filters."}
@@ -643,6 +643,10 @@ export default function OrderStatusTable({
 
                     <TableCell className="whitespace-nowrap py-3 text-gray-500 text-theme-sm dark:text-gray-400">
                       {formatDate(row.start_date)}
+                    </TableCell>
+
+                    <TableCell className="whitespace-nowrap py-3 text-gray-500 text-theme-sm dark:text-gray-400">
+                      {row.request_date ? formatDate(row.request_date) : <span className="text-gray-300 dark:text-gray-600">—</span>}
                     </TableCell>
 
                     <TableCell className="whitespace-nowrap py-3">
