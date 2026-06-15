@@ -2,10 +2,10 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { listAdminClients } from "@/services/admin/user.service";
-import { sendBulkWelcomeEmail } from "@/services/admin/user.service";
-import type { AdminUser, SortDirection } from "@/types/admin";
+import { listAdminClients, sendBulkWelcomeEmail } from "@/services/admin/user.service";
+import type { AdminUser, ClientSortField, PasswordResetStatusFilter, SortDirection } from "@/types/admin";
 import { useDebounce } from "@/hooks/useDebounce";
+import WelcomeEmailsFiltersBar from "@/components/admin/clients/WelcomeEmailsFiltersBar";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -31,27 +31,32 @@ function getAvatarColor(user_id: number): string {
 function ClientAvatar({ user }: { user: AdminUser }) {
   return (
     <div
-      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${getAvatarColor(user.id)}`}
+      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${getAvatarColor(user.id)}`}
     >
       {getInitials(user.first_name, user.last_name)}
     </div>
   );
 }
 
-function PasswordResetBadge({ has_reset }: { has_reset: boolean }) {
-  if (has_reset) {
+function PasswordResetBadge({ has_reset, reset_at }: { has_reset: boolean; reset_at: string | null }) {
+  if (has_reset && reset_at) {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20">
-        <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-          <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
-        </svg>
-        Reset Done
-      </span>
+      <div className="flex flex-col gap-0.5">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20">
+          <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
+          </svg>
+          Reset Done
+        </span>
+        <span className="pl-0.5 text-[10px] text-gray-400 dark:text-gray-500">
+          {new Date(reset_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+        </span>
+      </div>
     );
   }
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20">
-      <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400" />
       Pending
     </span>
   );
@@ -62,30 +67,34 @@ function SkeletonRows() {
     <>
       {Array.from({ length: 8 }).map((_, i) => (
         <tr key={i}>
-          <td className="px-4 py-3.5">
+          <td className="px-5 py-4">
             <div className="h-4 w-4 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
           </td>
-          <td className="px-4 py-3.5">
+          <td className="px-5 py-4">
             <div className="flex items-center gap-3">
-              <div className="h-8 w-8 animate-pulse rounded-full bg-gray-100 dark:bg-gray-800" />
+              <div className="h-9 w-9 animate-pulse rounded-full bg-gray-100 dark:bg-gray-800" />
               <div className="space-y-1.5">
                 <div className="h-3.5 w-28 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
                 <div className="h-3 w-36 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
               </div>
             </div>
           </td>
-          {Array.from({ length: 3 }).map((__, j) => (
-            <td key={j} className="px-4 py-3.5">
-              <div className="h-3.5 w-24 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
-            </td>
-          ))}
+          <td className="px-5 py-4">
+            <div className="h-3.5 w-28 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+          </td>
+          <td className="px-5 py-4">
+            <div className="h-3.5 w-20 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+          </td>
+          <td className="px-5 py-4">
+            <div className="h-5 w-20 animate-pulse rounded-full bg-gray-100 dark:bg-gray-800" />
+          </td>
         </tr>
       ))}
     </>
   );
 }
 
-// ── Result summary banner ──────────────────────────────────────────────────────
+// ── Result banner ──────────────────────────────────────────────────────────────
 
 interface SendResult {
   sent: number;
@@ -107,8 +116,16 @@ function ResultBanner({ result, onDismiss }: { result: SendResult; onDismiss: ()
             <p className="text-sm font-semibold text-teal-800 dark:text-teal-300">Email blast completed</p>
             <p className="mt-0.5 text-xs text-teal-600 dark:text-teal-400">
               <span className="font-medium">{result.sent} sent</span>
-              {result.skipped > 0 && <span className="ml-2 text-amber-600 dark:text-amber-400">{result.skipped} skipped (already reset)</span>}
-              {result.failed > 0 && <span className="ml-2 text-red-600 dark:text-red-400">{result.failed} failed</span>}
+              {result.skipped > 0 && (
+                <span className="ml-2 text-amber-600 dark:text-amber-400">
+                  {result.skipped} skipped (already reset)
+                </span>
+              )}
+              {result.failed > 0 && (
+                <span className="ml-2 text-red-600 dark:text-red-400">
+                  {result.failed} failed
+                </span>
+              )}
             </p>
           </div>
         </div>
@@ -140,26 +157,88 @@ function ConfirmSendModal({ count, send_to_all, is_loading, onConfirm, onClose }
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
         className="fixed inset-0 bg-black/40 backdrop-blur-sm dark:bg-black/60"
-        onClick={onClose}
+        onClick={!is_loading ? onClose : undefined}
       />
-      <div className="relative z-10 w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-gray-900">
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-indigo-50 dark:bg-indigo-500/15">
-          <svg className="h-6 w-6 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
-          </svg>
+      <div className="relative z-10 w-full max-w-lg rounded-2xl bg-white shadow-2xl dark:bg-gray-900">
+
+        {/* Header */}
+        <div className="flex items-start gap-4 border-b border-gray-100 px-6 py-5 dark:border-gray-800">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-500/15">
+            <svg className="h-6 w-6 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+            </svg>
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+              Confirm Welcome Email Blast
+            </h2>
+            <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+              {send_to_all
+                ? "You are about to send to all eligible clients"
+                : `You are about to send to ${count} selected client${count !== 1 ? "s" : ""}`}
+            </p>
+          </div>
         </div>
 
-        <h2 className="mb-1 text-lg font-semibold text-gray-900 dark:text-white">
-          Send platform welcome emails?
-        </h2>
-        <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">
-          {send_to_all
-            ? "A welcome email with a password-reset link will be sent to all clients who have not yet reset their password."
-            : `A welcome email with a password-reset link will be sent to the ${count} selected client${count !== 1 ? "s" : ""} who have not yet reset their password.`}
-          {" "}Clients who have already completed their reset will be skipped automatically.
-        </p>
+        {/* Body */}
+        <div className="space-y-4 px-6 py-5">
 
-        <div className="flex justify-end gap-3">
+          {/* What will happen */}
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+              What will happen
+            </p>
+            <ul className="space-y-2.5">
+              <li className="flex items-start gap-2.5">
+                <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-50 dark:bg-indigo-500/15">
+                  <svg className="h-3 w-3 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
+                  </svg>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  A <span className="font-medium text-gray-900 dark:text-white">platform welcome email</span> will be sent to each eligible recipient containing a unique password-reset link.
+                </p>
+              </li>
+              <li className="flex items-start gap-2.5">
+                <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-50 dark:bg-amber-500/15">
+                  <svg className="h-3 w-3 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                  </svg>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  Clients who have <span className="font-medium text-gray-900 dark:text-white">already reset their password</span> will be skipped automatically — they will not receive a duplicate email.
+                </p>
+              </li>
+              <li className="flex items-start gap-2.5">
+                <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
+                  <svg className="h-3 w-3 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                  </svg>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  Emails are sent <span className="font-medium text-gray-900 dark:text-white">immediately</span> and cannot be recalled once dispatched.
+                </p>
+              </li>
+            </ul>
+          </div>
+
+          {/* Audience summary */}
+          <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 px-4 py-3 dark:border-indigo-500/20 dark:bg-indigo-500/5">
+            <div className="flex items-center gap-2">
+              <svg className="h-4 w-4 shrink-0 text-indigo-500 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
+              </svg>
+              <p className="text-sm text-indigo-700 dark:text-indigo-300">
+                {send_to_all
+                  ? "Target: all clients whose password has not been reset yet."
+                  : `Target: ${count} selected client${count !== 1 ? "s" : ""} — pending ones will be emailed, already-reset ones will be skipped.`}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4 dark:border-gray-800">
           <button
             onClick={onClose}
             disabled={is_loading}
@@ -170,7 +249,7 @@ function ConfirmSendModal({ count, send_to_all, is_loading, onConfirm, onClose }
           <button
             onClick={onConfirm}
             disabled={is_loading}
-            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-600"
           >
             {is_loading ? (
               <>
@@ -185,7 +264,7 @@ function ConfirmSendModal({ count, send_to_all, is_loading, onConfirm, onClose }
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
                 </svg>
-                Yes, send emails
+                Confirm &amp; Send
               </>
             )}
           </button>
@@ -207,7 +286,11 @@ export default function AdminWelcomeEmailsContent() {
 
   const [search_input, setSearchInput] = useState("");
   const debounced_search = useDebounce(search_input, 450);
+  const [sort_field, setSortField] = useState<ClientSortField | undefined>("created_at");
   const [sort_direction, setSortDirection] = useState<SortDirection>("desc");
+  const [password_reset_status, setPasswordResetStatus] = useState<PasswordResetStatusFilter>("");
+  const [date_from, setDateFrom] = useState("");
+  const [date_to, setDateTo] = useState("");
 
   const [selected_ids, setSelectedIds] = useState<Set<number>>(new Set());
   const [page_all_checked, setPageAllChecked] = useState(false);
@@ -220,7 +303,7 @@ export default function AdminWelcomeEmailsContent() {
 
   useEffect(() => {
     setPage(1);
-  }, [debounced_search]);
+  }, [debounced_search, sort_field, sort_direction, password_reset_status, date_from, date_to]);
 
   const loadClients = useCallback(() => {
     let cancelled = false;
@@ -230,8 +313,11 @@ export default function AdminWelcomeEmailsContent() {
     listAdminClients({
       page,
       search: debounced_search,
-      sort_field: "created_at",
+      sort_field,
       sort_direction,
+      password_reset_status: password_reset_status || undefined,
+      date_from: date_from || undefined,
+      date_to: date_to || undefined,
     })
       .then((data) => {
         if (!cancelled) {
@@ -250,7 +336,7 @@ export default function AdminWelcomeEmailsContent() {
       });
 
     return () => { cancelled = true; };
-  }, [page, debounced_search, sort_direction]);
+  }, [page, debounced_search, sort_field, sort_direction, password_reset_status, date_from, date_to]);
 
   useEffect(() => {
     return loadClients();
@@ -287,6 +373,21 @@ export default function AdminWelcomeEmailsContent() {
   function clearSelection() {
     setSelectedIds(new Set());
     setPageAllChecked(false);
+  }
+
+  function handleClearAll() {
+    setSearchInput("");
+    setSortField("created_at");
+    setSortDirection("desc");
+    setPasswordResetStatus("");
+    setDateFrom("");
+    setDateTo("");
+    setPage(1);
+  }
+
+  function handleSortChange(field: ClientSortField, direction: SortDirection) {
+    setSortField(field);
+    setSortDirection(direction);
   }
 
   // ── Send handlers ──────────────────────────────────────────────────────────
@@ -326,7 +427,6 @@ export default function AdminWelcomeEmailsContent() {
 
   // ── Derived ────────────────────────────────────────────────────────────────
 
-  const pending_count = clients.filter((c) => c.password_reset_at === null).length;
   const selected_count = selected_ids.size;
 
   return (
@@ -353,11 +453,20 @@ export default function AdminWelcomeEmailsContent() {
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {is_loading
               ? "Loading clients…"
-              : `${total} client${total !== 1 ? "s" : ""} total · select recipients and send the platform welcome email`}
+              : `${total} client${total !== 1 ? "s" : ""} · select recipients and send the platform welcome email`}
           </p>
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          {selected_count > 0 && (
+            <button
+              onClick={clearSelection}
+              className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+            >
+              Clear selection ({selected_count})
+            </button>
+          )}
+
           <button
             onClick={openSendAll}
             className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
@@ -371,7 +480,7 @@ export default function AdminWelcomeEmailsContent() {
           <button
             onClick={openSendSelected}
             disabled={selected_count === 0}
-            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed dark:bg-indigo-500 dark:hover:bg-indigo-600"
+            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-indigo-500 dark:hover:bg-indigo-600"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
@@ -403,60 +512,23 @@ export default function AdminWelcomeEmailsContent() {
         </div>
       )}
 
-      {/* ── Stats strip ── */}
-      {!is_loading && (
-        <div className="grid grid-cols-3 gap-4">
-          <div className="rounded-xl border border-gray-100 bg-white px-5 py-4 dark:border-gray-800 dark:bg-gray-900">
-            <p className="text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">Total Clients</p>
-            <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{total}</p>
-          </div>
-          <div className="rounded-xl border border-amber-100 bg-amber-50/60 px-5 py-4 dark:border-amber-500/20 dark:bg-amber-500/5">
-            <p className="text-xs font-medium uppercase tracking-wider text-amber-600 dark:text-amber-400">Password Pending (this page)</p>
-            <p className="mt-1 text-2xl font-bold text-amber-700 dark:text-amber-300">{pending_count}</p>
-          </div>
-          <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 px-5 py-4 dark:border-indigo-500/20 dark:bg-indigo-500/5">
-            <p className="text-xs font-medium uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Selected</p>
-            <p className="mt-1 text-2xl font-bold text-indigo-700 dark:text-indigo-300">{selected_count}</p>
-          </div>
-        </div>
-      )}
-
-      {/* ── Search & controls ── */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1">
-          <svg
-            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
-            fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 15.803a7.5 7.5 0 0 0 10.607 0Z" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Search clients by name or email…"
-            value={search_input}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-4 text-sm placeholder:text-gray-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:placeholder:text-gray-500"
-          />
-        </div>
-
-        <select
-          value={sort_direction}
-          onChange={(e) => setSortDirection(e.target.value as SortDirection)}
-          className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 focus:border-indigo-400 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
-        >
-          <option value="desc">Newest first</option>
-          <option value="asc">Oldest first</option>
-        </select>
-
-        {selected_count > 0 && (
-          <button
-            onClick={clearSelection}
-            className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
-          >
-            Clear selection
-          </button>
-        )}
-      </div>
+      {/* ── Filters bar ── */}
+      <WelcomeEmailsFiltersBar
+        search_value={search_input}
+        on_search_change={setSearchInput}
+        password_reset_status={password_reset_status}
+        on_password_reset_status_change={setPasswordResetStatus}
+        sort_field={sort_field}
+        sort_direction={sort_direction}
+        on_sort_change={handleSortChange}
+        date_from={date_from}
+        date_to={date_to}
+        on_date_from_change={setDateFrom}
+        on_date_to_change={setDateTo}
+        total={total}
+        is_loading={is_loading}
+        on_clear_all={handleClearAll}
+      />
 
       {/* ── Table ── */}
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
@@ -464,7 +536,7 @@ export default function AdminWelcomeEmailsContent() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/80 dark:border-gray-800 dark:bg-gray-800/40">
-                <th className="px-4 py-3">
+                <th className="w-12 px-5 py-3.5">
                   <input
                     type="checkbox"
                     checked={page_all_checked}
@@ -473,16 +545,16 @@ export default function AdminWelcomeEmailsContent() {
                     aria-label="Select all on this page"
                   />
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   Client
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   Company
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  Email
+                <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  Joined
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   Password Reset
                 </th>
               </tr>
@@ -492,7 +564,7 @@ export default function AdminWelcomeEmailsContent() {
                 <SkeletonRows />
               ) : clients.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-16 text-center">
+                  <td colSpan={5} className="px-5 py-16 text-center">
                     <div className="flex flex-col items-center gap-2">
                       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
                         <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -501,7 +573,9 @@ export default function AdminWelcomeEmailsContent() {
                       </div>
                       <p className="text-sm font-medium text-gray-900 dark:text-white">No clients found</p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {search_input ? "Try adjusting your search." : "Registered client accounts will appear here."}
+                        {search_input || password_reset_status || date_from || date_to
+                          ? "Try adjusting your search or filters."
+                          : "Registered client accounts will appear here."}
                       </p>
                     </div>
                   </td>
@@ -513,13 +587,13 @@ export default function AdminWelcomeEmailsContent() {
                   return (
                     <tr
                       key={client.id}
-                      className={`cursor-pointer transition-colors hover:bg-gray-50/70 dark:hover:bg-white/2 ${
+                      className={`cursor-pointer transition-colors hover:bg-gray-50/70 dark:hover:bg-white/[0.02] ${
                         is_checked ? "bg-indigo-50/40 dark:bg-indigo-500/5" : ""
                       }`}
                       onClick={() => toggleClient(client.id)}
                     >
                       {/* Checkbox */}
-                      <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
+                      <td className="w-12 px-5 py-4" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={is_checked}
@@ -529,32 +603,39 @@ export default function AdminWelcomeEmailsContent() {
                       </td>
 
                       {/* Client */}
-                      <td className="px-4 py-3.5">
+                      <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
                           <ClientAvatar user={client} />
                           <div className="min-w-0">
                             <p className="truncate font-medium text-gray-900 dark:text-white">
                               {client.first_name} {client.last_name}
                             </p>
+                            <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+                              {client.email}
+                            </p>
                           </div>
                         </div>
                       </td>
 
                       {/* Company */}
-                      <td className="px-4 py-3.5 text-sm text-gray-600 dark:text-gray-400">
+                      <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-400">
                         {client.company ?? (
                           <span className="text-gray-300 dark:text-gray-600">—</span>
                         )}
                       </td>
 
-                      {/* Email */}
-                      <td className="px-4 py-3.5 text-sm text-gray-500 dark:text-gray-400">
-                        {client.email}
+                      {/* Joined */}
+                      <td className="px-5 py-4 text-sm text-gray-500 dark:text-gray-400">
+                        {new Date(client.created_at).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
                       </td>
 
                       {/* Password reset status */}
-                      <td className="px-4 py-3.5">
-                        <PasswordResetBadge has_reset={has_reset} />
+                      <td className="px-5 py-4">
+                        <PasswordResetBadge has_reset={has_reset} reset_at={client.password_reset_at} />
                       </td>
                     </tr>
                   );

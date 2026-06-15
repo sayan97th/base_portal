@@ -49,6 +49,7 @@ export async function listAdminClients(
   if (filters.date_to) params.set("date_to", filters.date_to);
   if (filters.email_status) params.set("email_status", filters.email_status);
   if (filters.account_status) params.set("account_status", filters.account_status);
+  if (filters.password_reset_status) params.set("password_reset_status", filters.password_reset_status);
   return apiClient.get<PaginatedResponse<AdminUser>>(
     `/api/admin/users?${params.toString()}`
   );

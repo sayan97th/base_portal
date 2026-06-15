@@ -97,6 +97,8 @@ export type ClientEmailStatusFilter = "verified" | "unverified" | "";
 
 export type ClientAccountStatusFilter = "active" | "disabled" | "";
 
+export type PasswordResetStatusFilter = "pending" | "reset" | "";
+
 export interface AdminClientFilters {
   page?: number;
   search?: string;
@@ -106,6 +108,7 @@ export interface AdminClientFilters {
   date_to?: string;
   email_status?: ClientEmailStatusFilter;
   account_status?: ClientAccountStatusFilter;
+  password_reset_status?: PasswordResetStatusFilter;
 }
 
 export interface AdminOrderFilters {
