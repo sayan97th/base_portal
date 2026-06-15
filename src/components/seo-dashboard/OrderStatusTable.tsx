@@ -93,6 +93,58 @@ const status_badge_color: Record<
   Scheduled: "primary",
 };
 
+// ── Custom checkbox: consistent rendering across macOS / Windows / Linux ──────
+
+function TableCheckbox({
+  checked,
+  indeterminate = false,
+  onChange,
+  title,
+}: {
+  checked: boolean;
+  indeterminate?: boolean;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  title?: string;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+
+  return (
+    <label
+      className="relative inline-flex h-4 w-4 flex-shrink-0 cursor-pointer items-center justify-center"
+      title={title}
+    >
+      <input
+        ref={ref}
+        type="checkbox"
+        checked={checked}
+        onChange={onChange}
+        className="sr-only"
+      />
+      <span
+        className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border transition-colors ${
+          checked || indeterminate
+            ? "border-coral-500 bg-coral-500"
+            : "border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-800"
+        }`}
+      >
+        {indeterminate ? (
+          <svg className="text-white" width="8" height="2" viewBox="0 0 8 2" fill="none">
+            <path d="M1 1H7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+        ) : checked ? (
+          <svg className="text-white" width="10" height="8" viewBox="0 0 10 8" fill="none">
+            <path d="M1 4L3.5 6.5L9 1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        ) : null}
+      </span>
+    </label>
+  );
+}
+
 // ── Shared class strings ──────────────────────────────────────────────────────
 
 const SELECT_CLS =
@@ -314,12 +366,6 @@ export default function OrderStatusTable({
   const some_selected =
     rows.some((r) => selected_row_ids.has(r.id)) && !all_selected;
 
-  const select_all_ref = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    if (select_all_ref.current) {
-      select_all_ref.current.indeterminate = some_selected;
-    }
-  }, [some_selected]);
 
   // ── Export dropdown ────────────────────────────────────────────────────────
 
@@ -641,13 +687,11 @@ export default function OrderStatusTable({
         <Table>
           <TableHeader className="border-y border-gray-100 dark:border-gray-800">
             <TableRow>
-              <TableCell isHeader className="w-10 py-3 text-start">
-                <input
-                  ref={select_all_ref}
-                  type="checkbox"
+              <TableCell isHeader className="w-10 px-3 py-3 text-start">
+                <TableCheckbox
                   checked={all_selected}
+                  indeterminate={some_selected}
                   onChange={(e) => (e.target.checked ? selectAllRows() : clearSelection())}
-                  className="h-4 w-4 cursor-pointer rounded border-gray-300 accent-coral-500 dark:border-gray-600"
                   title={all_selected ? "Deselect all" : "Select all on this page"}
                 />
               </TableCell>
@@ -704,12 +748,10 @@ export default function OrderStatusTable({
                     key={`${row.order_id}-${index}`}
                     className={is_checked ? "bg-coral-50/40 dark:bg-coral-500/5" : undefined}
                   >
-                    <TableCell className="w-10 py-3">
-                      <input
-                        type="checkbox"
+                    <TableCell className="w-10 px-3 py-3">
+                      <TableCheckbox
                         checked={is_checked}
                         onChange={() => toggleRowSelection(row.id)}
-                        className="h-4 w-4 cursor-pointer rounded border-gray-300 accent-coral-500 dark:border-gray-600"
                       />
                     </TableCell>
 

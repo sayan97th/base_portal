@@ -97,8 +97,8 @@ yarn run pm2:status
 After starting the app, run the following on the server to persist the process list across reboots:
 
 ```bash
-pm2 save
 pm2 startup
+pm2 save
 ```
 
 Follow the instructions printed by `pm2 startup` to register the systemd/init script.
