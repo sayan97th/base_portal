@@ -107,7 +107,7 @@ function ResultBanner({ result, onDismiss }: { result: SendResult; onDismiss: ()
             <p className="text-sm font-semibold text-teal-800 dark:text-teal-300">Email blast completed</p>
             <p className="mt-0.5 text-xs text-teal-600 dark:text-teal-400">
               <span className="font-medium">{result.sent} sent</span>
-              {result.skipped > 0 && <span className="ml-2 text-amber-600 dark:text-amber-400">{result.skipped} skipped (already logged in)</span>}
+              {result.skipped > 0 && <span className="ml-2 text-amber-600 dark:text-amber-400">{result.skipped} skipped (already reset)</span>}
               {result.failed > 0 && <span className="ml-2 text-red-600 dark:text-red-400">{result.failed} failed</span>}
             </p>
           </div>
@@ -154,9 +154,9 @@ function ConfirmSendModal({ count, send_to_all, is_loading, onConfirm, onClose }
         </h2>
         <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">
           {send_to_all
-            ? "A welcome email with a password-reset link will be sent to all clients who have not yet logged in."
-            : `A welcome email with a password-reset link will be sent to the ${count} selected client${count !== 1 ? "s" : ""} who have not yet logged in.`}
-          {" "}Clients who have already logged in will be skipped automatically.
+            ? "A welcome email with a password-reset link will be sent to all clients who have not yet reset their password."
+            : `A welcome email with a password-reset link will be sent to the ${count} selected client${count !== 1 ? "s" : ""} who have not yet reset their password.`}
+          {" "}Clients who have already completed their reset will be skipped automatically.
         </p>
 
         <div className="flex justify-end gap-3">
@@ -326,7 +326,7 @@ export default function AdminWelcomeEmailsContent() {
 
   // ── Derived ────────────────────────────────────────────────────────────────
 
-  const pending_count = clients.filter((c) => c.last_login_at === null).length;
+  const pending_count = clients.filter((c) => c.password_reset_at === null).length;
   const selected_count = selected_ids.size;
 
   return (
@@ -508,7 +508,7 @@ export default function AdminWelcomeEmailsContent() {
                 </tr>
               ) : (
                 clients.map((client) => {
-                  const has_reset = client.last_login_at !== null;
+                  const has_reset = client.password_reset_at !== null;
                   const is_checked = selected_ids.has(client.id);
                   return (
                     <tr
