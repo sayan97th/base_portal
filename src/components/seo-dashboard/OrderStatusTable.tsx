@@ -175,7 +175,7 @@ function TableSkeleton({ rows_count }: { rows_count: number }) {
       {[...Array(rows_count)].map((_, i) => (
         <TableRow key={i}>
           {[...Array(10)].map((__, j) => (
-            <TableCell key={j} className="py-3">
+            <TableCell key={j} className="px-4 py-3.5">
               <div className="h-4 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
             </TableCell>
           ))}
@@ -687,7 +687,7 @@ export default function OrderStatusTable({
         <Table>
           <TableHeader className="border-y border-gray-100 dark:border-gray-800">
             <TableRow>
-              <TableCell isHeader className="w-10 px-3 py-3 text-start">
+              <TableCell isHeader className="w-10 px-3 py-3.5 text-start">
                 <TableCheckbox
                   checked={all_selected}
                   indeterminate={some_selected}
@@ -704,7 +704,7 @@ export default function OrderStatusTable({
                 const is_active = is_sortable && sort_by === sort_key;
 
                 return (
-                  <TableCell key={col} isHeader className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
+                  <TableCell key={col} isHeader className="px-4 py-3.5 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400 whitespace-nowrap">
                     {is_sortable ? (
                       <button
                         onClick={() => handleSortToggle(col)}
@@ -746,16 +746,16 @@ export default function OrderStatusTable({
                 return (
                   <TableRow
                     key={`${row.order_id}-${index}`}
-                    className={is_checked ? "bg-coral-50/40 dark:bg-coral-500/5" : undefined}
+                    className={`transition-colors ${is_checked ? "bg-coral-50/40 dark:bg-coral-500/5" : "hover:bg-gray-50/70 dark:hover:bg-gray-800/40"}`}
                   >
-                    <TableCell className="w-10 px-3 py-3">
+                    <TableCell className="w-10 px-3 py-3.5">
                       <TableCheckbox
                         checked={is_checked}
                         onChange={() => toggleRowSelection(row.id)}
                       />
                     </TableCell>
 
-                    <TableCell className="whitespace-nowrap py-3 font-mono text-xs font-medium text-gray-700 dark:text-gray-300">
+                    <TableCell className="whitespace-nowrap px-4 py-3.5 font-mono text-xs font-medium text-gray-700 dark:text-gray-300">
                       <Link
                         href={row.source === "admin_assigned" ? `/link-building/placements/${row.id}` : `/orders/${row.order_id}`}
                         className="hover:text-coral-500 hover:underline"
@@ -764,21 +764,21 @@ export default function OrderStatusTable({
                       </Link>
                     </TableCell>
 
-                    <TableCell className="whitespace-nowrap py-3 text-gray-500 text-theme-sm dark:text-gray-400">
+                    <TableCell className="whitespace-nowrap px-4 py-3.5 text-gray-500 text-theme-sm dark:text-gray-400">
                       {row.request_date ? formatDate(row.request_date) : <span className="text-gray-300 dark:text-gray-600">—</span>}
                     </TableCell>
 
-                    <TableCell className="whitespace-nowrap py-3">
+                    <TableCell className="whitespace-nowrap px-4 py-3.5">
                       <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-700 dark:bg-gray-800 dark:text-gray-300">
                         {row.dr_type}
                       </span>
                     </TableCell>
 
-                    <TableCell className="whitespace-nowrap py-3 text-gray-500 text-theme-sm dark:text-gray-400">
+                    <TableCell className="whitespace-nowrap px-4 py-3.5 text-gray-500 text-theme-sm dark:text-gray-400">
                       {row.keyword ?? <span className="text-gray-300 dark:text-gray-600">—</span>}
                     </TableCell>
 
-                    <TableCell className="py-3 text-theme-sm">
+                    <TableCell className="px-4 py-3.5 text-theme-sm">
                       {row.landing_page ? (
                         <a href={row.landing_page} className="block max-w-[200px] truncate text-blue-light-500 hover:underline" target="_blank" rel="noopener noreferrer" title={row.landing_page}>
                           {row.landing_page}
@@ -788,13 +788,13 @@ export default function OrderStatusTable({
                       )}
                     </TableCell>
 
-                    <TableCell className="whitespace-nowrap py-3">
+                    <TableCell className="whitespace-nowrap px-4 py-3.5">
                       <Badge size="sm" color={status_badge_color[row.status] ?? "info"}>
                         {row.status}
                       </Badge>
                     </TableCell>
 
-                    <TableCell className="py-3 text-theme-sm">
+                    <TableCell className="px-4 py-3.5 text-theme-sm">
                       {row.live_link ? (
                         <a href={row.live_link} className="block max-w-[200px] truncate text-blue-light-500 hover:underline" target="_blank" rel="noopener noreferrer" title={row.live_link}>
                           {row.live_link}
@@ -804,11 +804,11 @@ export default function OrderStatusTable({
                       )}
                     </TableCell>
 
-                    <TableCell className="whitespace-nowrap py-3 text-gray-500 text-theme-sm dark:text-gray-400">
+                    <TableCell className="whitespace-nowrap px-4 py-3.5 text-gray-500 text-theme-sm dark:text-gray-400">
                       {row.completed_date ? formatDate(row.completed_date) : "—"}
                     </TableCell>
 
-                    <TableCell className="whitespace-nowrap py-3">
+                    <TableCell className="whitespace-nowrap px-4 py-3.5">
                       <Link
                         href={row.source === "admin_assigned" ? `/link-building/placements/${row.id}` : `/orders/${row.order_id}`}
                         className="inline-flex items-center gap-1.5 rounded-lg border border-coral-200 bg-coral-50 px-3 py-1.5 text-xs font-medium text-coral-600 transition-colors hover:bg-coral-500 hover:text-white dark:border-coral-500/30 dark:bg-coral-500/10 dark:text-coral-400 dark:hover:bg-coral-500 dark:hover:text-white"
