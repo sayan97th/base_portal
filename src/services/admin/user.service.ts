@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api-client";
-import type { AdminUser, AdminUserFilters, AdminClientFilters, AdminUserOrderSummary, PaginatedResponse, CreateClientPayload, CreateClientResponse } from "@/types/admin";
+import type { AdminUser, AdminUserFilters, AdminClientFilters, AdminUserOrderSummary, PaginatedResponse, CreateClientPayload, CreateClientResponse, BulkWelcomeEmailPayload, BulkWelcomeEmailResponse } from "@/types/admin";
 
 export interface BanUserResponse {
   message: string;
@@ -107,6 +107,20 @@ export async function createAdminClient(
   data: CreateClientPayload
 ): Promise<CreateClientResponse> {
   return apiClient.post<CreateClientResponse>(`/api/admin/clients`, data);
+}
+
+/**
+ * Send the platform welcome email (with password-reset link) to a selected
+ * set of clients, or to every client who has not yet logged in.
+ * Roles allowed: super_admin, admin.
+ */
+export async function sendBulkWelcomeEmail(
+  payload: BulkWelcomeEmailPayload
+): Promise<BulkWelcomeEmailResponse> {
+  return apiClient.post<BulkWelcomeEmailResponse>(
+    `/api/admin/clients/bulk-welcome-email`,
+    payload
+  );
 }
 
 export interface UpdateAdminUserMetaPayload {

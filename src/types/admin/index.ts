@@ -514,6 +514,20 @@ export interface AdminUserOrderSummary {
 
 // ── Roles ─────────────────────────────────────────────────────────────────────
 
+// ── Welcome Email Blast ───────────────────────────────────────────────────────
+
+export interface BulkWelcomeEmailPayload {
+  send_to_all?: boolean;
+  user_ids?: number[];
+}
+
+export interface BulkWelcomeEmailResponse {
+  message: string;
+  sent: number;
+  skipped: number;
+  failed: number;
+}
+
 export interface RolesListResponse {
   roles: RoleWithPermissions[];
 }
