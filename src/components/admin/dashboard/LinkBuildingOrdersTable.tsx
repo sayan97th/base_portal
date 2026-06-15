@@ -1676,6 +1676,30 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                     <p className="mt-0.5 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
                       {total.toLocaleString()} row{total !== 1 ? "s" : ""} · applies current search &amp; filters
                     </p>
+                    {(link_type_filter || status_filter || client_filter || search.trim()) && (
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {link_type_filter && (
+                          <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                            {link_type_filter}
+                          </span>
+                        )}
+                        {status_filter && (
+                          <span className="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                            {status_filter}
+                          </span>
+                        )}
+                        {client_filter && (
+                          <span className="inline-flex items-center rounded-full bg-teal-100 px-2 py-0.5 text-[10px] font-medium text-teal-700 dark:bg-teal-900/30 dark:text-teal-400">
+                            Client: {client_filter}
+                          </span>
+                        )}
+                        {search.trim() && (
+                          <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-400">
+                            &ldquo;{search.trim()}&rdquo;
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </button>
 
