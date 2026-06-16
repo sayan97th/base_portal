@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { listAdminClients, sendBulkWelcomeEmail, sendTestWelcomeEmail } from "@/services/admin/user.service";
+import { listAdminClients, sendBulkWelcomeEmail, sendTestWelcomeEmail, getPendingClientsCount } from "@/services/admin/user.service";
 import type { AdminUser, ClientSortField, PasswordResetStatusFilter, SortDirection } from "@/types/admin";
 import { useDebounce } from "@/hooks/useDebounce";
 import WelcomeEmailsFiltersBar from "@/components/admin/clients/WelcomeEmailsFiltersBar";
@@ -310,12 +310,15 @@ function TestEmailModal({ is_loading, on_send, on_close, success_message, error_
 interface ConfirmModalProps {
   count: number;
   send_to_all: boolean;
+  pending_count: number | null;
   is_loading: boolean;
   onConfirm: () => void;
   onClose: () => void;
 }
 
-function ConfirmSendModal({ count, send_to_all, is_loading, onConfirm, onClose }: ConfirmModalProps) {
+function ConfirmSendModal({ count, send_to_all, pending_count, is_loading, onConfirm, onClose }: ConfirmModalProps) {
+  const recipients = send_to_all ? pending_count : count;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
@@ -337,7 +340,9 @@ function ConfirmSendModal({ count, send_to_all, is_loading, onConfirm, onClose }
             </h2>
             <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
               {send_to_all
-                ? "You are about to send to all eligible clients"
+                ? recipients !== null
+                  ? `You are about to send to ${recipients} pending client${recipients !== 1 ? "s" : ""}`
+                  : "You are about to send to all pending clients"
                 : `You are about to send to ${count} selected client${count !== 1 ? "s" : ""}`}
             </p>
           </div>
@@ -345,6 +350,25 @@ function ConfirmSendModal({ count, send_to_all, is_loading, onConfirm, onClose }
 
         {/* Body */}
         <div className="space-y-4 px-6 py-5">
+
+          {/* Recipient count highlight — only for send_to_all */}
+          {send_to_all && recipients !== null && (
+            <div className="flex items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 dark:border-indigo-500/30 dark:bg-indigo-500/10">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-500/20">
+                <svg className="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-indigo-800 dark:text-indigo-200">
+                  {recipients} client{recipients !== 1 ? "s" : ""} will receive this email
+                </p>
+                <p className="text-xs text-indigo-600 dark:text-indigo-400">
+                  These are all clients who have not yet reset their password.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* What will happen */}
           <div>
@@ -460,6 +484,8 @@ export default function AdminWelcomeEmailsContent() {
 
   const [show_confirm, setShowConfirm] = useState(false);
   const [confirm_send_all, setConfirmSendAll] = useState(false);
+  const [pending_count, setPendingCount] = useState<number | null>(null);
+  const [is_fetching_pending_count, setIsFetchingPendingCount] = useState(false);
   const [is_sending, setIsSending] = useState(false);
   const [send_error, setSendError] = useState<string | null>(null);
   const [send_result, setSendResult] = useState<SendResult | null>(null);
@@ -566,9 +592,19 @@ export default function AdminWelcomeEmailsContent() {
     setShowConfirm(true);
   }
 
-  function openSendAll() {
+  async function openSendAll() {
     setSendError(null);
     setConfirmSendAll(true);
+    setPendingCount(null);
+    setIsFetchingPendingCount(true);
+    try {
+      const result = await getPendingClientsCount();
+      setPendingCount(result.pending_count);
+    } catch {
+      setPendingCount(null);
+    } finally {
+      setIsFetchingPendingCount(false);
+    }
     setShowConfirm(true);
   }
 

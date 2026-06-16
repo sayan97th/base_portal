@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api-client";
-import type { AdminUser, AdminUserFilters, AdminClientFilters, AdminUserOrderSummary, PaginatedResponse, CreateClientPayload, CreateClientResponse, BulkWelcomeEmailPayload, BulkWelcomeEmailResponse, SendTestWelcomeEmailPayload, SendTestWelcomeEmailResponse } from "@/types/admin";
+import type { AdminUser, AdminUserFilters, AdminClientFilters, AdminUserOrderSummary, PaginatedResponse, CreateClientPayload, CreateClientResponse, BulkWelcomeEmailPayload, BulkWelcomeEmailResponse, SendTestWelcomeEmailPayload, SendTestWelcomeEmailResponse, PendingClientsCountResponse } from "@/types/admin";
 
 export interface BanUserResponse {
   message: string;
@@ -121,6 +121,17 @@ export async function sendBulkWelcomeEmail(
   return apiClient.post<BulkWelcomeEmailResponse>(
     `/api/admin/clients/bulk-welcome-email`,
     payload
+  );
+}
+
+/**
+ * Get the count of clients who have not yet reset their password (pending clients).
+ * Used to inform admins before triggering a bulk welcome email blast.
+ * Roles allowed: super_admin, admin.
+ */
+export async function getPendingClientsCount(): Promise<PendingClientsCountResponse> {
+  return apiClient.get<PendingClientsCountResponse>(
+    `/api/admin/clients/pending-count`
   );
 }
 

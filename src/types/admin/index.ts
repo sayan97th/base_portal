@@ -539,6 +539,10 @@ export interface SendTestWelcomeEmailResponse {
   message: string;
 }
 
+export interface PendingClientsCountResponse {
+  pending_count: number;
+}
+
 export type WelcomeEmailSentStatusFilter = "sent" | "not_sent" | "";
 
 export interface RolesListResponse {
