@@ -39,6 +39,7 @@ export interface User {
   email_verified_at: string | null;
   last_login_at: string | null;
   password_reset_at: string | null;
+  welcome_email_sent_at: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

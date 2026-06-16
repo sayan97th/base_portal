@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api-client";
-import type { AdminUser, AdminUserFilters, AdminClientFilters, AdminUserOrderSummary, PaginatedResponse, CreateClientPayload, CreateClientResponse, BulkWelcomeEmailPayload, BulkWelcomeEmailResponse } from "@/types/admin";
+import type { AdminUser, AdminUserFilters, AdminClientFilters, AdminUserOrderSummary, PaginatedResponse, CreateClientPayload, CreateClientResponse, BulkWelcomeEmailPayload, BulkWelcomeEmailResponse, SendTestWelcomeEmailPayload, SendTestWelcomeEmailResponse } from "@/types/admin";
 
 export interface BanUserResponse {
   message: string;
@@ -120,6 +120,20 @@ export async function sendBulkWelcomeEmail(
 ): Promise<BulkWelcomeEmailResponse> {
   return apiClient.post<BulkWelcomeEmailResponse>(
     `/api/admin/clients/bulk-welcome-email`,
+    payload
+  );
+}
+
+/**
+ * Send a test preview of the platform welcome email to any email address.
+ * Used by admins to verify the email design before sending to real clients.
+ * Roles allowed: super_admin, admin.
+ */
+export async function sendTestWelcomeEmail(
+  payload: SendTestWelcomeEmailPayload
+): Promise<SendTestWelcomeEmailResponse> {
+  return apiClient.post<SendTestWelcomeEmailResponse>(
+    `/api/admin/clients/send-test-welcome-email`,
     payload
   );
 }

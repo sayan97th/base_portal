@@ -531,6 +531,16 @@ export interface BulkWelcomeEmailResponse {
   failed: number;
 }
 
+export interface SendTestWelcomeEmailPayload {
+  email: string;
+}
+
+export interface SendTestWelcomeEmailResponse {
+  message: string;
+}
+
+export type WelcomeEmailSentStatusFilter = "sent" | "not_sent" | "";
+
 export interface RolesListResponse {
   roles: RoleWithPermissions[];
 }

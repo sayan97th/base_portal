@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { listAdminClients, sendBulkWelcomeEmail } from "@/services/admin/user.service";
+import { listAdminClients, sendBulkWelcomeEmail, sendTestWelcomeEmail } from "@/services/admin/user.service";
 import type { AdminUser, ClientSortField, PasswordResetStatusFilter, SortDirection } from "@/types/admin";
 import { useDebounce } from "@/hooks/useDebounce";
 import WelcomeEmailsFiltersBar from "@/components/admin/clients/WelcomeEmailsFiltersBar";
@@ -62,6 +62,30 @@ function PasswordResetBadge({ has_reset, reset_at }: { has_reset: boolean; reset
   );
 }
 
+function WelcomeEmailBadge({ sent_at }: { sent_at: string | null }) {
+  if (sent_at) {
+    return (
+      <div className="flex flex-col gap-0.5">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700 ring-1 ring-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-400 dark:ring-indigo-500/20">
+          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+          </svg>
+          Sent
+        </span>
+        <span className="pl-0.5 text-[10px] text-gray-400 dark:text-gray-500">
+          {new Date(sent_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+        </span>
+      </div>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-2.5 py-0.5 text-xs font-medium text-gray-500 ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:ring-gray-700">
+      <span className="h-1.5 w-1.5 rounded-full bg-gray-400 dark:bg-gray-500" />
+      Not sent
+    </span>
+  );
+}
+
 function SkeletonRows() {
   return (
     <>
@@ -84,6 +108,9 @@ function SkeletonRows() {
           </td>
           <td className="px-5 py-4">
             <div className="h-3.5 w-20 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+          </td>
+          <td className="px-5 py-4">
+            <div className="h-5 w-20 animate-pulse rounded-full bg-gray-100 dark:bg-gray-800" />
           </td>
           <td className="px-5 py-4">
             <div className="h-5 w-20 animate-pulse rounded-full bg-gray-100 dark:bg-gray-800" />
@@ -137,6 +164,142 @@ function ResultBanner({ result, onDismiss }: { result: SendResult; onDismiss: ()
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
           </svg>
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Test Email Modal ───────────────────────────────────────────────────────────
+
+interface TestEmailModalProps {
+  is_loading: boolean;
+  on_send: (email: string) => void;
+  on_close: () => void;
+  success_message: string | null;
+  error_message: string | null;
+}
+
+function TestEmailModal({ is_loading, on_send, on_close, success_message, error_message }: TestEmailModalProps) {
+  const [email, setEmail] = useState("");
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (email.trim()) on_send(email.trim());
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div
+        className="fixed inset-0 bg-black/40 backdrop-blur-sm dark:bg-black/60"
+        onClick={!is_loading ? on_close : undefined}
+      />
+      <div className="relative z-10 w-full max-w-md rounded-2xl bg-white shadow-2xl dark:bg-gray-900">
+
+        {/* Header */}
+        <div className="flex items-start gap-4 border-b border-gray-100 px-6 py-5 dark:border-gray-800">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-50 dark:bg-violet-500/15">
+            <svg className="h-6 w-6 text-violet-600 dark:text-violet-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white">Send Test Welcome Email</h2>
+            <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+              Preview the welcome email format before sending to real clients.
+            </p>
+          </div>
+          <button
+            onClick={on_close}
+            disabled={is_loading}
+            className="shrink-0 text-gray-400 hover:text-gray-600 disabled:opacity-40 dark:text-gray-500 dark:hover:text-gray-300"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Body */}
+        <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
+
+          {/* Info note */}
+          <div className="rounded-xl border border-violet-100 bg-violet-50/60 px-4 py-3 dark:border-violet-500/20 dark:bg-violet-500/5">
+            <div className="flex items-start gap-2">
+              <svg className="mt-0.5 h-4 w-4 shrink-0 text-violet-500 dark:text-violet-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+              </svg>
+              <p className="text-xs text-violet-700 dark:text-violet-300">
+                A sample welcome email with a placeholder reset link will be delivered to the address you enter below. No client records are affected.
+              </p>
+            </div>
+          </div>
+
+          {/* Email input */}
+          <div>
+            <label htmlFor="test-email-input" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Recipient email address
+            </label>
+            <input
+              id="test-email-input"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              disabled={is_loading}
+              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 shadow-sm transition focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-200 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500 dark:focus:border-violet-500 dark:focus:ring-violet-500/20"
+            />
+          </div>
+
+          {/* Success / error feedback */}
+          {success_message && (
+            <div className="flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
+              <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+              </svg>
+              {success_message}
+            </div>
+          )}
+          {error_message && (
+            <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">
+              {error_message}
+            </div>
+          )}
+
+          {/* Footer actions */}
+          <div className="flex items-center justify-end gap-3 pt-1">
+            <button
+              type="button"
+              onClick={on_close}
+              disabled={is_loading}
+              className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+            >
+              Close
+            </button>
+            <button
+              type="submit"
+              disabled={is_loading || !email.trim()}
+              className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-violet-500 dark:hover:bg-violet-600"
+            >
+              {is_loading ? (
+                <>
+                  <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Sending…
+                </>
+              ) : (
+                <>
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
+                  </svg>
+                  Send Test Email
+                </>
+              )}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
@@ -301,6 +464,11 @@ export default function AdminWelcomeEmailsContent() {
   const [send_error, setSendError] = useState<string | null>(null);
   const [send_result, setSendResult] = useState<SendResult | null>(null);
 
+  const [show_test_modal, setShowTestModal] = useState(false);
+  const [is_sending_test, setIsSendingTest] = useState(false);
+  const [test_success, setTestSuccess] = useState<string | null>(null);
+  const [test_error, setTestError] = useState<string | null>(null);
+
   useEffect(() => {
     setPage(1);
   }, [debounced_search, sort_field, sort_direction, password_reset_status, date_from, date_to]);
@@ -425,6 +593,29 @@ export default function AdminWelcomeEmailsContent() {
     }
   }
 
+  // ── Test email handlers ────────────────────────────────────────────────────
+
+  function openTestModal() {
+    setTestSuccess(null);
+    setTestError(null);
+    setShowTestModal(true);
+  }
+
+  async function handleSendTestEmail(email: string) {
+    setIsSendingTest(true);
+    setTestSuccess(null);
+    setTestError(null);
+
+    try {
+      const result = await sendTestWelcomeEmail({ email });
+      setTestSuccess(result.message);
+    } catch {
+      setTestError("Failed to send test email. Please try again.");
+    } finally {
+      setIsSendingTest(false);
+    }
+  }
+
   // ── Derived ────────────────────────────────────────────────────────────────
 
   const selected_count = selected_ids.size;
@@ -457,7 +648,7 @@ export default function AdminWelcomeEmailsContent() {
           </p>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           {selected_count > 0 && (
             <button
               onClick={clearSelection}
@@ -466,6 +657,16 @@ export default function AdminWelcomeEmailsContent() {
               Clear selection ({selected_count})
             </button>
           )}
+
+          <button
+            onClick={openTestModal}
+            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" />
+            </svg>
+            Send Test Email
+          </button>
 
           <button
             onClick={openSendAll}
@@ -555,6 +756,9 @@ export default function AdminWelcomeEmailsContent() {
                   Joined
                 </th>
                 <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  Welcome Email
+                </th>
+                <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   Password Reset
                 </th>
               </tr>
@@ -564,7 +768,7 @@ export default function AdminWelcomeEmailsContent() {
                 <SkeletonRows />
               ) : clients.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-5 py-16 text-center">
+                  <td colSpan={6} className="px-5 py-16 text-center">
                     <div className="flex flex-col items-center gap-2">
                       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
                         <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -633,6 +837,11 @@ export default function AdminWelcomeEmailsContent() {
                         })}
                       </td>
 
+                      {/* Welcome email status */}
+                      <td className="px-5 py-4">
+                        <WelcomeEmailBadge sent_at={client.welcome_email_sent_at} />
+                      </td>
+
                       {/* Password reset status */}
                       <td className="px-5 py-4">
                         <PasswordResetBadge has_reset={has_reset} reset_at={client.password_reset_at} />
@@ -683,6 +892,17 @@ export default function AdminWelcomeEmailsContent() {
           is_loading={is_sending}
           onConfirm={handleConfirmSend}
           onClose={() => !is_sending && setShowConfirm(false)}
+        />
+      )}
+
+      {/* ── Test email modal ── */}
+      {show_test_modal && (
+        <TestEmailModal
+          is_loading={is_sending_test}
+          on_send={handleSendTestEmail}
+          on_close={() => !is_sending_test && setShowTestModal(false)}
+          success_message={test_success}
+          error_message={test_error}
         />
       )}
     </div>
