@@ -234,9 +234,27 @@ function BatchProgressPanel({ batch, is_stopping, onStop, onDismiss }: BatchProg
             </div>
 
             {batch.status === "processing" && (
-              <p className="mt-1.5 text-xs text-indigo-600 dark:text-indigo-400">
-                Emails are being queued and sent progressively. You can stop at any time.
-              </p>
+              <div className="mt-1.5 space-y-0.5">
+                <p className="text-xs text-indigo-600 dark:text-indigo-400">
+                  Emails are sent one at a time with a {batch.throttle_delay ?? 3}s delay between each to avoid SMTP rate limits.
+                </p>
+                {batch.estimated_seconds !== undefined && batch.estimated_seconds > 0 && (() => {
+                  const remaining_seconds = Math.max(
+                    0,
+                    batch.estimated_seconds - (batch.processed_count * (batch.throttle_delay ?? 3))
+                  );
+                  const mins = Math.floor(remaining_seconds / 60);
+                  const secs = remaining_seconds % 60;
+                  const eta = mins > 0
+                    ? `~${mins}m ${secs}s remaining`
+                    : remaining_seconds > 0
+                    ? `~${secs}s remaining`
+                    : "finishing soon…";
+                  return (
+                    <p className="text-xs text-indigo-500 dark:text-indigo-500">{eta}</p>
+                  );
+                })()}
+              </div>
             )}
           </div>
         </div>
@@ -512,7 +530,7 @@ function ConfirmSendModal({ count, send_to_all, pending_count, is_loading, onCon
                   </svg>
                 </div>
                 <p className="text-sm text-gray-600 dark:text-gray-300">
-                  Emails are sent <span className="font-medium text-gray-900 dark:text-white">progressively in the background</span> at a controlled rate. You can stop the process at any time.
+                  Emails are sent <span className="font-medium text-gray-900 dark:text-white">one at a time with a delay</span> between each send to respect SMTP provider rate limits. Large batches may take several minutes. You can stop at any time.
                 </p>
               </li>
             </ul>
@@ -772,6 +790,8 @@ export default function AdminWelcomeEmailsContent() {
         processed_count: 0,
         completed_at: null,
         stopped_at: null,
+        throttle_delay: response.throttle_delay,
+        estimated_seconds: response.estimated_seconds,
       };
 
       setActiveBatch(initial_batch);

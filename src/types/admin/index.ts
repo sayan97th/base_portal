@@ -530,6 +530,8 @@ export interface StartBulkWelcomeEmailResponse {
   batch_id: number;
   total_count: number;
   status: BulkEmailBatchStatus;
+  throttle_delay: number;
+  estimated_seconds: number;
 }
 
 export interface BulkEmailBatch {
@@ -542,6 +544,8 @@ export interface BulkEmailBatch {
   processed_count: number;
   completed_at: string | null;
   stopped_at: string | null;
+  throttle_delay?: number;
+  estimated_seconds?: number;
 }
 
 export interface StopBulkEmailBatchResponse {
