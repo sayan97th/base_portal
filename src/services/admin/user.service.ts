@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api-client";
-import type { AdminUser, AdminUserFilters, AdminClientFilters, AdminUserOrderSummary, PaginatedResponse, CreateClientPayload, CreateClientResponse, BulkWelcomeEmailPayload, BulkWelcomeEmailResponse, SendTestWelcomeEmailPayload, SendTestWelcomeEmailResponse, PendingClientsCountResponse } from "@/types/admin";
+import type { AdminUser, AdminUserFilters, AdminClientFilters, AdminUserOrderSummary, PaginatedResponse, CreateClientPayload, CreateClientResponse, BulkWelcomeEmailPayload, StartBulkWelcomeEmailResponse, BulkEmailBatch, StopBulkEmailBatchResponse, SendTestWelcomeEmailPayload, SendTestWelcomeEmailResponse, PendingClientsCountResponse } from "@/types/admin";
 
 export interface BanUserResponse {
   message: string;
@@ -111,16 +111,40 @@ export async function createAdminClient(
 }
 
 /**
- * Send the platform welcome email (with password-reset link) to a selected
- * set of clients, or to every client who has not yet logged in.
+ * Queue a progressive bulk welcome email send for a set of clients or all pending.
+ * Returns immediately with a batch_id — poll getBulkEmailBatchStatus for progress.
  * Roles allowed: super_admin, admin.
  */
-export async function sendBulkWelcomeEmail(
+export async function startBulkWelcomeEmail(
   payload: BulkWelcomeEmailPayload
-): Promise<BulkWelcomeEmailResponse> {
-  return apiClient.post<BulkWelcomeEmailResponse>(
+): Promise<StartBulkWelcomeEmailResponse> {
+  return apiClient.post<StartBulkWelcomeEmailResponse>(
     `/api/admin/clients/bulk-welcome-email`,
     payload
+  );
+}
+
+/**
+ * Poll the current progress of a bulk email batch.
+ * Roles allowed: super_admin, admin.
+ */
+export async function getBulkEmailBatchStatus(
+  batch_id: number
+): Promise<BulkEmailBatch> {
+  return apiClient.get<BulkEmailBatch>(
+    `/api/admin/clients/bulk-email-batch/${batch_id}`
+  );
+}
+
+/**
+ * Stop an in-progress bulk email batch. Jobs already dequeued may still send.
+ * Roles allowed: super_admin, admin.
+ */
+export async function stopBulkEmailBatch(
+  batch_id: number
+): Promise<StopBulkEmailBatchResponse> {
+  return apiClient.post<StopBulkEmailBatchResponse>(
+    `/api/admin/clients/bulk-email-batch/${batch_id}/stop`
   );
 }
 

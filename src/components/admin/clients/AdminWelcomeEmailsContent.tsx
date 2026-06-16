@@ -1,9 +1,22 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
-import { listAdminClients, sendBulkWelcomeEmail, sendTestWelcomeEmail, getPendingClientsCount } from "@/services/admin/user.service";
-import type { AdminUser, ClientSortField, PasswordResetStatusFilter, SortDirection } from "@/types/admin";
+import {
+  listAdminClients,
+  startBulkWelcomeEmail,
+  sendTestWelcomeEmail,
+  getPendingClientsCount,
+  getBulkEmailBatchStatus,
+  stopBulkEmailBatch,
+} from "@/services/admin/user.service";
+import type {
+  AdminUser,
+  ClientSortField,
+  PasswordResetStatusFilter,
+  SortDirection,
+  BulkEmailBatch,
+} from "@/types/admin";
 import { useDebounce } from "@/hooks/useDebounce";
 import WelcomeEmailsFiltersBar from "@/components/admin/clients/WelcomeEmailsFiltersBar";
 
@@ -121,49 +134,151 @@ function SkeletonRows() {
   );
 }
 
-// ── Result banner ──────────────────────────────────────────────────────────────
+// ── Batch Progress Panel ───────────────────────────────────────────────────────
 
-interface SendResult {
-  sent: number;
-  skipped: number;
-  failed: number;
+interface BatchProgressPanelProps {
+  batch: BulkEmailBatch;
+  is_stopping: boolean;
+  onStop: () => void;
+  onDismiss: () => void;
 }
 
-function ResultBanner({ result, onDismiss }: { result: SendResult; onDismiss: () => void }) {
+function BatchProgressPanel({ batch, is_stopping, onStop, onDismiss }: BatchProgressPanelProps) {
+  const is_done = batch.status === "completed" || batch.status === "stopped";
+  const progress_pct = batch.total_count > 0
+    ? Math.min(100, Math.round((batch.processed_count / batch.total_count) * 100))
+    : 0;
+
+  const status_color = batch.status === "completed"
+    ? "border-teal-200 bg-teal-50 dark:border-teal-500/20 dark:bg-teal-500/10"
+    : batch.status === "stopped"
+    ? "border-amber-200 bg-amber-50 dark:border-amber-500/20 dark:bg-amber-500/10"
+    : "border-indigo-200 bg-indigo-50 dark:border-indigo-500/20 dark:bg-indigo-500/10";
+
+  const bar_color = batch.status === "completed"
+    ? "bg-teal-500"
+    : batch.status === "stopped"
+    ? "bg-amber-500"
+    : "bg-indigo-500";
+
+  const title_color = batch.status === "completed"
+    ? "text-teal-800 dark:text-teal-300"
+    : batch.status === "stopped"
+    ? "text-amber-800 dark:text-amber-300"
+    : "text-indigo-800 dark:text-indigo-300";
+
+  const title = batch.status === "completed"
+    ? "Email blast completed"
+    : batch.status === "stopped"
+    ? "Email blast stopped"
+    : "Sending emails in progress…";
+
   return (
-    <div className="rounded-xl border border-teal-200 bg-teal-50 px-5 py-4 dark:border-teal-500/20 dark:bg-teal-500/10">
+    <div className={`rounded-xl border px-5 py-4 ${status_color}`}>
       <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-teal-100 dark:bg-teal-500/20">
-            <svg className="h-5 w-5 text-teal-600 dark:text-teal-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-            </svg>
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+
+          {/* Icon */}
+          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/60 dark:bg-white/10">
+            {batch.status === "processing" ? (
+              <svg className="h-5 w-5 animate-spin text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            ) : batch.status === "completed" ? (
+              <svg className="h-5 w-5 text-teal-600 dark:text-teal-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+              </svg>
+            ) : (
+              <svg className="h-5 w-5 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 7.5A2.25 2.25 0 0 1 7.5 5.25h9a2.25 2.25 0 0 1 2.25 2.25v9a2.25 2.25 0 0 1-2.25 2.25h-9a2.25 2.25 0 0 1-2.25-2.25v-9Z" />
+              </svg>
+            )}
           </div>
-          <div>
-            <p className="text-sm font-semibold text-teal-800 dark:text-teal-300">Email blast completed</p>
-            <p className="mt-0.5 text-xs text-teal-600 dark:text-teal-400">
-              <span className="font-medium">{result.sent} sent</span>
-              {result.skipped > 0 && (
-                <span className="ml-2 text-amber-600 dark:text-amber-400">
-                  {result.skipped} skipped (already reset)
+
+          {/* Content */}
+          <div className="min-w-0 flex-1">
+            <p className={`text-sm font-semibold ${title_color}`}>{title}</p>
+
+            {/* Progress bar */}
+            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-white/50 dark:bg-black/20">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${bar_color}`}
+                style={{ width: `${progress_pct}%` }}
+              />
+            </div>
+
+            {/* Stats row */}
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+              <span className="text-gray-600 dark:text-gray-400">
+                <span className="font-semibold text-gray-900 dark:text-white">{batch.processed_count}</span>
+                {" / "}{batch.total_count} processed
+                {" "}
+                <span className="text-gray-400">({progress_pct}%)</span>
+              </span>
+              {batch.sent_count > 0 && (
+                <span className="text-teal-600 dark:text-teal-400">
+                  <span className="font-semibold">{batch.sent_count}</span> sent
                 </span>
               )}
-              {result.failed > 0 && (
-                <span className="ml-2 text-red-600 dark:text-red-400">
-                  {result.failed} failed
+              {batch.skipped_count > 0 && (
+                <span className="text-amber-600 dark:text-amber-400">
+                  <span className="font-semibold">{batch.skipped_count}</span> skipped
                 </span>
               )}
-            </p>
+              {batch.failed_count > 0 && (
+                <span className="text-red-600 dark:text-red-400">
+                  <span className="font-semibold">{batch.failed_count}</span> failed
+                </span>
+              )}
+            </div>
+
+            {batch.status === "processing" && (
+              <p className="mt-1.5 text-xs text-indigo-600 dark:text-indigo-400">
+                Emails are being queued and sent progressively. You can stop at any time.
+              </p>
+            )}
           </div>
         </div>
-        <button
-          onClick={onDismiss}
-          className="shrink-0 text-teal-500 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-200"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-          </svg>
-        </button>
+
+        {/* Actions */}
+        <div className="flex shrink-0 items-center gap-2">
+          {batch.status === "processing" && (
+            <button
+              onClick={onStop}
+              disabled={is_stopping}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 shadow-sm transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-500/30 dark:bg-gray-900 dark:text-red-400 dark:hover:bg-red-500/10"
+            >
+              {is_stopping ? (
+                <>
+                  <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Stopping…
+                </>
+              ) : (
+                <>
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 7.5A2.25 2.25 0 0 1 7.5 5.25h9a2.25 2.25 0 0 1 2.25 2.25v9a2.25 2.25 0 0 1-2.25 2.25h-9a2.25 2.25 0 0 1-2.25-2.25v-9Z" />
+                  </svg>
+                  Stop sending
+                </>
+              )}
+            </button>
+          )}
+
+          {is_done && (
+            <button
+              onClick={onDismiss}
+              className="shrink-0 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -222,7 +337,6 @@ function TestEmailModal({ is_loading, on_send, on_close, success_message, error_
         {/* Body */}
         <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
 
-          {/* Info note */}
           <div className="rounded-xl border border-violet-100 bg-violet-50/60 px-4 py-3 dark:border-violet-500/20 dark:bg-violet-500/5">
             <div className="flex items-start gap-2">
               <svg className="mt-0.5 h-4 w-4 shrink-0 text-violet-500 dark:text-violet-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
@@ -234,7 +348,6 @@ function TestEmailModal({ is_loading, on_send, on_close, success_message, error_
             </div>
           </div>
 
-          {/* Email input */}
           <div>
             <label htmlFor="test-email-input" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
               Recipient email address
@@ -251,7 +364,6 @@ function TestEmailModal({ is_loading, on_send, on_close, success_message, error_
             />
           </div>
 
-          {/* Success / error feedback */}
           {success_message && (
             <div className="flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
               <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -266,7 +378,6 @@ function TestEmailModal({ is_loading, on_send, on_close, success_message, error_
             </div>
           )}
 
-          {/* Footer actions */}
           <div className="flex items-center justify-end gap-3 pt-1">
             <button
               type="button"
@@ -351,7 +462,6 @@ function ConfirmSendModal({ count, send_to_all, pending_count, is_loading, onCon
         {/* Body */}
         <div className="space-y-4 px-6 py-5">
 
-          {/* Recipient count highlight — only for send_to_all */}
           {send_to_all && recipients !== null && (
             <div className="flex items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 dark:border-indigo-500/30 dark:bg-indigo-500/10">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-500/20">
@@ -370,7 +480,6 @@ function ConfirmSendModal({ count, send_to_all, pending_count, is_loading, onCon
             </div>
           )}
 
-          {/* What will happen */}
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
               What will happen
@@ -397,19 +506,18 @@ function ConfirmSendModal({ count, send_to_all, pending_count, is_loading, onCon
                 </p>
               </li>
               <li className="flex items-start gap-2.5">
-                <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
-                  <svg className="h-3 w-3 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-teal-50 dark:bg-teal-500/15">
+                  <svg className="h-3 w-3 text-teal-600 dark:text-teal-400" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                   </svg>
                 </div>
                 <p className="text-sm text-gray-600 dark:text-gray-300">
-                  Emails are sent <span className="font-medium text-gray-900 dark:text-white">immediately</span> and cannot be recalled once dispatched.
+                  Emails are sent <span className="font-medium text-gray-900 dark:text-white">progressively in the background</span> at a controlled rate. You can stop the process at any time.
                 </p>
               </li>
             </ul>
           </div>
 
-          {/* Audience summary */}
           <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 px-4 py-3 dark:border-indigo-500/20 dark:bg-indigo-500/5">
             <div className="flex items-center gap-2">
               <svg className="h-4 w-4 shrink-0 text-indigo-500 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
@@ -444,7 +552,7 @@ function ConfirmSendModal({ count, send_to_all, pending_count, is_loading, onCon
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                Sending…
+                Starting…
               </>
             ) : (
               <>
@@ -462,6 +570,8 @@ function ConfirmSendModal({ count, send_to_all, pending_count, is_loading, onCon
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────────
+
+const POLL_INTERVAL_MS = 2500;
 
 export default function AdminWelcomeEmailsContent() {
   const [clients, setClients] = useState<AdminUser[]>([]);
@@ -486,9 +596,13 @@ export default function AdminWelcomeEmailsContent() {
   const [confirm_send_all, setConfirmSendAll] = useState(false);
   const [pending_count, setPendingCount] = useState<number | null>(null);
   const [is_fetching_pending_count, setIsFetchingPendingCount] = useState(false);
-  const [is_sending, setIsSending] = useState(false);
-  const [send_error, setSendError] = useState<string | null>(null);
-  const [send_result, setSendResult] = useState<SendResult | null>(null);
+  const [is_starting, setIsStarting] = useState(false);
+  const [start_error, setStartError] = useState<string | null>(null);
+
+  // ── Batch progress state ──────────────────────────────────────────────────
+  const [active_batch, setActiveBatch] = useState<BulkEmailBatch | null>(null);
+  const [is_stopping, setIsStopping] = useState(false);
+  const poll_ref = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [show_test_modal, setShowTestModal] = useState(false);
   const [is_sending_test, setIsSendingTest] = useState(false);
@@ -536,7 +650,36 @@ export default function AdminWelcomeEmailsContent() {
     return loadClients();
   }, [loadClients]);
 
-  // ── Selection handlers ─────────────────────────────────────────────────────
+  // ── Batch polling ─────────────────────────────────────────────────────────
+
+  const stopPolling = useCallback(() => {
+    if (poll_ref.current) {
+      clearInterval(poll_ref.current);
+      poll_ref.current = null;
+    }
+  }, []);
+
+  const startPolling = useCallback((batch_id: number) => {
+    stopPolling();
+    poll_ref.current = setInterval(async () => {
+      try {
+        const updated = await getBulkEmailBatchStatus(batch_id);
+        setActiveBatch(updated);
+        if (updated.status !== "processing") {
+          stopPolling();
+          loadClients();
+        }
+      } catch {
+        // keep polling silently on transient errors
+      }
+    }, POLL_INTERVAL_MS);
+  }, [stopPolling, loadClients]);
+
+  useEffect(() => {
+    return () => stopPolling();
+  }, [stopPolling]);
+
+  // ── Selection handlers ────────────────────────────────────────────────────
 
   function toggleClient(id: number) {
     setSelectedIds((prev) => {
@@ -584,16 +727,16 @@ export default function AdminWelcomeEmailsContent() {
     setSortDirection(direction);
   }
 
-  // ── Send handlers ──────────────────────────────────────────────────────────
+  // ── Send handlers ─────────────────────────────────────────────────────────
 
   function openSendSelected() {
-    setSendError(null);
+    setStartError(null);
     setConfirmSendAll(false);
     setShowConfirm(true);
   }
 
   async function openSendAll() {
-    setSendError(null);
+    setStartError(null);
     setConfirmSendAll(true);
     setPendingCount(null);
     setIsFetchingPendingCount(true);
@@ -609,27 +752,61 @@ export default function AdminWelcomeEmailsContent() {
   }
 
   async function handleConfirmSend() {
-    setIsSending(true);
-    setSendError(null);
+    setIsStarting(true);
+    setStartError(null);
 
     try {
       const payload = confirm_send_all
         ? { send_to_all: true }
         : { user_ids: Array.from(selected_ids) };
 
-      const result = await sendBulkWelcomeEmail(payload);
-      setSendResult({ sent: result.sent, skipped: result.skipped, failed: result.failed });
+      const response = await startBulkWelcomeEmail(payload);
+
+      const initial_batch: BulkEmailBatch = {
+        batch_id: response.batch_id,
+        status: response.status,
+        total_count: response.total_count,
+        sent_count: 0,
+        skipped_count: 0,
+        failed_count: 0,
+        processed_count: 0,
+        completed_at: null,
+        stopped_at: null,
+      };
+
+      setActiveBatch(initial_batch);
       setShowConfirm(false);
       clearSelection();
-      loadClients();
+      startPolling(response.batch_id);
     } catch {
-      setSendError("Something went wrong sending the emails. Please try again.");
+      setStartError("Something went wrong starting the email blast. Please try again.");
     } finally {
-      setIsSending(false);
+      setIsStarting(false);
     }
   }
 
-  // ── Test email handlers ────────────────────────────────────────────────────
+  async function handleStopBatch() {
+    if (!active_batch) return;
+    setIsStopping(true);
+    try {
+      await stopBulkEmailBatch(active_batch.batch_id);
+      const updated = await getBulkEmailBatchStatus(active_batch.batch_id);
+      setActiveBatch(updated);
+      stopPolling();
+      loadClients();
+    } catch {
+      // swallow — the poll will pick up the stopped status anyway
+    } finally {
+      setIsStopping(false);
+    }
+  }
+
+  function dismissBatch() {
+    stopPolling();
+    setActiveBatch(null);
+  }
+
+  // ── Test email handlers ───────────────────────────────────────────────────
 
   function openTestModal() {
     setTestSuccess(null);
@@ -652,9 +829,10 @@ export default function AdminWelcomeEmailsContent() {
     }
   }
 
-  // ── Derived ────────────────────────────────────────────────────────────────
+  // ── Derived ───────────────────────────────────────────────────────────────
 
   const selected_count = selected_ids.size;
+  const is_blast_active = active_batch?.status === "processing";
 
   return (
     <div className="space-y-5">
@@ -685,7 +863,7 @@ export default function AdminWelcomeEmailsContent() {
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          {selected_count > 0 && (
+          {selected_count > 0 && !is_blast_active && (
             <button
               onClick={clearSelection}
               className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
@@ -706,7 +884,8 @@ export default function AdminWelcomeEmailsContent() {
 
           <button
             onClick={openSendAll}
-            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
+            disabled={is_blast_active}
+            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 shadow-sm transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
@@ -716,7 +895,7 @@ export default function AdminWelcomeEmailsContent() {
 
           <button
             onClick={openSendSelected}
-            disabled={selected_count === 0}
+            disabled={selected_count === 0 || is_blast_active}
             className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-indigo-500 dark:hover:bg-indigo-600"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -732,9 +911,14 @@ export default function AdminWelcomeEmailsContent() {
         </div>
       </div>
 
-      {/* ── Result banner ── */}
-      {send_result && (
-        <ResultBanner result={send_result} onDismiss={() => setSendResult(null)} />
+      {/* ── Batch progress panel ── */}
+      {active_batch && (
+        <BatchProgressPanel
+          batch={active_batch}
+          is_stopping={is_stopping}
+          onStop={handleStopBatch}
+          onDismiss={dismissBatch}
+        />
       )}
 
       {/* ── Error banners ── */}
@@ -743,9 +927,9 @@ export default function AdminWelcomeEmailsContent() {
           {error}
         </div>
       )}
-      {send_error && (
+      {start_error && (
         <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">
-          {send_error}
+          {start_error}
         </div>
       )}
 
@@ -925,9 +1109,10 @@ export default function AdminWelcomeEmailsContent() {
         <ConfirmSendModal
           count={selected_count}
           send_to_all={confirm_send_all}
-          is_loading={is_sending}
+          pending_count={pending_count}
+          is_loading={is_starting || is_fetching_pending_count}
           onConfirm={handleConfirmSend}
-          onClose={() => !is_sending && setShowConfirm(false)}
+          onClose={() => !is_starting && setShowConfirm(false)}
         />
       )}
 

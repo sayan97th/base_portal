@@ -524,11 +524,33 @@ export interface BulkWelcomeEmailPayload {
   user_ids?: number[];
 }
 
-export interface BulkWelcomeEmailResponse {
+export type BulkEmailBatchStatus = "processing" | "completed" | "stopped";
+
+export interface StartBulkWelcomeEmailResponse {
+  batch_id: number;
+  total_count: number;
+  status: BulkEmailBatchStatus;
+}
+
+export interface BulkEmailBatch {
+  batch_id: number;
+  status: BulkEmailBatchStatus;
+  total_count: number;
+  sent_count: number;
+  skipped_count: number;
+  failed_count: number;
+  processed_count: number;
+  completed_at: string | null;
+  stopped_at: string | null;
+}
+
+export interface StopBulkEmailBatchResponse {
   message: string;
-  sent: number;
-  skipped: number;
-  failed: number;
+  batch_id: number;
+  status: BulkEmailBatchStatus;
+  sent_count: number;
+  skipped_count: number;
+  failed_count: number;
 }
 
 export interface SendTestWelcomeEmailPayload {
