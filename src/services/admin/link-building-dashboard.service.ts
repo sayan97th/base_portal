@@ -238,6 +238,8 @@ export interface ImportStatus {
   /** Number of rows whose "Link Builder" column matched an admin user and were auto-assigned. */
   assigned?: number;
   errors: Array<{ order_id: string; message: string }>;
+  /** Per-row skip details (up to 100 entries). Explains exactly why each record was not imported. */
+  skipped_records?: Array<{ order_id: string; reason: string }>;
 }
 
 export interface ImportStartResponse {
