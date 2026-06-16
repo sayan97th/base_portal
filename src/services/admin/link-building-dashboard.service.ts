@@ -257,6 +257,8 @@ export interface ImportOptions {
   date_to?: string;
   /** Controls which link types are imported. Defaults to 'external_only'. */
   link_type_filter: "external_only" | "internal_only" | "all";
+  /** When true, rows whose order_id already exists are left untouched and counted as skipped instead of being updated. Defaults to false. */
+  only_new_records: boolean;
 }
 
 /**
@@ -284,6 +286,7 @@ export function importLinkBuildingOrders(
       form_data.append("date_to", options.date_to);
     }
     form_data.append("link_type_filter", options.link_type_filter);
+    form_data.append("only_new_records", options.only_new_records ? "1" : "0");
 
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `${base}/api/admin/link-building-orders/import`);

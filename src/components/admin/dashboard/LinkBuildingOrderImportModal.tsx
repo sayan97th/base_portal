@@ -152,6 +152,7 @@ export default function LinkBuildingOrderImportModal({ is_open, onClose, onImpor
   const [custom_date_to, setCustomDateTo]          = useState<string>("");
   const [include_external, setIncludeExternal]     = useState(true);
   const [include_internal, setIncludeInternal]     = useState(false);
+  const [only_new_records, setOnlyNewRecords]      = useState(false);
 
   const file_input_ref  = useRef<HTMLInputElement>(null);
   const poll_timer_ref  = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -185,8 +186,8 @@ export default function LinkBuildingOrderImportModal({ is_open, onClose, onImpor
       link_type_filter = "external_only";
     }
 
-    return { apply_date_filter, date_from, date_to, link_type_filter };
-  }, [date_mode, custom_date_from, custom_date_to, include_external, include_internal]);
+    return { apply_date_filter, date_from, date_to, link_type_filter, only_new_records };
+  }, [date_mode, custom_date_from, custom_date_to, include_external, include_internal, only_new_records]);
 
   // ── Reset on close ──────────────────────────────────────────────────────────
 
@@ -210,6 +211,7 @@ export default function LinkBuildingOrderImportModal({ is_open, onClose, onImpor
     setCustomDateTo("");
     setIncludeExternal(true);
     setIncludeInternal(false);
+    setOnlyNewRecords(false);
   }, []);
 
   const handleClose = useCallback(() => {
@@ -364,6 +366,8 @@ export default function LinkBuildingOrderImportModal({ is_open, onClose, onImpor
       : include_internal
       ? "Internal only"
       : "None selected";
+
+  const import_mode_summary = only_new_records ? "New records only" : "Create & update";
 
   // ── JSX ─────────────────────────────────────────────────────────────────────
 
@@ -529,7 +533,7 @@ export default function LinkBuildingOrderImportModal({ is_open, onClose, onImpor
                   <div className="flex items-center gap-3">
                     {!show_advanced && (
                       <span className="text-[10px] text-gray-400 dark:text-gray-500">
-                        {date_summary} · {link_summary}
+                        {date_summary} · {link_summary} · {import_mode_summary}
                       </span>
                     )}
                     <svg
@@ -660,6 +664,35 @@ export default function LinkBuildingOrderImportModal({ is_open, onClose, onImpor
                           At least one link type must be selected.
                         </p>
                       )}
+                    </div>
+
+                    {/* Divider */}
+                    <div className="border-t border-gray-200 dark:border-gray-700" />
+
+                    {/* Import Mode */}
+                    <div className="space-y-2.5">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        Import Mode
+                      </p>
+                      <label className="flex cursor-pointer items-start gap-2.5">
+                        <input
+                          type="checkbox"
+                          checked={only_new_records}
+                          onChange={(e) => setOnlyNewRecords(e.target.checked)}
+                          className="mt-0.5 rounded accent-brand-500"
+                        />
+                        <div>
+                          <span className="text-xs font-medium text-gray-700 dark:text-gray-200">
+                            Import new records only
+                          </span>
+                          <p className="mt-0.5 text-[10px] text-gray-400 dark:text-gray-500">
+                            Rows whose Order ID already exists are left completely untouched
+                            and counted as skipped. Existing records are never updated, even
+                            if their values changed in the file. New rows are still subject
+                            to the Date Range and Link Type Filter above.
+                          </p>
+                        </div>
+                      </label>
                     </div>
                   </div>
                 )}
