@@ -41,7 +41,7 @@ function ClientAvatar({ user }: { user: AdminUser }) {
 function PasswordResetBadge({ has_reset, reset_at }: { has_reset: boolean; reset_at: string | null }) {
   if (has_reset && reset_at) {
     return (
-      <div className="flex flex-col gap-0.5">
+      <div className="inline-flex flex-col gap-0.5">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20">
           <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
@@ -65,7 +65,7 @@ function PasswordResetBadge({ has_reset, reset_at }: { has_reset: boolean; reset
 function WelcomeEmailBadge({ sent_at }: { sent_at: string | null }) {
   if (sent_at) {
     return (
-      <div className="flex flex-col gap-0.5">
+      <div className="inline-flex flex-col gap-0.5">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700 ring-1 ring-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-400 dark:ring-indigo-500/20">
           <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
@@ -91,11 +91,11 @@ function SkeletonRows() {
     <>
       {Array.from({ length: 8 }).map((_, i) => (
         <tr key={i}>
-          <td className="px-5 py-4">
+          <td className="px-5 py-4 align-top">
             <div className="h-4 w-4 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
           </td>
-          <td className="px-5 py-4">
-            <div className="flex items-center gap-3">
+          <td className="px-5 py-4 align-top">
+            <div className="flex items-start gap-3">
               <div className="h-9 w-9 animate-pulse rounded-full bg-gray-100 dark:bg-gray-800" />
               <div className="space-y-1.5">
                 <div className="h-3.5 w-28 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
@@ -103,16 +103,16 @@ function SkeletonRows() {
               </div>
             </div>
           </td>
-          <td className="px-5 py-4">
+          <td className="px-5 py-4 align-top">
             <div className="h-3.5 w-28 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
           </td>
-          <td className="px-5 py-4">
+          <td className="px-5 py-4 align-top">
             <div className="h-3.5 w-20 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
           </td>
-          <td className="px-5 py-4">
+          <td className="px-5 py-4 align-top">
             <div className="h-5 w-20 animate-pulse rounded-full bg-gray-100 dark:bg-gray-800" />
           </td>
-          <td className="px-5 py-4">
+          <td className="px-5 py-4 align-top">
             <div className="h-5 w-20 animate-pulse rounded-full bg-gray-100 dark:bg-gray-800" />
           </td>
         </tr>
@@ -797,7 +797,7 @@ export default function AdminWelcomeEmailsContent() {
                       onClick={() => toggleClient(client.id)}
                     >
                       {/* Checkbox */}
-                      <td className="w-12 px-5 py-4" onClick={(e) => e.stopPropagation()}>
+                      <td className="w-12 align-top px-5 py-4" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={is_checked}
@@ -807,8 +807,8 @@ export default function AdminWelcomeEmailsContent() {
                       </td>
 
                       {/* Client */}
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
+                      <td className="px-5 py-4 align-top">
+                        <div className="flex items-start gap-3">
                           <ClientAvatar user={client} />
                           <div className="min-w-0">
                             <p className="truncate font-medium text-gray-900 dark:text-white">
@@ -822,14 +822,14 @@ export default function AdminWelcomeEmailsContent() {
                       </td>
 
                       {/* Company */}
-                      <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-400">
+                      <td className="px-5 py-4 align-top text-sm text-gray-600 dark:text-gray-400">
                         {client.company ?? (
                           <span className="text-gray-300 dark:text-gray-600">—</span>
                         )}
                       </td>
 
                       {/* Joined */}
-                      <td className="px-5 py-4 text-sm text-gray-500 dark:text-gray-400">
+                      <td className="px-5 py-4 align-top text-sm text-gray-500 dark:text-gray-400">
                         {new Date(client.created_at).toLocaleDateString("en-US", {
                           month: "short",
                           day: "numeric",
@@ -838,12 +838,12 @@ export default function AdminWelcomeEmailsContent() {
                       </td>
 
                       {/* Welcome email status */}
-                      <td className="px-5 py-4">
+                      <td className="px-5 py-4 align-top">
                         <WelcomeEmailBadge sent_at={client.welcome_email_sent_at} />
                       </td>
 
                       {/* Password reset status */}
-                      <td className="px-5 py-4">
+                      <td className="px-5 py-4 align-top">
                         <PasswordResetBadge has_reset={has_reset} reset_at={client.password_reset_at} />
                       </td>
                     </tr>
