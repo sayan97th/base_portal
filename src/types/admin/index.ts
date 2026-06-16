@@ -519,8 +519,11 @@ export interface AdminUserOrderSummary {
 
 // ── Welcome Email Blast ───────────────────────────────────────────────────────
 
+export type BulkEmailSendMode = "not_sent" | "all_pending";
+
 export interface BulkWelcomeEmailPayload {
   send_to_all?: boolean;
+  send_mode?: BulkEmailSendMode;
   user_ids?: number[];
 }
 
@@ -566,7 +569,8 @@ export interface SendTestWelcomeEmailResponse {
 }
 
 export interface PendingClientsCountResponse {
-  pending_count: number;
+  not_sent_count: number;
+  password_reset_pending_count: number;
 }
 
 export type WelcomeEmailSentStatusFilter = "sent" | "not_sent" | "";

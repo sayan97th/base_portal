@@ -12,6 +12,7 @@ import {
 } from "@/services/admin/user.service";
 import type {
   AdminUser,
+  BulkEmailSendMode,
   ClientSortField,
   PasswordResetStatusFilter,
   SortDirection,
@@ -439,14 +440,35 @@ function TestEmailModal({ is_loading, on_send, on_close, success_message, error_
 interface ConfirmModalProps {
   count: number;
   send_to_all: boolean;
-  pending_count: number | null;
+  send_mode: BulkEmailSendMode;
+  on_send_mode_change: (mode: BulkEmailSendMode) => void;
+  not_sent_count: number | null;
+  password_reset_pending_count: number | null;
   is_loading: boolean;
   onConfirm: () => void;
   onClose: () => void;
 }
 
-function ConfirmSendModal({ count, send_to_all, pending_count, is_loading, onConfirm, onClose }: ConfirmModalProps) {
-  const recipients = send_to_all ? pending_count : count;
+function ConfirmSendModal({
+  count,
+  send_to_all,
+  send_mode,
+  on_send_mode_change,
+  not_sent_count,
+  password_reset_pending_count,
+  is_loading,
+  onConfirm,
+  onClose,
+}: ConfirmModalProps) {
+  const active_count = send_to_all
+    ? send_mode === "not_sent"
+      ? not_sent_count
+      : password_reset_pending_count
+    : count;
+
+  const skip_label = send_mode === "not_sent"
+    ? "Clients who have already received the welcome email will be skipped automatically."
+    : "Clients who have already reset their password will be skipped automatically.";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -469,9 +491,9 @@ function ConfirmSendModal({ count, send_to_all, pending_count, is_loading, onCon
             </h2>
             <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
               {send_to_all
-                ? recipients !== null
-                  ? `You are about to send to ${recipients} pending client${recipients !== 1 ? "s" : ""}`
-                  : "You are about to send to all pending clients"
+                ? active_count !== null
+                  ? `You are about to send to ${active_count} client${active_count !== 1 ? "s" : ""}`
+                  : "You are about to send to all eligible clients"
                 : `You are about to send to ${count} selected client${count !== 1 ? "s" : ""}`}
             </p>
           </div>
@@ -480,20 +502,82 @@ function ConfirmSendModal({ count, send_to_all, pending_count, is_loading, onCon
         {/* Body */}
         <div className="space-y-4 px-6 py-5">
 
-          {send_to_all && recipients !== null && (
-            <div className="flex items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 dark:border-indigo-500/30 dark:bg-indigo-500/10">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-500/20">
-                <svg className="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-indigo-800 dark:text-indigo-200">
-                  {recipients} client{recipients !== 1 ? "s" : ""} will receive this email
-                </p>
-                <p className="text-xs text-indigo-600 dark:text-indigo-400">
-                  These are all clients who have not yet reset their password.
-                </p>
+          {/* ── Send mode selector (only when send_to_all) ── */}
+          {send_to_all && (
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                Who should receive the email?
+              </p>
+              <div className="space-y-2">
+
+                {/* Option A — Not received yet */}
+                <label
+                  className={`flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 transition-colors ${
+                    send_mode === "not_sent"
+                      ? "border-indigo-300 bg-indigo-50 dark:border-indigo-500/40 dark:bg-indigo-500/10"
+                      : "border-gray-200 bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800/40 dark:hover:bg-gray-800"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="send_mode"
+                    value="not_sent"
+                    checked={send_mode === "not_sent"}
+                    onChange={() => on_send_mode_change("not_sent")}
+                    disabled={is_loading}
+                    className="mt-0.5 h-4 w-4 shrink-0 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        Not received yet
+                      </p>
+                      {not_sent_count !== null && (
+                        <span className="shrink-0 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+                          {not_sent_count} client{not_sent_count !== 1 ? "s" : ""}
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                      Send only to clients who have never received the welcome email.
+                    </p>
+                  </div>
+                </label>
+
+                {/* Option B — All still pending */}
+                <label
+                  className={`flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 transition-colors ${
+                    send_mode === "all_pending"
+                      ? "border-indigo-300 bg-indigo-50 dark:border-indigo-500/40 dark:bg-indigo-500/10"
+                      : "border-gray-200 bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800/40 dark:hover:bg-gray-800"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="send_mode"
+                    value="all_pending"
+                    checked={send_mode === "all_pending"}
+                    onChange={() => on_send_mode_change("all_pending")}
+                    disabled={is_loading}
+                    className="mt-0.5 h-4 w-4 shrink-0 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        All still pending
+                      </p>
+                      {password_reset_pending_count !== null && (
+                        <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
+                          {password_reset_pending_count} client{password_reset_pending_count !== 1 ? "s" : ""}
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                      Send to all clients who haven't reset their password yet — including those who already received the email but haven't acted on it.
+                    </p>
+                  </div>
+                </label>
+
               </div>
             </div>
           )}
@@ -520,7 +604,7 @@ function ConfirmSendModal({ count, send_to_all, pending_count, is_loading, onCon
                   </svg>
                 </div>
                 <p className="text-sm text-gray-600 dark:text-gray-300">
-                  Clients who have <span className="font-medium text-gray-900 dark:text-white">already reset their password</span> will be skipped automatically — they will not receive a duplicate email.
+                  {skip_label}
                 </p>
               </li>
               <li className="flex items-start gap-2.5">
@@ -543,8 +627,10 @@ function ConfirmSendModal({ count, send_to_all, pending_count, is_loading, onCon
               </svg>
               <p className="text-sm text-indigo-700 dark:text-indigo-300">
                 {send_to_all
-                  ? "Target: all clients whose password has not been reset yet."
-                  : `Target: ${count} selected client${count !== 1 ? "s" : ""} — pending ones will be emailed, already-reset ones will be skipped.`}
+                  ? send_mode === "not_sent"
+                    ? "Target: all clients who have never received the welcome email."
+                    : "Target: all clients who have not yet reset their password."
+                  : `Target: ${count} selected client${count !== 1 ? "s" : ""} — already-reset ones will be skipped.`}
               </p>
             </div>
           </div>
@@ -612,7 +698,9 @@ export default function AdminWelcomeEmailsContent() {
 
   const [show_confirm, setShowConfirm] = useState(false);
   const [confirm_send_all, setConfirmSendAll] = useState(false);
-  const [pending_count, setPendingCount] = useState<number | null>(null);
+  const [send_mode, setSendMode] = useState<BulkEmailSendMode>("not_sent");
+  const [not_sent_count, setNotSentCount] = useState<number | null>(null);
+  const [password_reset_pending_count, setPasswordResetPendingCount] = useState<number | null>(null);
   const [is_fetching_pending_count, setIsFetchingPendingCount] = useState(false);
   const [is_starting, setIsStarting] = useState(false);
   const [start_error, setStartError] = useState<string | null>(null);
@@ -756,13 +844,17 @@ export default function AdminWelcomeEmailsContent() {
   async function openSendAll() {
     setStartError(null);
     setConfirmSendAll(true);
-    setPendingCount(null);
+    setSendMode("not_sent");
+    setNotSentCount(null);
+    setPasswordResetPendingCount(null);
     setIsFetchingPendingCount(true);
     try {
       const result = await getPendingClientsCount();
-      setPendingCount(result.pending_count);
+      setNotSentCount(result.not_sent_count);
+      setPasswordResetPendingCount(result.password_reset_pending_count);
     } catch {
-      setPendingCount(null);
+      setNotSentCount(null);
+      setPasswordResetPendingCount(null);
     } finally {
       setIsFetchingPendingCount(false);
     }
@@ -775,7 +867,7 @@ export default function AdminWelcomeEmailsContent() {
 
     try {
       const payload = confirm_send_all
-        ? { send_to_all: true }
+        ? { send_to_all: true, send_mode }
         : { user_ids: Array.from(selected_ids) };
 
       const response = await startBulkWelcomeEmail(payload);
@@ -1129,7 +1221,10 @@ export default function AdminWelcomeEmailsContent() {
         <ConfirmSendModal
           count={selected_count}
           send_to_all={confirm_send_all}
-          pending_count={pending_count}
+          send_mode={send_mode}
+          on_send_mode_change={setSendMode}
+          not_sent_count={not_sent_count}
+          password_reset_pending_count={password_reset_pending_count}
           is_loading={is_starting || is_fetching_pending_count}
           onConfirm={handleConfirmSend}
           onClose={() => !is_starting && setShowConfirm(false)}
