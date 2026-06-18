@@ -447,8 +447,17 @@ export default function PublicInvoicePayView({
 
       setTotalCentsValue(total_cents_amount);
 
-      const payment_intent_result = await createInvoicePaymentIntent(total_cents_amount, invoice_response.unique_id, token);
-      setClientSecretValue(payment_intent_result.client_secret);
+      const session_key = `pi_secret_${invoice_response.unique_id}_${total_cents_amount}`;
+      const cached_secret = sessionStorage.getItem(session_key);
+
+      if (cached_secret) {
+        setClientSecretValue(cached_secret);
+      } else {
+        const payment_intent_result = await createInvoicePaymentIntent(total_cents_amount, invoice_response.unique_id, token);
+        sessionStorage.setItem(session_key, payment_intent_result.client_secret);
+        setClientSecretValue(payment_intent_result.client_secret);
+      }
+
       setPageState("ready");
     } catch (error_response: unknown) {
       const api_error_response = error_response as { status_code?: number };
@@ -651,8 +660,14 @@ export default function PublicInvoicePayView({
                       invoice_id={invoice_id}
                       token={token}
                       total_cents={total_cents_value}
-                      onSuccess={() => setPageState("success")}
-                      onSuccessPending={() => setPageState("success_pending")}
+                      onSuccess={() => {
+                        sessionStorage.removeItem(`pi_secret_${invoice_data.unique_id}_${total_cents_value}`);
+                        setPageState("success");
+                      }}
+                      onSuccessPending={() => {
+                        sessionStorage.removeItem(`pi_secret_${invoice_data.unique_id}_${total_cents_value}`);
+                        setPageState("success_pending");
+                      }}
                       on_confirm_payment={
                         is_authenticated_flow
                           ? async (payment_intent_id) => {

@@ -10,6 +10,7 @@ export async function POST(req: NextRequest) {
       metadata,
       stripe_payment_method_id,
       save_for_future,
+      idempotency_key,
     } = await req.json();
 
     if (!amount_cents || typeof amount_cents !== "number" || amount_cents <= 0) {
@@ -100,8 +101,14 @@ export async function POST(req: NextRequest) {
       payment_intent_params.automatic_payment_methods = { enabled: true };
     }
 
+    const stripe_request_options: Stripe.RequestOptions = {};
+    if (idempotency_key) {
+      stripe_request_options.idempotencyKey = idempotency_key;
+    }
+
     const payment_intent = await stripe.paymentIntents.create(
-      payment_intent_params
+      payment_intent_params,
+      stripe_request_options
     );
 
     return NextResponse.json({

@@ -16,6 +16,7 @@ export async function createInvoicePaymentIntent(
     body: JSON.stringify({
       amount_cents,
       metadata: { invoice_unique_id, token },
+      idempotency_key: `invoice-${invoice_unique_id}-${amount_cents}`,
     }),
   });
 
