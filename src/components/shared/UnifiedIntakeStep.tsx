@@ -63,6 +63,7 @@ const UnifiedIntakeStep = forwardRef<UnifiedIntakeStepHandle, UnifiedIntakeStepP
   } = useCart();
 
   const [error, setError] = useState<string | null>(null);
+  const [show_nc_type_errors, setShowNcTypeErrors] = useState(false);
 
   // ── Item groups ─────────────────────────────────────────────────────────────
 
@@ -208,6 +209,7 @@ const UnifiedIntakeStep = forwardRef<UnifiedIntakeStepHandle, UnifiedIntakeStepP
   const handleNcRowsChange = useCallback(
     (virtual_tier_id: string, rows: CartIntakeRow[]) => {
       if (error) setError(null);
+      if (show_nc_type_errors) setShowNcTypeErrors(false);
       const sep = virtual_tier_id.lastIndexOf(":");
       const tier_id = virtual_tier_id.slice(0, sep);
       const instance_index = parseInt(virtual_tier_id.slice(sep + 1), 10);
@@ -220,7 +222,7 @@ const UnifiedIntakeStep = forwardRef<UnifiedIntakeStepHandle, UnifiedIntakeStepP
       );
       updateNewContentIntakeData(tier_id, updated);
     },
-    [error, nc_items, getIntakeDataForTier, updateNewContentIntakeData]
+    [error, show_nc_type_errors, nc_items, getIntakeDataForTier, updateNewContentIntakeData]
   );
 
   const handleCoRowsChange = useCallback(
@@ -257,12 +259,24 @@ const UnifiedIntakeStep = forwardRef<UnifiedIntakeStepHandle, UnifiedIntakeStepP
     }
 
     if (has_nc) {
-      const incomplete = nc_intake_data.some((tier) =>
+      const incomplete_keyword = nc_intake_data.some((tier) =>
         tier.rows.some((row) => !row.keyword_phrase.trim())
       );
-      if (incomplete) {
+      if (incomplete_keyword) {
         setError(
           "Please fill in the keyword phrase for every New Content row before continuing."
+        );
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+
+      const incomplete_type = nc_intake_data.some((tier) =>
+        tier.rows.some((row) => !row.type_of_content?.trim())
+      );
+      if (incomplete_type) {
+        setShowNcTypeErrors(true);
+        setError(
+          "Please select a Type of Content for every New Content row before continuing."
         );
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
@@ -446,6 +460,7 @@ const UnifiedIntakeStep = forwardRef<UnifiedIntakeStepHandle, UnifiedIntakeStepP
               total_forms={nc_intake_data.length}
               rows={tier.rows}
               onChange={(rows) => handleNcRowsChange(tier.tier_id, rows)}
+              show_errors={show_nc_type_errors}
             />
           ))}
         </div>

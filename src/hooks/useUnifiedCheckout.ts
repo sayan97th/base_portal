@@ -215,7 +215,12 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
                   unit_price: item.unit_price,
                   intake_rows:
                     item.intake_data && item.intake_data.length > 0
-                      ? item.intake_data.flat()
+                      ? item.intake_data.flat().map((row) => ({
+                          keyword_phrase: row.keyword_phrase ?? "",
+                          secondary_keywords: row.secondary_keywords || null,
+                          type_of_content: row.type_of_content || null,
+                          notes: row.notes || null,
+                        }))
                       : undefined,
                 }))
               : undefined,
@@ -342,7 +347,12 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
                 unit_price: item.unit_price,
                 intake_rows:
                   item.intake_data && item.intake_data.length > 0
-                    ? item.intake_data.flat()
+                    ? item.intake_data.flat().map((row) => ({
+                        keyword_phrase: row.keyword_phrase ?? "",
+                        secondary_keywords: row.secondary_keywords || null,
+                        type_of_content: row.type_of_content || null,
+                        notes: row.notes || null,
+                      }))
                     : undefined,
               }))
             : undefined,

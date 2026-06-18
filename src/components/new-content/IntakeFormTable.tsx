@@ -18,6 +18,7 @@ interface IntakeFormTableProps {
   rows: CartIntakeRow[];
   onChange: (rows: CartIntakeRow[]) => void;
   hide_actions?: boolean;
+  show_errors?: boolean;
 }
 
 export default function IntakeFormTable({
@@ -27,6 +28,7 @@ export default function IntakeFormTable({
   rows,
   onChange,
   hide_actions = false,
+  show_errors = false,
 }: IntakeFormTableProps) {
   const handleRowChange = useCallback(
     (row_index: number, field: keyof CartIntakeRow, value: string) => {
@@ -84,6 +86,7 @@ export default function IntakeFormTable({
               </th>
               <th className={`border-b border-gray-200 px-3 py-2.5 text-left text-xs font-semibold text-gray-600 dark:border-gray-700 dark:text-gray-400 ${!hide_actions ? "border-r" : ""}`}>
                 Type of Content
+                <span className="ml-1 text-red-500">*</span>
               </th>
               {!hide_actions && (
                 <th className="border-b border-gray-200 py-2.5 dark:border-gray-700" />
@@ -134,7 +137,11 @@ export default function IntakeFormTable({
                     onChange={(e) =>
                       handleRowChange(idx, "type_of_content", e.target.value)
                     }
-                    className="h-8 w-full cursor-pointer rounded border-0 bg-transparent px-2 text-sm text-gray-700 focus:bg-blue-50/40 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-200 dark:bg-transparent dark:text-white/80 dark:focus:bg-blue-950/20 dark:focus:ring-blue-900"
+                    className={`h-8 w-full cursor-pointer rounded border-0 bg-transparent px-2 text-sm text-gray-700 focus:bg-blue-50/40 focus:outline-none focus:ring-2 focus:ring-inset dark:bg-transparent dark:text-white/80 dark:focus:bg-blue-950/20 ${
+                      show_errors && !row.type_of_content
+                        ? "ring-2 ring-inset ring-red-300 dark:ring-red-700 focus:ring-red-300 dark:focus:ring-red-700"
+                        : "focus:ring-blue-200 dark:focus:ring-blue-900"
+                    }`}
                   >
                     <option value="">Select type...</option>
                     {CONTENT_TYPES.map((type) => (
