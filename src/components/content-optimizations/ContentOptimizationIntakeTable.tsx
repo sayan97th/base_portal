@@ -159,7 +159,7 @@ export default function ContentOptimizationIntakeTable({
                 <td className={`border-b border-gray-200 p-1 dark:border-gray-700 ${!hide_actions ? "border-r" : ""}`}>
                   <input
                     type="url"
-                    value={row.content_page_url}
+                    value={row.content_page_url ?? ""}
                     onChange={(e) => handleRowChange(idx, "content_page_url", e.target.value)}
                     placeholder="https://example.com/page"
                     className="h-8 w-full rounded border-0 bg-transparent px-2.5 text-sm text-gray-700 placeholder:text-gray-300 focus:bg-blue-50/40 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-200 dark:text-white/80 dark:placeholder:text-white/20 dark:focus:bg-blue-950/20 dark:focus:ring-blue-900"
