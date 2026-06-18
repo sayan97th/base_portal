@@ -447,7 +447,7 @@ export default function PublicInvoicePayView({
 
       setTotalCentsValue(total_cents_amount);
 
-      const session_key = `pi_secret_${invoice_response.unique_id}_${total_cents_amount}`;
+      const session_key = `pi_secret_${invoice_response.unique_id}_${total_cents_amount}_${token}`;
       const cached_secret = sessionStorage.getItem(session_key);
 
       if (cached_secret) {
@@ -661,11 +661,11 @@ export default function PublicInvoicePayView({
                       token={token}
                       total_cents={total_cents_value}
                       onSuccess={() => {
-                        sessionStorage.removeItem(`pi_secret_${invoice_data.unique_id}_${total_cents_value}`);
+                        sessionStorage.removeItem(`pi_secret_${invoice_data.unique_id}_${total_cents_value}_${token}`);
                         setPageState("success");
                       }}
                       onSuccessPending={() => {
-                        sessionStorage.removeItem(`pi_secret_${invoice_data.unique_id}_${total_cents_value}`);
+                        sessionStorage.removeItem(`pi_secret_${invoice_data.unique_id}_${total_cents_value}_${token}`);
                         setPageState("success_pending");
                       }}
                       on_confirm_payment={
