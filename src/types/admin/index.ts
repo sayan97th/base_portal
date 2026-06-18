@@ -587,3 +587,61 @@ export interface RoleActionResponse {
   message: string;
   user: AdminUser;
 }
+
+// ── Transactions ──────────────────────────────────────────────────────────────
+
+export type TransactionType =
+  | "purchase"
+  | "credit_payment"
+  | "hybrid_payment"
+  | "failed_purchase";
+
+export type TransactionStatus = "success" | "failed";
+
+export type TransactionPaymentMethod = "credit_card" | "account_credits" | "hybrid";
+
+export type TransactionSortField =
+  | "created_at"
+  | "amount"
+  | "status"
+  | "type"
+  | "payment_method";
+
+export interface TransactionUser {
+  id: number;
+  first_name: string;
+  last_name: string;
+  email: string;
+}
+
+export interface AdminTransaction {
+  id: number;
+  type: TransactionType;
+  status: TransactionStatus;
+  amount: number;
+  payment_method: TransactionPaymentMethod;
+  payment_intent_id: string | null;
+  session_id: string | null;
+  session_title: string | null;
+  order_id: number | null;
+  invoice_id: string | null;
+  description: string | null;
+  error_message: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+  user: TransactionUser | null;
+}
+
+export interface AdminTransactionFilters {
+  page?: number;
+  per_page?: number;
+  search?: string;
+  status?: TransactionStatus | "";
+  type?: TransactionType | "";
+  payment_method?: TransactionPaymentMethod | "";
+  sort_field?: TransactionSortField;
+  sort_direction?: SortDirection;
+  date_from?: string;
+  date_to?: string;
+}
