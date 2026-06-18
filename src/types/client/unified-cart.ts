@@ -12,9 +12,9 @@ export interface CartKeywordRow {
 
 export interface CartIntakeRow {
   keyword_phrase: string;
-  secondary_keywords: string;
-  type_of_content: string;
-  notes: string;
+  secondary_keywords: string | null;
+  type_of_content: string | null;
+  notes: string | null;
 }
 
 export interface ContentOptimizationIntakeRow {
