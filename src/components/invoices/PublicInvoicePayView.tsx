@@ -660,7 +660,6 @@ export default function PublicInvoicePayView({
                                 payment_method: "credit_card",
                                 payment_intent_id,
                               });
-                              await invoicesService.sendInvoicePaymentNotification(invoice_id);
                             }
                           : (payment_intent_id) =>
                               confirmInvoicePayment(invoice_id, token, payment_intent_id)
