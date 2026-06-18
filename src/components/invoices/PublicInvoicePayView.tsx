@@ -30,7 +30,8 @@ type PageState =
   | "credits_invoice"
   | "invalid_status"
   | "ready"
-  | "success";
+  | "success"
+  | "success_pending";
 
 function parseTotalCents(total: string): number | null {
   if (/credits/i.test(total)) return null;
@@ -51,10 +52,11 @@ interface CheckoutFormProps {
   token: string;
   total_cents: number;
   onSuccess: () => void;
+  onSuccessPending: () => void;
   on_confirm_payment: (payment_intent_id: string) => Promise<void>;
 }
 
-function CheckoutForm({ invoice_id, token, total_cents, onSuccess, on_confirm_payment }: CheckoutFormProps) {
+function CheckoutForm({ invoice_id, token, total_cents, onSuccess, onSuccessPending, on_confirm_payment }: CheckoutFormProps) {
   const stripe = useStripe();
   const elements = useElements();
   const [is_submitting, setIsSubmitting] = useState(false);
@@ -84,10 +86,12 @@ function CheckoutForm({ invoice_id, token, total_cents, onSuccess, on_confirm_pa
     if (paymentIntent?.status === "succeeded") {
       try {
         await on_confirm_payment(paymentIntent.id);
+        onSuccess();
       } catch {
-        // Best-effort: payment succeeded on Stripe side; notify backend
+        // Stripe charge succeeded but backend confirmation failed.
+        // Show a pending state so the client knows to follow up if needed.
+        onSuccessPending();
       }
-      onSuccess();
       return;
     }
 
@@ -539,6 +543,18 @@ export default function PublicInvoicePayView({
     );
   }
 
+  if (page_state === "success_pending") {
+    return (
+      <StatusPage
+        icon="check"
+        title="Payment processed"
+        description={`Your payment of ${formatCurrency(total_cents_value / 100)} was successfully charged. There may be a brief delay before your invoice reflects this update. If the invoice still shows as unpaid after a few minutes, please contact us at basesearchmarketing.com.`}
+        success
+        action_link={is_authenticated_flow ? { label: "Return to Invoices", href: "/invoices" } : undefined}
+      />
+    );
+  }
+
   if (page_state === "error" || !invoice_data || !client_secret_value) {
     return (
       <StatusPage
@@ -636,6 +652,7 @@ export default function PublicInvoicePayView({
                       token={token}
                       total_cents={total_cents_value}
                       onSuccess={() => setPageState("success")}
+                      onSuccessPending={() => setPageState("success_pending")}
                       on_confirm_payment={
                         is_authenticated_flow
                           ? async (payment_intent_id) => {
