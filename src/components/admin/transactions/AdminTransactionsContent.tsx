@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { listAdminTransactions } from "@/services/admin/transactions.service";
 import type {
   AdminTransaction,
@@ -461,9 +462,12 @@ export default function AdminTransactionsContent() {
                         </p>
                       )}
                       {tx.invoice_id && (
-                        <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                        <Link
+                          href={`/admin/invoices/${tx.invoice_id}`}
+                          className="text-[11px] text-brand-500 underline-offset-2 hover:underline dark:text-brand-400"
+                        >
                           Invoice #{tx.invoice_id}
-                        </p>
+                        </Link>
                       )}
                       {!tx.session_title && !tx.session_id && !tx.order_id && !tx.invoice_id && (
                         <span className="text-xs text-gray-400">—</span>

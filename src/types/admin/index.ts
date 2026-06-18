@@ -101,6 +101,7 @@ export type PasswordResetStatusFilter = "pending" | "reset" | "";
 
 export interface AdminClientFilters {
   page?: number;
+  per_page?: number;
   search?: string;
   sort_field?: ClientSortField;
   sort_direction?: SortDirection;

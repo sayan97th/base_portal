@@ -9,6 +9,7 @@ import type {
 } from "@/types/admin";
 
 export interface UpdateInvoicePayload {
+  user_id?: number;
   date_due?: string;
   line_items?: CreateInvoiceLineItemPayload[];
   notes?: string;

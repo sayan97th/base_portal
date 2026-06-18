@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import flatpickr from "flatpickr";
 import { getAdminInvoice, updateAdminInvoice } from "@/services/admin/invoice.service";
-import type { AdminInvoice, InvoiceLineItem, OrderUser } from "@/types/admin";
+import ClientSelectDropdown from "@/components/admin/invoices/ClientSelectDropdown";
+import type { AdminInvoice, AdminUser, InvoiceLineItem } from "@/types/admin";
 
 // ── Local line item state ─────────────────────────────────────────────────────
 
@@ -74,28 +75,6 @@ function calcSubtotal(items: LocalLineItem[]): number {
 
 function calcTotalDiscount(items: LocalLineItem[]): number {
   return items.reduce((s, item) => s + calcItemDiscount(item), 0);
-}
-
-// ── Readonly client card ──────────────────────────────────────────────────────
-
-function ReadonlyClientCard({ user }: { user: OrderUser }) {
-  return (
-    <div className="flex items-center gap-3 rounded-xl border border-brand-200 bg-brand-50 p-4 dark:border-brand-500/30 dark:bg-brand-500/10">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700 dark:bg-brand-500/20 dark:text-brand-400">
-        {user.first_name.charAt(0).toUpperCase()}
-        {user.last_name.charAt(0).toUpperCase()}
-      </div>
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-gray-900 dark:text-white">
-          {user.first_name} {user.last_name}
-        </p>
-        <p className="truncate text-xs text-gray-500 dark:text-gray-400">{user.email}</p>
-      </div>
-      <span className="ml-auto shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-500 dark:bg-gray-700 dark:text-gray-400">
-        Read-only
-      </span>
-    </div>
-  );
 }
 
 // ── Line item row ─────────────────────────────────────────────────────────────
@@ -436,6 +415,7 @@ export default function EditInvoiceContent({ invoice_id }: { invoice_id: string 
   const [loading, setLoading] = useState(true);
   const [load_error, setLoadError] = useState<string | null>(null);
 
+  const [selected_client, setSelectedClient] = useState<AdminUser | null>(null);
   const [date_due, setDateDue] = useState("");
   const [line_items, setLineItems] = useState<LocalLineItem[]>([createEmptyLineItem()]);
   const [notes, setNotes] = useState("");
@@ -452,6 +432,32 @@ export default function EditInvoiceContent({ invoice_id }: { invoice_id: string 
         const data = await getAdminInvoice(invoice_id);
         setInvoice(data);
         if (data.date_due) setDateDue(data.date_due);
+        if (data.user) {
+          setSelectedClient({
+            id: data.user.id,
+            first_name: data.user.first_name,
+            last_name: data.user.last_name,
+            email: data.user.email,
+            business_email: null,
+            phone: null,
+            job_title: null,
+            profile_photo_url: null,
+            organization_id: null,
+            email_verified_at: null,
+            last_login_at: null,
+            password_reset_at: null,
+            welcome_email_sent_at: null,
+            is_active: true,
+            created_at: "",
+            updated_at: "",
+            roles: [],
+            organization: null,
+            company: null,
+            google_studio_link: null,
+            referrer_id: null,
+            note: null,
+          } as AdminUser);
+        }
         setLineItems(
           data.line_items.length > 0
             ? data.line_items.map(fromApiLineItem)
@@ -486,6 +492,7 @@ export default function EditInvoiceContent({ invoice_id }: { invoice_id: string 
 
   function validateForm(): boolean {
     const errors: Record<string, string> = {};
+    if (!selected_client) errors.client = "Please select a client";
     if (!date_due) errors.date_due = "A due date is required";
     line_items.forEach((item, idx) => {
       if (!item.item_name.trim()) errors[`item_${idx}_name`] = "Item name is required";
@@ -505,6 +512,7 @@ export default function EditInvoiceContent({ invoice_id }: { invoice_id: string 
 
     try {
       await updateAdminInvoice(invoice_id, {
+        user_id: selected_client!.id,
         date_due,
         line_items: line_items.map((item) => {
           const price = parseFloat(item.price) || 0;
@@ -601,7 +609,7 @@ export default function EditInvoiceContent({ invoice_id }: { invoice_id: string 
         {/* ── Left column ──────────────────────────────────── */}
         <div className="space-y-6 lg:col-span-8">
 
-          {/* Client section — read-only */}
+          {/* Client section */}
           <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
             <div className="flex items-center gap-2.5 border-b border-gray-100 px-6 py-4 dark:border-gray-800">
               <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-50 dark:bg-brand-500/10">
@@ -612,7 +620,11 @@ export default function EditInvoiceContent({ invoice_id }: { invoice_id: string 
               <span className="text-sm font-semibold text-gray-800 dark:text-white/90">Client</span>
             </div>
             <div className="p-6">
-              <ReadonlyClientCard user={invoice.user} />
+              <ClientSelectDropdown
+                selected_client={selected_client}
+                on_select={setSelectedClient}
+                error={validation_errors.client}
+              />
             </div>
           </div>
 

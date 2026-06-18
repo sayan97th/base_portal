@@ -50,6 +50,7 @@ export async function listAdminClients(
   if (filters.email_status) params.set("email_status", filters.email_status);
   if (filters.account_status) params.set("account_status", filters.account_status);
   if (filters.password_reset_status) params.set("password_reset_status", filters.password_reset_status);
+  if (filters.per_page) params.set("per_page", String(filters.per_page));
   return apiClient.get<PaginatedResponse<AdminUser>>(
     `/api/admin/users?${params.toString()}`
   );
