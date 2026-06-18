@@ -623,7 +623,7 @@ export interface AdminTransaction {
   payment_intent_id: string | null;
   session_id: string | null;
   session_title: string | null;
-  order_id: number | null;
+  order_id: string | null;
   invoice_id: string | null;
   description: string | null;
   error_message: string | null;

@@ -453,8 +453,11 @@ export default function AdminTransactionsContent() {
                         </p>
                       )}
                       {tx.order_id && (
-                        <p className="text-[11px] text-gray-400 dark:text-gray-500">
-                          Order #{tx.order_id}
+                        <p
+                          className="font-mono text-[10px] text-gray-400 dark:text-gray-500"
+                          title={tx.order_id}
+                        >
+                          Order {tx.order_id.substring(0, 8)}…
                         </p>
                       )}
                       {tx.invoice_id && (
