@@ -59,7 +59,11 @@ interface ColumnDef {
   required?: boolean;
   sort_key?: string;
   sortable?: boolean;
+  sticky?: boolean;
 }
+
+// Width of the checkbox column in pixels (w-10 = 40px). Used to offset sticky data columns.
+const CHECKBOX_COL_WIDTH = 40;
 
 // ── Column definitions ─────────────────────────────────────────────────────────
 
@@ -93,7 +97,7 @@ const STATUS_OPTIONS = [
 ];
 
 const COLUMNS: ColumnDef[] = [
-  { key: "order_id", label: "Order ID", group: "order", min_width: 110, type: "text" },
+  { key: "order_id", label: "Order ID", group: "order", min_width: 110, type: "text", sticky: true },
   { key: "status", label: "Status", group: "status_col", min_width: 130, type: "select", options: STATUS_OPTIONS },
   { key: "team_specific_link_id", label: "Team Specific Link ID", group: "team_link", min_width: 160, type: "text" },
   { key: "link_type", label: "Link Type", group: "core", min_width: 155, type: "select", options: LINK_TYPE_OPTIONS, required: true },
@@ -432,6 +436,9 @@ interface EditableCellProps {
   onSelectImmediateSave?: (value: string) => void;
   /** When provided, shows a copy-to-clipboard icon on cell hover. */
   onCopy?: (value: string) => void;
+  is_sticky?: boolean;
+  sticky_left?: number;
+  sticky_bg_class?: string;
 }
 
 function EditableCell({
@@ -448,6 +455,9 @@ function EditableCell({
   onKeyNav,
   onSelectImmediateSave,
   onCopy,
+  is_sticky = false,
+  sticky_left = 0,
+  sticky_bg_class = "bg-white dark:bg-gray-900",
 }: EditableCellProps) {
   const input_ref = useRef<HTMLInputElement>(null);
   const select_ref = useRef<HTMLSelectElement>(null);
@@ -487,7 +497,10 @@ function EditableCell({
     if (col.type === "select" && col.options) {
       const has_current_value = !value || col.options.includes(value);
       return (
-        <td className="p-0">
+        <td
+          className={`p-0${is_sticky ? ` ${sticky_bg_class}` : ""}`}
+          style={is_sticky ? { position: "sticky", left: sticky_left, zIndex: 1 } : undefined}
+        >
           <select
             ref={select_ref}
             value={value}
@@ -520,7 +533,10 @@ function EditableCell({
     }
 
     return (
-      <td className="p-0">
+      <td
+        className={`p-0${is_sticky ? ` ${sticky_bg_class}` : ""}`}
+        style={is_sticky ? { position: "sticky", left: sticky_left, zIndex: 1 } : undefined}
+      >
         <input
           ref={input_ref}
           type="text"
@@ -608,15 +624,17 @@ function EditableCell({
 
   return (
     <td
-      className={`group/cell relative cursor-pointer whitespace-nowrap px-2 py-1.5 text-xs text-gray-700 transition-colors dark:text-gray-300 ${is_required_error
-        ? "bg-red-50/80 ring-1 ring-inset ring-red-300 hover:bg-red-100/60 dark:bg-red-900/20 dark:ring-red-700"
-        : "hover:bg-blue-50 dark:hover:bg-blue-900/20"
-        }`}
-      style={
-        has_cell_editors
+      className={`group/cell relative cursor-pointer whitespace-nowrap px-2 py-1.5 text-xs text-gray-700 transition-colors dark:text-gray-300 ${
+        is_required_error
+          ? "bg-red-50/80 ring-1 ring-inset ring-red-300 hover:bg-red-100/60 dark:bg-red-900/20 dark:ring-red-700"
+          : `hover:bg-blue-50 dark:hover:bg-blue-900/20${is_sticky ? ` ${sticky_bg_class}` : ""}`
+      }${is_sticky ? " shadow-[4px_0_6px_-3px_rgba(0,0,0,0.2)]" : ""}`}
+      style={{
+        ...(has_cell_editors
           ? { outline: `2px solid ${cell_editors[0].color}`, outlineOffset: "-2px" }
-          : undefined
-      }
+          : {}),
+        ...(is_sticky ? { position: "sticky", left: sticky_left, zIndex: 1 } : {}),
+      }}
       onClick={onStartEdit}
       title={is_required_error ? `Required: ${col.label} must be filled to save this row` : "Click to edit · Ctrl+C to copy cell value · Hover for copy icon"}
     >
@@ -2106,7 +2124,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
             <thead className="sticky top-0 z-20">
               <tr>
                 {/* Select-all checkbox column */}
-                <th className="w-px border border-gray-700/30 bg-gray-800 px-2 py-1.5 text-center">
+                <th className="sticky left-0 z-[31] w-10 border border-gray-700/30 bg-gray-800 px-2 py-1.5 text-center shadow-[3px_0_5px_-2px_rgba(0,0,0,0.35)]">
                   <input
                     ref={select_all_ref}
                     type="checkbox"
@@ -2133,8 +2151,11 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                   return (
                     <th
                       key={col.key}
-                      className={`border border-gray-700/30 px-2 py-1.5 text-left font-semibold tracking-wide ${GROUP_HEADER_STYLES[col.group]}`}
-                      style={{ minWidth: col.min_width }}
+                      className={`border border-gray-700/30 px-2 py-1.5 text-left font-semibold tracking-wide ${GROUP_HEADER_STYLES[col.group]}${col.sticky ? " sticky z-[30] shadow-[4px_0_6px_-3px_rgba(0,0,0,0.35)]" : ""}`}
+                      style={{
+                        minWidth: col.min_width,
+                        ...(col.sticky ? { left: CHECKBOX_COL_WIDTH } : {}),
+                      }}
                     >
                       <div className="flex items-center gap-1">
                         <button
@@ -2326,6 +2347,16 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                   const is_locally_selected =
                     !is_new && selected_row_id === row.id && !has_collaborators;
 
+                  const sticky_row_bg_class = is_new
+                    ? "bg-amber-50/80 dark:bg-amber-900/10"
+                    : is_multi_selected
+                    ? "bg-indigo-50/80 dark:bg-indigo-950/20"
+                    : is_locally_selected
+                    ? "bg-brand-50/80 dark:bg-brand-900/10"
+                    : row_idx % 2 === 0
+                    ? "bg-white dark:bg-gray-900"
+                    : "bg-gray-50 dark:bg-gray-800/30";
+
                   return (
                     <tr
                       key={row.id}
@@ -2355,7 +2386,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                     >
                       {/* Row checkbox */}
                       <td
-                        className="w-px border-r border-gray-100 px-2 py-1.5 dark:border-gray-800"
+                        className={`sticky left-0 z-[1] w-10 border-r border-gray-100 px-2 py-1.5 shadow-[3px_0_5px_-2px_rgba(0,0,0,0.1)] dark:border-gray-800 ${sticky_row_bg_class}`}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <input
@@ -2388,6 +2419,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                             onKeyNav={(dir) => navigateCell(row.id, col.key, dir)}
                             onSelectImmediateSave={undefined}
                             onCopy={(val) => copyCellValue(val, col.key)}
+                            is_sticky={col.sticky}
+                            sticky_left={col.sticky ? CHECKBOX_COL_WIDTH : undefined}
+                            sticky_bg_class={col.sticky ? sticky_row_bg_class : undefined}
                           />
                         );
                       })}
