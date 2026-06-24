@@ -20,9 +20,18 @@ export interface DashboardStats {
 
 export const computeStats = (orders: LinkBuildingOrderSummary[]): DashboardStats => ({
   total_orders: orders.length,
-  total_spend: orders.reduce((sum, o) => sum + o.total_amount, 0),
+  // Only count non-cancelled orders toward total spend so voided/cancelled
+  // orders do not inflate the amount the client actually paid.
+  total_spend: orders
+    .filter((o) => o.status !== "cancelled")
+    .reduce((sum, o) => sum + o.total_amount, 0),
+  // new_request and payment_pending are also active states — include them.
   active_orders: orders.filter(
-    (o) => o.status === "pending" || o.status === "processing"
+    (o) =>
+      o.status === "new_request" ||
+      o.status === "pending" ||
+      o.status === "payment_pending" ||
+      o.status === "processing"
   ).length,
   completed_orders: orders.filter((o) => o.status === "completed").length,
   cancelled_orders: orders.filter((o) => o.status === "cancelled").length,

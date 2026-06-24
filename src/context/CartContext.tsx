@@ -468,15 +468,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     0
   );
 
-  // Only one discount type applies — whichever gives the bigger savings.
-  const effective_discount_amount = Math.max(bulk_discount_amount, total_discount);
-
+  // When a coupon is explicitly applied it always overrides the bulk discount,
+  // even if the coupon saves less. The user (or admin) made a deliberate choice
+  // to apply the promo, so that decision takes precedence.
   const active_discount_type: "bulk" | "coupon" | "none" =
-    total_discount > 0 && total_discount >= bulk_discount_amount
+    applied_coupons.length > 0
       ? "coupon"
       : bulk_discount_amount > 0
       ? "bulk"
       : "none";
+
+  const effective_discount_amount =
+    active_discount_type === "coupon" ? total_discount : bulk_discount_amount;
 
   const total = Math.max(0, subtotal - effective_discount_amount);
 
@@ -576,16 +579,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Defer to bulk discount when it now gives more savings than the recalculated coupon
-    const recalculated_coupon_total = updated.reduce(
-      (sum, c) => sum + c.discount_amount,
-      0
-    );
-    if (bulk_discount_amount > 0 && bulk_discount_amount > recalculated_coupon_total) {
-      setAppliedCoupons([]);
-      return;
-    }
-
+    // Applied coupons always override the bulk discount — no removal.
     if (changed) setAppliedCoupons(updated);
   }, [is_cart_ready, items, applied_coupons, bulk_discount_amount]); // eslint-disable-line react-hooks/exhaustive-deps
 

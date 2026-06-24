@@ -150,9 +150,9 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
     return items.some((i) => i.product_type === d.config.applies_to);
   });
 
-  // Applied bulk badges — hidden when a coupon is the active discount
+  // Applied bulk badges — hidden when a coupon is active (coupon overrides bulk)
   const applied_details = bulk_discount_details.filter(
-    (d) => d.is_applied && active_discount_type === "bulk"
+    (d) => d.is_applied && active_discount_type === "bulk" && applied_coupons.length === 0
   );
 
   // Coupon minimum check uses full subtotal since coupon replaces bulk if it wins
@@ -234,18 +234,18 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
       });
 
       if (response.valid) {
-        // Reject coupon if the bulk quantity discount gives more savings
+        // When a coupon is explicitly applied it overrides the bulk discount.
+        // Show a notice so the user knows the bulk discount is being replaced.
         if (bulk_discount_amount > 0 && response.discount_amount < bulk_discount_amount) {
-          setCouponError(
-            `Your bulk quantity discount ($${bulk_discount_amount.toLocaleString("en-US", {
+          setCouponAdjustmentNotice(
+            `Promo code "${response.code}" applied — this overrides the bulk discount. The bulk discount ($${bulk_discount_amount.toLocaleString("en-US", {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
-            })}) saves more than this promo code ($${response.discount_amount.toLocaleString("en-US", {
+            })}) has been replaced by this promo ($${response.discount_amount.toLocaleString("en-US", {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
-            })}). Only one discount type can apply — keep the bulk discount for better savings.`
+            })}).`
           );
-          return;
         }
 
         setCouponInputCode("");
