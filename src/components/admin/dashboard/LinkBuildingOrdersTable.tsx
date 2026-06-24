@@ -2101,9 +2101,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       {is_loading ? (
         <TableSkeleton />
       ) : (
-        <div className="w-full min-w-0 overflow-x-auto">
+        <div className="w-full min-w-0 overflow-auto max-h-[calc(100vh-200px)]">
           <table className="min-w-full border-collapse text-xs">
-            <thead>
+            <thead className="sticky top-0 z-20">
               <tr>
                 {/* Select-all checkbox column */}
                 <th className="w-px border border-gray-700/30 bg-gray-800 px-2 py-1.5 text-center">
