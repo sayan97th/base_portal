@@ -132,3 +132,76 @@ All environments share the following PM2 settings:
 | `min_uptime` | `10s` |
 | `max_memory_restart` | `512M` |
 | `watch` | `false` |
+
+
+# Test Cases
+
+## Backend (Laravel)
+
+### Run all tests
+```bash
+php artisan test
+```
+
+### Run payment-related tests only
+```bash
+php artisan test tests/Feature/Payment/ tests/Unit/
+```
+
+### Run a specific test file
+```bash
+php artisan test tests/Feature/Payment/CartCheckoutTest.php
+```
+
+### Run tests with code coverage
+```bash
+php artisan test --coverage
+```
+
+---
+
+## Frontend (Next.js)
+
+```bash
+cd /mnt/linux-storage/projects/97thfloor/base_clients/base_portal
+```
+
+### Run all tests
+```bash
+npx jest
+```
+
+### Or use the package.json script
+```bash
+npm test
+```
+
+### Watch mode (automatically reruns tests when files change)
+```bash
+npm run test:watch
+```
+
+### Generate a code coverage report
+```bash
+npm run test:coverage
+```
+
+---
+
+## Run Backend and Frontend Tests
+
+Execute them in separate terminals or sequentially.
+
+### Backend
+```bash
+cd /mnt/linux-storage/projects/97thfloor/base_clients/base_clients_api
+
+php artisan test tests/Feature/Payment/ tests/Unit/ --no-coverage
+```
+
+### Frontend
+```bash
+cd /mnt/linux-storage/projects/97thfloor/base_clients/base_portal
+
+npx jest --no-coverage
+```
