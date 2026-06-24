@@ -62,8 +62,6 @@ interface ColumnDef {
   sticky?: boolean;
 }
 
-// Width of the checkbox column in pixels (w-10 = 40px). Used to offset sticky data columns.
-const CHECKBOX_COL_WIDTH = 40;
 
 // ── Column definitions ─────────────────────────────────────────────────────────
 
@@ -2124,7 +2122,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
             <thead className="sticky top-0 z-20">
               <tr>
                 {/* Select-all checkbox column */}
-                <th className="sticky left-0 z-[31] w-10 border border-gray-700/30 bg-gray-800 px-2 py-1.5 text-center shadow-[3px_0_5px_-2px_rgba(0,0,0,0.35)]">
+                <th className="w-px border border-gray-700/30 bg-gray-800 px-2 py-1.5 text-center">
                   <input
                     ref={select_all_ref}
                     type="checkbox"
@@ -2154,7 +2152,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                       className={`border border-gray-700/30 px-2 py-1.5 text-left font-semibold tracking-wide ${GROUP_HEADER_STYLES[col.group]}${col.sticky ? " sticky z-[30] shadow-[4px_0_6px_-3px_rgba(0,0,0,0.35)]" : ""}`}
                       style={{
                         minWidth: col.min_width,
-                        ...(col.sticky ? { left: CHECKBOX_COL_WIDTH } : {}),
+                        ...(col.sticky ? { left: 0 } : {}),
                       }}
                     >
                       <div className="flex items-center gap-1">
@@ -2386,7 +2384,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                     >
                       {/* Row checkbox */}
                       <td
-                        className={`sticky left-0 z-[1] w-10 border-r border-gray-100 px-2 py-1.5 shadow-[3px_0_5px_-2px_rgba(0,0,0,0.1)] dark:border-gray-800 ${sticky_row_bg_class}`}
+                        className="w-px border-r border-gray-100 px-2 py-1.5 dark:border-gray-800"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <input
@@ -2420,7 +2418,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                             onSelectImmediateSave={undefined}
                             onCopy={(val) => copyCellValue(val, col.key)}
                             is_sticky={col.sticky}
-                            sticky_left={col.sticky ? CHECKBOX_COL_WIDTH : undefined}
+                            sticky_left={col.sticky ? 0 : undefined}
                             sticky_bg_class={col.sticky ? sticky_row_bg_class : undefined}
                           />
                         );
