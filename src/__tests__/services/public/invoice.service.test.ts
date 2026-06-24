@@ -146,10 +146,18 @@ describe("getPublicInvoice", () => {
     const original = process.env.NEXT_PUBLIC_API_BASE_URL;
     process.env.NEXT_PUBLIC_API_BASE_URL = "https://api.example.com";
 
+    // API_BASE_URL is captured at module-load time, so re-import the module
+    // in isolation after overriding the env var to pick up the new value.
+    let getPublicInvoiceReloaded: typeof getPublicInvoice;
+    jest.isolateModules(() => {
+      getPublicInvoiceReloaded =
+        require("@/services/public/invoice.service").getPublicInvoice;
+    });
+
     const detail = makeInvoiceDetail();
     mockFetchResponse(200, { data: detail });
 
-    await getPublicInvoice("ABC123", "valid-token");
+    await getPublicInvoiceReloaded!("ABC123", "valid-token");
 
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining("https://api.example.com"),

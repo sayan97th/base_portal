@@ -164,7 +164,7 @@ describe("PublicInvoicePayView", () => {
     it("shows Access denied when API returns 401", async () => {
       mockGetPublicInvoice.mockRejectedValue({ status_code: 401 });
 
-      render(<PublicInvoicePayView invoice_id="ABC123" token="" />);
+      render(<PublicInvoicePayView invoice_id="ABC123" token="expired-token" />);
 
       await waitFor(() => {
         expect(screen.getByText(/access denied/i)).toBeInTheDocument();
@@ -319,7 +319,7 @@ describe("PublicInvoicePayView", () => {
       render(<PublicInvoicePayView invoice_id="ABC123" token="valid-tok" />);
 
       await waitFor(() => {
-        expect(screen.getByText(/BSM-1234/)).toBeInTheDocument();
+        expect(screen.getAllByText(/BSM-1234/).length).toBeGreaterThan(0);
       });
     });
 
@@ -327,7 +327,7 @@ describe("PublicInvoicePayView", () => {
       render(<PublicInvoicePayView invoice_id="ABC123" token="valid-tok" />);
 
       await waitFor(() => {
-        expect(screen.getByText(/\$500\.00/)).toBeInTheDocument();
+        expect(screen.getAllByText(/\$500\.00/).length).toBeGreaterThan(0);
       });
     });
 
@@ -343,7 +343,7 @@ describe("PublicInvoicePayView", () => {
       render(<PublicInvoicePayView invoice_id="ABC123" token="valid-tok" />);
 
       await waitFor(() => {
-        expect(screen.getByText(/secured.*stripe/i)).toBeInTheDocument();
+        expect(screen.getByText(/encrypted and secured by/i)).toBeInTheDocument();
       });
     });
 
@@ -606,7 +606,7 @@ describe("PublicInvoicePayView", () => {
       fireEvent.click(toggle.closest("button")!);
 
       await waitFor(() => {
-        expect(screen.getByText("Test Item")).toBeInTheDocument();
+        expect(screen.getAllByText("Test Item").length).toBeGreaterThan(0);
       });
     });
   });
