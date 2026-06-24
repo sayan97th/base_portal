@@ -103,7 +103,7 @@ const formatCurrency = (amount: number): string =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount);
 
 const isBulkDiscount = (discount_type?: string): boolean =>
-  discount_type === "bulk";
+  discount_type === "bulk" || discount_type === "bulk_10";
 
 const getDiscountLabel = (discount_type?: string): string =>
   isBulkDiscount(discount_type) ? "Bulk Discount (10% off)" : "Discount";
