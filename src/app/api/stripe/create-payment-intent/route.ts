@@ -1,7 +1,9 @@
 import Stripe from "stripe";
 import { NextRequest, NextResponse } from "next/server";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2026-02-25.clover",
+});
 
 export async function POST(req: NextRequest) {
   try {
@@ -101,14 +103,9 @@ export async function POST(req: NextRequest) {
       payment_intent_params.automatic_payment_methods = { enabled: true };
     }
 
-    const stripe_request_options: Stripe.RequestOptions = {};
-    if (idempotency_key) {
-      stripe_request_options.idempotencyKey = idempotency_key;
-    }
-
     const payment_intent = await stripe.paymentIntents.create(
       payment_intent_params,
-      stripe_request_options
+      idempotency_key ? { idempotencyKey: idempotency_key } : undefined
     );
 
     return NextResponse.json({
