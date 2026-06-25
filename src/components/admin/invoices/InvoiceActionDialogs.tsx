@@ -927,6 +927,11 @@ export function RefundInvoiceDialog({ invoice, onClose, onSuccess }: RefundInvoi
   const [error, setError] = useState<string | null>(null);
 
   const customer_name = `${invoice.user.first_name} ${invoice.user.last_name}`;
+  const fmt = (n: number) =>
+    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
+
+  const can_refund = invoice.status === "paid";
+  const has_stripe = Boolean(invoice.has_stripe_payment);
 
   const handleConfirm = async () => {
     setError(null);
@@ -934,8 +939,9 @@ export function RefundInvoiceDialog({ invoice, onClose, onSuccess }: RefundInvoi
     try {
       const updated = await refundAdminInvoice(invoice.id);
       onSuccess(updated);
-    } catch {
-      setError("Failed to process refund. Please try again.");
+    } catch (err: unknown) {
+      const api_err = err as { message?: string };
+      setError(api_err?.message ?? "Failed to process refund. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -953,35 +959,79 @@ export function RefundInvoiceDialog({ invoice, onClose, onSuccess }: RefundInvoi
         }
       />
 
-      <div className="p-6">
-        <div className="mb-5 flex items-center gap-4 rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-500/30 dark:bg-blue-500/10">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-500/20">
-            <svg className="h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-blue-800 dark:text-blue-300">Confirm refund for this invoice</p>
-            <p className="mt-0.5 text-xs text-blue-700 dark:text-blue-400">
-              Invoice <span className="font-mono font-semibold">{invoice.invoice_number}</span> will be marked as refunded. This records that payment was returned to the customer.
-            </p>
-          </div>
-        </div>
+      <div className="overflow-y-auto p-6">
+        <div className="space-y-5">
+          {/* Payment status guard */}
+          {!can_refund && (
+            <div className="flex items-start gap-3 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+              <svg className="mt-0.5 h-5 w-5 shrink-0 text-error-600 dark:text-error-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+              </svg>
+              <div>
+                <p className="text-sm font-semibold text-error-800 dark:text-error-300">Refund not available</p>
+                <p className="mt-1 text-xs text-error-700 dark:text-error-400">
+                  Refunds can only be issued for invoices with a <span className="font-semibold">Paid</span> status.
+                  This invoice is currently <span className="font-semibold capitalize">{invoice.status}</span>.
+                  The customer must complete payment before a refund can be processed.
+                </p>
+              </div>
+            </div>
+          )}
 
-        <div className="space-y-2 text-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-gray-500 dark:text-gray-400">Customer</span>
-            <span className="font-medium text-gray-900 dark:text-white">{customer_name}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-gray-500 dark:text-gray-400">Refund Amount</span>
-            <span className="font-semibold text-blue-700 dark:text-blue-400">
-              {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(invoice.total_amount)}
-            </span>
-          </div>
-        </div>
+          {/* Stripe / manual indicator */}
+          {can_refund && (
+            <div className={`flex items-start gap-3 rounded-xl border p-4 ${has_stripe ? "border-blue-200 bg-blue-50 dark:border-blue-500/30 dark:bg-blue-500/10" : "border-warning-200 bg-warning-50 dark:border-warning-500/30 dark:bg-warning-500/10"}`}>
+              {has_stripe ? (
+                <>
+                  <svg className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+                  </svg>
+                  <div>
+                    <p className="text-xs font-semibold text-blue-800 dark:text-blue-300">Stripe refund — {fmt(invoice.total_amount)} will be credited back to the original card</p>
+                    <p className="mt-0.5 text-xs text-blue-700 dark:text-blue-400">
+                      This is a Stripe-processed payment. The full amount will be refunded to the customer&apos;s card automatically.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <svg className="mt-0.5 h-4 w-4 shrink-0 text-warning-600 dark:text-warning-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                  </svg>
+                  <div>
+                    <p className="text-xs font-semibold text-warning-800 dark:text-warning-300">Manual record — no automatic card credit</p>
+                    <p className="mt-0.5 text-xs text-warning-700 dark:text-warning-400">
+                      No Stripe payment is associated with this invoice. The refund will be recorded in the system, but you must process the card credit manually.
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
-        {error && <div className="mt-4"><ErrorBanner message={error} /></div>}
+          {/* Invoice summary */}
+          {can_refund && (
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Refund Summary</p>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500 dark:text-gray-400">Customer</span>
+                  <span className="font-medium text-gray-900 dark:text-white">{customer_name}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500 dark:text-gray-400">Invoice</span>
+                  <span className="font-mono text-gray-700 dark:text-gray-300">{invoice.invoice_number}</span>
+                </div>
+                <div className="flex items-center justify-between border-t border-gray-200 pt-2 dark:border-gray-700">
+                  <span className="font-medium text-gray-700 dark:text-gray-300">Refund Amount</span>
+                  <span className="font-semibold text-blue-700 dark:text-blue-400">{fmt(invoice.total_amount)}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {error && <ErrorBanner message={error} />}
+        </div>
       </div>
 
       <DialogFooter>
@@ -994,8 +1044,8 @@ export function RefundInvoiceDialog({ invoice, onClose, onSuccess }: RefundInvoi
         </button>
         <button
           onClick={handleConfirm}
-          disabled={submitting}
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-400"
+          disabled={submitting || !can_refund}
+          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-blue-500 dark:hover:bg-blue-400"
         >
           {submitting && (
             <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -1003,7 +1053,7 @@ export function RefundInvoiceDialog({ invoice, onClose, onSuccess }: RefundInvoi
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
           )}
-          Process Refund
+          {has_stripe ? "Process Stripe Refund" : "Record Refund"}
         </button>
       </DialogFooter>
     </DialogShell>
@@ -1030,9 +1080,11 @@ export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: Part
   const fmt = (n: number) =>
     new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
 
+  const can_refund = invoice.status === "paid" || invoice.status === "refund";
+  const has_stripe = Boolean(invoice.has_stripe_payment);
+
   const parsed_amount = parseFloat(refund_input) || 0;
-  const is_valid_amount =
-    parsed_amount > 0 && parsed_amount <= remaining_refundable;
+  const is_valid_amount = parsed_amount > 0 && parsed_amount <= remaining_refundable;
 
   const handleSubmit = async () => {
     setError(null);
@@ -1042,9 +1094,7 @@ export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: Part
       return;
     }
     if (parsed_amount > remaining_refundable) {
-      setError(
-        `Amount exceeds the remaining refundable balance of ${fmt(remaining_refundable)}.`
-      );
+      setError(`Amount exceeds the remaining refundable balance of ${fmt(remaining_refundable)}.`);
       return;
     }
 
@@ -1075,6 +1125,7 @@ export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: Part
 
       <div className="overflow-y-auto p-6">
         {success ? (
+          /* ── Success state ── */
           <div className="flex flex-col items-center gap-3 py-6 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-500/15">
               <svg className="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -1082,23 +1133,55 @@ export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: Part
               </svg>
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-900 dark:text-white">Partial refund processed</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                {has_stripe ? "Stripe refund processed" : "Refund recorded"}
+              </p>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                {fmt(parsed_amount)} has been recorded as refunded to <span className="font-medium">{customer_name}</span>.
+                {fmt(parsed_amount)} has been {has_stripe ? "refunded to the card on file for" : "recorded as a refund for"}{" "}
+                <span className="font-medium">{customer_name}</span>.
+              </p>
+            </div>
+          </div>
+        ) : !can_refund ? (
+          /* ── Payment guard ── */
+          <div className="flex items-start gap-3 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+            <svg className="mt-0.5 h-5 w-5 shrink-0 text-error-600 dark:text-error-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+            </svg>
+            <div>
+              <p className="text-sm font-semibold text-error-800 dark:text-error-300">Refund not available</p>
+              <p className="mt-1 text-xs text-error-700 dark:text-error-400">
+                Partial refunds can only be issued for invoices with a <span className="font-semibold">Paid</span> status.
+                This invoice is currently <span className="font-semibold capitalize">{invoice.status}</span>.
+                The customer must complete payment before a refund can be processed.
               </p>
             </div>
           </div>
         ) : (
+          /* ── Refund form ── */
           <div className="space-y-5">
-            {/* Info banner */}
-            <div className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-500/30 dark:bg-blue-500/10">
-              <svg className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-              </svg>
-              <p className="text-xs text-blue-700 dark:text-blue-300">
-                Enter the dollar amount to refund back to the customer&apos;s card. The refund will be recorded against invoice{" "}
-                <span className="font-mono font-semibold">{invoice.invoice_number}</span>.
-              </p>
+            {/* Stripe / manual indicator */}
+            <div className={`flex items-start gap-3 rounded-xl border p-4 ${has_stripe ? "border-blue-200 bg-blue-50 dark:border-blue-500/30 dark:bg-blue-500/10" : "border-warning-200 bg-warning-50 dark:border-warning-500/30 dark:bg-warning-500/10"}`}>
+              {has_stripe ? (
+                <>
+                  <svg className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+                  </svg>
+                  <p className="text-xs text-blue-700 dark:text-blue-300">
+                    <span className="font-semibold">Stripe refund</span> — the specified amount will be credited back to the customer&apos;s original payment card automatically.
+                    Invoice <span className="font-mono font-semibold">{invoice.invoice_number}</span>.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <svg className="mt-0.5 h-4 w-4 shrink-0 text-warning-600 dark:text-warning-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                  </svg>
+                  <p className="text-xs text-warning-700 dark:text-warning-300">
+                    <span className="font-semibold">Manual record</span> — no Stripe payment found for this invoice. The refund amount will be recorded in the system, but you must process the card credit manually.
+                  </p>
+                </>
+              )}
             </div>
 
             {/* Invoice summary */}
@@ -1122,7 +1205,7 @@ export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: Part
                   </div>
                 )}
                 <div className="flex items-center justify-between border-t border-gray-200 pt-2 dark:border-gray-700">
-                  <span className="text-gray-600 dark:text-gray-300 font-medium">Remaining Refundable</span>
+                  <span className="font-medium text-gray-600 dark:text-gray-300">Remaining Refundable</span>
                   <span className="font-semibold text-gray-900 dark:text-white">{fmt(remaining_refundable)}</span>
                 </div>
               </div>
@@ -1148,17 +1231,17 @@ export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: Part
                     setError(null);
                   }}
                   placeholder="0.00"
-                  className="w-full rounded-lg border border-gray-200 bg-white pl-7 pr-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
+                  className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-7 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
                 />
               </div>
               <div className="mt-1.5 flex items-center justify-between">
                 <p className="text-xs text-gray-400 dark:text-gray-500">
-                  Maximum refundable: <span className="font-medium">{fmt(remaining_refundable)}</span>
+                  Maximum: <span className="font-medium">{fmt(remaining_refundable)}</span>
                 </p>
-                {parsed_amount > 0 && is_valid_amount && (
+                {remaining_refundable > 0 && (
                   <button
                     type="button"
-                    onClick={() => setRefundInput(String(remaining_refundable))}
+                    onClick={() => { setRefundInput(String(remaining_refundable)); setError(null); }}
                     className="text-xs text-blue-600 hover:underline dark:text-blue-400"
                   >
                     Refund full balance
@@ -1167,7 +1250,7 @@ export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: Part
               </div>
             </div>
 
-            {/* Validation feedback */}
+            {/* Over-limit inline warning */}
             {parsed_amount > remaining_refundable && refund_input !== "" && (
               <div className="flex items-center gap-2 rounded-lg border border-error-200 bg-error-50 px-3 py-2.5 text-xs text-error-600 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
                 <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -1201,7 +1284,7 @@ export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: Part
             </button>
             <button
               onClick={handleSubmit}
-              disabled={submitting || !is_valid_amount}
+              disabled={submitting || !is_valid_amount || !can_refund}
               className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-blue-500 dark:hover:bg-blue-400"
             >
               {submitting && (
@@ -1210,7 +1293,7 @@ export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: Part
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
               )}
-              Issue Refund
+              {has_stripe ? "Issue Stripe Refund" : "Record Refund"}
             </button>
           </>
         )}

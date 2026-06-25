@@ -324,6 +324,8 @@ export interface AdminInvoice {
   order_id: string;
   status: InvoiceStatus;
   payment_method: InvoicePaymentMethod;
+  payment_intent_id?: string | null;
+  has_stripe_payment?: boolean;
   currency_type: InvoiceCurrencyType;
   subtotal_amount: number;
   discount_amount?: number;
