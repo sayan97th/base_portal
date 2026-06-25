@@ -1056,7 +1056,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     const new_row = createEmptyRow();
     new_row_ids_ref.current.add(new_row.id);
     setRows((prev) => {
-      const updated = [...prev, new_row];
+      const updated = [new_row, ...prev];
       const drafts = updated.filter((r) => new_row_ids_ref.current.has(r.id));
       saveDraftsToStorage(drafts);
       return updated;
