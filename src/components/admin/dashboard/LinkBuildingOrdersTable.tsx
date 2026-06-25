@@ -639,7 +639,7 @@ function TableSkeleton() {
 // ── Default sort ───────────────────────────────────────────────────────────────
 
 const DEFAULT_SORT_RULES: SortRulePayload[] = [
-  { key: "request_date", direction: "desc", nulls_last: true },
+  { key: "order_id", direction: "desc", nulls_last: true },
 ];
 
 // ── Main component ─────────────────────────────────────────────────────────────
