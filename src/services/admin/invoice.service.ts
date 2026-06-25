@@ -95,16 +95,32 @@ export async function markAdminInvoiceAsOverdue(invoice_id: string): Promise<Adm
   return apiClient.post<AdminInvoice>(`/api/admin/invoices/${invoice_id}/mark-overdue`, {});
 }
 
-export async function refundAdminInvoice(invoice_id: string): Promise<AdminInvoice> {
-  return apiClient.post<AdminInvoice>(`/api/admin/invoices/${invoice_id}/refund`, {});
+export async function refundAdminInvoice(
+  invoice_id: string,
+  payment_intent_id?: string
+): Promise<AdminInvoice> {
+  return apiClient.post<AdminInvoice>(`/api/admin/invoices/${invoice_id}/refund`, {
+    ...(payment_intent_id ? { payment_intent_id } : {}),
+  });
 }
 
 export async function partialRefundAdminInvoice(
   invoice_id: string,
-  refund_amount: number
+  refund_amount: number,
+  payment_intent_id?: string
 ): Promise<AdminInvoice> {
   return apiClient.post<AdminInvoice>(`/api/admin/invoices/${invoice_id}/partial-refund`, {
     refund_amount,
+    ...(payment_intent_id ? { payment_intent_id } : {}),
+  });
+}
+
+export async function setInvoicePaymentIntent(
+  invoice_id: string,
+  payment_intent_id: string
+): Promise<AdminInvoice> {
+  return apiClient.patch<AdminInvoice>(`/api/admin/invoices/${invoice_id}/payment-intent`, {
+    payment_intent_id,
   });
 }
 

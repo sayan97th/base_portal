@@ -87,6 +87,38 @@ function SortIcon({
   );
 }
 
+function CopyablePI({ pi }: { pi: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    navigator.clipboard.writeText(pi).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    });
+  };
+  return (
+    <span className="flex items-center gap-1">
+      <span className="font-mono text-[10px] text-gray-400 dark:text-gray-500" title={pi}>
+        {pi.substring(0, 16)}…
+      </span>
+      <button
+        onClick={copy}
+        title={copied ? "Copied!" : "Copy full ID"}
+        className="shrink-0 rounded p-0.5 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
+      >
+        {copied ? (
+          <svg className="h-3 w-3 text-green-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+          </svg>
+        ) : (
+          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" />
+          </svg>
+        )}
+      </button>
+    </span>
+  );
+}
+
 const PER_PAGE = 25;
 
 export default function AdminTransactionsContent() {
@@ -486,12 +518,7 @@ export default function AdminTransactionsContent() {
                     {/* Payment intent ID */}
                     <td className="px-4 py-3">
                       {tx.payment_intent_id ? (
-                        <span
-                          className="font-mono text-[10px] text-gray-400 dark:text-gray-500"
-                          title={tx.payment_intent_id}
-                        >
-                          {tx.payment_intent_id.substring(0, 16)}…
-                        </span>
+                        <CopyablePI pi={tx.payment_intent_id} />
                       ) : (
                         <span className="text-xs text-gray-400">—</span>
                       )}

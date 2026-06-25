@@ -15,6 +15,7 @@ import {
   duplicateAdminInvoice,
   deleteAdminInvoice,
   voidAdminInvoice,
+  setInvoicePaymentIntent,
   type UpdateInvoiceBillingPayload,
 } from "@/services/admin/invoice.service";
 import type { CreateInvoiceLineItemPayload } from "@/types/admin";
@@ -925,6 +926,7 @@ interface RefundInvoiceDialogProps {
 export function RefundInvoiceDialog({ invoice, onClose, onSuccess }: RefundInvoiceDialogProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pi_input, setPiInput] = useState("");
 
   const customer_name = `${invoice.user.first_name} ${invoice.user.last_name}`;
   const fmt = (n: number) =>
@@ -934,12 +936,14 @@ export function RefundInvoiceDialog({ invoice, onClose, onSuccess }: RefundInvoi
   const payment_type = resolveRefundPaymentType(invoice);
   const credit_amount = invoice.credit_amount ?? 0;
   const card_amount = Math.max(0, invoice.total_amount - credit_amount);
+  const is_missing_pi = invoice.payment_method === "Credit Card" && !invoice.has_stripe_payment;
 
   const handleConfirm = async () => {
     setError(null);
     setSubmitting(true);
     try {
-      const updated = await refundAdminInvoice(invoice.id);
+      const override_pi = pi_input.trim() || undefined;
+      const updated = await refundAdminInvoice(invoice.id, override_pi);
       onSuccess(updated);
     } catch (err: unknown) {
       const api_err = err as { message?: string };
@@ -953,6 +957,7 @@ export function RefundInvoiceDialog({ invoice, onClose, onSuccess }: RefundInvoi
     if (payment_type === "credits") return "Refund Credits";
     if (payment_type === "card") return "Process Stripe Refund";
     if (payment_type === "mixed") return "Process Full Refund";
+    if (is_missing_pi) return pi_input.trim() ? "Process Stripe Refund" : "Record as Manual Refund";
     return "Record Refund";
   };
 
@@ -1038,7 +1043,7 @@ export function RefundInvoiceDialog({ invoice, onClose, onSuccess }: RefundInvoi
             </div>
           )}
 
-          {can_refund && payment_type === "manual" && (
+          {can_refund && payment_type === "manual" && !is_missing_pi && (
             <div className="flex items-start gap-3 rounded-xl border border-warning-200 bg-warning-50 p-4 dark:border-warning-500/30 dark:bg-warning-500/10">
               <svg className="mt-0.5 h-4 w-4 shrink-0 text-warning-600 dark:text-warning-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
@@ -1047,6 +1052,37 @@ export function RefundInvoiceDialog({ invoice, onClose, onSuccess }: RefundInvoi
                 <p className="text-xs font-semibold text-warning-800 dark:text-warning-300">Manual record — no automatic credit</p>
                 <p className="mt-0.5 text-xs text-warning-700 dark:text-warning-400">
                   No Stripe payment is associated with this invoice. The refund will be recorded in the system, but you must process the credit manually.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {can_refund && is_missing_pi && (
+            <div className="space-y-3">
+              <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-500/10">
+                <svg className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+                </svg>
+                <div>
+                  <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">Stripe Payment Intent ID missing</p>
+                  <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">
+                    This invoice was paid by credit card but no Stripe Payment Intent ID is on file. Paste the ID below to process the Stripe refund automatically, or leave it blank to record the refund manually.
+                  </p>
+                </div>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-gray-700 dark:text-gray-300">
+                  Stripe Payment Intent ID <span className="font-normal text-gray-400">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={pi_input}
+                  onChange={(e) => { setPiInput(e.target.value); setError(null); }}
+                  placeholder="pi_3…"
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 font-mono text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
+                />
+                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                  Find it in your <span className="font-medium">Stripe Dashboard</span> under the customer&apos;s payment.
                 </p>
               </div>
             </div>
@@ -1214,6 +1250,7 @@ function RefundPaymentBanner({ invoice }: { invoice: AdminInvoice }) {
 
 export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: PartialRefundInvoiceDialogProps) {
   const [refund_input, setRefundInput] = useState("");
+  const [pi_input, setPiInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -1227,6 +1264,7 @@ export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: Part
   const can_refund = invoice.status === "paid" || invoice.status === "refund";
   const payment_type = resolveRefundPaymentType(invoice);
   const is_credit_payment = payment_type === "credits" || payment_type === "mixed";
+  const is_missing_pi = invoice.payment_method === "Credit Card" && !invoice.has_stripe_payment;
 
   const parsed_amount = parseFloat(refund_input) || 0;
   const is_valid_amount = parsed_amount > 0 && parsed_amount <= remaining_refundable;
@@ -1235,6 +1273,7 @@ export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: Part
     if (payment_type === "credits") return `${fmt(parsed_amount)} has been returned to ${customer_name}'s account balance.`;
     if (payment_type === "card") return `${fmt(parsed_amount)} has been refunded to the card on file for ${customer_name}.`;
     if (payment_type === "mixed") return `${fmt(parsed_amount)} has been refunded. Credits returned to account balance and card portion refunded via Stripe.`;
+    if (is_missing_pi && pi_input.trim()) return `${fmt(parsed_amount)} has been refunded to the card for ${customer_name}.`;
     return `${fmt(parsed_amount)} has been recorded as a refund for ${customer_name}.`;
   };
 
@@ -1242,6 +1281,7 @@ export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: Part
     if (payment_type === "credits") return "Refund Credits";
     if (payment_type === "card") return "Issue Stripe Refund";
     if (payment_type === "mixed") return "Issue Refund";
+    if (is_missing_pi) return pi_input.trim() ? "Issue Stripe Refund" : "Record Refund";
     return "Record Refund";
   };
 
@@ -1259,7 +1299,8 @@ export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: Part
 
     setSubmitting(true);
     try {
-      const updated = await partialRefundAdminInvoice(invoice.id, parsed_amount);
+      const override_pi = pi_input.trim() || undefined;
+      const updated = await partialRefundAdminInvoice(invoice.id, parsed_amount, override_pi);
       setSuccess(true);
       onSuccess(updated);
     } catch (err: unknown) {
@@ -1316,6 +1357,32 @@ export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: Part
           <div className="space-y-5">
             {/* Payment method indicator */}
             <RefundPaymentBanner invoice={invoice} />
+
+            {/* PI input for card payments missing a Stripe PI */}
+            {is_missing_pi && (
+              <div className="space-y-3">
+                <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3.5 dark:border-amber-500/30 dark:bg-amber-500/10">
+                  <svg className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                  </svg>
+                  <p className="text-xs text-amber-700 dark:text-amber-400">
+                    <span className="font-semibold">Stripe Payment Intent ID missing.</span> Paste the ID below to refund the card automatically, or leave blank to record manually.
+                  </p>
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-gray-700 dark:text-gray-300">
+                    Stripe Payment Intent ID <span className="font-normal text-gray-400">(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={pi_input}
+                    onChange={(e) => { setPiInput(e.target.value); setError(null); }}
+                    placeholder="pi_3…"
+                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 font-mono text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Invoice summary */}
             <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
@@ -1817,6 +1884,144 @@ export function VoidInvoiceDialog({ invoice, onClose, onVoidSuccess, onDeleteSuc
           >
             Select an option
           </button>
+        )}
+      </DialogFooter>
+    </DialogShell>
+  );
+}
+
+// ── Set Payment Intent Dialog ─────────────────────────────────────────────────
+
+interface SetPaymentIntentDialogProps {
+  invoice: AdminInvoice;
+  onClose: () => void;
+  onSuccess: (updated: AdminInvoice) => void;
+}
+
+export function SetPaymentIntentDialog({ invoice, onClose, onSuccess }: SetPaymentIntentDialogProps) {
+  const [pi_input, setPiInput] = useState(invoice.payment_intent_id ?? "");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const is_update = Boolean(invoice.payment_intent_id);
+  const is_valid = pi_input.trim().length > 0;
+
+  const handleSubmit = async () => {
+    const trimmed = pi_input.trim();
+    if (!trimmed) {
+      setError("Please enter a Stripe Payment Intent ID.");
+      return;
+    }
+    setError(null);
+    setSubmitting(true);
+    try {
+      const updated = await setInvoicePaymentIntent(invoice.id, trimmed);
+      setSuccess(true);
+      onSuccess(updated);
+    } catch (err: unknown) {
+      const api_err = err as { message?: string };
+      setError(api_err?.message ?? "Failed to save the Payment Intent ID. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <DialogShell onClose={onClose}>
+      <DialogHeader
+        title={is_update ? "Update Stripe Payment ID" : "Set Stripe Payment ID"}
+        onClose={onClose}
+        icon={
+          <svg className="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+          </svg>
+        }
+      />
+
+      <div className="p-6">
+        {success ? (
+          <div className="flex flex-col items-center gap-3 py-4 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-500/15">
+              <svg className="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-900 dark:text-white">Stripe Payment ID saved</p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Invoice <span className="font-mono font-semibold">{invoice.invoice_number}</span> can now be refunded via Stripe.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {is_update
+                ? "Update the Stripe Payment Intent ID associated with this invoice."
+                : "This invoice was paid by credit card but no Stripe Payment Intent ID was recorded. Paste the ID from your Stripe Dashboard to enable automatic refunds."}
+            </p>
+
+            {is_update && invoice.payment_intent_id && (
+              <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 dark:border-gray-800 dark:bg-white/[0.02]">
+                <p className="mb-0.5 text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">Current ID</p>
+                <p className="font-mono text-xs text-gray-700 dark:text-gray-300 break-all">{invoice.payment_intent_id}</p>
+              </div>
+            )}
+
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-700 dark:text-gray-300">
+                Stripe Payment Intent ID
+              </label>
+              <input
+                type="text"
+                value={pi_input}
+                onChange={(e) => { setPiInput(e.target.value); setError(null); }}
+                placeholder="pi_3…"
+                autoFocus
+                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 font-mono text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
+              />
+              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                Find it in the <span className="font-medium">Stripe Dashboard</span> → Payments → select the charge → copy the Payment Intent ID.
+              </p>
+            </div>
+
+            {error && <ErrorBanner message={error} />}
+          </div>
+        )}
+      </div>
+
+      <DialogFooter>
+        {success ? (
+          <button
+            onClick={onClose}
+            className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            Close
+          </button>
+        ) : (
+          <>
+            <button
+              onClick={onClose}
+              disabled={submitting}
+              className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={submitting || !is_valid}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-blue-500 dark:hover:bg-blue-400"
+            >
+              {submitting && (
+                <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              )}
+              {is_update ? "Update" : "Save Payment ID"}
+            </button>
+          </>
         )}
       </DialogFooter>
     </DialogShell>

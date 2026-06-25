@@ -22,6 +22,7 @@ import {
   DuplicateInvoiceDialog,
   DeleteInvoiceDialog,
   VoidInvoiceDialog,
+  SetPaymentIntentDialog,
 } from "./InvoiceActionDialogs";
 
 interface AdminInvoiceDetailContentProps {
@@ -164,6 +165,38 @@ const InfoRow: React.FC<InfoRowProps> = ({ label, value, border = true }) => (
     <dd className="text-sm font-medium text-gray-900 dark:text-white text-right">{value}</dd>
   </div>
 );
+
+function StripePaymentIdCell({ pi }: { pi: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    navigator.clipboard.writeText(pi).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    });
+  };
+  return (
+    <span className="flex items-center gap-1.5">
+      <span className="font-mono text-xs text-gray-600 dark:text-gray-400" title={pi}>
+        {pi.substring(0, 18)}…
+      </span>
+      <button
+        onClick={copy}
+        title={copied ? "Copied!" : "Copy full ID"}
+        className="shrink-0 rounded p-0.5 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
+      >
+        {copied ? (
+          <svg className="h-3.5 w-3.5 text-success-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+          </svg>
+        ) : (
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" />
+          </svg>
+        )}
+      </button>
+    </span>
+  );
+}
 
 const SkeletonLoader: React.FC = () => (
   <div className="space-y-6">
@@ -758,7 +791,7 @@ function groupHistoryByDate(entries: InvoiceHistoryEntry[]): Array<{ date_label:
 
 // ── Actions dropdown ──────────────────────────────────────────────────────────
 
-type ActiveDialog = "email" | "edit" | "edit_billing" | "mark_paid" | "mark_unpaid" | "mark_overdue" | "refund" | "partial_refund" | "duplicate" | "delete" | "void" | null;
+type ActiveDialog = "email" | "edit" | "edit_billing" | "mark_paid" | "mark_unpaid" | "mark_overdue" | "refund" | "partial_refund" | "duplicate" | "delete" | "void" | "set_payment_intent" | null;
 // "edit" is intercepted in handleDialogSelect and navigates to the full edit page
 
 interface ActionsDropdownProps {
@@ -785,17 +818,18 @@ function ActionsDropdown({ onSelect }: ActionsDropdownProps) {
   };
 
   const menu_items: { label: string; dialog: ActiveDialog; danger?: boolean; separator_before?: boolean }[] = [
-    { label: "Email invoice",   dialog: "email" },
-    { label: "Edit",            dialog: "edit" },
+    { label: "Email invoice",        dialog: "email" },
+    { label: "Edit",                 dialog: "edit" },
     { label: "Edit Billing Details", dialog: "edit_billing" },
-    { label: "Mark as Paid",    dialog: "mark_paid",    separator_before: true },
-    { label: "Mark as Unpaid",  dialog: "mark_unpaid" },
-    { label: "Mark as Overdue", dialog: "mark_overdue" },
-    { label: "Refund",           dialog: "refund" },
-    { label: "Partial Refund",  dialog: "partial_refund" },
-    { label: "Duplicate",       dialog: "duplicate",   separator_before: true },
-    { label: "Void",            dialog: "void",        separator_before: true },
-    { label: "Delete",          dialog: "delete",      danger: true },
+    { label: "Set Stripe Payment ID", dialog: "set_payment_intent", separator_before: true },
+    { label: "Mark as Paid",         dialog: "mark_paid",    separator_before: true },
+    { label: "Mark as Unpaid",       dialog: "mark_unpaid" },
+    { label: "Mark as Overdue",      dialog: "mark_overdue" },
+    { label: "Refund",               dialog: "refund" },
+    { label: "Partial Refund",       dialog: "partial_refund" },
+    { label: "Duplicate",            dialog: "duplicate",   separator_before: true },
+    { label: "Void",                 dialog: "void",        separator_before: true },
+    { label: "Delete",               dialog: "delete",      danger: true },
   ];
 
   return (
@@ -1532,6 +1566,22 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
                   )}
                 </>
               )}
+              <InfoRow
+                label="Stripe Payment ID"
+                border={false}
+                value={
+                  invoice.payment_intent_id ? (
+                    <StripePaymentIdCell pi={invoice.payment_intent_id} />
+                  ) : (
+                    <button
+                      onClick={() => handleDialogSelect("set_payment_intent")}
+                      className="text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
+                    >
+                      + Set ID
+                    </button>
+                  )
+                }
+              />
             </dl>
           </div>
 
@@ -1713,6 +1763,13 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
           onClose={() => setActiveDialog(null)}
           onVoidSuccess={(updated) => { setInvoice(updated); setActiveDialog(null); }}
           onDeleteSuccess={() => setActiveDialog(null)}
+        />
+      )}
+      {active_dialog === "set_payment_intent" && (
+        <SetPaymentIntentDialog
+          invoice={invoice}
+          onClose={() => setActiveDialog(null)}
+          onSuccess={(updated) => { setInvoice(updated); setActiveDialog(null); }}
         />
       )}
     </div>
