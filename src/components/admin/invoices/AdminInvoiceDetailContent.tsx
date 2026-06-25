@@ -18,6 +18,7 @@ import {
   MarkAsUnpaidDialog,
   MarkAsOverdueDialog,
   RefundInvoiceDialog,
+  PartialRefundInvoiceDialog,
   DuplicateInvoiceDialog,
   DeleteInvoiceDialog,
   VoidInvoiceDialog,
@@ -757,7 +758,7 @@ function groupHistoryByDate(entries: InvoiceHistoryEntry[]): Array<{ date_label:
 
 // ── Actions dropdown ──────────────────────────────────────────────────────────
 
-type ActiveDialog = "email" | "edit" | "edit_billing" | "mark_paid" | "mark_unpaid" | "mark_overdue" | "refund" | "duplicate" | "delete" | "void" | null;
+type ActiveDialog = "email" | "edit" | "edit_billing" | "mark_paid" | "mark_unpaid" | "mark_overdue" | "refund" | "partial_refund" | "duplicate" | "delete" | "void" | null;
 // "edit" is intercepted in handleDialogSelect and navigates to the full edit page
 
 interface ActionsDropdownProps {
@@ -790,7 +791,8 @@ function ActionsDropdown({ onSelect }: ActionsDropdownProps) {
     { label: "Mark as Paid",    dialog: "mark_paid",    separator_before: true },
     { label: "Mark as Unpaid",  dialog: "mark_unpaid" },
     { label: "Mark as Overdue", dialog: "mark_overdue" },
-    { label: "Refund",          dialog: "refund" },
+    { label: "Refund",           dialog: "refund" },
+    { label: "Partial Refund",  dialog: "partial_refund" },
     { label: "Duplicate",       dialog: "duplicate",   separator_before: true },
     { label: "Void",            dialog: "void",        separator_before: true },
     { label: "Delete",          dialog: "delete",      danger: true },
@@ -1504,8 +1506,31 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
                 <InfoRow
                   label="Date Paid"
                   value={<span className="text-success-600 dark:text-success-400">{formatDate(invoice.date_paid)}</span>}
-                  border={false}
+                  border={!!(invoice.refund_amount && invoice.refund_amount > 0)}
                 />
+              )}
+              {invoice.refund_amount != null && invoice.refund_amount > 0 && (
+                <>
+                  <InfoRow
+                    label={
+                      <span className="flex items-center gap-1.5 font-medium text-blue-600 dark:text-blue-400">
+                        <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+                        </svg>
+                        Refunded
+                      </span>
+                    }
+                    value={<span className="font-semibold tabular-nums text-blue-600 dark:text-blue-400">-{formatCurrency(invoice.refund_amount)}</span>}
+                    border={!!(invoice.refunded_at)}
+                  />
+                  {invoice.refunded_at && (
+                    <InfoRow
+                      label="Refund Date"
+                      value={<span className="text-blue-600 dark:text-blue-400">{formatDate(invoice.refunded_at)}</span>}
+                      border={false}
+                    />
+                  )}
+                </>
               )}
             </dl>
           </div>
@@ -1656,6 +1681,13 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
       )}
       {active_dialog === "refund" && (
         <RefundInvoiceDialog
+          invoice={invoice}
+          onClose={() => setActiveDialog(null)}
+          onSuccess={(updated) => { setInvoice(updated); setActiveDialog(null); }}
+        />
+      )}
+      {active_dialog === "partial_refund" && (
+        <PartialRefundInvoiceDialog
           invoice={invoice}
           onClose={() => setActiveDialog(null)}
           onSuccess={(updated) => { setInvoice(updated); setActiveDialog(null); }}

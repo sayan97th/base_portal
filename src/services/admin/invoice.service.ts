@@ -99,6 +99,15 @@ export async function refundAdminInvoice(invoice_id: string): Promise<AdminInvoi
   return apiClient.post<AdminInvoice>(`/api/admin/invoices/${invoice_id}/refund`, {});
 }
 
+export async function partialRefundAdminInvoice(
+  invoice_id: string,
+  refund_amount: number
+): Promise<AdminInvoice> {
+  return apiClient.post<AdminInvoice>(`/api/admin/invoices/${invoice_id}/partial-refund`, {
+    refund_amount,
+  });
+}
+
 export async function emailAdminInvoice(invoice_id: string): Promise<void> {
   return apiClient.post<void>(`/api/admin/invoices/${invoice_id}/send-reminder`, {});
 }

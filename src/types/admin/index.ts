@@ -330,9 +330,11 @@ export interface AdminInvoice {
   discount_type?: "bulk" | "percentage" | "fixed_amount";
   total_amount: number;
   credit_amount: number;
+  refund_amount?: number | null;
   date_issued: string | null;
   date_due: string | null;
   date_paid: string | null;
+  refunded_at?: string | null;
   created_at: string;
   updated_at: string;
   user: OrderUser;

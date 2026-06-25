@@ -11,6 +11,7 @@ import {
   markAdminInvoiceAsUnpaid,
   markAdminInvoiceAsOverdue,
   refundAdminInvoice,
+  partialRefundAdminInvoice,
   duplicateAdminInvoice,
   deleteAdminInvoice,
   voidAdminInvoice,
@@ -1004,6 +1005,215 @@ export function RefundInvoiceDialog({ invoice, onClose, onSuccess }: RefundInvoi
           )}
           Process Refund
         </button>
+      </DialogFooter>
+    </DialogShell>
+  );
+}
+
+// ── Partial Refund Invoice Dialog ─────────────────────────────────────────────
+
+interface PartialRefundInvoiceDialogProps {
+  invoice: AdminInvoice;
+  onClose: () => void;
+  onSuccess: (updated: AdminInvoice) => void;
+}
+
+export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: PartialRefundInvoiceDialogProps) {
+  const [refund_input, setRefundInput] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const customer_name = `${invoice.user.first_name} ${invoice.user.last_name}`;
+  const already_refunded = invoice.refund_amount ?? 0;
+  const remaining_refundable = Math.max(0, invoice.total_amount - already_refunded);
+  const fmt = (n: number) =>
+    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
+
+  const parsed_amount = parseFloat(refund_input) || 0;
+  const is_valid_amount =
+    parsed_amount > 0 && parsed_amount <= remaining_refundable;
+
+  const handleSubmit = async () => {
+    setError(null);
+
+    if (parsed_amount <= 0) {
+      setError("Please enter a refund amount greater than $0.00.");
+      return;
+    }
+    if (parsed_amount > remaining_refundable) {
+      setError(
+        `Amount exceeds the remaining refundable balance of ${fmt(remaining_refundable)}.`
+      );
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const updated = await partialRefundAdminInvoice(invoice.id, parsed_amount);
+      setSuccess(true);
+      onSuccess(updated);
+    } catch (err: unknown) {
+      const api_err = err as { message?: string };
+      setError(api_err?.message ?? "Failed to process the partial refund. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <DialogShell onClose={onClose}>
+      <DialogHeader
+        title="Issue Partial Refund"
+        onClose={onClose}
+        icon={
+          <svg className="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+          </svg>
+        }
+      />
+
+      <div className="overflow-y-auto p-6">
+        {success ? (
+          <div className="flex flex-col items-center gap-3 py-6 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-500/15">
+              <svg className="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-900 dark:text-white">Partial refund processed</p>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                {fmt(parsed_amount)} has been recorded as refunded to <span className="font-medium">{customer_name}</span>.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {/* Info banner */}
+            <div className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-500/30 dark:bg-blue-500/10">
+              <svg className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+              </svg>
+              <p className="text-xs text-blue-700 dark:text-blue-300">
+                Enter the dollar amount to refund back to the customer&apos;s card. The refund will be recorded against invoice{" "}
+                <span className="font-mono font-semibold">{invoice.invoice_number}</span>.
+              </p>
+            </div>
+
+            {/* Invoice summary */}
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                Refund Summary
+              </p>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500 dark:text-gray-400">Customer</span>
+                  <span className="font-medium text-gray-900 dark:text-white">{customer_name}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500 dark:text-gray-400">Invoice Total</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">{fmt(invoice.total_amount)}</span>
+                </div>
+                {already_refunded > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-500 dark:text-gray-400">Already Refunded</span>
+                    <span className="font-medium text-blue-600 dark:text-blue-400">-{fmt(already_refunded)}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between border-t border-gray-200 pt-2 dark:border-gray-700">
+                  <span className="text-gray-600 dark:text-gray-300 font-medium">Remaining Refundable</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">{fmt(remaining_refundable)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Amount input */}
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-gray-700 dark:text-gray-300">
+                Refund Amount
+              </label>
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-500 dark:text-gray-400">
+                  $
+                </span>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  max={remaining_refundable}
+                  value={refund_input}
+                  onChange={(e) => {
+                    setRefundInput(e.target.value);
+                    setError(null);
+                  }}
+                  placeholder="0.00"
+                  className="w-full rounded-lg border border-gray-200 bg-white pl-7 pr-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
+                />
+              </div>
+              <div className="mt-1.5 flex items-center justify-between">
+                <p className="text-xs text-gray-400 dark:text-gray-500">
+                  Maximum refundable: <span className="font-medium">{fmt(remaining_refundable)}</span>
+                </p>
+                {parsed_amount > 0 && is_valid_amount && (
+                  <button
+                    type="button"
+                    onClick={() => setRefundInput(String(remaining_refundable))}
+                    className="text-xs text-blue-600 hover:underline dark:text-blue-400"
+                  >
+                    Refund full balance
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Validation feedback */}
+            {parsed_amount > remaining_refundable && refund_input !== "" && (
+              <div className="flex items-center gap-2 rounded-lg border border-error-200 bg-error-50 px-3 py-2.5 text-xs text-error-600 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
+                <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                </svg>
+                Amount exceeds the remaining refundable balance of {fmt(remaining_refundable)}.
+              </div>
+            )}
+
+            {error && <ErrorBanner message={error} />}
+          </div>
+        )}
+      </div>
+
+      <DialogFooter>
+        {success ? (
+          <button
+            onClick={onClose}
+            className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            Close
+          </button>
+        ) : (
+          <>
+            <button
+              onClick={onClose}
+              disabled={submitting}
+              className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={submitting || !is_valid_amount}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-blue-500 dark:hover:bg-blue-400"
+            >
+              {submitting && (
+                <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              )}
+              Issue Refund
+            </button>
+          </>
+        )}
       </DialogFooter>
     </DialogShell>
   );
