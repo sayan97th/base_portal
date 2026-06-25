@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import type { LinkBuildingOrderRow } from "@/types/admin/link-building-order";
 import { useTableSort } from "@/hooks/useTableSort";
 import { useColumnFilters, isFilterActive } from "@/hooks/useColumnFilters";
@@ -100,9 +100,9 @@ const COLUMNS: ColumnDef[] = [
   { key: "status", label: "Status", group: "status_col", min_width: 130, type: "select", options: STATUS_OPTIONS },
   { key: "team_specific_link_id", label: "Team Specific Link ID", group: "team_link", min_width: 160, type: "text" },
   { key: "link_type", label: "Link Type", group: "core", min_width: 155, type: "select", options: LINK_TYPE_OPTIONS, required: true },
-  { key: "client", label: "Company", group: "core", min_width: 120, type: "text", required: true },
+  { key: "client", label: "Company", group: "core", min_width: 120, type: "text", required: true, sticky: true },
   { key: "keyword", label: "Keyword", group: "core", min_width: 200, type: "text", required: true },
-  { key: "landing_page", label: "Landing Page", group: "core", min_width: 240, type: "url", required: true },
+  { key: "landing_page", label: "Landing Page", group: "core", min_width: 240, type: "url", required: true, sticky: true },
   { key: "exact_match", label: "Exact Match?", group: "core", min_width: 100, type: "select", options: ["Yes", "No"] },
   { key: "notes", label: "Notes (Client)", group: "core", min_width: 160, type: "text" },
   { key: "internal_notes", label: "Internal Notes", group: "internal", min_width: 200, type: "text" },
@@ -129,6 +129,9 @@ const COLUMNS: ColumnDef[] = [
 const COLUMN_LABELS: Record<string, string> = Object.fromEntries(
   COLUMNS.map((col) => [col.key, col.label])
 );
+
+// Fixed pixel width of the checkbox column, used to compute sticky left offsets.
+const CHECKBOX_COL_WIDTH = 40;
 
 // ── Group header styles ────────────────────────────────────────────────────────
 
@@ -364,6 +367,7 @@ interface EditableCellProps {
   is_sticky?: boolean;
   sticky_left?: number;
   sticky_bg_class?: string;
+  show_shadow?: boolean;
 }
 
 function EditableCell({
@@ -383,6 +387,7 @@ function EditableCell({
   is_sticky = false,
   sticky_left = 0,
   sticky_bg_class = "bg-white dark:bg-gray-900",
+  show_shadow = false,
 }: EditableCellProps) {
   const input_ref = useRef<HTMLInputElement>(null);
   const select_ref = useRef<HTMLSelectElement>(null);
@@ -553,7 +558,7 @@ function EditableCell({
         is_required_error
           ? "bg-red-50/80 ring-1 ring-inset ring-red-300 hover:bg-red-100/60 dark:bg-red-900/20 dark:ring-red-700"
           : `hover:bg-blue-50 dark:hover:bg-blue-900/20${is_sticky ? ` ${sticky_bg_class}` : ""}`
-      }${is_sticky ? " shadow-[4px_0_6px_-3px_rgba(0,0,0,0.2)]" : ""}`}
+      }${is_sticky && show_shadow ? " shadow-[4px_0_6px_-3px_rgba(0,0,0,0.35)]" : ""}`}
       style={{
         ...(has_cell_editors
           ? { outline: `2px solid ${cell_editors[0].color}`, outlineOffset: "-2px" }
@@ -908,6 +913,26 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
   const visible_columns = COLUMNS.filter((col) => !hidden_columns.has(col.key));
   const filtered_rows = rows;
+
+  // Cumulative left offsets for sticky columns (accounts for hidden sticky columns).
+  // Starts after the fixed-width checkbox column.
+  const sticky_left_offsets = useMemo<Record<string, number>>(() => {
+    const offsets: Record<string, number> = {};
+    let cumulative = CHECKBOX_COL_WIDTH;
+    for (const col of visible_columns) {
+      if (col.sticky) {
+        offsets[col.key] = cumulative;
+        cumulative += col.min_width;
+      }
+    }
+    return offsets;
+  }, [visible_columns]);
+
+  // Key of the rightmost visible sticky column — receives the separator shadow.
+  const last_sticky_col_key = useMemo(
+    () => visible_columns.filter((c) => c.sticky).at(-1)?.key ?? null,
+    [visible_columns]
+  );
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -2138,8 +2163,11 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
           <table className="min-w-full border-collapse text-xs">
             <thead className="sticky top-0 z-20">
               <tr>
-                {/* Select-all checkbox column */}
-                <th className="w-px border border-gray-700/30 bg-gray-800 px-2 py-1.5 text-center">
+                {/* Select-all checkbox column — sticky so it stays visible while scrolling */}
+                <th
+                  className="border border-gray-700/30 bg-gray-800 px-2 py-1.5 text-center sticky left-0 z-[31]"
+                  style={{ width: CHECKBOX_COL_WIDTH, minWidth: CHECKBOX_COL_WIDTH }}
+                >
                   <input
                     ref={select_all_ref}
                     type="checkbox"
@@ -2166,10 +2194,10 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                   return (
                     <th
                       key={col.key}
-                      className={`border border-gray-700/30 px-2 py-1.5 text-left font-semibold tracking-wide ${GROUP_HEADER_STYLES[col.group]}${col.sticky ? " sticky z-[30] shadow-[4px_0_6px_-3px_rgba(0,0,0,0.35)]" : ""}`}
+                      className={`border border-gray-700/30 px-2 py-1.5 text-left font-semibold tracking-wide ${GROUP_HEADER_STYLES[col.group]}${col.sticky ? ` sticky z-[30]${col.key === last_sticky_col_key ? " shadow-[4px_0_6px_-3px_rgba(0,0,0,0.35)]" : ""}` : ""}`}
                       style={{
                         minWidth: col.min_width,
-                        ...(col.sticky ? { left: 0 } : {}),
+                        ...(col.sticky ? { left: sticky_left_offsets[col.key] } : {}),
                       }}
                     >
                       <div className="flex items-center gap-1">
@@ -2399,9 +2427,10 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                           : undefined
                       }
                     >
-                      {/* Row checkbox */}
+                      {/* Row checkbox — sticky so it stays aligned with the frozen column block */}
                       <td
-                        className="w-px border-r border-gray-100 px-2 py-1.5 dark:border-gray-800"
+                        className={`border-r border-gray-100 px-2 py-1.5 dark:border-gray-800 sticky left-0 z-[2] ${sticky_row_bg_class}`}
+                        style={{ width: CHECKBOX_COL_WIDTH, minWidth: CHECKBOX_COL_WIDTH }}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <input
@@ -2435,8 +2464,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                             onSelectImmediateSave={undefined}
                             onCopy={(val) => copyCellValue(val, col.key)}
                             is_sticky={col.sticky}
-                            sticky_left={col.sticky ? 0 : undefined}
+                            sticky_left={col.sticky ? sticky_left_offsets[col.key] : undefined}
                             sticky_bg_class={col.sticky ? sticky_row_bg_class : undefined}
+                            show_shadow={col.sticky && col.key === last_sticky_col_key}
                           />
                         );
                       })}
