@@ -1052,17 +1052,26 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
   // ── Add / Delete ────────────────────────────────────────────────────────────
 
-  const addRow = useCallback(() => {
-    const new_row = createEmptyRow();
-    new_row_ids_ref.current.add(new_row.id);
+  const addMultipleRows = useCallback((count: number) => {
+    const clamped = Math.max(1, Math.min(count, 100));
+    const new_rows: LinkBuildingOrderRow[] = Array.from({ length: clamped }, () => createEmptyRow());
+    new_rows.forEach((r) => new_row_ids_ref.current.add(r.id));
     setRows((prev) => {
-      const updated = [new_row, ...prev];
+      const updated = [...new_rows, ...prev];
       const drafts = updated.filter((r) => new_row_ids_ref.current.has(r.id));
       saveDraftsToStorage(drafts);
       return updated;
     });
-    setTimeout(() => setEditingCell({ row_id: new_row.id, col_key: "client" }), 50);
+    setShowAddMenu(false);
+    setTimeout(() => {
+      table_scroll_ref.current?.scrollTo({ top: 0, behavior: "smooth" });
+      if (new_rows[0]) setEditingCell({ row_id: new_rows[0].id, col_key: "client" });
+    }, 50);
   }, []);
+
+  const addRow = useCallback(() => {
+    addMultipleRows(1);
+  }, [addMultipleRows]);
 
   const deleteRow = useCallback(async (row_id: string) => {
     if (editing_cell_ref.current?.row_id === row_id) setEditingCell(null);
@@ -1379,6 +1388,24 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     select_all_ref.current.indeterminate = some && !all;
   }, [filtered_rows, selected_row_ids]);
 
+  // ── Bulk add rows ────────────────────────────────────────────────────────────
+
+  const [show_add_menu, setShowAddMenu] = useState(false);
+  const [custom_row_count, setCustomRowCount] = useState("5");
+  const add_btn_ref = useRef<HTMLDivElement>(null);
+  const table_scroll_ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!show_add_menu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (add_btn_ref.current && !add_btn_ref.current.contains(e.target as Node)) {
+        setShowAddMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [show_add_menu]);
+
   // ── Import modal ─────────────────────────────────────────────────────────────
 
   const [show_import_modal, setShowImportModal] = useState(false);
@@ -1687,16 +1714,79 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
               </div>
             )}
           </div>
-          {/* Add row */}
-          <button
-            onClick={addRow}
-            className="flex h-8 items-center gap-1.5 rounded-lg bg-brand-500 px-3 text-xs font-medium text-white transition-colors hover:bg-brand-600"
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
-            Add Row
-          </button>
+          {/* Add row — split button with bulk-add dropdown */}
+          <div ref={add_btn_ref} className="relative flex">
+            <button
+              onClick={addRow}
+              className="flex h-8 items-center gap-1.5 rounded-l-lg bg-brand-500 px-3 text-xs font-medium text-white transition-colors hover:bg-brand-600"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              Add Row
+            </button>
+            <button
+              onClick={() => setShowAddMenu((v) => !v)}
+              title="Add multiple rows at once"
+              className="flex h-8 items-center rounded-r-lg border-l border-brand-400 bg-brand-500 px-1.5 text-white transition-colors hover:bg-brand-600"
+            >
+              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+              </svg>
+            </button>
+
+            {show_add_menu && (
+              <div className="absolute right-0 top-full z-50 mt-1.5 w-64 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl shadow-gray-200/60 dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/30">
+                <div className="border-b border-gray-100 px-4 py-3 dark:border-gray-700">
+                  <p className="text-xs font-semibold text-gray-800 dark:text-gray-100">Add Multiple Rows</p>
+                  <p className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">Rows are added to the top of the table</p>
+                </div>
+                <div className="p-3">
+                  <p className="mb-2 text-[11px] font-medium text-gray-500 dark:text-gray-400">Quick add:</p>
+                  <div className="mb-3 flex flex-wrap gap-1.5">
+                    {[2, 5, 10, 25, 50].map((count) => (
+                      <button
+                        key={count}
+                        onClick={() => addMultipleRows(count)}
+                        className="flex h-7 items-center gap-0.5 rounded-lg border border-brand-200 bg-brand-50 px-2.5 text-xs font-medium text-brand-700 transition-colors hover:bg-brand-100 dark:border-brand-800 dark:bg-brand-900/20 dark:text-brand-400 dark:hover:bg-brand-900/40"
+                      >
+                        +{count}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="border-t border-gray-100 pt-3 dark:border-gray-700">
+                    <p className="mb-1.5 text-[11px] font-medium text-gray-500 dark:text-gray-400">Custom count:</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={custom_row_count}
+                        onChange={(e) => setCustomRowCount(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            const n = parseInt(custom_row_count, 10);
+                            if (!isNaN(n) && n > 0) addMultipleRows(n);
+                          }
+                        }}
+                        className="h-7 w-16 rounded border border-gray-200 bg-white px-2 text-center text-xs outline-none focus:border-brand-400 dark:border-gray-700 dark:bg-gray-700 dark:text-white"
+                      />
+                      <button
+                        onClick={() => {
+                          const n = parseInt(custom_row_count, 10);
+                          if (!isNaN(n) && n > 0) addMultipleRows(n);
+                        }}
+                        disabled={!custom_row_count || parseInt(custom_row_count, 10) < 1}
+                        className="flex h-7 flex-1 items-center justify-center rounded-lg bg-brand-500 px-3 text-xs font-medium text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
+                      >
+                        Add {custom_row_count || "?"} rows
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -2044,7 +2134,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       {is_loading ? (
         <TableSkeleton />
       ) : (
-        <div className="w-full min-w-0 overflow-auto max-h-[calc(100vh-200px)]">
+        <div ref={table_scroll_ref} className="w-full min-w-0 overflow-auto max-h-[calc(100vh-200px)]">
           <table className="min-w-full border-collapse text-xs">
             <thead className="sticky top-0 z-20">
               <tr>
