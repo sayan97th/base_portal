@@ -97,6 +97,7 @@ export interface ClientUserOption {
   name: string;
   email: string;
   avatar_url: string | null;
+  company: string;
 }
 
 /**

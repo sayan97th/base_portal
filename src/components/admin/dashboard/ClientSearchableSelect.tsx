@@ -57,14 +57,15 @@ export default function ClientSearchableSelect({
     const list = search.trim()
       ? client_users.filter(
           (u) =>
+            u.company.toLowerCase().includes(search.toLowerCase()) ||
             u.name.toLowerCase().includes(search.toLowerCase()) ||
             u.email.toLowerCase().includes(search.toLowerCase())
         )
       : [...client_users];
 
     return list.sort((a, b) => {
-      const a_empty = !a.name.trim();
-      const b_empty = !b.name.trim();
+      const a_empty = !a.company.trim() && !a.name.trim();
+      const b_empty = !b.company.trim() && !b.name.trim();
       if (a_empty === b_empty) return 0;
       return a_empty ? 1 : -1;
     });
@@ -154,7 +155,7 @@ export default function ClientSearchableSelect({
           {selected_client ? (
             <p className="mt-0.5 flex items-center gap-1 truncate text-[10px] text-teal-600 dark:text-teal-400">
               <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-teal-500" />
-              {selected_client.name}
+              {selected_client.company || selected_client.name}
             </p>
           ) : (
             <p className="mt-0.5 text-[10px] text-teal-500/60 dark:text-teal-500/50">
@@ -291,19 +292,25 @@ export default function ClientSearchableSelect({
                 />
               ) : (
                 <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-teal-100 text-[11px] font-bold text-teal-700 dark:bg-teal-900/50 dark:text-teal-300">
-                  {user.name.charAt(0).toUpperCase()}
+                  {(user.company || user.name).charAt(0).toUpperCase()}
                 </span>
               )}
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium leading-tight">
                   {search.trim()
-                    ? highlightMatch(user.name, search)
-                    : user.name}
+                    ? highlightMatch(user.company || user.name, search)
+                    : (user.company || user.name)}
                 </p>
                 <p className="mt-0.5 truncate text-[10px] leading-tight text-gray-400 dark:text-gray-500">
-                  {search.trim()
-                    ? highlightMatch(user.email, search)
-                    : user.email}
+                  {user.company ? (
+                    <>
+                      {search.trim() ? highlightMatch(user.name, search) : user.name}
+                      {" · "}
+                      {search.trim() ? highlightMatch(user.email, search) : user.email}
+                    </>
+                  ) : (
+                    search.trim() ? highlightMatch(user.email, search) : user.email
+                  )}
                 </p>
               </div>
               {is_selected && (

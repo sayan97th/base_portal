@@ -99,7 +99,7 @@ const COLUMNS: ColumnDef[] = [
   { key: "status", label: "Status", group: "status_col", min_width: 130, type: "select", options: STATUS_OPTIONS },
   { key: "team_specific_link_id", label: "Team Specific Link ID", group: "team_link", min_width: 160, type: "text" },
   { key: "link_type", label: "Link Type", group: "core", min_width: 155, type: "select", options: LINK_TYPE_OPTIONS, required: true },
-  { key: "client", label: "Client", group: "core", min_width: 120, type: "text", required: true },
+  { key: "client", label: "Company", group: "core", min_width: 120, type: "text", required: true },
   { key: "keyword", label: "Keyword", group: "core", min_width: 200, type: "text", required: true },
   { key: "landing_page", label: "Landing Page", group: "core", min_width: 240, type: "url", required: true },
   { key: "exact_match", label: "Exact Match?", group: "core", min_width: 100, type: "select", options: ["Yes", "No"] },
@@ -377,15 +377,17 @@ function ClientAssignCell({
               />
             ) : (
               <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-teal-600 text-[10px] font-bold text-white">
-                {selected_client.name.charAt(0).toUpperCase()}
+                {(selected_client.company || selected_client.name).charAt(0).toUpperCase()}
               </span>
             )}
             <span className="font-medium text-gray-700 dark:text-gray-200">
-              {selected_client.name}
+              {selected_client.company || selected_client.name}
             </span>
-            <span className="text-[10px] text-gray-400 dark:text-gray-500">
-              {selected_client.email}
-            </span>
+            {selected_client.company && (
+              <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                {selected_client.name}
+              </span>
+            )}
           </span>
         ) : (
           <span className="text-gray-300 dark:text-gray-600">— Unassigned —</span>
@@ -1825,7 +1827,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
               You have unsaved draft rows
             </p>
             <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">
-              Draft rows are highlighted in amber. Fill in <strong>Link Type</strong>, <strong>Client</strong>,{" "}
+              Draft rows are highlighted in amber. Fill in <strong>Link Type</strong>, <strong>Company</strong>,{" "}
               <strong>Keyword</strong>, and <strong>Landing Page</strong> in each draft row, then click outside
               the cell to save it to the server. Your data is preserved locally and will not be lost on reload.
             </p>
@@ -1919,10 +1921,10 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                             <img src={selected_client.avatar_url} alt={selected_client.name} className="h-4 w-4 shrink-0 rounded-full object-cover" />
                           ) : (
                             <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-teal-600 text-[8px] font-bold text-white">
-                              {selected_client.name.charAt(0).toUpperCase()}
+                              {(selected_client.company || selected_client.name).charAt(0).toUpperCase()}
                             </span>
                           )}
-                          <span className="flex-1 truncate font-medium text-gray-700 dark:text-gray-200">{selected_client.name}</span>
+                          <span className="flex-1 truncate font-medium text-gray-700 dark:text-gray-200">{selected_client.company || selected_client.name}</span>
                         </>
                       ) : (
                         <span className="flex-1 text-gray-400 dark:text-gray-500">Choose client…</span>
