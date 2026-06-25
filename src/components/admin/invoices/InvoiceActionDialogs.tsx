@@ -931,7 +931,9 @@ export function RefundInvoiceDialog({ invoice, onClose, onSuccess }: RefundInvoi
     new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
 
   const can_refund = invoice.status === "paid";
-  const has_stripe = Boolean(invoice.has_stripe_payment);
+  const payment_type = resolveRefundPaymentType(invoice);
+  const credit_amount = invoice.credit_amount ?? 0;
+  const card_amount = Math.max(0, invoice.total_amount - credit_amount);
 
   const handleConfirm = async () => {
     setError(null);
@@ -945,6 +947,13 @@ export function RefundInvoiceDialog({ invoice, onClose, onSuccess }: RefundInvoi
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const getSubmitLabel = () => {
+    if (payment_type === "credits") return "Refund Credits";
+    if (payment_type === "card") return "Process Stripe Refund";
+    if (payment_type === "mixed") return "Process Full Refund";
+    return "Record Refund";
   };
 
   return (
@@ -961,7 +970,7 @@ export function RefundInvoiceDialog({ invoice, onClose, onSuccess }: RefundInvoi
 
       <div className="overflow-y-auto p-6">
         <div className="space-y-5">
-          {/* Payment status guard */}
+          {/* Status guard */}
           {!can_refund && (
             <div className="flex items-start gap-3 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
               <svg className="mt-0.5 h-5 w-5 shrink-0 text-error-600 dark:text-error-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -978,34 +987,68 @@ export function RefundInvoiceDialog({ invoice, onClose, onSuccess }: RefundInvoi
             </div>
           )}
 
-          {/* Stripe / manual indicator */}
-          {can_refund && (
-            <div className={`flex items-start gap-3 rounded-xl border p-4 ${has_stripe ? "border-blue-200 bg-blue-50 dark:border-blue-500/30 dark:bg-blue-500/10" : "border-warning-200 bg-warning-50 dark:border-warning-500/30 dark:bg-warning-500/10"}`}>
-              {has_stripe ? (
-                <>
-                  <svg className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
-                  </svg>
-                  <div>
-                    <p className="text-xs font-semibold text-blue-800 dark:text-blue-300">Stripe refund — {fmt(invoice.total_amount)} will be credited back to the original card</p>
-                    <p className="mt-0.5 text-xs text-blue-700 dark:text-blue-400">
-                      This is a Stripe-processed payment. The full amount will be refunded to the customer&apos;s card automatically.
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <svg className="mt-0.5 h-4 w-4 shrink-0 text-warning-600 dark:text-warning-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                  </svg>
-                  <div>
-                    <p className="text-xs font-semibold text-warning-800 dark:text-warning-300">Manual record — no automatic card credit</p>
-                    <p className="mt-0.5 text-xs text-warning-700 dark:text-warning-400">
-                      No Stripe payment is associated with this invoice. The refund will be recorded in the system, but you must process the card credit manually.
-                    </p>
-                  </div>
-                </>
-              )}
+          {/* Payment method indicator */}
+          {can_refund && payment_type === "credits" && (
+            <div className="flex items-start gap-3 rounded-xl border border-violet-200 bg-violet-50 p-4 dark:border-violet-500/30 dark:bg-violet-500/10">
+              <svg className="mt-0.5 h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <p className="text-xs font-semibold text-violet-800 dark:text-violet-300">Credit refund — {fmt(invoice.total_amount)} returned to client account balance</p>
+                <p className="mt-0.5 text-xs text-violet-700 dark:text-violet-400">
+                  This invoice was paid using account credits. The full amount will be added back to{" "}
+                  <span className="font-semibold">{invoice.user.first_name}&apos;s</span> account balance immediately.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {can_refund && payment_type === "card" && (
+            <div className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-500/30 dark:bg-blue-500/10">
+              <svg className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+              </svg>
+              <div>
+                <p className="text-xs font-semibold text-blue-800 dark:text-blue-300">Stripe refund — {fmt(invoice.total_amount)} will be credited back to the original card</p>
+                <p className="mt-0.5 text-xs text-blue-700 dark:text-blue-400">
+                  This is a Stripe-processed payment. The full amount will be refunded to the customer&apos;s card automatically.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {can_refund && payment_type === "mixed" && (
+            <div className="space-y-2">
+              <div className="flex items-start gap-3 rounded-xl border border-violet-200 bg-violet-50 p-3.5 dark:border-violet-500/30 dark:bg-violet-500/10">
+                <svg className="mt-0.5 h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-xs text-violet-700 dark:text-violet-300">
+                  <span className="font-semibold">Credits ({fmt(credit_amount)})</span> — returned to client account balance immediately.
+                </p>
+              </div>
+              <div className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 p-3.5 dark:border-blue-500/30 dark:bg-blue-500/10">
+                <svg className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+                </svg>
+                <p className="text-xs text-blue-700 dark:text-blue-300">
+                  <span className="font-semibold">Card ({fmt(card_amount)})</span> — refunded to the original payment card via Stripe.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {can_refund && payment_type === "manual" && (
+            <div className="flex items-start gap-3 rounded-xl border border-warning-200 bg-warning-50 p-4 dark:border-warning-500/30 dark:bg-warning-500/10">
+              <svg className="mt-0.5 h-4 w-4 shrink-0 text-warning-600 dark:text-warning-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+              </svg>
+              <div>
+                <p className="text-xs font-semibold text-warning-800 dark:text-warning-300">Manual record — no automatic credit</p>
+                <p className="mt-0.5 text-xs text-warning-700 dark:text-warning-400">
+                  No Stripe payment is associated with this invoice. The refund will be recorded in the system, but you must process the credit manually.
+                </p>
+              </div>
             </div>
           )}
 
@@ -1022,8 +1065,20 @@ export function RefundInvoiceDialog({ invoice, onClose, onSuccess }: RefundInvoi
                   <span className="text-gray-500 dark:text-gray-400">Invoice</span>
                   <span className="font-mono text-gray-700 dark:text-gray-300">{invoice.invoice_number}</span>
                 </div>
+                {credit_amount > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-500 dark:text-gray-400">Credits Portion</span>
+                    <span className="font-medium text-violet-600 dark:text-violet-400">{fmt(credit_amount)}</span>
+                  </div>
+                )}
+                {card_amount > 0 && credit_amount > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-500 dark:text-gray-400">Card Portion</span>
+                    <span className="font-medium text-blue-600 dark:text-blue-400">{fmt(card_amount)}</span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between border-t border-gray-200 pt-2 dark:border-gray-700">
-                  <span className="font-medium text-gray-700 dark:text-gray-300">Refund Amount</span>
+                  <span className="font-medium text-gray-700 dark:text-gray-300">Total Refund Amount</span>
                   <span className="font-semibold text-blue-700 dark:text-blue-400">{fmt(invoice.total_amount)}</span>
                 </div>
               </div>
@@ -1053,7 +1108,7 @@ export function RefundInvoiceDialog({ invoice, onClose, onSuccess }: RefundInvoi
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
           )}
-          {has_stripe ? "Process Stripe Refund" : "Record Refund"}
+          {getSubmitLabel()}
         </button>
       </DialogFooter>
     </DialogShell>
@@ -1066,6 +1121,95 @@ interface PartialRefundInvoiceDialogProps {
   invoice: AdminInvoice;
   onClose: () => void;
   onSuccess: (updated: AdminInvoice) => void;
+}
+
+type RefundPaymentType = "credits" | "card" | "mixed" | "manual";
+
+function resolveRefundPaymentType(invoice: AdminInvoice): RefundPaymentType {
+  const credit_amount = invoice.credit_amount ?? 0;
+  const has_stripe = Boolean(invoice.has_stripe_payment);
+  const has_credits = credit_amount > 0;
+
+  if (has_credits && has_stripe) return "mixed";
+  if (has_credits && !has_stripe) return "credits";
+  if (!has_credits && has_stripe) return "card";
+  return "manual";
+}
+
+function RefundPaymentBanner({ invoice }: { invoice: AdminInvoice }) {
+  const credit_amount = invoice.credit_amount ?? 0;
+  const card_amount = Math.max(0, invoice.total_amount - credit_amount);
+  const payment_type = resolveRefundPaymentType(invoice);
+  const fmt = (n: number) =>
+    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
+
+  if (payment_type === "credits") {
+    return (
+      <div className="flex items-start gap-3 rounded-xl border border-violet-200 bg-violet-50 p-4 dark:border-violet-500/30 dark:bg-violet-500/10">
+        <svg className="mt-0.5 h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <div>
+          <p className="text-xs font-semibold text-violet-800 dark:text-violet-300">Credit refund — amount returned to client account balance</p>
+          <p className="mt-0.5 text-xs text-violet-700 dark:text-violet-400">
+            This invoice was paid using account credits. The refunded amount will be added back to{" "}
+            <span className="font-semibold">{invoice.user.first_name}&apos;s</span> account balance immediately.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (payment_type === "card") {
+    return (
+      <div className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-500/30 dark:bg-blue-500/10">
+        <svg className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+        </svg>
+        <p className="text-xs text-blue-700 dark:text-blue-300">
+          <span className="font-semibold">Stripe refund</span> — the specified amount will be credited back to the customer&apos;s original payment card automatically.
+          Invoice <span className="font-mono font-semibold">{invoice.invoice_number}</span>.
+        </p>
+      </div>
+    );
+  }
+
+  if (payment_type === "mixed") {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-start gap-3 rounded-xl border border-violet-200 bg-violet-50 p-3.5 dark:border-violet-500/30 dark:bg-violet-500/10">
+          <svg className="mt-0.5 h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="text-xs text-violet-700 dark:text-violet-300">
+            <span className="font-semibold">Credits portion ({fmt(credit_amount)})</span> — returned to client account balance.
+          </p>
+        </div>
+        <div className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 p-3.5 dark:border-blue-500/30 dark:bg-blue-500/10">
+          <svg className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+          </svg>
+          <p className="text-xs text-blue-700 dark:text-blue-300">
+            <span className="font-semibold">Card portion ({fmt(card_amount)})</span> — refunded to original payment card via Stripe.
+          </p>
+        </div>
+        <p className="px-1 text-xs text-gray-500 dark:text-gray-400">
+          Credits are refunded first. Any remaining amount is returned to the card.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-warning-200 bg-warning-50 p-4 dark:border-warning-500/30 dark:bg-warning-500/10">
+      <svg className="mt-0.5 h-4 w-4 shrink-0 text-warning-600 dark:text-warning-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+      </svg>
+      <p className="text-xs text-warning-700 dark:text-warning-300">
+        <span className="font-semibold">Manual record</span> — no payment method detected for this invoice. The refund will be recorded in the system, but you must process any credit manually.
+      </p>
+    </div>
+  );
 }
 
 export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: PartialRefundInvoiceDialogProps) {
@@ -1081,10 +1225,25 @@ export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: Part
     new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
 
   const can_refund = invoice.status === "paid" || invoice.status === "refund";
-  const has_stripe = Boolean(invoice.has_stripe_payment);
+  const payment_type = resolveRefundPaymentType(invoice);
+  const is_credit_payment = payment_type === "credits" || payment_type === "mixed";
 
   const parsed_amount = parseFloat(refund_input) || 0;
   const is_valid_amount = parsed_amount > 0 && parsed_amount <= remaining_refundable;
+
+  const getSuccessMessage = () => {
+    if (payment_type === "credits") return `${fmt(parsed_amount)} has been returned to ${customer_name}'s account balance.`;
+    if (payment_type === "card") return `${fmt(parsed_amount)} has been refunded to the card on file for ${customer_name}.`;
+    if (payment_type === "mixed") return `${fmt(parsed_amount)} has been refunded. Credits returned to account balance and card portion refunded via Stripe.`;
+    return `${fmt(parsed_amount)} has been recorded as a refund for ${customer_name}.`;
+  };
+
+  const getSubmitLabel = () => {
+    if (payment_type === "credits") return "Refund Credits";
+    if (payment_type === "card") return "Issue Stripe Refund";
+    if (payment_type === "mixed") return "Issue Refund";
+    return "Record Refund";
+  };
 
   const handleSubmit = async () => {
     setError(null);
@@ -1127,23 +1286,18 @@ export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: Part
         {success ? (
           /* ── Success state ── */
           <div className="flex flex-col items-center gap-3 py-6 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-500/15">
-              <svg className="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <div className={`flex h-12 w-12 items-center justify-center rounded-full ${is_credit_payment ? "bg-violet-100 dark:bg-violet-500/15" : "bg-blue-100 dark:bg-blue-500/15"}`}>
+              <svg className={`h-6 w-6 ${is_credit_payment ? "text-violet-600 dark:text-violet-400" : "text-blue-600 dark:text-blue-400"}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
               </svg>
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-900 dark:text-white">
-                {has_stripe ? "Stripe refund processed" : "Refund recorded"}
-              </p>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                {fmt(parsed_amount)} has been {has_stripe ? "refunded to the card on file for" : "recorded as a refund for"}{" "}
-                <span className="font-medium">{customer_name}</span>.
-              </p>
+              <p className="text-sm font-medium text-gray-900 dark:text-white">Refund processed successfully</p>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{getSuccessMessage()}</p>
             </div>
           </div>
         ) : !can_refund ? (
-          /* ── Payment guard ── */
+          /* ── Status guard ── */
           <div className="flex items-start gap-3 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
             <svg className="mt-0.5 h-5 w-5 shrink-0 text-error-600 dark:text-error-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
@@ -1160,29 +1314,8 @@ export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: Part
         ) : (
           /* ── Refund form ── */
           <div className="space-y-5">
-            {/* Stripe / manual indicator */}
-            <div className={`flex items-start gap-3 rounded-xl border p-4 ${has_stripe ? "border-blue-200 bg-blue-50 dark:border-blue-500/30 dark:bg-blue-500/10" : "border-warning-200 bg-warning-50 dark:border-warning-500/30 dark:bg-warning-500/10"}`}>
-              {has_stripe ? (
-                <>
-                  <svg className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
-                  </svg>
-                  <p className="text-xs text-blue-700 dark:text-blue-300">
-                    <span className="font-semibold">Stripe refund</span> — the specified amount will be credited back to the customer&apos;s original payment card automatically.
-                    Invoice <span className="font-mono font-semibold">{invoice.invoice_number}</span>.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <svg className="mt-0.5 h-4 w-4 shrink-0 text-warning-600 dark:text-warning-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                  </svg>
-                  <p className="text-xs text-warning-700 dark:text-warning-300">
-                    <span className="font-semibold">Manual record</span> — no Stripe payment found for this invoice. The refund amount will be recorded in the system, but you must process the card credit manually.
-                  </p>
-                </>
-              )}
-            </div>
+            {/* Payment method indicator */}
+            <RefundPaymentBanner invoice={invoice} />
 
             {/* Invoice summary */}
             <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
@@ -1198,10 +1331,22 @@ export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: Part
                   <span className="text-gray-500 dark:text-gray-400">Invoice Total</span>
                   <span className="font-semibold text-gray-900 dark:text-white">{fmt(invoice.total_amount)}</span>
                 </div>
+                {(invoice.credit_amount ?? 0) > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-500 dark:text-gray-400">Paid with Credits</span>
+                    <span className="font-medium text-violet-600 dark:text-violet-400">{fmt(invoice.credit_amount ?? 0)}</span>
+                  </div>
+                )}
+                {(invoice.credit_amount ?? 0) > 0 && invoice.total_amount > (invoice.credit_amount ?? 0) && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-500 dark:text-gray-400">Paid with Card</span>
+                    <span className="font-medium text-blue-600 dark:text-blue-400">{fmt(invoice.total_amount - (invoice.credit_amount ?? 0))}</span>
+                  </div>
+                )}
                 {already_refunded > 0 && (
                   <div className="flex items-center justify-between">
                     <span className="text-gray-500 dark:text-gray-400">Already Refunded</span>
-                    <span className="font-medium text-blue-600 dark:text-blue-400">-{fmt(already_refunded)}</span>
+                    <span className="font-medium text-gray-500 dark:text-gray-400">-{fmt(already_refunded)}</span>
                   </div>
                 )}
                 <div className="flex items-center justify-between border-t border-gray-200 pt-2 dark:border-gray-700">
@@ -1293,7 +1438,7 @@ export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: Part
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
               )}
-              {has_stripe ? "Issue Stripe Refund" : "Record Refund"}
+              {getSubmitLabel()}
             </button>
           </>
         )}
