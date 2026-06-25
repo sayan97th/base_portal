@@ -24,6 +24,9 @@ const TYPE_LABELS: Record<TransactionType, string> = {
   credit_payment:  "Credit Payment",
   hybrid_payment:  "Hybrid Payment",
   failed_purchase: "Failed Purchase",
+  refund:          "Refund",
+  partial_refund:  "Partial Refund",
+  dispute:         "Dispute",
 };
 
 const TYPE_STYLES: Record<TransactionType, string> = {
@@ -31,6 +34,9 @@ const TYPE_STYLES: Record<TransactionType, string> = {
   credit_payment:  "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
   hybrid_payment:  "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400",
   failed_purchase: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+  refund:          "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400",
+  partial_refund:  "bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400",
+  dispute:         "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400",
 };
 
 const METHOD_LABELS: Record<TransactionPaymentMethod, string> = {
@@ -245,6 +251,9 @@ export default function AdminTransactionsContent() {
           <option value="credit_payment">Credit Payment</option>
           <option value="hybrid_payment">Hybrid Payment</option>
           <option value="failed_purchase">Failed Purchase</option>
+          <option value="refund">Refund</option>
+          <option value="partial_refund">Partial Refund</option>
+          <option value="dispute">Dispute</option>
         </select>
 
         {/* Payment method filter */}

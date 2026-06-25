@@ -599,7 +599,10 @@ export type TransactionType =
   | "purchase"
   | "credit_payment"
   | "hybrid_payment"
-  | "failed_purchase";
+  | "failed_purchase"
+  | "refund"
+  | "partial_refund"
+  | "dispute";
 
 export type TransactionStatus = "success" | "failed";
 
