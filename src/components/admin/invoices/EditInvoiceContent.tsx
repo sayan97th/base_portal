@@ -6,6 +6,7 @@ import Link from "next/link";
 import flatpickr from "flatpickr";
 import { getAdminInvoice, updateAdminInvoice } from "@/services/admin/invoice.service";
 import ClientSelectDropdown from "@/components/admin/invoices/ClientSelectDropdown";
+import { toDateInputValue } from "@/lib/date";
 import type { AdminInvoice, AdminUser, InvoiceLineItem } from "@/types/admin";
 
 // ── Local line item state ─────────────────────────────────────────────────────
@@ -431,7 +432,7 @@ export default function EditInvoiceContent({ invoice_id }: { invoice_id: string 
       try {
         const data = await getAdminInvoice(invoice_id);
         setInvoice(data);
-        if (data.date_due) setDateDue(data.date_due);
+        if (data.date_due) setDateDue(toDateInputValue(data.date_due));
         if (data.user) {
           setSelectedClient({
             id: data.user.id,
@@ -513,7 +514,7 @@ export default function EditInvoiceContent({ invoice_id }: { invoice_id: string 
     try {
       await updateAdminInvoice(invoice_id, {
         user_id: selected_client!.id,
-        date_due,
+        date_due: toDateInputValue(date_due),
         line_items: line_items.map((item) => {
           const price = parseFloat(item.price) || 0;
           const qty = Math.max(1, parseInt(item.quantity) || 1);

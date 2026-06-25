@@ -6,6 +6,7 @@ import Link from "next/link";
 import flatpickr from "flatpickr";
 import { createAdminInvoice } from "@/services/admin/invoice.service";
 import ClientSelectDropdown from "@/components/admin/invoices/ClientSelectDropdown";
+import { toDateInputValue } from "@/lib/date";
 import type { AdminUser, CreateInvoicePayload } from "@/types/admin";
 
 // ── Local line item state ─────────────────────────────────────────────────────
@@ -411,7 +412,7 @@ export default function CreateInvoiceContent() {
     try {
       const payload: CreateInvoicePayload = {
         user_id: selected_client!.id,
-        date_due,
+        date_due: toDateInputValue(date_due),
         line_items: line_items.map((item) => {
           const price = parseFloat(item.price) || 0;
           const qty = Math.max(1, parseInt(item.quantity) || 1);
