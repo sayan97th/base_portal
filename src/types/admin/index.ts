@@ -251,7 +251,14 @@ export interface LaravelPaginatedResponse<T> {
 
 // ── Invoices ──────────────────────────────────────────────────────────────────
 
-export type InvoiceStatus = "paid" | "unpaid" | "overdue" | "refund" | "void";
+export type InvoiceStatus =
+  | "paid"
+  | "unpaid"
+  | "overdue"
+  | "refund"
+  | "partial_refund"
+  | "dispute"
+  | "void";
 
 export type InvoiceSortField =
   | "date_issued"

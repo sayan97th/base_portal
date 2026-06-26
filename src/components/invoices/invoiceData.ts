@@ -1,4 +1,11 @@
-export type InvoiceStatus = "paid" | "unpaid" | "overdue" | "refund" | "void";
+export type InvoiceStatus =
+  | "paid"
+  | "unpaid"
+  | "overdue"
+  | "refund"
+  | "partial_refund"
+  | "dispute"
+  | "void";
 export type ProductType = "link_building" | "new_content" | "content_optimization" | "content_brief";
 
 export const INVOICE_PRODUCT_CONFIG: Record<

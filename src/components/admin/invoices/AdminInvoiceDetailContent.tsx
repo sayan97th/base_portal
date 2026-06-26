@@ -132,11 +132,13 @@ const BackLink: React.FC = () => (
 type StatusConfig = { label: string; badge_class: string; dot_class: string };
 
 const STATUS_CONFIG: Record<import("@/types/admin").InvoiceStatus, StatusConfig> = {
-  paid:    { label: "Paid",    badge_class: "bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400",   dot_class: "bg-success-500" },
-  unpaid:  { label: "Unpaid",  badge_class: "bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400",   dot_class: "bg-warning-500" },
-  overdue: { label: "Overdue", badge_class: "bg-error-50 text-error-700 dark:bg-error-500/15 dark:text-error-400",           dot_class: "bg-error-500" },
-  refund:  { label: "Refund",  badge_class: "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400",               dot_class: "bg-blue-500" },
-  void:    { label: "Void",    badge_class: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",                 dot_class: "bg-gray-500" },
+  paid:           { label: "Paid",           badge_class: "bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400",   dot_class: "bg-success-500" },
+  unpaid:         { label: "Unpaid",         badge_class: "bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400",   dot_class: "bg-warning-500" },
+  overdue:        { label: "Overdue",        badge_class: "bg-error-50 text-error-700 dark:bg-error-500/15 dark:text-error-400",           dot_class: "bg-error-500" },
+  refund:         { label: "Refund",         badge_class: "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400",               dot_class: "bg-blue-500" },
+  partial_refund: { label: "Partial Refund", badge_class: "bg-orange-50 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400",       dot_class: "bg-orange-500" },
+  dispute:        { label: "Dispute",        badge_class: "bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400",               dot_class: "bg-rose-500" },
+  void:           { label: "Void",           badge_class: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",                 dot_class: "bg-gray-500" },
 };
 
 const StatusBadge: React.FC<{ status: import("@/types/admin").InvoiceStatus }> = ({ status }) => {
@@ -244,11 +246,13 @@ async function generateAdminInvoicePdf(invoice: AdminInvoice): Promise<void> {
   };
 
   const PDF_STATUS_COLORS: Record<string, [number, number, number]> = {
-    paid:    PDF_COLORS.success,
-    unpaid:  [217, 119, 6],
-    overdue: PDF_COLORS.error,
-    refund:  [37, 99, 235],
-    void:    [107, 114, 128],
+    paid:           PDF_COLORS.success,
+    unpaid:         [217, 119, 6],
+    overdue:        PDF_COLORS.error,
+    refund:         [37, 99, 235],
+    partial_refund: [234, 88, 12],
+    dispute:        [225, 29, 72],
+    void:           [107, 114, 128],
   };
 
   // Load logo
@@ -993,7 +997,7 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
             </svg>
             Share
           </button>
-          {invoice.status !== "paid" && invoice.status !== "void" && invoice.status !== "refund" && invoice.currency_type !== "credits" && (
+          {invoice.status !== "paid" && invoice.status !== "void" && invoice.status !== "refund" && invoice.status !== "partial_refund" && invoice.status !== "dispute" && invoice.currency_type !== "credits" && (
             <button
               onClick={() => setShareDialogOpen(true)}
               className="inline-flex items-center gap-2 rounded-lg border border-brand-300 bg-brand-50 px-4 py-2 text-sm font-medium text-brand-700 transition-colors hover:bg-brand-100 dark:border-brand-500/40 dark:bg-brand-500/10 dark:text-brand-400 dark:hover:bg-brand-500/20"

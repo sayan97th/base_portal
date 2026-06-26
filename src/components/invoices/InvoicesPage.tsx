@@ -14,11 +14,13 @@ const STATUS_BADGE: Record<
   string,
   { color: "success" | "warning" | "error" | "info" | "light"; dot: string; label: string }
 > = {
-  paid:    { color: "success", dot: "bg-success-500", label: "Paid" },
-  unpaid:  { color: "warning", dot: "bg-warning-500", label: "Unpaid" },
-  overdue: { color: "error",   dot: "bg-error-500",   label: "Overdue" },
-  refund:  { color: "info",    dot: "bg-blue-500",    label: "Refund" },
-  void:    { color: "light",   dot: "bg-gray-500",    label: "Void" },
+  paid:           { color: "success", dot: "bg-success-500", label: "Paid" },
+  unpaid:         { color: "warning", dot: "bg-warning-500", label: "Unpaid" },
+  overdue:        { color: "error",   dot: "bg-error-500",   label: "Overdue" },
+  refund:         { color: "info",    dot: "bg-blue-500",    label: "Refund" },
+  partial_refund: { color: "warning", dot: "bg-orange-500",  label: "Partial Refund" },
+  dispute:        { color: "error",   dot: "bg-rose-500",    label: "Dispute" },
+  void:           { color: "light",   dot: "bg-gray-500",    label: "Void" },
 };
 
 function buildPageButtons(current: number, last: number): (number | "...")[] {
