@@ -1261,7 +1261,13 @@ export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: Part
   const fmt = (n: number) =>
     new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
 
-  const can_refund = invoice.status === "paid" || invoice.status === "refund";
+  // Partial refunds are allowed while the invoice is "Paid" or already
+  // "Partially Refunded", as long as there is still a refundable balance.
+  // Once the cumulative refund reaches the invoice total the backend flips
+  // the status to "Refund" and no balance remains, disabling further refunds.
+  const is_refundable_status = invoice.status === "paid" || invoice.status === "partial_refund";
+  const is_fully_refunded = remaining_refundable <= 0;
+  const can_refund = is_refundable_status && !is_fully_refunded;
   const payment_type = resolveRefundPaymentType(invoice);
   const is_credit_payment = payment_type === "credits" || payment_type === "mixed";
   const is_missing_pi = invoice.payment_method === "Credit Card" && !invoice.has_stripe_payment;
@@ -1344,12 +1350,22 @@ export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: Part
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
             </svg>
             <div>
-              <p className="text-sm font-semibold text-error-800 dark:text-error-300">Refund not available</p>
-              <p className="mt-1 text-xs text-error-700 dark:text-error-400">
-                Partial refunds can only be issued for invoices with a <span className="font-semibold">Paid</span> status.
-                This invoice is currently <span className="font-semibold capitalize">{invoice.status}</span>.
-                The customer must complete payment before a refund can be processed.
+              <p className="text-sm font-semibold text-error-800 dark:text-error-300">
+                {is_fully_refunded && is_refundable_status ? "Invoice fully refunded" : "Refund not available"}
               </p>
+              {is_fully_refunded && is_refundable_status ? (
+                <p className="mt-1 text-xs text-error-700 dark:text-error-400">
+                  The full invoice total of <span className="font-semibold">{fmt(invoice.total_amount)}</span> has
+                  already been refunded, so there is no remaining balance to refund.
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-error-700 dark:text-error-400">
+                  Partial refunds can only be issued for invoices with a <span className="font-semibold">Paid</span> or{" "}
+                  <span className="font-semibold">Partially Refunded</span> status. This invoice is currently{" "}
+                  <span className="font-semibold capitalize">{invoice.status.replace("_", " ")}</span>.
+                  The customer must complete payment before a refund can be processed.
+                </p>
+              )}
             </div>
           </div>
         ) : (
