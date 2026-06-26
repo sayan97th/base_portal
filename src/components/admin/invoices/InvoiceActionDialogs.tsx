@@ -97,6 +97,73 @@ function ErrorBanner({ message }: { message: string }) {
   );
 }
 
+// ── Refund confirmation primitives ─────────────────────────────────────────────
+
+interface RefundConfirmationPanelProps {
+  /** Headline describing exactly what is about to happen, e.g. "Refund $50.00 to John Doe". */
+  headline: string;
+  /** Plain-language description of where the money goes / what the refund does. */
+  description: React.ReactNode;
+  /** Detail rows (customer, amounts, etc.) shown inside the summary card. */
+  children: React.ReactNode;
+  acknowledged: boolean;
+  onAcknowledgedChange: (value: boolean) => void;
+  error: string | null;
+}
+
+/**
+ * The final, deliberate confirmation step shown before a refund or partial
+ * refund is executed. The admin must tick the acknowledgement checkbox before
+ * the action can be submitted, so a refund is never triggered by a single
+ * accidental click.
+ */
+function RefundConfirmationPanel({
+  headline,
+  description,
+  children,
+  acknowledged,
+  onAcknowledgedChange,
+  error,
+}: RefundConfirmationPanelProps) {
+  return (
+    <div className="space-y-5">
+      {/* Irreversible-action warning */}
+      <div className="flex items-start gap-3 rounded-xl border border-warning-200 bg-warning-50 p-4 dark:border-warning-500/30 dark:bg-warning-500/10">
+        <svg className="mt-0.5 h-5 w-5 shrink-0 text-warning-600 dark:text-warning-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+        </svg>
+        <div>
+          <p className="text-sm font-semibold text-warning-800 dark:text-warning-300">{headline}</p>
+          <p className="mt-1 text-xs text-warning-700 dark:text-warning-400">{description}</p>
+        </div>
+      </div>
+
+      {/* Summary card */}
+      <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+          Please review carefully
+        </p>
+        <div className="space-y-2 text-sm">{children}</div>
+      </div>
+
+      {/* Acknowledgement checkbox */}
+      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 bg-white p-3.5 transition-colors hover:border-gray-300 dark:border-gray-700 dark:bg-white/[0.02] dark:hover:border-gray-600">
+        <input
+          type="checkbox"
+          checked={acknowledged}
+          onChange={(e) => onAcknowledgedChange(e.target.checked)}
+          className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800"
+        />
+        <span className="text-xs text-gray-700 dark:text-gray-300">
+          I understand this refund cannot be undone and confirm I want to proceed.
+        </span>
+      </label>
+
+      {error && <ErrorBanner message={error} />}
+    </div>
+  );
+}
+
 // ── Email Invoice Dialog ───────────────────────────────────────────────────────
 
 interface EmailInvoiceDialogProps {
@@ -924,9 +991,11 @@ interface RefundInvoiceDialogProps {
 }
 
 export function RefundInvoiceDialog({ invoice, onClose, onSuccess }: RefundInvoiceDialogProps) {
+  const [step, setStep] = useState<"form" | "confirm">("form");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pi_input, setPiInput] = useState("");
+  const [acknowledged, setAcknowledged] = useState(false);
 
   const customer_name = `${invoice.user.first_name} ${invoice.user.last_name}`;
   const fmt = (n: number) =>
@@ -937,13 +1006,28 @@ export function RefundInvoiceDialog({ invoice, onClose, onSuccess }: RefundInvoi
   const credit_amount = invoice.credit_amount ?? 0;
   const card_amount = Math.max(0, invoice.total_amount - credit_amount);
   const is_missing_pi = invoice.payment_method === "Credit Card" && !invoice.has_stripe_payment;
+  const is_confirmed = acknowledged;
+
+  const confirm_description = (() => {
+    if (payment_type === "credits") return "The full amount will be returned to the client's account balance immediately. This cannot be undone.";
+    if (payment_type === "card") return "The full amount will be refunded to the original card via Stripe. This cannot be undone.";
+    if (payment_type === "mixed") return "Credits will be returned to the account balance and the card portion refunded via Stripe. This cannot be undone.";
+    if (is_missing_pi && pi_input.trim()) return "The full amount will be refunded to the card via Stripe. This cannot be undone.";
+    return "This refund will be recorded in the system; you must process any credit manually. This cannot be undone.";
+  })();
+
+  const goToConfirm = () => {
+    setError(null);
+    setStep("confirm");
+  };
 
   const handleConfirm = async () => {
     setError(null);
     setSubmitting(true);
     try {
-      const override_pi = pi_input.trim() || undefined;
-      const updated = await refundAdminInvoice(invoice.id, override_pi);
+      const updated = await refundAdminInvoice(invoice.id, {
+        payment_intent_id: pi_input.trim() || undefined,
+      });
       onSuccess(updated);
     } catch (err: unknown) {
       const api_err = err as { message?: string };
@@ -974,6 +1058,40 @@ export function RefundInvoiceDialog({ invoice, onClose, onSuccess }: RefundInvoi
       />
 
       <div className="overflow-y-auto p-6">
+        {step === "confirm" ? (
+          <RefundConfirmationPanel
+            headline={`Refund ${fmt(invoice.total_amount)} to ${customer_name}`}
+            description={confirm_description}
+            acknowledged={acknowledged}
+            onAcknowledgedChange={setAcknowledged}
+            error={error}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-gray-500 dark:text-gray-400">Customer</span>
+              <span className="font-medium text-gray-900 dark:text-white">{customer_name}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-gray-500 dark:text-gray-400">Invoice</span>
+              <span className="font-mono text-gray-700 dark:text-gray-300">{invoice.invoice_number}</span>
+            </div>
+            {credit_amount > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500 dark:text-gray-400">Credits Portion</span>
+                <span className="font-medium text-violet-600 dark:text-violet-400">{fmt(credit_amount)}</span>
+              </div>
+            )}
+            {card_amount > 0 && credit_amount > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500 dark:text-gray-400">Card Portion</span>
+                <span className="font-medium text-blue-600 dark:text-blue-400">{fmt(card_amount)}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between border-t border-gray-200 pt-2 dark:border-gray-700">
+              <span className="font-medium text-gray-700 dark:text-gray-300">Total Refund Amount</span>
+              <span className="font-semibold text-blue-700 dark:text-blue-400">{fmt(invoice.total_amount)}</span>
+            </div>
+          </RefundConfirmationPanel>
+        ) : (
         <div className="space-y-5">
           {/* Status guard */}
           {!can_refund && (
@@ -1123,29 +1241,54 @@ export function RefundInvoiceDialog({ invoice, onClose, onSuccess }: RefundInvoi
 
           {error && <ErrorBanner message={error} />}
         </div>
+        )}
       </div>
 
       <DialogFooter>
-        <button
-          onClick={onClose}
-          disabled={submitting}
-          className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={handleConfirm}
-          disabled={submitting || !can_refund}
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-blue-500 dark:hover:bg-blue-400"
-        >
-          {submitting && (
-            <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-          )}
-          {getSubmitLabel()}
-        </button>
+        {step === "confirm" ? (
+          <>
+            <button
+              onClick={() => { setStep("form"); setError(null); }}
+              disabled={submitting}
+              className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              Back
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={submitting || !is_confirmed}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-blue-500 dark:hover:bg-blue-400"
+            >
+              {submitting && (
+                <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              )}
+              {getSubmitLabel()}
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={onClose}
+              disabled={submitting}
+              className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={goToConfirm}
+              disabled={!can_refund}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-blue-500 dark:hover:bg-blue-400"
+            >
+              Continue to Confirmation
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+              </svg>
+            </button>
+          </>
+        )}
       </DialogFooter>
     </DialogShell>
   );
@@ -1249,8 +1392,10 @@ function RefundPaymentBanner({ invoice }: { invoice: AdminInvoice }) {
 }
 
 export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: PartialRefundInvoiceDialogProps) {
+  const [step, setStep] = useState<"form" | "confirm">("form");
   const [refund_input, setRefundInput] = useState("");
   const [pi_input, setPiInput] = useState("");
+  const [acknowledged, setAcknowledged] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -1291,6 +1436,30 @@ export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: Part
     return "Record Refund";
   };
 
+  const is_confirmed = acknowledged;
+
+  const confirm_description = (() => {
+    if (payment_type === "credits") return `${fmt(parsed_amount)} will be returned to the client's account balance immediately. This cannot be undone.`;
+    if (payment_type === "card") return `${fmt(parsed_amount)} will be refunded to the original card via Stripe. This cannot be undone.`;
+    if (payment_type === "mixed") return `${fmt(parsed_amount)} will be refunded — credits first, then the remainder to the card via Stripe. This cannot be undone.`;
+    if (is_missing_pi && pi_input.trim()) return `${fmt(parsed_amount)} will be refunded to the card via Stripe. This cannot be undone.`;
+    return `${fmt(parsed_amount)} will be recorded as a refund; you must process any credit manually. This cannot be undone.`;
+  })();
+
+  // Validates the amount before advancing to the deliberate confirmation step.
+  const goToConfirm = () => {
+    setError(null);
+    if (parsed_amount <= 0) {
+      setError("Please enter a refund amount greater than $0.00.");
+      return;
+    }
+    if (parsed_amount > remaining_refundable) {
+      setError(`Amount exceeds the remaining refundable balance of ${fmt(remaining_refundable)}.`);
+      return;
+    }
+    setStep("confirm");
+  };
+
   const handleSubmit = async () => {
     setError(null);
 
@@ -1305,8 +1474,9 @@ export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: Part
 
     setSubmitting(true);
     try {
-      const override_pi = pi_input.trim() || undefined;
-      const updated = await partialRefundAdminInvoice(invoice.id, parsed_amount, override_pi);
+      const updated = await partialRefundAdminInvoice(invoice.id, parsed_amount, {
+        payment_intent_id: pi_input.trim() || undefined,
+      });
       setSuccess(true);
       onSuccess(updated);
     } catch (err: unknown) {
@@ -1368,6 +1538,38 @@ export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: Part
               )}
             </div>
           </div>
+        ) : step === "confirm" ? (
+          /* ── Confirmation step ── */
+          <RefundConfirmationPanel
+            headline={`Refund ${fmt(parsed_amount)} to ${customer_name}`}
+            description={confirm_description}
+            acknowledged={acknowledged}
+            onAcknowledgedChange={setAcknowledged}
+            error={error}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-gray-500 dark:text-gray-400">Customer</span>
+              <span className="font-medium text-gray-900 dark:text-white">{customer_name}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-gray-500 dark:text-gray-400">Invoice</span>
+              <span className="font-mono text-gray-700 dark:text-gray-300">{invoice.invoice_number}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-gray-500 dark:text-gray-400">Invoice Total</span>
+              <span className="font-medium text-gray-900 dark:text-white">{fmt(invoice.total_amount)}</span>
+            </div>
+            {already_refunded > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500 dark:text-gray-400">Already Refunded</span>
+                <span className="font-medium text-gray-500 dark:text-gray-400">-{fmt(already_refunded)}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between border-t border-gray-200 pt-2 dark:border-gray-700">
+              <span className="font-medium text-gray-700 dark:text-gray-300">This Refund</span>
+              <span className="font-semibold text-blue-700 dark:text-blue-400">{fmt(parsed_amount)}</span>
+            </div>
+          </RefundConfirmationPanel>
         ) : (
           /* ── Refund form ── */
           <div className="space-y-5">
@@ -1501,6 +1703,29 @@ export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: Part
           >
             Close
           </button>
+        ) : step === "confirm" ? (
+          <>
+            <button
+              onClick={() => { setStep("form"); setError(null); }}
+              disabled={submitting}
+              className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              Back
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={submitting || !is_confirmed || !is_valid_amount || !can_refund}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-blue-500 dark:hover:bg-blue-400"
+            >
+              {submitting && (
+                <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              )}
+              {getSubmitLabel()}
+            </button>
+          </>
         ) : (
           <>
             <button
@@ -1511,17 +1736,14 @@ export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: Part
               Cancel
             </button>
             <button
-              onClick={handleSubmit}
-              disabled={submitting || !is_valid_amount || !can_refund}
+              onClick={goToConfirm}
+              disabled={!is_valid_amount || !can_refund}
               className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-blue-500 dark:hover:bg-blue-400"
             >
-              {submitting && (
-                <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-              )}
-              {getSubmitLabel()}
+              Continue to Confirmation
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+              </svg>
             </button>
           </>
         )}

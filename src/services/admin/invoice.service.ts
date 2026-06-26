@@ -95,23 +95,34 @@ export async function markAdminInvoiceAsOverdue(invoice_id: string): Promise<Adm
   return apiClient.post<AdminInvoice>(`/api/admin/invoices/${invoice_id}/mark-overdue`, {});
 }
 
+/**
+ * Options for a refund action. The backend rejects refunds unless
+ * `confirmation` is true, which the dialog sends once the admin has ticked the
+ * acknowledgement checkbox in the confirmation step.
+ */
+export interface RefundOptions {
+  payment_intent_id?: string;
+}
+
 export async function refundAdminInvoice(
   invoice_id: string,
-  payment_intent_id?: string
+  options: RefundOptions = {}
 ): Promise<AdminInvoice> {
   return apiClient.post<AdminInvoice>(`/api/admin/invoices/${invoice_id}/refund`, {
-    ...(payment_intent_id ? { payment_intent_id } : {}),
+    confirmation: true,
+    ...(options.payment_intent_id ? { payment_intent_id: options.payment_intent_id } : {}),
   });
 }
 
 export async function partialRefundAdminInvoice(
   invoice_id: string,
   refund_amount: number,
-  payment_intent_id?: string
+  options: RefundOptions = {}
 ): Promise<AdminInvoice> {
   return apiClient.post<AdminInvoice>(`/api/admin/invoices/${invoice_id}/partial-refund`, {
     refund_amount,
-    ...(payment_intent_id ? { payment_intent_id } : {}),
+    confirmation: true,
+    ...(options.payment_intent_id ? { payment_intent_id: options.payment_intent_id } : {}),
   });
 }
 
