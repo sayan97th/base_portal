@@ -112,6 +112,7 @@ export async function refundAdminInvoice(
   options: RefundOptions = {}
 ): Promise<AdminInvoice> {
   return apiClient.post<AdminInvoice>(`/api/admin/invoices/${invoice_id}/refund`, {
+    confirmation: true,
     send_client_notification: options.send_client_notification ?? true,
     ...(options.payment_intent_id ? { payment_intent_id: options.payment_intent_id } : {}),
   });
