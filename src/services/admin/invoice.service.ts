@@ -96,14 +96,11 @@ export async function markAdminInvoiceAsOverdue(invoice_id: string): Promise<Adm
 }
 
 /**
- * Options for a refund action. The backend rejects refunds unless
- * `confirmation` is true, which the dialog sends once the admin has ticked the
- * acknowledgement checkbox in the confirmation step.
+ * Options shared by full and partial refund actions.
  *
  * `send_client_notification` controls whether the client receives a refund
- * confirmation email. It is enabled by default in the dialog, but the admin can
- * opt out per refund. The admin-side refund alert is always sent regardless of
- * this flag.
+ * confirmation email. Defaults to true. The admin-side refund alert is always
+ * sent regardless of this flag.
  */
 export interface RefundOptions {
   payment_intent_id?: string;
@@ -115,7 +112,6 @@ export async function refundAdminInvoice(
   options: RefundOptions = {}
 ): Promise<AdminInvoice> {
   return apiClient.post<AdminInvoice>(`/api/admin/invoices/${invoice_id}/refund`, {
-    confirmation: true,
     send_client_notification: options.send_client_notification ?? true,
     ...(options.payment_intent_id ? { payment_intent_id: options.payment_intent_id } : {}),
   });
@@ -128,7 +124,6 @@ export async function partialRefundAdminInvoice(
 ): Promise<AdminInvoice> {
   return apiClient.post<AdminInvoice>(`/api/admin/invoices/${invoice_id}/partial-refund`, {
     refund_amount,
-    confirmation: true,
     send_client_notification: options.send_client_notification ?? true,
     ...(options.payment_intent_id ? { payment_intent_id: options.payment_intent_id } : {}),
   });

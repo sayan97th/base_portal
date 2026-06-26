@@ -1589,6 +1589,64 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
             </dl>
           </div>
 
+          {/* Partial Refund Progress card */}
+          {invoice.status === "partial_refund" && (invoice.refund_amount ?? 0) > 0 && (
+            <div className="overflow-hidden rounded-2xl border border-orange-200 bg-white dark:border-orange-500/30 dark:bg-white/[0.03]">
+              <div className="flex items-center gap-2 border-b border-orange-100 bg-orange-50/60 px-5 py-4 dark:border-orange-500/20 dark:bg-orange-500/5">
+                <svg className="h-4 w-4 text-orange-500 dark:text-orange-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+                </svg>
+                <span className="text-sm font-semibold text-orange-700 dark:text-orange-400">Refund Progress</span>
+              </div>
+              <div className="px-5 py-4 space-y-3">
+                {(() => {
+                  const refunded = invoice.refund_amount ?? 0;
+                  const remaining = Math.max(0, invoice.total_amount - refunded);
+                  const pct = invoice.total_amount > 0 ? Math.min(100, (refunded / invoice.total_amount) * 100) : 0;
+                  return (
+                    <>
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                          <span>Refunded</span>
+                          <span className="font-semibold text-orange-600 dark:text-orange-400">{pct.toFixed(0)}%</span>
+                        </div>
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                          <div
+                            className="h-full rounded-full bg-orange-400 dark:bg-orange-500 transition-all duration-500"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                      <dl className="space-y-0">
+                        <InfoRow
+                          label="Total Invoice"
+                          value={<span className="font-semibold">{formatCurrency(invoice.total_amount)}</span>}
+                        />
+                        <InfoRow
+                          label="Amount Refunded"
+                          value={<span className="font-semibold text-orange-600 dark:text-orange-400">-{formatCurrency(refunded)}</span>}
+                        />
+                        <InfoRow
+                          label="Remaining Balance"
+                          value={<span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(remaining)}</span>}
+                          border={false}
+                        />
+                      </dl>
+                      {remaining > 0 && (
+                        <button
+                          onClick={() => handleDialogSelect("partial_refund")}
+                          className="mt-1 w-full rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-medium text-orange-700 transition-colors hover:bg-orange-100 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-400 dark:hover:bg-orange-500/20"
+                        >
+                          Issue Another Partial Refund
+                        </button>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+
           {/* Products Purchased card (multi-product) */}
           {is_multi && invoice.invoice_products && (
             <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
