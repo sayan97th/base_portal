@@ -110,7 +110,7 @@ describe("refundAdminInvoice", () => {
 
     expect(mocked.post).toHaveBeenCalledWith(
       "/api/admin/invoices/inv-1/refund",
-      expect.objectContaining({ confirmation: true })
+      expect.objectContaining({ send_client_notification: true })
     );
   });
 
@@ -169,7 +169,7 @@ describe("partialRefundAdminInvoice", () => {
 
     expect(mocked.post).toHaveBeenCalledWith(
       "/api/admin/invoices/inv-2/partial-refund",
-      expect.objectContaining({ refund_amount: 150, confirmation: true })
+      expect.objectContaining({ refund_amount: 150, send_client_notification: true })
     );
   });
 
