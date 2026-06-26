@@ -108,6 +108,11 @@ interface RefundConfirmationPanelProps {
   children: React.ReactNode;
   acknowledged: boolean;
   onAcknowledgedChange: (value: boolean) => void;
+  /** Whether the client should receive a refund confirmation email. */
+  notify_client: boolean;
+  onNotifyClientChange: (value: boolean) => void;
+  /** Customer name shown in the notify-client helper text. */
+  customer_name: string;
   error: string | null;
 }
 
@@ -123,6 +128,9 @@ function RefundConfirmationPanel({
   children,
   acknowledged,
   onAcknowledgedChange,
+  notify_client,
+  onNotifyClientChange,
+  customer_name,
   error,
 }: RefundConfirmationPanelProps) {
   return (
@@ -156,6 +164,29 @@ function RefundConfirmationPanel({
         />
         <span className="text-xs text-gray-700 dark:text-gray-300">
           I understand this refund cannot be undone and confirm I want to proceed.
+        </span>
+      </label>
+
+      {/* Notify-client toggle — enabled by default, the admin may opt out */}
+      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 bg-white p-3.5 transition-colors hover:border-gray-300 dark:border-gray-700 dark:bg-white/[0.02] dark:hover:border-gray-600">
+        <input
+          type="checkbox"
+          checked={notify_client}
+          onChange={(e) => onNotifyClientChange(e.target.checked)}
+          className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800"
+        />
+        <span className="flex items-start gap-2">
+          <svg className="mt-0.5 h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+          </svg>
+          <span className="text-xs text-gray-700 dark:text-gray-300">
+            <span className="font-medium text-gray-900 dark:text-white">Email the client about this refund</span>
+            <span className="mt-0.5 block text-gray-500 dark:text-gray-400">
+              {notify_client
+                ? `${customer_name} will receive a refund confirmation email with the amount and details.`
+                : `${customer_name} will not be notified of this refund by email.`}
+            </span>
+          </span>
         </span>
       </label>
 
@@ -996,6 +1027,7 @@ export function RefundInvoiceDialog({ invoice, onClose, onSuccess }: RefundInvoi
   const [error, setError] = useState<string | null>(null);
   const [pi_input, setPiInput] = useState("");
   const [acknowledged, setAcknowledged] = useState(false);
+  const [send_client_notification, setSendClientNotification] = useState(true);
 
   const customer_name = `${invoice.user.first_name} ${invoice.user.last_name}`;
   const fmt = (n: number) =>
@@ -1027,6 +1059,7 @@ export function RefundInvoiceDialog({ invoice, onClose, onSuccess }: RefundInvoi
     try {
       const updated = await refundAdminInvoice(invoice.id, {
         payment_intent_id: pi_input.trim() || undefined,
+        send_client_notification,
       });
       onSuccess(updated);
     } catch (err: unknown) {
@@ -1064,6 +1097,9 @@ export function RefundInvoiceDialog({ invoice, onClose, onSuccess }: RefundInvoi
             description={confirm_description}
             acknowledged={acknowledged}
             onAcknowledgedChange={setAcknowledged}
+            notify_client={send_client_notification}
+            onNotifyClientChange={setSendClientNotification}
+            customer_name={customer_name}
             error={error}
           >
             <div className="flex items-center justify-between">
@@ -1396,6 +1432,7 @@ export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: Part
   const [refund_input, setRefundInput] = useState("");
   const [pi_input, setPiInput] = useState("");
   const [acknowledged, setAcknowledged] = useState(false);
+  const [send_client_notification, setSendClientNotification] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -1476,6 +1513,7 @@ export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: Part
     try {
       const updated = await partialRefundAdminInvoice(invoice.id, parsed_amount, {
         payment_intent_id: pi_input.trim() || undefined,
+        send_client_notification,
       });
       setSuccess(true);
       onSuccess(updated);
@@ -1545,6 +1583,9 @@ export function PartialRefundInvoiceDialog({ invoice, onClose, onSuccess }: Part
             description={confirm_description}
             acknowledged={acknowledged}
             onAcknowledgedChange={setAcknowledged}
+            notify_client={send_client_notification}
+            onNotifyClientChange={setSendClientNotification}
+            customer_name={customer_name}
             error={error}
           >
             <div className="flex items-center justify-between">
