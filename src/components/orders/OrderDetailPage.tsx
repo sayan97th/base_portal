@@ -18,6 +18,7 @@ import {
 import type {
   OrderItemDetail,
   LinkBuildingOrderDetail,
+  OrderDiscountDetail,
 } from "@/types/client/link-building";
 import type { CartProductType } from "@/types/client/unified-cart";
 import OrderComments from "@/components/orders/OrderComments";
@@ -198,6 +199,13 @@ function getDetectedSubtotal(detected: DetectedOrderDetail | null): number {
   if (!detected) return 0;
   const data = detected.data as { subtotal_before_discount?: number; total_amount: number };
   return data.subtotal_before_discount ?? data.total_amount;
+}
+
+// Extract discounts from any detected order type
+function getDetectedDiscounts(detected: DetectedOrderDetail | null): OrderDiscountDetail[] {
+  if (!detected) return [];
+  const data = detected.data as { discounts?: OrderDiscountDetail[] };
+  return data.discounts ?? [];
 }
 
 // ─── Icons ─────────────────────────────────────────────────────────────────────
@@ -737,6 +745,10 @@ const OrderDetailPage: React.FC<OrderDetailPageProps> = ({ order_id }) => {
     ? ((lb_data?.coupons as GenericOrderCoupon[]) ?? [])
     : getDetectedCoupons(detected);
 
+  const all_discounts: OrderDiscountDetail[] = is_lb
+    ? (lb_data?.discounts ?? [])
+    : getDetectedDiscounts(detected);
+
   const credit_amount = is_lb
     ? (lb_data?.credit_amount ?? 0)
     : getDetectedCreditAmount(detected);
@@ -754,23 +766,12 @@ const OrderDetailPage: React.FC<OrderDetailPageProps> = ({ order_id }) => {
     : getDetectedSubtotal(detected);
 
   const coupon_discount_total = all_coupons.reduce((s, c) => s + c.discount_amount, 0);
+  const discount_total = all_discounts.reduce((s, d) => s + d.discount_amount, 0);
 
   const total_links = lb_data?.items.reduce((s, i) => s + i.quantity, 0) ?? 0;
 
-  // Bulk discount only applies to link building; subtract credits from the calculation
-  const bulk_discount_amount = is_lb
-    ? Math.max(
-        0,
-        Math.round(
-          (raw_subtotal - total_amount - coupon_discount_total - credit_amount) * 100
-        ) / 100
-      )
-    : 0;
-
-  const has_bulk_discount = total_links >= 10 && bulk_discount_amount > 0;
-  const total_savings = bulk_discount_amount + coupon_discount_total + credit_amount;
-  const has_discounts_or_credits =
-    has_bulk_discount || coupon_discount_total > 0 || credit_amount > 0;
+  const total_savings = discount_total + coupon_discount_total + credit_amount;
+  const has_discounts_or_credits = discount_total > 0 || coupon_discount_total > 0 || credit_amount > 0;
 
   const content_items = detected && !is_lb ? buildContentItems(detected) : [];
   const keywords_link = detected
@@ -988,22 +989,22 @@ const OrderDetailPage: React.FC<OrderDetailPageProps> = ({ order_id }) => {
                     </div>
                   )}
 
-                  {/* Bulk discount — LB only */}
-                  {has_bulk_discount && (
-                    <div className="flex justify-between gap-2">
-                      <dt className="flex items-center gap-1.5 text-sm font-medium text-violet-600 dark:text-violet-400">
+                  {/* Applied discounts — all product types */}
+                  {all_discounts.map((discount) => (
+                    <div key={discount.name} className="flex justify-between gap-2">
+                      <dt className="flex items-center gap-1.5 text-sm font-medium text-amber-600 dark:text-amber-400">
                         <SparkleIcon />
-                        Bulk Discount (10% off)
+                        {discount.name}
                       </dt>
-                      <dd className="text-sm font-semibold tabular-nums text-violet-600 dark:text-violet-400">
-                        -{formatCurrency(bulk_discount_amount)}
+                      <dd className="text-sm font-semibold tabular-nums text-amber-600 dark:text-amber-400">
+                        -{formatCurrency(discount.discount_amount)}
                       </dd>
                     </div>
-                  )}
+                  ))}
 
                   {/* Coupon discounts — all product types */}
                   {all_coupons.length > 0 && (
-                    <div className={`space-y-2 ${has_discounts_or_credits && !has_bulk_discount ? "" : "border-t border-dashed border-gray-200 pt-3 dark:border-gray-700"}`}>
+                    <div className={`space-y-2 ${has_discounts_or_credits && all_discounts.length === 0 ? "" : "border-t border-dashed border-gray-200 pt-3 dark:border-gray-700"}`}>
                       <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
                         <TagIcon />
                         Coupon discounts applied

@@ -947,10 +947,10 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" />
                       </svg>
                       <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
-                        {discount.name}:
+                        Discount applied:
                       </span>
                       <span className="inline-flex items-center rounded border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400">
-                        {discount.description}
+                        {discount.name}
                       </span>
                     </div>
                     <span className="text-xs font-bold text-amber-600 dark:text-amber-400 tabular-nums">
