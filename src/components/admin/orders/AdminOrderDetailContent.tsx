@@ -114,12 +114,13 @@ function isCreditsPayment(payment_intent_id: string | null): boolean {
 }
 
 // An order is considered paid with account credits when its invoice uses the
-// credits currency / "Account Balance" method, or its payment reference is a
-// credits placeholder. Coupons and discounts never apply to credit payments,
-// so the summary must not surface any (legacy) discount data for these orders.
+// "credits" currency, or its payment reference is a credits placeholder. The
+// "Account Balance" payment_method is intentionally NOT used here, since
+// manually created USD invoices also default to it. Coupons and discounts never
+// apply to credit payments, so the summary must not surface any (legacy)
+// discount data for these orders.
 function orderPaidWithCredits(order: Pick<AdminOrder, "invoice" | "payment_intent_id">): boolean {
   return (
-    order.invoice?.payment_method === "Account Balance" ||
     order.invoice?.currency_type === "credits" ||
     isCreditsPayment(order.payment_intent_id)
   );
