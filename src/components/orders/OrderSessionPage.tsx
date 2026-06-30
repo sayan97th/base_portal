@@ -22,10 +22,20 @@ import type { CartProductType } from "@/types/client/unified-cart";
 
 type OrderStatus = "pending" | "new_request" | "processing" | "completed" | "cancelled" | "payment_pending";
 
+interface CouponSummary {
+  code: string;
+  name: string;
+  discount_type: string;
+  discount_value: number;
+  discount_amount: number;
+}
+
 interface ResolvedOrderSection {
   order_id: string;
   product_type: CartProductType;
   total_amount: number;
+  subtotal_before_discount: number;
+  coupons: CouponSummary[];
   status: string;
   lb_detail?: LinkBuildingOrderDetail;
   nc_detail?: NewContentOrderDetail;
@@ -347,15 +357,51 @@ function ProductSectionCard({
         </div>
       )}
 
-      {/* Section Subtotal */}
-      <div className={`flex items-center justify-between px-5 py-3 border-t ${cfg.border} ${cfg.bg}`}>
-        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
-          {cfg.label} Subtotal
-        </span>
-        <span className={`text-sm font-bold ${cfg.color}`}>
-          {formatCurrency(section.total_amount)}
-        </span>
-      </div>
+      {/* Section Subtotal / Discount Breakdown */}
+      {section.coupons.length > 0 ? (
+        <div className={`border-t ${cfg.border} ${cfg.bg}`}>
+          <div className="flex items-center justify-between px-5 py-2.5">
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              Items Subtotal
+            </span>
+            <span className="text-xs font-medium text-gray-600 dark:text-gray-300 line-through decoration-gray-400">
+              {formatCurrency(section.subtotal_before_discount)}
+            </span>
+          </div>
+          {section.coupons.map((coupon) => (
+            <div key={coupon.code} className="flex items-center justify-between px-5 py-1.5">
+              <div className="flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 rounded border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                  {coupon.code}
+                </span>
+                <span className="text-xs text-emerald-600 dark:text-emerald-400">
+                  promo applied
+                </span>
+              </div>
+              <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                &minus;{formatCurrency(coupon.discount_amount)}
+              </span>
+            </div>
+          ))}
+          <div className={`flex items-center justify-between px-5 py-3 border-t ${cfg.border}`}>
+            <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">
+              {cfg.label} Total
+            </span>
+            <span className={`text-sm font-bold ${cfg.color}`}>
+              {formatCurrency(section.total_amount)}
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div className={`flex items-center justify-between px-5 py-3 border-t ${cfg.border} ${cfg.bg}`}>
+          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+            {cfg.label} Subtotal
+          </span>
+          <span className={`text-sm font-bold ${cfg.color}`}>
+            {formatCurrency(section.total_amount)}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -443,25 +489,60 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
             order_id: order.order_id,
             product_type: order.product_type,
             total_amount: order.total_amount,
+            subtotal_before_discount: order.total_amount,
+            coupons: [],
             status: "pending",
           };
+
+          const extractCoupons = (raw?: { code: string; name: string; discount_type: string; discount_value: number; discount_amount: number }[]): CouponSummary[] =>
+            (raw ?? []).map((c) => ({
+              code: c.code,
+              name: c.name,
+              discount_type: c.discount_type,
+              discount_value: c.discount_value,
+              discount_amount: c.discount_amount,
+            }));
 
           try {
             if (order.product_type === "link_building") {
               const lb = await linkBuildingService.fetchLinkBuildingOrderDetail(order.order_id);
-              return { ...base, status: lb.status, lb_detail: lb };
+              return {
+                ...base,
+                status: lb.status,
+                lb_detail: lb,
+                subtotal_before_discount: lb.subtotal_before_discount ?? order.total_amount,
+                coupons: extractCoupons(lb.coupons),
+              };
             }
             if (order.product_type === "new_content") {
               const nc = await newContentService.fetchOrderDetail(order.order_id);
-              return { ...base, status: nc.status, nc_detail: nc };
+              return {
+                ...base,
+                status: nc.status,
+                nc_detail: nc,
+                subtotal_before_discount: nc.subtotal_before_discount ?? order.total_amount,
+                coupons: extractCoupons(nc.coupons),
+              };
             }
             if (order.product_type === "content_optimization") {
               const co = await contentOptimizationService.fetchOrderDetail(order.order_id);
-              return { ...base, status: co.status, co_detail: co };
+              return {
+                ...base,
+                status: co.status,
+                co_detail: co,
+                subtotal_before_discount: co.subtotal_before_discount ?? order.total_amount,
+                coupons: extractCoupons(co.coupons),
+              };
             }
             if (order.product_type === "content_brief") {
               const cb = await contentBriefsService.fetchOrderDetail(order.order_id);
-              return { ...base, status: cb.status, cb_detail: cb };
+              return {
+                ...base,
+                status: cb.status,
+                cb_detail: cb,
+                subtotal_before_discount: cb.subtotal_before_discount ?? order.total_amount,
+                coupons: extractCoupons(cb.coupons),
+              };
             }
           } catch {
             // fallback: show summary-only section
@@ -514,6 +595,28 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
   const invoice_pay_href = session?.invoice_unique_id
     ? `/invoices/${session.invoice_unique_id}/pay`
     : "/invoices";
+
+  // Discount summary computed once for the grand total area
+  const grand_subtotal_sum = sections.reduce((sum, s) => sum + s.subtotal_before_discount, 0);
+  const grand_coupon_savings = sections.reduce(
+    (sum, s) => sum + s.coupons.reduce((cs, c) => cs + c.discount_amount, 0),
+    0
+  );
+  const grand_has_discount = grand_coupon_savings > 0.001;
+
+  // Deduplicate coupons by code, summing amounts across product types
+  const grand_coupon_map = new Map<string, { code: string; name: string; total_amount: number }>();
+  sections.forEach((s) => {
+    s.coupons.forEach((c) => {
+      const existing = grand_coupon_map.get(c.code);
+      grand_coupon_map.set(c.code, {
+        code: c.code,
+        name: c.name,
+        total_amount: (existing?.total_amount ?? 0) + c.discount_amount,
+      });
+    });
+  });
+  const grand_unique_coupons = Array.from(grand_coupon_map.values());
 
   const resolvedItems = (section: ResolvedOrderSection): NormalizedItem[] | undefined => {
     if (section.product_type === "link_building" && section.lb_detail) {
@@ -750,6 +853,39 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
                 ))}
               </div>
             )}
+
+            {/* Discount summary rows */}
+            {grand_has_discount && (
+              <div className="divide-y divide-gray-100 dark:divide-gray-700/60 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between px-4 py-2.5">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    Subtotal
+                  </span>
+                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400 line-through decoration-gray-400 tabular-nums">
+                    {formatCurrency(grand_subtotal_sum)}
+                  </span>
+                </div>
+                {grand_unique_coupons.map((coupon) => (
+                  <div key={coupon.code} className="flex items-center justify-between px-4 py-2">
+                    <div className="flex items-center gap-1.5">
+                      <svg className="h-3.5 w-3.5 text-emerald-500 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 14.25l6-6m4.5-3.493V21.75l-4.125-1.5-4.125 1.5-4.125-1.5-4.125 1.5V4.757c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0c1.1.128 1.907 1.077 1.907 2.185z" />
+                      </svg>
+                      <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                        Promo applied:
+                      </span>
+                      <span className="inline-flex items-center rounded border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                        {coupon.code}
+                      </span>
+                    </div>
+                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                      &minus;{formatCurrency(coupon.total_amount)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/40 px-4 py-3.5">
               <div className="flex items-center gap-2">
                 <div className={`h-6 w-6 rounded-full flex items-center justify-center ${

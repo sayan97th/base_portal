@@ -379,6 +379,7 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
         order_title: order_title || null,
         total_amount: total,
         payment_status: "pending" as const,
+        invoice_unique_id: result.invoice_unique_id ?? null,
         orders: result.orders.map((o) => ({
           order_id: o.order_id,
           product_type: o.product_type,

@@ -134,6 +134,7 @@ export interface UnifiedCheckoutCreatedOrder {
 export interface UnifiedCheckoutResponse {
   orders: UnifiedCheckoutCreatedOrder[];
   session_id?: string;
+  invoice_unique_id?: string | null;
 }
 
 export interface UnifiedDeferredCheckoutPayload {
