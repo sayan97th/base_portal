@@ -142,11 +142,19 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
           (i) => i.product_type === "content_brief"
         );
 
+        // Coupons are never sent with a credits-backed payment (pure credits or a
+        // hybrid card + partial credits payment). Credits already represent a
+        // discounted value, so coupons/discounts are disabled — this mirrors the
+        // backend guard and protects against any stale coupon state in the cart.
+        const is_credits_backed_payment =
+          payment_intent_id.startsWith("credits_") ||
+          (credits_amount != null && credits_amount > 0);
+
         // Only include coupon_ids when coupons are actually applied.
         // Laravel's `required` rule rejects empty arrays, so omitting the
         // field entirely when there are no coupons avoids a validation error.
         const coupon_ids =
-          applied_coupons.length > 0
+          !is_credits_backed_payment && applied_coupons.length > 0
             ? applied_coupons.map((c) => c.coupon_id)
             : undefined;
 

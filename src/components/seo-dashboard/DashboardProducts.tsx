@@ -389,6 +389,7 @@ const DashboardProducts: React.FC = () => {
     updateLinkBuildingKeywords,
     getKeywordDataForTier,
     item_count,
+    subtotal,
     total,
     order_title,
     order_notes,
@@ -992,7 +993,7 @@ const DashboardProducts: React.FC = () => {
                 onPayLater={handlePayLater}
                 is_loading={is_submitting}
                 error_message={submit_error}
-                total_amount={total}
+                total_amount={is_applying_credits ? subtotal : total}
                 saved_billing_address={saved_billing_address}
                 onApplySavedAddress={handleApplySavedAddress}
                 back_label={
