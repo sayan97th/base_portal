@@ -540,6 +540,13 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
       const max = Math.min(credit_balance, Math.ceil(total_amount));
       setCreditsToApply(max);
       setCreditsInput(String(max));
+      // When credits fully cover the order, drop a stale "Pay Later" selection:
+      // "don't pay now" and "pay now with credits" are mutually exclusive intents
+      // and re-enabling full-coverage credits is the most recent one. Saved-card
+      // selections are kept so switching back to "Pay with card" stays pre-filled.
+      if (max >= total_amount) {
+        setSelectedProfileId((prev) => (prev === "pay_later" ? null : prev));
+      }
     } else {
       setCreditsToApply(0);
       setCreditsInput("0");
@@ -684,13 +691,13 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
       return;
     }
 
-    // ── Pay Later ──
-    if (is_pay_later) {
-      onPayLater?.();
-      return;
-    }
-
     // ── Full credits payment ──
+    // Credits that fully cover the order are a complete payment on their own and
+    // need no payment method, so this branch takes precedence over Pay Later.
+    // Without this ordering, a stale `selected_profile_id === "pay_later"` (e.g.
+    // the user toggled credits off, selected Pay Later, then re-enabled
+    // full-coverage credits) would route a fully credit-covered order through
+    // Pay Later and incorrectly leave it as "Payment Pending".
     if (is_fully_paid_by_credits) {
       setIsProcessing(true);
       onProcessingChange?.(true);
@@ -720,6 +727,12 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
         // rolled back automatically — credits can never be lost on a backend error.
         onComplete(`credits_pay_${credits_to_apply}`, false);
       }
+      return;
+    }
+
+    // ── Pay Later ──
+    if (is_pay_later) {
+      onPayLater?.();
       return;
     }
 
