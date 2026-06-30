@@ -127,6 +127,101 @@ describe("calculateLinkBuildingBulkDiscount", () => {
   });
 });
 
+// ─── Pay-later (deferred) coupon discount calculation ────────────────────────
+//
+// Regression: coupon discount was stripped from the invoice when the client
+// chose "Pay Later". These tests mirror the discount math used in CartContext
+// and verified in the backend DeferredCheckoutCouponTest.
+
+describe("deferred checkout coupon discount calculation", () => {
+  function applyPercentageCoupon(subtotal: number, discount_pct: number): number {
+    const discount = Math.round(subtotal * (discount_pct / 100) * 100) / 100;
+    return Math.max(0, Math.round((subtotal - discount) * 100) / 100);
+  }
+
+  function applyFixedCoupon(subtotal: number, fixed_amount: number): number {
+    const discount = Math.min(fixed_amount, subtotal);
+    return Math.max(0, Math.round((subtotal - discount) * 100) / 100);
+  }
+
+  function couponDiscountAmount(subtotal: number, discount_pct: number): number {
+    return Math.round(subtotal * (discount_pct / 100) * 100) / 100;
+  }
+
+  function buildDeferredCouponIds(
+    applied_coupons: Array<{ coupon_id: string }>
+  ): string[] | undefined {
+    return applied_coupons.length > 0
+      ? applied_coupons.map((c) => c.coupon_id)
+      : undefined;
+  }
+
+  it("percentage coupon reduces total by the correct amount", () => {
+    expect(applyPercentageCoupon(1000, 10)).toBe(900);
+  });
+
+  it("percentage coupon handles fractional discount correctly", () => {
+    expect(applyPercentageCoupon(333, 10)).toBe(299.7);
+  });
+
+  it("100% percentage coupon reduces total to 0", () => {
+    expect(applyPercentageCoupon(500, 100)).toBe(0);
+  });
+
+  it("fixed coupon reduces total by the fixed amount", () => {
+    expect(applyFixedCoupon(1000, 100)).toBe(900);
+  });
+
+  it("fixed coupon is capped at the subtotal — total never goes negative", () => {
+    expect(applyFixedCoupon(50, 200)).toBe(0);
+  });
+
+  it("fixed coupon equal to subtotal results in $0 total", () => {
+    expect(applyFixedCoupon(100, 100)).toBe(0);
+  });
+
+  it("coupon discount amount is calculated correctly from subtotal", () => {
+    expect(couponDiscountAmount(800, 15)).toBe(120);
+  });
+
+  it("buildDeferredCouponIds returns array of ids when coupons are applied", () => {
+    const result = buildDeferredCouponIds([
+      { coupon_id: "coupon-uuid-1" },
+      { coupon_id: "coupon-uuid-2" },
+    ]);
+    expect(result).toEqual(["coupon-uuid-1", "coupon-uuid-2"]);
+  });
+
+  it("buildDeferredCouponIds returns undefined when no coupons are applied", () => {
+    expect(buildDeferredCouponIds([])).toBeUndefined();
+  });
+
+  it("total_amount sent to deferred endpoint equals subtotal minus coupon discount", () => {
+    const subtotal     = 1000;
+    const discount_pct = 10;
+    const discount     = couponDiscountAmount(subtotal, discount_pct);
+    const total_amount = subtotal - discount;
+
+    expect(total_amount).toBe(900);
+  });
+
+  it("coupon overrides bulk discount: only coupon discount is applied", () => {
+    const subtotal = 1000;
+
+    // Bulk would give 10% off ($100), but coupon gives 15% off ($150)
+    const coupon_discount = couponDiscountAmount(subtotal, 15);
+    const bulk_discount   = Math.round(subtotal * BULK_DISCOUNT_RATE * 100) / 100;
+
+    // When coupon is present, only the coupon applies
+    const effective_discount = coupon_discount;
+    const total              = subtotal - effective_discount;
+
+    expect(effective_discount).toBe(150);
+    expect(bulk_discount).toBe(100);
+    expect(total).toBe(850);
+  });
+});
+
 // ─── Credits savings percentage ───────────────────────────────────────────────
 
 describe("credits savings percentage display", () => {

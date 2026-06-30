@@ -603,4 +603,215 @@ describe("UnifiedCartSummary", () => {
       expect(screen.queryByRole("button", { name: /back/i })).not.toBeInTheDocument();
     });
   });
+
+  // ─── Pay Later coupon discount display ───────────────────────────────────────
+  //
+  // Regression: when a client applied a promo code and then chose "Pay Later",
+  // the invoice was showing the full price instead of the discounted total.
+  // These tests confirm the cart summary correctly reflects the coupon discount
+  // in the pay-later step — the same summary component is rendered at that step.
+
+  describe("pay later coupon discount display", () => {
+    it("shows the discounted total when a coupon is applied in pay-later context", () => {
+      const applied: CartAppliedCoupon = {
+        coupon_id:       "coupon-uuid-1",
+        code:            "UNIPHORE",
+        coupon_name:     "Uniphore 10% Off",
+        discount_amount: 100,
+        discount_type:   "percentage",
+        discount_value:  10,
+      };
+
+      mockUseCart.mockReturnValue(
+        buildCartContext({
+          items: [makeCartItem({ quantity: 5, unit_price: 200 })],
+          subtotal:                  1000,
+          applied_coupons:           [applied],
+          total_discount:            100,
+          effective_discount_amount: 100,
+          active_discount_type:      "coupon",
+          total:                     900,
+        })
+      );
+
+      render(
+        <UnifiedCartSummary
+          show_coupon_field
+          is_quantity_locked
+          checkout_action={{ total: 900, is_processing: false, onSubmit: jest.fn() }}
+        />
+      );
+
+      expect(screen.getByText("Subtotal")).toBeInTheDocument();
+      expect(screen.getByText("Coupon Discount")).toBeInTheDocument();
+      expect(screen.getByText("$900.00")).toBeInTheDocument();
+    });
+
+    it("shows the coupon code and name badge in the order summary", () => {
+      const applied: CartAppliedCoupon = {
+        coupon_id:       "coupon-uuid-2",
+        code:            "UNIPHORE",
+        coupon_name:     "Uniphore 10% Off",
+        discount_amount: 100,
+        discount_type:   "percentage",
+        discount_value:  10,
+      };
+
+      mockUseCart.mockReturnValue(
+        buildCartContext({
+          items:            [makeCartItem({ quantity: 5, unit_price: 200 })],
+          subtotal:         1000,
+          applied_coupons:  [applied],
+          total_discount:   100,
+          effective_discount_amount: 100,
+          active_discount_type: "coupon",
+          total:            900,
+        })
+      );
+
+      render(<UnifiedCartSummary show_coupon_field is_quantity_locked />);
+
+      expect(screen.getByText("Uniphore 10% Off")).toBeInTheDocument();
+      expect(screen.getByText("UNIPHORE")).toBeInTheDocument();
+    });
+
+    it("shows the discount amount in the applied coupon badge", () => {
+      const applied: CartAppliedCoupon = {
+        coupon_id:       "coupon-uuid-3",
+        code:            "SAVE150",
+        coupon_name:     "$150 Discount",
+        discount_amount: 150,
+        discount_type:   "fixed_amount",
+        discount_value:  150,
+      };
+
+      mockUseCart.mockReturnValue(
+        buildCartContext({
+          items:            [makeCartItem({ quantity: 5, unit_price: 200 })],
+          subtotal:         1000,
+          applied_coupons:  [applied],
+          total_discount:   150,
+          effective_discount_amount: 150,
+          active_discount_type: "coupon",
+          total:            850,
+        })
+      );
+
+      render(<UnifiedCartSummary show_coupon_field is_quantity_locked />);
+
+      // −$150.00 appears in both the badge and the discount line — both are valid
+      const discount_els = screen.getAllByText("−$150.00");
+      expect(discount_els.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("does not show bulk discount when coupon is active in pay-later summary", () => {
+      const applied: CartAppliedCoupon = {
+        coupon_id:       "coupon-uuid-4",
+        code:            "BEATS-BULK",
+        coupon_name:     "Beats Bulk",
+        discount_amount: 120,
+        discount_type:   "percentage",
+        discount_value:  12,
+      };
+
+      mockUseCart.mockReturnValue(
+        buildCartContext({
+          items: [makeCartItem({ quantity: 10, unit_price: 100 })],
+          subtotal:              1000,
+          bulk_discount_amount:  100,
+          applied_coupons:       [applied],
+          total_discount:        120,
+          effective_discount_amount: 120,
+          active_discount_type:  "coupon",
+          total:                 880,
+          bulk_discount_details: [
+            {
+              config: {
+                id:            "bd1",
+                applies_to:    "link_building",
+                discount_rate: 10,
+                min_quantity:  10,
+              },
+              is_applied:      true,
+              quantity_needed: 0,
+              discount_amount: 100,
+            },
+          ],
+        })
+      );
+
+      render(<UnifiedCartSummary show_coupon_field is_quantity_locked />);
+
+      // Bulk discount badge should NOT be shown when coupon is active
+      expect(screen.queryByText(/10% bulk discount applied/i)).not.toBeInTheDocument();
+      // Coupon badge is shown instead
+      expect(screen.getByText("Beats Bulk")).toBeInTheDocument();
+    });
+
+    it("total displayed to client matches the discounted amount in pay-later context", () => {
+      const applied: CartAppliedCoupon = {
+        coupon_id:       "coupon-uuid-5",
+        code:            "UNIPHORE",
+        coupon_name:     "Uniphore Discount",
+        discount_amount: 200,
+        discount_type:   "percentage",
+        discount_value:  20,
+      };
+
+      mockUseCart.mockReturnValue(
+        buildCartContext({
+          items: [makeCartItem({ quantity: 5, unit_price: 200 })],
+          subtotal:                  1000,
+          applied_coupons:           [applied],
+          total_discount:            200,
+          effective_discount_amount: 200,
+          active_discount_type:      "coupon",
+          total:                     800,
+        })
+      );
+
+      render(
+        <UnifiedCartSummary
+          is_quantity_locked
+          checkout_action={{ total: 800, is_processing: false, onSubmit: jest.fn() }}
+        />
+      );
+
+      // The grand total row must show the discounted price
+      expect(screen.getByText("$800.00")).toBeInTheDocument();
+      // The coupon discount line must be present
+      expect(screen.getByText("Coupon Discount")).toBeInTheDocument();
+    });
+
+    it("quantity controls are locked at the pay-later confirmation step", () => {
+      mockUseCart.mockReturnValue(
+        buildCartContext({
+          items:    [makeCartItem({ quantity: 3, unit_price: 200 })],
+          subtotal: 600,
+          total:    600,
+        })
+      );
+
+      render(<UnifiedCartSummary is_quantity_locked />);
+
+      const decrease_btn = screen.getByRole("button", { name: /decrease/i });
+      const increase_btn = screen.getByRole("button", { name: /increase/i });
+      expect(decrease_btn).toBeDisabled();
+      expect(increase_btn).toBeDisabled();
+    });
+
+    it("locked quantities notice is shown in pay-later step", () => {
+      mockUseCart.mockReturnValue(
+        buildCartContext({
+          items:    [makeCartItem({ quantity: 2 })],
+          subtotal: 200,
+          total:    200,
+        })
+      );
+
+      render(<UnifiedCartSummary is_quantity_locked />);
+
+      expect(screen.getByText(/quantities are locked/i)).toBeInTheDocument();
+    });
+  });
 });
