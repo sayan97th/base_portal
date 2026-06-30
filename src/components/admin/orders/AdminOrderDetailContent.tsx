@@ -113,6 +113,18 @@ function isCreditsPayment(payment_intent_id: string | null): boolean {
   return !!payment_intent_id && payment_intent_id.startsWith("credits_");
 }
 
+// An order is considered paid with account credits when its invoice uses the
+// credits currency / "Account Balance" method, or its payment reference is a
+// credits placeholder. Coupons and discounts never apply to credit payments,
+// so the summary must not surface any (legacy) discount data for these orders.
+function orderPaidWithCredits(order: Pick<AdminOrder, "invoice" | "payment_intent_id">): boolean {
+  return (
+    order.invoice?.payment_method === "Account Balance" ||
+    order.invoice?.currency_type === "credits" ||
+    isCreditsPayment(order.payment_intent_id)
+  );
+}
+
 function getItemPrimaryLabel(item: OrderItem): string {
   if (item.item_name) return item.item_name;
   if (item.dr_tier?.label) return item.dr_tier.label;
@@ -179,17 +191,21 @@ interface OrderItemsTableProps {
   product_type?: AdminOrderProductType | null;
   order_title?: string;
   order_id?: string;
+  // When the order was paid with account credits, no discounts or coupons apply.
+  is_credits?: boolean;
 }
 
-const OrderItemsTable = ({ items, coupons, total_amount, product_type, order_title, order_id }: OrderItemsTableProps) => {
+const OrderItemsTable = ({ items, coupons, total_amount, product_type, order_title, order_id, is_credits = false }: OrderItemsTableProps) => {
   const items_subtotal = items.reduce((sum, i) => sum + i.subtotal, 0);
-  const coupon_total = coupons?.reduce((sum, c) => sum + c.discount_amount, 0) ?? 0;
-  const bulk_discount_amount = Math.max(
-    0,
-    Math.round((items_subtotal - (total_amount ?? items_subtotal) - coupon_total) * 100) / 100
-  );
+  const coupon_total = is_credits ? 0 : (coupons?.reduce((sum, c) => sum + c.discount_amount, 0) ?? 0);
+  const bulk_discount_amount = is_credits
+    ? 0
+    : Math.max(
+        0,
+        Math.round((items_subtotal - (total_amount ?? items_subtotal) - coupon_total) * 100) / 100
+      );
   const has_bulk_discount = bulk_discount_amount > 0;
-  const has_coupons = coupons && coupons.length > 0;
+  const has_coupons = !is_credits && coupons && coupons.length > 0;
   const has_any_discount = has_bulk_discount || !!has_coupons;
 
   const type_cfg = product_type ? PRODUCT_TYPE_CONFIG[product_type] : null;
@@ -452,6 +468,7 @@ const SessionItemsView = ({ session_orders, session_title }: SessionItemsViewPro
             product_type={order.product_type}
             order_title={order.order_title}
             order_id={order.id}
+            is_credits={orderPaidWithCredits(order)}
           />
         </div>
       ))}
@@ -865,6 +882,7 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
                   coupons={order.coupons}
                   total_amount={order.total_amount}
                   product_type={order.product_type}
+                  is_credits={orderPaidWithCredits(order)}
                 />
               )}
 
@@ -952,19 +970,27 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
                     />
                   )}
                   {(() => {
+                    const order_is_credits = orderPaidWithCredits(order);
                     const order_items_subtotal = order.items.reduce((s, i) => s + i.subtotal, 0);
-                    const order_coupon_total = order.coupons?.reduce((s, c) => s + c.discount_amount, 0) ?? 0;
+                    // Coupons and discounts never apply to credit payments, so
+                    // exclude any (legacy) coupon / bulk-discount amounts here.
+                    const order_coupon_total = order_is_credits
+                      ? 0
+                      : (order.coupons?.reduce((s, c) => s + c.discount_amount, 0) ?? 0);
                     const order_credit_amount = order.invoice?.credit_amount ?? 0;
-                    const order_bulk_discount = Math.max(
-                      0,
-                      Math.round(
-                        ((order.subtotal_before_discount ?? order_items_subtotal) - order.total_amount - order_coupon_total - order_credit_amount) * 100
-                      ) / 100
-                    );
+                    const order_bulk_discount = order_is_credits
+                      ? 0
+                      : Math.max(
+                          0,
+                          Math.round(
+                            ((order.subtotal_before_discount ?? order_items_subtotal) - order.total_amount - order_coupon_total - order_credit_amount) * 100
+                          ) / 100
+                        );
+                    const show_coupons = !order_is_credits && !!order.coupons && order.coupons.length > 0;
                     const order_total_savings = order_bulk_discount + order_coupon_total + order_credit_amount;
                     const show_breakdown =
                       order_bulk_discount > 0 ||
-                      (order.coupons && order.coupons.length > 0) ||
+                      show_coupons ||
                       order_credit_amount > 0;
 
                     return show_breakdown ? (
@@ -986,7 +1012,7 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
                             value={<span className="font-semibold tabular-nums text-violet-600 dark:text-violet-400">-{formatCurrency(order_bulk_discount)}</span>}
                           />
                         )}
-                        {order.coupons && order.coupons.length > 0 && (
+                        {show_coupons && order.coupons && (
                           <div className="border-t border-dashed border-gray-100 py-2 dark:border-gray-800">
                             <p className="mb-1.5 flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
                               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
