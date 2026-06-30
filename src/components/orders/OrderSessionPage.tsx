@@ -86,6 +86,13 @@ function formatTime(iso: string): string {
   });
 }
 
+function formatDiscountLabel(discount_type: string, discount_rate: number): string {
+  if (discount_type === "percentage") {
+    return `${Math.round(discount_rate)}% off`;
+  }
+  return `${formatCurrency(discount_rate)} off`;
+}
+
 function getStatusConfig(status: string): {
   color: "warning" | "info" | "success" | "error";
   label: string;
@@ -396,10 +403,7 @@ function ProductSectionCard({
             <div key={discount.name} className="flex items-center justify-between px-5 py-1.5">
               <div className="flex items-center gap-1.5">
                 <span className="inline-flex items-center gap-1 rounded border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400">
-                  {discount.name}
-                </span>
-                <span className="text-xs text-amber-600 dark:text-amber-400">
-                  discount applied
+                  {discount.name} ({formatDiscountLabel(discount.discount_type, discount.discount_rate)})
                 </span>
               </div>
               <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 tabular-nums">
@@ -661,13 +665,15 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
   const grand_unique_coupons = Array.from(grand_coupon_map.values());
 
   // Deduplicate discounts by name, summing amounts across product types
-  const grand_discount_map = new Map<string, { name: string; description: string; total_amount: number }>();
+  const grand_discount_map = new Map<string, { name: string; description: string; discount_type: string; discount_rate: number; total_amount: number }>();
   sections.forEach((s) => {
     s.discounts.forEach((d) => {
       const existing = grand_discount_map.get(d.name);
       grand_discount_map.set(d.name, {
         name: d.name,
         description: d.description,
+        discount_type: d.discount_type,
+        discount_rate: d.discount_rate,
         total_amount: (existing?.total_amount ?? 0) + d.discount_amount,
       });
     });
@@ -946,11 +952,8 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" />
                       </svg>
-                      <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
-                        Discount applied:
-                      </span>
                       <span className="inline-flex items-center rounded border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400">
-                        {discount.name}
+                        {discount.name} ({formatDiscountLabel(discount.discount_type, discount.discount_rate)})
                       </span>
                     </div>
                     <span className="text-xs font-bold text-amber-600 dark:text-amber-400 tabular-nums">

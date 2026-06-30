@@ -994,7 +994,12 @@ const OrderDetailPage: React.FC<OrderDetailPageProps> = ({ order_id }) => {
                     <div key={discount.name} className="flex justify-between gap-2">
                       <dt className="flex items-center gap-1.5 text-sm font-medium text-amber-600 dark:text-amber-400">
                         <SparkleIcon />
-                        {discount.name}
+                        {discount.name}{" "}
+                        <span className="text-xs font-normal">
+                          ({discount.discount_type === "percentage"
+                            ? `${Math.round(discount.discount_rate)}% off`
+                            : `${formatCurrency(discount.discount_rate)} off`})
+                        </span>
                       </dt>
                       <dd className="text-sm font-semibold tabular-nums text-amber-600 dark:text-amber-400">
                         -{formatCurrency(discount.discount_amount)}
