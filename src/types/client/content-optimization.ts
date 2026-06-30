@@ -85,6 +85,14 @@ export interface ContentOptimizationOrderCoupon {
   discount_amount: number;
 }
 
+export interface ContentOptimizationOrderDiscount {
+  name: string;
+  description: string;
+  discount_type: "percentage" | "fixed_amount";
+  discount_rate: number;
+  discount_amount: number;
+}
+
 export interface ContentOptimizationOrderDetail {
   id: string;
   order_title?: string | null;
@@ -98,4 +106,5 @@ export interface ContentOptimizationOrderDetail {
   updated_at: string;
   items: ContentOptimizationOrderItemDetail[];
   coupons?: ContentOptimizationOrderCoupon[];
+  discounts?: ContentOptimizationOrderDiscount[];
 }

@@ -82,6 +82,14 @@ export interface ContentBriefOrderCoupon {
   discount_amount: number;
 }
 
+export interface ContentBriefOrderDiscount {
+  name: string;
+  description: string;
+  discount_type: "percentage" | "fixed_amount";
+  discount_rate: number;
+  discount_amount: number;
+}
+
 export interface ContentBriefOrderDetail {
   id: string;
   order_title?: string | null;
@@ -95,4 +103,5 @@ export interface ContentBriefOrderDetail {
   updated_at: string;
   items: ContentBriefOrderItemDetail[];
   coupons?: ContentBriefOrderCoupon[];
+  discounts?: ContentBriefOrderDiscount[];
 }

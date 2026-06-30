@@ -30,12 +30,21 @@ interface CouponSummary {
   discount_amount: number;
 }
 
+interface DiscountSummary {
+  name: string;
+  description: string;
+  discount_type: string;
+  discount_rate: number;
+  discount_amount: number;
+}
+
 interface ResolvedOrderSection {
   order_id: string;
   product_type: CartProductType;
   total_amount: number;
   subtotal_before_discount: number;
   coupons: CouponSummary[];
+  discounts: DiscountSummary[];
   status: string;
   lb_detail?: LinkBuildingOrderDetail;
   nc_detail?: NewContentOrderDetail;
@@ -358,7 +367,7 @@ function ProductSectionCard({
       )}
 
       {/* Section Subtotal / Discount Breakdown */}
-      {section.coupons.length > 0 ? (
+      {(section.coupons.length > 0 || section.discounts.length > 0) ? (
         <div className={`border-t ${cfg.border} ${cfg.bg}`}>
           <div className="flex items-center justify-between px-5 py-2.5">
             <span className="text-xs text-gray-500 dark:text-gray-400">
@@ -380,6 +389,21 @@ function ProductSectionCard({
               </div>
               <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
                 &minus;{formatCurrency(coupon.discount_amount)}
+              </span>
+            </div>
+          ))}
+          {section.discounts.map((discount) => (
+            <div key={discount.name} className="flex items-center justify-between px-5 py-1.5">
+              <div className="flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 rounded border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400">
+                  {discount.name}
+                </span>
+                <span className="text-xs text-amber-600 dark:text-amber-400">
+                  discount applied
+                </span>
+              </div>
+              <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 tabular-nums">
+                &minus;{formatCurrency(discount.discount_amount)}
               </span>
             </div>
           ))}
@@ -491,6 +515,7 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
             total_amount: order.total_amount,
             subtotal_before_discount: order.total_amount,
             coupons: [],
+            discounts: [],
             status: "pending",
           };
 
@@ -503,6 +528,15 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
               discount_amount: c.discount_amount,
             }));
 
+          const extractDiscounts = (raw?: { name: string; description: string; discount_type: string; discount_rate: number; discount_amount: number }[]): DiscountSummary[] =>
+            (raw ?? []).map((d) => ({
+              name: d.name,
+              description: d.description,
+              discount_type: d.discount_type,
+              discount_rate: d.discount_rate,
+              discount_amount: d.discount_amount,
+            }));
+
           try {
             if (order.product_type === "link_building") {
               const lb = await linkBuildingService.fetchLinkBuildingOrderDetail(order.order_id);
@@ -512,6 +546,7 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
                 lb_detail: lb,
                 subtotal_before_discount: lb.subtotal_before_discount ?? order.total_amount,
                 coupons: extractCoupons(lb.coupons),
+                discounts: extractDiscounts(lb.discounts),
               };
             }
             if (order.product_type === "new_content") {
@@ -522,6 +557,7 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
                 nc_detail: nc,
                 subtotal_before_discount: nc.subtotal_before_discount ?? order.total_amount,
                 coupons: extractCoupons(nc.coupons),
+                discounts: extractDiscounts(nc.discounts),
               };
             }
             if (order.product_type === "content_optimization") {
@@ -532,6 +568,7 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
                 co_detail: co,
                 subtotal_before_discount: co.subtotal_before_discount ?? order.total_amount,
                 coupons: extractCoupons(co.coupons),
+                discounts: extractDiscounts(co.discounts),
               };
             }
             if (order.product_type === "content_brief") {
@@ -542,6 +579,7 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
                 cb_detail: cb,
                 subtotal_before_discount: cb.subtotal_before_discount ?? order.total_amount,
                 coupons: extractCoupons(cb.coupons),
+                discounts: extractDiscounts(cb.discounts),
               };
             }
           } catch {
@@ -602,7 +640,11 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
     (sum, s) => sum + s.coupons.reduce((cs, c) => cs + c.discount_amount, 0),
     0
   );
-  const grand_has_discount = grand_coupon_savings > 0.001;
+  const grand_discount_savings = sections.reduce(
+    (sum, s) => sum + s.discounts.reduce((ds, d) => ds + d.discount_amount, 0),
+    0
+  );
+  const grand_has_discount = grand_coupon_savings > 0.001 || grand_discount_savings > 0.001;
 
   // Deduplicate coupons by code, summing amounts across product types
   const grand_coupon_map = new Map<string, { code: string; name: string; total_amount: number }>();
@@ -617,6 +659,20 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
     });
   });
   const grand_unique_coupons = Array.from(grand_coupon_map.values());
+
+  // Deduplicate discounts by name, summing amounts across product types
+  const grand_discount_map = new Map<string, { name: string; description: string; total_amount: number }>();
+  sections.forEach((s) => {
+    s.discounts.forEach((d) => {
+      const existing = grand_discount_map.get(d.name);
+      grand_discount_map.set(d.name, {
+        name: d.name,
+        description: d.description,
+        total_amount: (existing?.total_amount ?? 0) + d.discount_amount,
+      });
+    });
+  });
+  const grand_unique_discounts = Array.from(grand_discount_map.values());
 
   const resolvedItems = (section: ResolvedOrderSection): NormalizedItem[] | undefined => {
     if (section.product_type === "link_building" && section.lb_detail) {
@@ -880,6 +936,25 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
                     </div>
                     <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
                       &minus;{formatCurrency(coupon.total_amount)}
+                    </span>
+                  </div>
+                ))}
+                {grand_unique_discounts.map((discount) => (
+                  <div key={discount.name} className="flex items-center justify-between px-4 py-2">
+                    <div className="flex items-center gap-1.5">
+                      <svg className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" />
+                      </svg>
+                      <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
+                        {discount.name}:
+                      </span>
+                      <span className="inline-flex items-center rounded border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400">
+                        {discount.description}
+                      </span>
+                    </div>
+                    <span className="text-xs font-bold text-amber-600 dark:text-amber-400 tabular-nums">
+                      &minus;{formatCurrency(discount.total_amount)}
                     </span>
                   </div>
                 ))}

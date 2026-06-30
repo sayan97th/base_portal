@@ -120,6 +120,14 @@ export interface OrderCouponDetail {
   discount_amount: number;
 }
 
+export interface OrderDiscountDetail {
+  name: string;
+  description: string;
+  discount_type: "percentage" | "fixed_amount";
+  discount_rate: number;
+  discount_amount: number;
+}
+
 export interface LinkBuildingOrderDetail {
   id: string;
   order_title: string | null;
@@ -135,6 +143,7 @@ export interface LinkBuildingOrderDetail {
   items: OrderItemDetail[];
   billing: OrderBillingDetail;
   coupons?: OrderCouponDetail[];
+  discounts?: OrderDiscountDetail[];
 }
 
 export interface CreateOrderResponse {

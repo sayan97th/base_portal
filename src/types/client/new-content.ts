@@ -87,6 +87,14 @@ export interface NewContentOrderCoupon {
   discount_amount: number;
 }
 
+export interface NewContentOrderDiscount {
+  name: string;
+  description: string;
+  discount_type: "percentage" | "fixed_amount";
+  discount_rate: number;
+  discount_amount: number;
+}
+
 export interface NewContentOrderDetail {
   id: string;
   order_title?: string | null;
@@ -100,5 +108,6 @@ export interface NewContentOrderDetail {
   updated_at: string;
   items: NewContentOrderItemDetail[];
   coupons?: NewContentOrderCoupon[];
+  discounts?: NewContentOrderDiscount[];
 }
 
