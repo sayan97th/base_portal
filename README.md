@@ -10,7 +10,7 @@ Each environment has its own dedicated ecosystem configuration file located in t
 
 | File | Environment | Server Path |
 |---|---|---|
-| `ecosystem/ecosystem.testing.config.js` | Testing | `/var/www/html/base-portal.97dev.com` |
+| `ecosystem/ecosystem.testing.config.js` | Testing | `/var/www/base-portal.97dev.com` |
 | `ecosystem/ecosystem.staging.config.js` | Staging | `/var/www/clients.basesearchmarketing.com` |
 | `ecosystem/ecosystem.production.config.js` | Production | `/var/www/portal.basesearchmarketing.com` |
 
