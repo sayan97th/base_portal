@@ -24,7 +24,7 @@ import UserSelectFilterDropdown from "./UserSelectFilterDropdown";
 import ClientAssignCell from "./ClientAssignCell";
 import ClientSearchableSelect from "./ClientSearchableSelect";
 import AdminSearchableSelect from "./AdminSearchableSelect";
-import type { LinkBuildingOrderSearchBody, ColumnFilterPayload, SortRulePayload } from "@/types/admin/link-building-order";
+import type { LinkBuildingOrderSearchBody, ColumnFilterPayload, SortRulePayload, LinkBuildingOrderPayload } from "@/types/admin/link-building-order";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useAuth } from "@/context/AuthContext";
 import { useLinkBuildingCollaboration } from "@/hooks/useLinkBuildingCollaboration";
@@ -161,6 +161,11 @@ function generateOrderId(): string {
   // the real BL-{n} ID when the row is saved (see store() on the backend).
   return "BL-####";
 }
+
+// Matches the admin-facing order id format used to track the external BLS
+// spreadsheet number, e.g. "BL-25143". Kept in sync with the backend regex in
+// UpdateLinkBuildingOrderRequest.
+const ORDER_ID_PATTERN = /^BL-\d+$/i;
 
 function formatDateMMDDYYYY(date: Date): string {
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -987,7 +992,14 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     markSaving(row.id);
     setSaveError(null);
     try {
-      const res = await updateLinkBuildingOrder(row.id, buildLboPayload(row));
+      const payload: Partial<LinkBuildingOrderPayload> = buildLboPayload(row);
+      if (changed_col_key !== "order_id") {
+        // Only send order_id when the admin explicitly edited that cell — otherwise
+        // omit it so a client-purchased row's UUID-derived fallback display ID is
+        // never silently persisted just because an unrelated field was edited.
+        delete payload.order_id;
+      }
+      const res = await updateLinkBuildingOrder(row.id, payload);
       replaceRow(row.id, res.data);
 
       const triggers_notification =
@@ -1025,7 +1037,17 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     const row = rows_ref.current.find((r) => r.id === cell.row_id);
     if (!row) return;
 
-    if (new_row_ids_ref.current.has(row.id)) {
+    const is_draft_row = new_row_ids_ref.current.has(row.id);
+
+    if (cell.col_key === "order_id" && !is_draft_row) {
+      const trimmed = row.order_id.trim();
+      if (trimmed !== "" && !ORDER_ID_PATTERN.test(trimmed)) {
+        setSaveError(`Invalid Order ID "${trimmed}" — must follow the format BL-<number> (e.g. BL-25143).`);
+        return;
+      }
+    }
+
+    if (is_draft_row) {
       persistNewRow(row);
     } else {
       persistRowUpdate(row, cell.col_key);

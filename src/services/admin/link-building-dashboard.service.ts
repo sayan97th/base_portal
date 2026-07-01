@@ -140,16 +140,19 @@ export async function createLinkBuildingOrder(
 /**
  * PUT /api/admin/link-building-orders/{id}
  * Full replacement update of an existing row.
+ *
+ * order_id is only included by the caller when the admin explicitly edited that
+ * cell (see persistRowUpdate in LinkBuildingOrdersTable.tsx) — omitting it otherwise
+ * avoids accidentally persisting a client-purchased row's UUID-derived fallback
+ * display ID as a side effect of editing an unrelated field.
  */
 export async function updateLinkBuildingOrder(
   id: string,
-  payload: LinkBuildingOrderPayload
+  payload: Partial<LinkBuildingOrderPayload>
 ): Promise<LinkBuildingOrderMutationResponse> {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { order_id: _oid, ...update_body } = payload;
   return apiClient.put<LinkBuildingOrderMutationResponse>(
     `/api/admin/link-building-orders/${id}`,
-    update_body
+    payload
   );
 }
 
