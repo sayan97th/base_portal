@@ -184,10 +184,22 @@ describe("updateLinkBuildingOrder", () => {
     );
   });
 
-  it("strips order_id from the PUT body", async () => {
+  it("passes order_id through untouched — the caller decides whether to include it", async () => {
     mocked.put.mockResolvedValueOnce({ message: "Updated", data: makeRow() } as never);
 
-    await updateLinkBuildingOrder("uuid-1", buildLboPayload(makeRow({ order_id: "BL-1" })));
+    await updateLinkBuildingOrder("uuid-1", buildLboPayload(makeRow({ order_id: "BL-25143" })));
+
+    const [, body] = mocked.put.mock.calls[0];
+    expect(body).toMatchObject({ order_id: "BL-25143" });
+  });
+
+  it("omits order_id from the PUT body when the caller excludes it", async () => {
+    mocked.put.mockResolvedValueOnce({ message: "Updated", data: makeRow() } as never);
+
+    const payload = buildLboPayload(makeRow({ order_id: "BL-1" }));
+    delete (payload as Partial<typeof payload>).order_id;
+
+    await updateLinkBuildingOrder("uuid-1", payload);
 
     const [, body] = mocked.put.mock.calls[0];
     expect(body).not.toHaveProperty("order_id");
