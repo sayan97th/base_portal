@@ -2,24 +2,22 @@
 
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
-  importLinkBuildingOrders,
+  metricsImportLinkBuildingOrders,
   getLinkBuildingImportStatus,
+  METRIC_COLUMN_OPTIONS,
   type ImportStatus,
-  type ImportOptions,
+  type MetricColumnKey,
 } from "@/services/admin/link-building-dashboard.service";
-import FilterDatePicker from "@/components/admin/users/FilterDatePicker";
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
-type ImportPhase =
+type ModalPhase =
   | "idle"
   | "file_selected"
   | "uploading"
   | "processing"
   | "completed"
   | "failed";
-
-type DateMode = "last_year" | "custom" | "all";
 
 interface Props {
   is_open: boolean;
@@ -31,6 +29,13 @@ const ACCEPTED_EXTENSIONS = [".csv", ".txt"];
 const MAX_FILE_SIZE_MB = 50;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 const POLL_INTERVAL_MS = 1500;
+
+const DEFAULT_SELECTED_COLUMNS: MetricColumnKey[] = [
+  "current_traffic",
+  "dr_formula",
+  "current_poc",
+  "current_price",
+];
 
 // ── Helpers ─────────────────────────────────────────────────────────────────────
 
@@ -51,41 +56,10 @@ function isValidFile(file: File): string | null {
   return null;
 }
 
-function formatMMDDYYYY(date: Date): string {
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  const y = date.getFullYear();
-  return `${m}/${d}/${y}`;
-}
-
-function mmddyyyyToIso(date: string): string {
-  const [m, d, y] = date.split("/");
-  if (!m || !d || !y) return "";
-  return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
-}
-
-function isoToMmddyyyy(date: string): string {
-  const [y, m, d] = date.split("-");
-  if (!y || !m || !d) return "";
-  return `${m}/${d}/${y}`;
-}
-
-function getDefaultDateFrom(): string {
-  const d = new Date();
-  d.setFullYear(d.getFullYear() - 1);
-  return formatMMDDYYYY(d);
-}
-
-
 // ── Sub-components ──────────────────────────────────────────────────────────────
 
-function ProgressBar({ value, max, color = "brand" }: { value: number; max: number; color?: string }) {
+function ProgressBar({ value, max }: { value: number; max: number }) {
   const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
-  const bar_color = color === "green"
-    ? "bg-green-500"
-    : color === "red"
-    ? "bg-red-500"
-    : "bg-brand-500";
 
   return (
     <div className="w-full">
@@ -99,7 +73,7 @@ function ProgressBar({ value, max, color = "brand" }: { value: number; max: numb
       </div>
       <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-700">
         <div
-          className={`h-full rounded-full transition-all duration-300 ${bar_color}`}
+          className="h-full rounded-full bg-brand-500 transition-all duration-300"
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -114,14 +88,12 @@ function StatBadge({
 }: {
   count: number;
   label: string;
-  color: "green" | "blue" | "amber" | "red" | "purple";
+  color: "blue" | "amber" | "red";
 }) {
   const styles: Record<string, string> = {
-    green:  "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800",
-    blue:   "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800",
-    amber:  "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800",
-    red:    "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800",
-    purple: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800",
+    blue:  "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800",
+    amber: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800",
+    red:   "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800",
   };
 
   return (
@@ -134,8 +106,8 @@ function StatBadge({
 
 // ── Main modal ──────────────────────────────────────────────────────────────────
 
-export default function LinkBuildingOrderImportModal({ is_open, onClose, onImportComplete }: Props) {
-  const [phase, setPhase]                     = useState<ImportPhase>("idle");
+export default function LinkBuildingMetricsUpdateModal({ is_open, onClose, onImportComplete }: Props) {
+  const [phase, setPhase]                     = useState<ModalPhase>("idle");
   const [selected_file, setSelectedFile]      = useState<File | null>(null);
   const [file_error, setFileError]            = useState<string | null>(null);
   const [upload_pct, setUploadPct]            = useState(0);
@@ -143,51 +115,13 @@ export default function LinkBuildingOrderImportModal({ is_open, onClose, onImpor
   const [status, setStatus]                   = useState<ImportStatus | null>(null);
   const [error_message, setErrorMessage]      = useState<string | null>(null);
   const [is_dragging_over, setIsDraggingOver] = useState(false);
-
-  // ── Advanced options ────────────────────────────────────────────────────────
-
-  const [show_advanced, setShowAdvanced]           = useState(false);
-  const [date_mode, setDateMode]                   = useState<DateMode>("last_year");
-  const [custom_date_from, setCustomDateFrom]      = useState<string>("");
-  const [custom_date_to, setCustomDateTo]          = useState<string>("");
-  const [include_external, setIncludeExternal]     = useState(true);
-  const [include_internal, setIncludeInternal]     = useState(false);
-  const [only_new_records, setOnlyNewRecords]      = useState(false);
+  const [selected_columns, setSelectedColumns] = useState<Set<MetricColumnKey>>(
+    new Set(DEFAULT_SELECTED_COLUMNS)
+  );
 
   const file_input_ref  = useRef<HTMLInputElement>(null);
   const poll_timer_ref  = useRef<ReturnType<typeof setInterval> | null>(null);
   const completed_ref   = useRef(false);
-
-  // ── Build ImportOptions from current state ──────────────────────────────────
-
-  const buildImportOptions = useCallback((): ImportOptions => {
-    const apply_date_filter = date_mode !== "all";
-
-    let date_from: string | undefined;
-    let date_to: string | undefined;
-
-    if (date_mode === "last_year") {
-      date_from = getDefaultDateFrom();
-      // No upper bound — only excludes records older than 1 year. Defaulting
-      // date_to to "today" would silently reject legitimately future-dated
-      // request dates (e.g. orders scheduled ahead).
-      date_to   = undefined;
-    } else if (date_mode === "custom") {
-      date_from = custom_date_from ? isoToMmddyyyy(custom_date_from) : undefined;
-      date_to   = custom_date_to   ? isoToMmddyyyy(custom_date_to)   : undefined;
-    }
-
-    let link_type_filter: ImportOptions["link_type_filter"];
-    if (include_external && include_internal) {
-      link_type_filter = "all";
-    } else if (include_internal) {
-      link_type_filter = "internal_only";
-    } else {
-      link_type_filter = "external_only";
-    }
-
-    return { apply_date_filter, date_from, date_to, link_type_filter, only_new_records };
-  }, [date_mode, custom_date_from, custom_date_to, include_external, include_internal, only_new_records]);
 
   // ── Reset on close ──────────────────────────────────────────────────────────
 
@@ -204,14 +138,8 @@ export default function LinkBuildingOrderImportModal({ is_open, onClose, onImpor
     setStatus(null);
     setErrorMessage(null);
     setIsDraggingOver(false);
+    setSelectedColumns(new Set(DEFAULT_SELECTED_COLUMNS));
     completed_ref.current = false;
-    setShowAdvanced(false);
-    setDateMode("last_year");
-    setCustomDateFrom("");
-    setCustomDateTo("");
-    setIncludeExternal(true);
-    setIncludeInternal(false);
-    setOnlyNewRecords(false);
   }, []);
 
   const handleClose = useCallback(() => {
@@ -241,7 +169,7 @@ export default function LinkBuildingOrderImportModal({ is_open, onClose, onImpor
           clearInterval(poll_timer_ref.current!);
           poll_timer_ref.current = null;
           setPhase("failed");
-          setErrorMessage(result.errors[0]?.message ?? "The import job failed unexpectedly.");
+          setErrorMessage(result.errors[0]?.message ?? "The metrics update job failed unexpectedly.");
         }
       } catch {
         // Network hiccup — keep polling
@@ -249,7 +177,6 @@ export default function LinkBuildingOrderImportModal({ is_open, onClose, onImpor
     }, POLL_INTERVAL_MS);
   }, []);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (poll_timer_ref.current) clearInterval(poll_timer_ref.current);
@@ -288,18 +215,32 @@ export default function LinkBuildingOrderImportModal({ is_open, onClose, onImpor
     if (file) handleFileSelect(file);
   };
 
-  // ── Upload & start import ───────────────────────────────────────────────────
+  // ── Column selection ─────────────────────────────────────────────────────────
 
-  const handleStartImport = useCallback(async () => {
-    if (!selected_file) return;
+  const toggleColumn = useCallback((key: MetricColumnKey) => {
+    setSelectedColumns((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }, []);
+
+  // ── Upload & start update ───────────────────────────────────────────────────
+
+  const handleStartUpdate = useCallback(async () => {
+    if (!selected_file || selected_columns.size === 0) return;
 
     setPhase("uploading");
     setUploadPct(0);
     setErrorMessage(null);
 
     try {
-      const options  = buildImportOptions();
-      const response = await importLinkBuildingOrders(selected_file, options, (pct) => {
+      const target_columns = Array.from(selected_columns);
+      const response = await metricsImportLinkBuildingOrders(selected_file, target_columns, (pct) => {
         setUploadPct(pct);
       });
 
@@ -311,7 +252,6 @@ export default function LinkBuildingOrderImportModal({ is_open, onClose, onImpor
         created:   0,
         updated:   0,
         skipped:   0,
-        assigned:  0,
         errors:    [],
       });
       setPhase("processing");
@@ -325,7 +265,7 @@ export default function LinkBuildingOrderImportModal({ is_open, onClose, onImpor
       setPhase("failed");
       setErrorMessage(msg);
     }
-  }, [selected_file, buildImportOptions, startPolling]);
+  }, [selected_file, selected_columns, startPolling]);
 
   // ── Dismiss & refresh ───────────────────────────────────────────────────────
 
@@ -345,29 +285,7 @@ export default function LinkBuildingOrderImportModal({ is_open, onClose, onImpor
   const processed_rows = status?.processed ?? 0;
   const total_rows     = status?.total ?? 0;
   const is_idle_phase  = phase === "idle" || phase === "file_selected";
-
-  // Validation: at least one link type must be selected
-  const link_type_valid = include_external || include_internal;
-  const can_start = !!selected_file && link_type_valid;
-
-  // Active filter summary shown when advanced panel is collapsed
-  const date_summary =
-    date_mode === "all"
-      ? "All dates"
-      : date_mode === "last_year"
-      ? `From ${getDefaultDateFrom()} onward (no upper limit)`
-      : `Custom (${custom_date_from ? isoToMmddyyyy(custom_date_from) : "?"} – ${custom_date_to ? isoToMmddyyyy(custom_date_to) : "?"})`;
-
-  const link_summary =
-    include_external && include_internal
-      ? "External & Internal"
-      : include_external
-      ? "External only"
-      : include_internal
-      ? "Internal only"
-      : "None selected";
-
-  const import_mode_summary = only_new_records ? "New records only" : "Create & update";
+  const can_start      = !!selected_file && selected_columns.size > 0;
 
   // ── JSX ─────────────────────────────────────────────────────────────────────
 
@@ -390,12 +308,11 @@ export default function LinkBuildingOrderImportModal({ is_open, onClose, onImpor
         <div className="flex items-start justify-between border-b border-gray-100 px-6 py-4 dark:border-gray-800">
           <div>
             <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-              Import Link Building Orders
+              Update Metrics
             </h2>
             <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-              Upload a CSV file exported from Google Sheets. Existing orders are matched
-              by <strong>Order ID</strong> and updated automatically, including metric
-              columns like Current Traffic, DR Formula, Current POC, and Current Price.
+              Bulk-update selected metric columns from a reference CSV. Rows are matched by{" "}
+              <strong>Order ID</strong> — no other field is touched.
             </p>
           </div>
           {!is_busy && (
@@ -414,9 +331,36 @@ export default function LinkBuildingOrderImportModal({ is_open, onClose, onImpor
         {/* Body */}
         <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
 
-          {/* ── idle / file_selected: drop zone ── */}
+          {/* ── idle / file_selected: column picker + drop zone ── */}
           {is_idle_phase && (
             <div className="space-y-4">
+              {/* Column picker */}
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50">
+                <p className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  Columns to Update
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {METRIC_COLUMN_OPTIONS.map((col) => (
+                    <label key={col.key} className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={selected_columns.has(col.key)}
+                        onChange={() => toggleColumn(col.key)}
+                        className="rounded accent-brand-500"
+                      />
+                      <span className="text-xs font-medium text-gray-700 dark:text-gray-200">
+                        {col.label}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                {selected_columns.size === 0 && (
+                  <p className="mt-2 text-xs text-red-500 dark:text-red-400">
+                    Select at least one column to update.
+                  </p>
+                )}
+              </div>
+
               {/* Drop zone */}
               <div
                 onDragOver={handleDragOver}
@@ -514,210 +458,17 @@ export default function LinkBuildingOrderImportModal({ is_open, onClose, onImpor
                 </div>
               )}
 
-              {/* ── Advanced Options ─────────────────────────────────────────── */}
-              <div className="rounded-xl border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50">
-                {/* Toggle header */}
-                <button
-                  type="button"
-                  onClick={() => setShowAdvanced((v) => !v)}
-                  className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-left transition-colors hover:bg-gray-100 dark:hover:bg-gray-700/50"
-                >
-                  <div className="flex items-center gap-2">
-                    <svg className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    <span className="text-xs font-medium text-gray-700 dark:text-gray-200">
-                      Advanced Options
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {!show_advanced && (
-                      <span className="text-[10px] text-gray-400 dark:text-gray-500">
-                        {date_summary} · {link_summary} · {import_mode_summary}
-                      </span>
-                    )}
-                    <svg
-                      className={`h-3.5 w-3.5 text-gray-400 transition-transform ${show_advanced ? "rotate-180" : ""}`}
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
-                </button>
-
-                {/* Expanded panel */}
-                {show_advanced && (
-                  <div className="space-y-5 border-t border-gray-200 px-4 pb-4 pt-4 dark:border-gray-700">
-
-                    {/* Date Range */}
-                    <div className="space-y-2.5">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                        Date Range (Request Date)
-                      </p>
-                      <div className="space-y-2">
-                        {(["last_year", "custom", "all"] as DateMode[]).map((mode) => (
-                          <label key={mode} className="flex cursor-pointer items-start gap-2.5">
-                            <input
-                              type="radio"
-                              name="date_mode"
-                              value={mode}
-                              checked={date_mode === mode}
-                              onChange={() => setDateMode(mode)}
-                              className="mt-0.5 accent-brand-500"
-                            />
-                            <div>
-                              <span className="text-xs font-medium text-gray-700 dark:text-gray-200">
-                                {mode === "last_year" && "Last year (default)"}
-                                {mode === "custom"    && "Custom range"}
-                                {mode === "all"       && "All dates — no restriction"}
-                              </span>
-                              {mode === "last_year" && (
-                                <p className="mt-0.5 text-[10px] text-gray-400 dark:text-gray-500">
-                                  From {getDefaultDateFrom()} onward — no upper limit, future-dated orders are included
-                                </p>
-                              )}
-                            </div>
-                          </label>
-                        ))}
-                      </div>
-
-                      {/* Custom date inputs */}
-                      {date_mode === "custom" && (
-                        <div className="ml-5 mt-2 grid grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                              Start Date
-                            </label>
-                            <FilterDatePicker
-                              id="import_date_from"
-                              placeholder="Start date"
-                              value={custom_date_from}
-                              max_date={custom_date_to || undefined}
-                              on_change={setCustomDateFrom}
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                              End Date
-                            </label>
-                            <FilterDatePicker
-                              id="import_date_to"
-                              placeholder="End date"
-                              value={custom_date_to}
-                              min_date={custom_date_from || undefined}
-                              on_change={setCustomDateTo}
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Divider */}
-                    <div className="border-t border-gray-200 dark:border-gray-700" />
-
-                    {/* Link Type Filter */}
-                    <div className="space-y-2.5">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                        Link Type Filter
-                      </p>
-                      <div className="space-y-2">
-                        <label className="flex cursor-pointer items-center gap-2.5">
-                          <input
-                            type="checkbox"
-                            checked={include_external}
-                            onChange={(e) => setIncludeExternal(e.target.checked)}
-                            className="rounded accent-brand-500"
-                          />
-                          <div>
-                            <span className="text-xs font-medium text-gray-700 dark:text-gray-200">
-                              External link types{" "}
-                              <span className="font-normal text-gray-400 dark:text-gray-500">(default)</span>
-                            </span>
-                            <p className="text-[10px] text-gray-400 dark:text-gray-500">
-                              e.g. DR 30+ External, DR 40+ External
-                            </p>
-                          </div>
-                        </label>
-                        <label className="flex cursor-pointer items-center gap-2.5">
-                          <input
-                            type="checkbox"
-                            checked={include_internal}
-                            onChange={(e) => setIncludeInternal(e.target.checked)}
-                            className="rounded accent-brand-500"
-                          />
-                          <div>
-                            <span className="text-xs font-medium text-gray-700 dark:text-gray-200">
-                              Internal link types
-                            </span>
-                            <p className="text-[10px] text-gray-400 dark:text-gray-500">
-                              e.g. DR 30+ Internal, DR 40+ Internal
-                            </p>
-                          </div>
-                        </label>
-                      </div>
-
-                      {!link_type_valid && (
-                        <p className="text-xs text-red-500 dark:text-red-400">
-                          At least one link type must be selected.
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Divider */}
-                    <div className="border-t border-gray-200 dark:border-gray-700" />
-
-                    {/* Import Mode */}
-                    <div className="space-y-2.5">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                        Import Mode
-                      </p>
-                      <label className="flex cursor-pointer items-start gap-2.5">
-                        <input
-                          type="checkbox"
-                          checked={only_new_records}
-                          onChange={(e) => setOnlyNewRecords(e.target.checked)}
-                          className="mt-0.5 rounded accent-brand-500"
-                        />
-                        <div>
-                          <span className="text-xs font-medium text-gray-700 dark:text-gray-200">
-                            Import new records only
-                          </span>
-                          <p className="mt-0.5 text-[10px] text-gray-400 dark:text-gray-500">
-                            Rows whose Order ID already exists are left completely untouched
-                            and counted as skipped. Existing records are never updated, even
-                            if their values changed in the file. New rows are still subject
-                            to the Date Range and Link Type Filter above.
-                          </p>
-                        </div>
-                      </label>
-                    </div>
-                  </div>
-                )}
-              </div>
-
               {/* Info note */}
               <div className="flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2.5 dark:border-blue-900/40 dark:bg-blue-900/10">
                 <svg className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
                 </svg>
                 <p className="text-xs text-blue-700 dark:text-blue-400">
-                  Rows are matched by <strong>Order ID</strong>. Existing records will be updated;
-                  new Order IDs will create new entries. Rows outside the selected filters will be
-                  counted as <strong>skipped</strong>. The <strong>Client</strong> column is
-                  automatically matched to a registered client account by company name. The{" "}
-                  <strong>Link Builder</strong> column is matched to an admin user by name —
-                  matched orders are automatically assigned to that user in the{" "}
-                  <strong>Assigned To</strong> column. Admin-only fields (notes, checks) are never
-                  overwritten by the import. The metric columns —{" "}
-                  <strong>Current Traffic, DR Formula, Current POC, and Current Price</strong> —
-                  are updated automatically for every matched row whenever this file includes
-                  them. If you only need to refresh those metric columns without touching the
-                  rest of the order data, use <strong>Update Metrics</strong> instead — it lets
-                  you pick exactly which columns to update.
+                  Rows are matched by <strong>Order ID</strong> — only the columns checked above
+                  are written, every other field is left untouched. Order IDs not found in the
+                  system are skipped (no new rows are ever created). Only records from the{" "}
+                  <strong>last year</strong> (by Request Date) are considered, matching the
+                  behavior of the full CSV import.
                 </p>
               </div>
             </div>
@@ -767,10 +518,10 @@ export default function LinkBuildingOrderImportModal({ is_open, onClose, onImpor
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                    Processing import…
+                    Updating metrics…
                   </p>
                   <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                    Importing rows in batches of 500 — please wait
+                    Applying updates in batches of 500 — please wait
                   </p>
                 </div>
               </div>
@@ -783,12 +534,8 @@ export default function LinkBuildingOrderImportModal({ is_open, onClose, onImpor
                 </div>
               )}
 
-              {status && (processed_rows > 0 || status.created > 0 || status.updated > 0) && (
+              {status && (processed_rows > 0 || status.updated > 0) && (
                 <div className="flex items-center justify-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-                  <span className="flex items-center gap-1">
-                    <span className="inline-block h-2 w-2 rounded-full bg-green-400" />
-                    {status.created.toLocaleString()} created
-                  </span>
                   <span className="flex items-center gap-1">
                     <span className="inline-block h-2 w-2 rounded-full bg-blue-400" />
                     {status.updated.toLocaleString()} updated
@@ -815,21 +562,17 @@ export default function LinkBuildingOrderImportModal({ is_open, onClose, onImpor
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                    Import complete!
+                    Metrics update complete!
                   </p>
                   <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                    {(status.created + status.updated).toLocaleString()} rows processed successfully
+                    {status.updated.toLocaleString()} row(s) updated
                   </p>
                 </div>
               </div>
 
-              <div className={`grid gap-3 ${(status.assigned ?? 0) > 0 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"}`}>
-                <StatBadge count={status.created}           label="Created"       color="green"  />
-                <StatBadge count={status.updated}           label="Updated"       color="blue"   />
-                <StatBadge count={status.skipped}           label="Skipped"       color="amber"  />
-                {(status.assigned ?? 0) > 0 && (
-                  <StatBadge count={status.assigned ?? 0}   label="Auto-assigned" color="purple" />
-                )}
+              <div className="grid grid-cols-2 gap-3">
+                <StatBadge count={status.updated} label="Updated" color="blue"  />
+                <StatBadge count={status.skipped} label="Skipped" color="amber" />
               </div>
 
               {status.errors.length > 0 && (
@@ -876,11 +619,6 @@ export default function LinkBuildingOrderImportModal({ is_open, onClose, onImpor
                       </li>
                     ))}
                   </ul>
-                  <div className="border-t border-amber-200 px-4 py-2 dark:border-amber-800">
-                    <p className="text-[10px] text-amber-600 dark:text-amber-500">
-                      To import these records, expand <strong>Advanced Options</strong> above and adjust the <strong>Date Range</strong> or <strong>Link Type Filter</strong> to include the filtered types, then re-import.
-                    </p>
-                  </div>
                 </div>
               )}
             </div>
@@ -897,7 +635,7 @@ export default function LinkBuildingOrderImportModal({ is_open, onClose, onImpor
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                    Import failed
+                    Metrics update failed
                   </p>
                   {error_message && (
                     <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error_message}</p>
@@ -922,17 +660,17 @@ export default function LinkBuildingOrderImportModal({ is_open, onClose, onImpor
             </button>
           )}
 
-          {/* Start import */}
+          {/* Start update */}
           {phase === "file_selected" && (
             <button
-              onClick={handleStartImport}
+              onClick={handleStartUpdate}
               disabled={!can_start}
               className="flex items-center gap-2 rounded-lg bg-brand-500 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
               </svg>
-              Start Import
+              Start Update
             </button>
           )}
 

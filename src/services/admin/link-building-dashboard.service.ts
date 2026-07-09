@@ -343,6 +343,87 @@ export async function getLinkBuildingImportStatus(
   );
 }
 
+// ── Metrics-only bulk update ──────────────────────────────────────────────────
+
+/**
+ * Columns eligible for the metrics-only bulk updater. Kept in sync with
+ * ProcessLinkBuildingMetricsImportJob::TARGET_COLUMNS on the backend.
+ */
+export const METRIC_COLUMN_OPTIONS = [
+  { key: "current_traffic", label: "Current Traffic" },
+  { key: "dr_formula",      label: "DR Formula" },
+  { key: "current_poc",     label: "Current POC" },
+  { key: "current_price",   label: "Current Price" },
+  { key: "dr_lbs",          label: "DR (LBs)" },
+  { key: "posting_fee_lbs", label: "Posting Fee (LBs)" },
+  { key: "lb_tl_approval",  label: "LB TL Approval" },
+  { key: "approval_date",   label: "Approval Date" },
+  { key: "final_price",     label: "Final Price" },
+] as const;
+
+export type MetricColumnKey = (typeof METRIC_COLUMN_OPTIONS)[number]["key"];
+
+/**
+ * POST /api/admin/link-building-orders/metrics-import
+ *
+ * Uploads a CSV file (same shape as the full order export) and starts a background job
+ * that updates only the selected target_columns on rows matched by Order ID. Existing
+ * rows are updated in place; unmatched Order IDs are skipped and never created. Returns
+ * an import_id pollable via getLinkBuildingImportStatus() — same status shape as the
+ * full CSV import.
+ */
+export function metricsImportLinkBuildingOrders(
+  file: File,
+  target_columns: MetricColumnKey[],
+  onUploadProgress?: (percent: number) => void
+): Promise<ImportStartResponse> {
+  return new Promise((resolve, reject) => {
+    const base  = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+    const token = getToken();
+
+    const form_data = new FormData();
+    form_data.append("file", file);
+    target_columns.forEach((col) => form_data.append("target_columns[]", col));
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${base}/api/admin/link-building-orders/metrics-import`);
+
+    if (token) {
+      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    }
+    xhr.setRequestHeader("Accept", "application/json");
+
+    if (onUploadProgress) {
+      xhr.upload.addEventListener("progress", (e) => {
+        if (e.lengthComputable) {
+          onUploadProgress(Math.round((e.loaded / e.total) * 100));
+        }
+      });
+    }
+
+    xhr.addEventListener("load", () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(JSON.parse(xhr.responseText) as ImportStartResponse);
+        } catch {
+          reject(new Error("Invalid response from server."));
+        }
+      } else {
+        try {
+          reject(JSON.parse(xhr.responseText));
+        } catch {
+          reject(new Error(`Upload failed with status ${xhr.status}.`));
+        }
+      }
+    });
+
+    xhr.addEventListener("error", () => reject(new Error("Network error during upload.")));
+    xhr.addEventListener("abort", () => reject(new Error("Upload was cancelled.")));
+
+    xhr.send(form_data);
+  });
+}
+
 export interface ResolveAssignmentsResult {
   message: string;
   resolved: number;
