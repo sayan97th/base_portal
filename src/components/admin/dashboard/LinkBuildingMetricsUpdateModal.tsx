@@ -141,11 +141,11 @@ export default function LinkBuildingMetricsUpdateModal({ is_open, onClose, onImp
     new Set(DEFAULT_SELECTED_COLUMNS)
   );
 
-  // ── Date range ──────────────────────────────────────────────────────────────
+  // ── Date range — always visible, defaults to the last month so the admin sees
+  // exactly what will be applied and can widen or narrow it before uploading. ──
 
-  const [use_custom_date_range, setUseCustomDateRange] = useState(false);
-  const [custom_date_from, setCustomDateFrom]           = useState<string>("");
-  const [custom_date_to, setCustomDateTo]               = useState<string>("");
+  const [date_from, setDateFrom] = useState<string>(() => getDefaultLastMonthRange().from);
+  const [date_to, setDateTo]     = useState<string>(() => getDefaultLastMonthRange().to);
 
   const file_input_ref  = useRef<HTMLInputElement>(null);
   const poll_timer_ref  = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -167,22 +167,11 @@ export default function LinkBuildingMetricsUpdateModal({ is_open, onClose, onImp
     setErrorMessage(null);
     setIsDraggingOver(false);
     setSelectedColumns(new Set(DEFAULT_SELECTED_COLUMNS));
-    setUseCustomDateRange(false);
-    setCustomDateFrom("");
-    setCustomDateTo("");
+    const default_range = getDefaultLastMonthRange();
+    setDateFrom(default_range.from);
+    setDateTo(default_range.to);
     completed_ref.current = false;
   }, []);
-
-  // Toggling the checkbox on pre-fills the range with last month's dates the first
-  // time — afterward the user's own picks are preserved across re-toggles.
-  const toggleCustomDateRange = useCallback((checked: boolean) => {
-    setUseCustomDateRange(checked);
-    if (checked && !custom_date_from && !custom_date_to) {
-      const { from, to } = getDefaultLastMonthRange();
-      setCustomDateFrom(from);
-      setCustomDateTo(to);
-    }
-  }, [custom_date_from, custom_date_to]);
 
   const handleClose = useCallback(() => {
     resetState();
@@ -282,12 +271,10 @@ export default function LinkBuildingMetricsUpdateModal({ is_open, onClose, onImp
 
     try {
       const target_columns = Array.from(selected_columns);
-      const date_range = use_custom_date_range
-        ? {
-            date_from: custom_date_from ? isoToMmddyyyy(custom_date_from) : undefined,
-            date_to:   custom_date_to   ? isoToMmddyyyy(custom_date_to)   : undefined,
-          }
-        : undefined;
+      const date_range = {
+        date_from: date_from ? isoToMmddyyyy(date_from) : undefined,
+        date_to:   date_to   ? isoToMmddyyyy(date_to)   : undefined,
+      };
 
       const response = await metricsImportLinkBuildingOrders(selected_file, target_columns, date_range, (pct) => {
         setUploadPct(pct);
@@ -314,7 +301,7 @@ export default function LinkBuildingMetricsUpdateModal({ is_open, onClose, onImp
       setPhase("failed");
       setErrorMessage(msg);
     }
-  }, [selected_file, selected_columns, use_custom_date_range, custom_date_from, custom_date_to, startPolling]);
+  }, [selected_file, selected_columns, date_from, date_to, startPolling]);
 
   // ── Dismiss & refresh ───────────────────────────────────────────────────────
 
@@ -360,8 +347,8 @@ export default function LinkBuildingMetricsUpdateModal({ is_open, onClose, onImp
               Update Metrics
             </h2>
             <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-              Bulk-update selected metric columns from a reference CSV. Rows are matched by{" "}
-              <strong>Order ID</strong> — no other field is touched.
+              Upload a CSV to bulk-update selected metric columns. Rows are matched by{" "}
+              <strong>Order ID</strong>.
             </p>
           </div>
           {!is_busy && (
@@ -412,52 +399,36 @@ export default function LinkBuildingMetricsUpdateModal({ is_open, onClose, onImp
 
               {/* Date range */}
               <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50">
-                <label className="flex cursor-pointer items-start gap-2.5">
-                  <input
-                    type="checkbox"
-                    checked={use_custom_date_range}
-                    onChange={(e) => toggleCustomDateRange(e.target.checked)}
-                    className="mt-0.5 rounded accent-brand-500"
-                  />
-                  <div>
-                    <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                      Use a custom date range
-                    </span>
-                    <p className="mt-0.5 text-[10px] text-gray-400 dark:text-gray-500">
-                      By default, only records from the <strong>last year</strong> (by Request
-                      Date) are considered. Enable this to narrow it down — e.g. just last month.
-                    </p>
-                  </div>
-                </label>
+                <p className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  Date Range (Request Date)
+                </p>
 
-                {use_custom_date_range && (
-                  <div className="ml-6 mt-3 grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                        Start Date
-                      </label>
-                      <FilterDatePicker
-                        id="metrics_date_from"
-                        placeholder="Start date"
-                        value={custom_date_from}
-                        max_date={custom_date_to || undefined}
-                        on_change={setCustomDateFrom}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                        End Date
-                      </label>
-                      <FilterDatePicker
-                        id="metrics_date_to"
-                        placeholder="End date"
-                        value={custom_date_to}
-                        min_date={custom_date_from || undefined}
-                        on_change={setCustomDateTo}
-                      />
-                    </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                      Start Date
+                    </label>
+                    <FilterDatePicker
+                      id="metrics_date_from"
+                      placeholder="Start date"
+                      value={date_from}
+                      max_date={date_to || undefined}
+                      on_change={setDateFrom}
+                    />
                   </div>
-                )}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                      End Date
+                    </label>
+                    <FilterDatePicker
+                      id="metrics_date_to"
+                      placeholder="End date"
+                      value={date_to}
+                      min_date={date_from || undefined}
+                      on_change={setDateTo}
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Drop zone */}
@@ -563,9 +534,8 @@ export default function LinkBuildingMetricsUpdateModal({ is_open, onClose, onImp
                   <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
                 </svg>
                 <p className="text-xs text-blue-700 dark:text-blue-400">
-                  Rows are matched by <strong>Order ID</strong> — only the columns checked above
-                  are written, every other field is left untouched. Order IDs not found in the
-                  system are skipped (no new rows are ever created).
+                  Only the checked columns are updated. Order IDs not found are skipped —
+                  no new rows are created.
                 </p>
               </div>
             </div>
