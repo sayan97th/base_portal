@@ -1458,6 +1458,19 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
   const [show_import_modal, setShowImportModal] = useState(false);
   const [show_metrics_modal, setShowMetricsModal] = useState(false);
+  const [show_import_menu, setShowImportMenu] = useState(false);
+  const import_btn_ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!show_import_menu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (import_btn_ref.current && !import_btn_ref.current.contains(e.target as Node)) {
+        setShowImportMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [show_import_menu]);
 
   const handleImportComplete = useCallback(() => {
     fetchRows(1, current_body_ref.current);
@@ -1631,27 +1644,76 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
               </button>
             </div>
           )}
-          {/* Import CSV */}
-          <button
-            onClick={() => setShowImportModal(true)}
-            className="flex h-8 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40"
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-            </svg>
-            Import CSV
-          </button>
-          {/* Update Metrics (column-scoped bulk update) */}
-          <button
-            onClick={() => setShowMetricsModal(true)}
-            className="flex h-8 items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-400 dark:hover:bg-indigo-900/40"
-            title="Bulk-update Current Traffic, DR Formula, Current POC, Current Price and other metric columns from a reference CSV, matched by Order ID"
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.5m3-3v3m3-6v6m-9 3h12a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0018 4.5H6a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 006 19.5z" />
-            </svg>
-            Update Metrics
-          </button>
+          {/* Import dropdown */}
+          <div ref={import_btn_ref} className="relative">
+            <button
+              onClick={() => setShowImportMenu((v) => !v)}
+              className="flex h-8 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+              </svg>
+              Import CSV
+              <svg className="h-3 w-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+              </svg>
+            </button>
+
+            {show_import_menu && (
+              <div className="absolute left-0 top-full z-50 mt-1.5 w-72 min-w-[18rem] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl shadow-gray-200/60 dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/30">
+                <div className="border-b border-gray-100 px-4 py-3 dark:border-gray-700">
+                  <p className="text-xs font-semibold text-gray-800 dark:text-gray-100">Import Data</p>
+                  <p className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">Upload a CSV file to create or update records</p>
+                </div>
+
+                {/* Option 1 — Full order import */}
+                <button
+                  onClick={() => {
+                    setShowImportMenu(false);
+                    setShowImportModal(true);
+                  }}
+                  className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                >
+                  <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
+                    <svg className="h-4 w-4 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                    </svg>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-gray-800 dark:text-gray-100">Import Link Building Orders</p>
+                    <p className="mt-0.5 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
+                      Full order CSV — creates and updates rows, matched by Order ID
+                    </p>
+                  </div>
+                </button>
+
+                {/* Divider */}
+                <div className="mx-4 border-t border-gray-100 dark:border-gray-700" />
+
+                {/* Option 2 — Metrics-only update */}
+                <button
+                  onClick={() => {
+                    setShowImportMenu(false);
+                    setShowMetricsModal(true);
+                  }}
+                  className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                >
+                  <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
+                    <svg className="h-4 w-4 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.5m3-3v3m3-6v6m-9 3h12a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0018 4.5H6a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 006 19.5z" />
+                    </svg>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-gray-800 dark:text-gray-100">Update Metrics</p>
+                    <p className="mt-0.5 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
+                      Bulk-update Current Traffic, DR Formula, Current POC, Current Price and
+                      other metric columns only, matched by Order ID
+                    </p>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
           {/* Export dropdown */}
           <div ref={export_btn_ref} className="relative">
             <button

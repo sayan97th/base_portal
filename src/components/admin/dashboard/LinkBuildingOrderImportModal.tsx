@@ -394,8 +394,7 @@ export default function LinkBuildingOrderImportModal({ is_open, onClose, onImpor
             </h2>
             <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
               Upload a CSV file exported from Google Sheets. Existing orders are matched
-              by <strong>Order ID</strong> and updated automatically, including metric
-              columns like Current Traffic, DR Formula, Current POC, and Current Price.
+              by <strong>Order ID</strong> and updated automatically.
             </p>
           </div>
           {!is_busy && (
@@ -712,12 +711,7 @@ export default function LinkBuildingOrderImportModal({ is_open, onClose, onImpor
                   <strong>Link Builder</strong> column is matched to an admin user by name —
                   matched orders are automatically assigned to that user in the{" "}
                   <strong>Assigned To</strong> column. Admin-only fields (notes, checks) are never
-                  overwritten by the import. The metric columns —{" "}
-                  <strong>Current Traffic, DR Formula, Current POC, and Current Price</strong> —
-                  are updated automatically for every matched row whenever this file includes
-                  them. If you only need to refresh those metric columns without touching the
-                  rest of the order data, use <strong>Update Metrics</strong> instead — it lets
-                  you pick exactly which columns to update.
+                  overwritten by the import.
                 </p>
               </div>
             </div>
