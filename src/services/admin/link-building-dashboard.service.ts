@@ -363,6 +363,13 @@ export const METRIC_COLUMN_OPTIONS = [
 
 export type MetricColumnKey = (typeof METRIC_COLUMN_OPTIONS)[number]["key"];
 
+export interface MetricsImportDateRange {
+  /** Lower bound in MM/DD/YYYY format. Omit (along with date_to) to use the backend default of one year ago. */
+  date_from?: string;
+  /** Upper bound in MM/DD/YYYY format. Optional even when date_from is set. */
+  date_to?: string;
+}
+
 /**
  * POST /api/admin/link-building-orders/metrics-import
  *
@@ -371,10 +378,13 @@ export type MetricColumnKey = (typeof METRIC_COLUMN_OPTIONS)[number]["key"];
  * rows are updated in place; unmatched Order IDs are skipped and never created. Returns
  * an import_id pollable via getLinkBuildingImportStatus() — same status shape as the
  * full CSV import.
+ *
+ * When date_range is omitted, the backend defaults to records from the last year.
  */
 export function metricsImportLinkBuildingOrders(
   file: File,
   target_columns: MetricColumnKey[],
+  date_range?: MetricsImportDateRange,
   onUploadProgress?: (percent: number) => void
 ): Promise<ImportStartResponse> {
   return new Promise((resolve, reject) => {
@@ -384,6 +394,8 @@ export function metricsImportLinkBuildingOrders(
     const form_data = new FormData();
     form_data.append("file", file);
     target_columns.forEach((col) => form_data.append("target_columns[]", col));
+    if (date_range?.date_from) form_data.append("date_from", date_range.date_from);
+    if (date_range?.date_to) form_data.append("date_to", date_range.date_to);
 
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `${base}/api/admin/link-building-orders/metrics-import`);

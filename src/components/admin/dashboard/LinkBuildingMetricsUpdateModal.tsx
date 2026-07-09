@@ -8,6 +8,7 @@ import {
   type ImportStatus,
   type MetricColumnKey,
 } from "@/services/admin/link-building-dashboard.service";
+import FilterDatePicker from "@/components/admin/users/FilterDatePicker";
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
@@ -54,6 +55,27 @@ function isValidFile(file: File): string | null {
     return `File is too large (${formatBytes(file.size)}). Maximum size is ${MAX_FILE_SIZE_MB} MB.`;
   }
   return null;
+}
+
+function toIso(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function isoToMmddyyyy(date: string): string {
+  const [y, m, d] = date.split("-");
+  if (!y || !m || !d) return "";
+  return `${m}/${d}/${y}`;
+}
+
+/** Default range shown the first time the custom date range checkbox is enabled: last month. */
+function getDefaultLastMonthRange(): { from: string; to: string } {
+  const to = new Date();
+  const from = new Date();
+  from.setMonth(from.getMonth() - 1);
+  return { from: toIso(from), to: toIso(to) };
 }
 
 // ── Sub-components ──────────────────────────────────────────────────────────────
@@ -119,6 +141,12 @@ export default function LinkBuildingMetricsUpdateModal({ is_open, onClose, onImp
     new Set(DEFAULT_SELECTED_COLUMNS)
   );
 
+  // ── Date range ──────────────────────────────────────────────────────────────
+
+  const [use_custom_date_range, setUseCustomDateRange] = useState(false);
+  const [custom_date_from, setCustomDateFrom]           = useState<string>("");
+  const [custom_date_to, setCustomDateTo]               = useState<string>("");
+
   const file_input_ref  = useRef<HTMLInputElement>(null);
   const poll_timer_ref  = useRef<ReturnType<typeof setInterval> | null>(null);
   const completed_ref   = useRef(false);
@@ -139,8 +167,22 @@ export default function LinkBuildingMetricsUpdateModal({ is_open, onClose, onImp
     setErrorMessage(null);
     setIsDraggingOver(false);
     setSelectedColumns(new Set(DEFAULT_SELECTED_COLUMNS));
+    setUseCustomDateRange(false);
+    setCustomDateFrom("");
+    setCustomDateTo("");
     completed_ref.current = false;
   }, []);
+
+  // Toggling the checkbox on pre-fills the range with last month's dates the first
+  // time — afterward the user's own picks are preserved across re-toggles.
+  const toggleCustomDateRange = useCallback((checked: boolean) => {
+    setUseCustomDateRange(checked);
+    if (checked && !custom_date_from && !custom_date_to) {
+      const { from, to } = getDefaultLastMonthRange();
+      setCustomDateFrom(from);
+      setCustomDateTo(to);
+    }
+  }, [custom_date_from, custom_date_to]);
 
   const handleClose = useCallback(() => {
     resetState();
@@ -240,7 +282,14 @@ export default function LinkBuildingMetricsUpdateModal({ is_open, onClose, onImp
 
     try {
       const target_columns = Array.from(selected_columns);
-      const response = await metricsImportLinkBuildingOrders(selected_file, target_columns, (pct) => {
+      const date_range = use_custom_date_range
+        ? {
+            date_from: custom_date_from ? isoToMmddyyyy(custom_date_from) : undefined,
+            date_to:   custom_date_to   ? isoToMmddyyyy(custom_date_to)   : undefined,
+          }
+        : undefined;
+
+      const response = await metricsImportLinkBuildingOrders(selected_file, target_columns, date_range, (pct) => {
         setUploadPct(pct);
       });
 
@@ -265,7 +314,7 @@ export default function LinkBuildingMetricsUpdateModal({ is_open, onClose, onImp
       setPhase("failed");
       setErrorMessage(msg);
     }
-  }, [selected_file, selected_columns, startPolling]);
+  }, [selected_file, selected_columns, use_custom_date_range, custom_date_from, custom_date_to, startPolling]);
 
   // ── Dismiss & refresh ───────────────────────────────────────────────────────
 
@@ -358,6 +407,56 @@ export default function LinkBuildingMetricsUpdateModal({ is_open, onClose, onImp
                   <p className="mt-2 text-xs text-red-500 dark:text-red-400">
                     Select at least one column to update.
                   </p>
+                )}
+              </div>
+
+              {/* Date range */}
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50">
+                <label className="flex cursor-pointer items-start gap-2.5">
+                  <input
+                    type="checkbox"
+                    checked={use_custom_date_range}
+                    onChange={(e) => toggleCustomDateRange(e.target.checked)}
+                    className="mt-0.5 rounded accent-brand-500"
+                  />
+                  <div>
+                    <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      Use a custom date range
+                    </span>
+                    <p className="mt-0.5 text-[10px] text-gray-400 dark:text-gray-500">
+                      By default, only records from the <strong>last year</strong> (by Request
+                      Date) are considered. Enable this to narrow it down — e.g. just last month.
+                    </p>
+                  </div>
+                </label>
+
+                {use_custom_date_range && (
+                  <div className="ml-6 mt-3 grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                        Start Date
+                      </label>
+                      <FilterDatePicker
+                        id="metrics_date_from"
+                        placeholder="Start date"
+                        value={custom_date_from}
+                        max_date={custom_date_to || undefined}
+                        on_change={setCustomDateFrom}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                        End Date
+                      </label>
+                      <FilterDatePicker
+                        id="metrics_date_to"
+                        placeholder="End date"
+                        value={custom_date_to}
+                        min_date={custom_date_from || undefined}
+                        on_change={setCustomDateTo}
+                      />
+                    </div>
+                  </div>
                 )}
               </div>
 
@@ -466,9 +565,7 @@ export default function LinkBuildingMetricsUpdateModal({ is_open, onClose, onImp
                 <p className="text-xs text-blue-700 dark:text-blue-400">
                   Rows are matched by <strong>Order ID</strong> — only the columns checked above
                   are written, every other field is left untouched. Order IDs not found in the
-                  system are skipped (no new rows are ever created). Only records from the{" "}
-                  <strong>last year</strong> (by Request Date) are considered, matching the
-                  behavior of the full CSV import.
+                  system are skipped (no new rows are ever created).
                 </p>
               </div>
             </div>
