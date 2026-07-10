@@ -205,7 +205,8 @@ export interface OrderPlacementRow {
   status: OrderStatus | PlacementStatus;
   live_link: string;
   completed_date: string;
-  dr: number | null;
+  /** Internal DR value from the admin Link Building Orders dashboard, populated once the placement's live link is set. */
+  dr_lbs: string | null;
   /** ISO date string of when the link building request was submitted */
   request_date: string | null;
   /** Distinguishes client-purchased orders from admin-assigned standalone placements. */

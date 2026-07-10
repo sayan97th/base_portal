@@ -187,8 +187,8 @@ export interface DashboardTableRow {
   live_link: string;
   /** ISO date string when order was marked completed */
   completed_date: string;
-  /** Actual DR score of the live link (populated from future tracking data) */
-  dr: number | null;
+  /** Internal DR value from the admin Link Building Orders dashboard, populated once the placement's live link is set */
+  dr_lbs: string | null;
   /** ISO date string of when the link building request was submitted */
   request_date: string | null;
   /** Row origin: client-purchased order or admin-created standalone placement. */
@@ -304,7 +304,7 @@ async function exportOrderPlacements(options: ExportOrderPlacementsOptions): Pro
     row.status            ?? "",
     row.live_link         ?? "",
     row.completed_date    ?? "",
-    row.dr                ?? "",
+    row.dr_lbs            ?? "",
   ]);
 
   const ws = xlsx.utils.aoa_to_sheet([header_row, ...data_rows]);

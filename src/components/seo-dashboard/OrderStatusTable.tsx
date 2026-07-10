@@ -174,7 +174,7 @@ function TableSkeleton({ rows_count }: { rows_count: number }) {
     <>
       {[...Array(rows_count)].map((_, i) => (
         <TableRow key={i}>
-          {[...Array(10)].map((__, j) => (
+          {[...Array(11)].map((__, j) => (
             <TableCell key={j} className="px-3 py-3">
               <div className="h-4 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
             </TableCell>
@@ -273,6 +273,7 @@ const SORTABLE_COLUMN_MAP: Record<string, string> = {
   "Landing Page":   "landing_page",
   "Status":         "status",
   "Live Link":      "live_link",
+  "DR":             "dr_lbs",
   "Completed Date": "completed_date",
 };
 
@@ -697,7 +698,7 @@ export default function OrderStatusTable({
               </TableCell>
               {[
                 "Order ID", "Request Date", "DR Type", "Keyword",
-                "Landing Page", "Status", "Live Link", "Completed Date", "Actions",
+                "Landing Page", "Status", "Live Link", "DR", "Completed Date", "Actions",
               ].map((col) => {
                 const sort_key = SORTABLE_COLUMN_MAP[col];
                 const is_sortable = !!sort_key && !!onSortChange;
@@ -734,7 +735,7 @@ export default function OrderStatusTable({
               <TableSkeleton rows_count={per_page} />
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="py-12 text-center text-sm text-gray-400 dark:text-gray-500">
+                <TableCell colSpan={11} className="py-12 text-center text-sm text-gray-400 dark:text-gray-500">
                   {total === 0 && !search_term && !has_active_filters
                     ? "No orders yet. Place your first order to get started."
                     : "No orders match your search or filters."}
@@ -799,6 +800,16 @@ export default function OrderStatusTable({
                         <a href={row.live_link} className="block max-w-[200px] truncate text-blue-light-500 hover:underline" target="_blank" rel="noopener noreferrer" title={row.live_link}>
                           {row.live_link}
                         </a>
+                      ) : (
+                        <span className="text-gray-300 dark:text-gray-600">—</span>
+                      )}
+                    </TableCell>
+
+                    <TableCell className="whitespace-nowrap px-3 py-3">
+                      {row.dr_lbs ? (
+                        <span className="inline-flex items-center rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-bold text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
+                          {row.dr_lbs}
+                        </span>
                       ) : (
                         <span className="text-gray-300 dark:text-gray-600">—</span>
                       )}
