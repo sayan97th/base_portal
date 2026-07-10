@@ -807,7 +807,7 @@ export default function OrderStatusTable({
 
                     <TableCell className="whitespace-nowrap px-3 py-3">
                       {row.dr_lbs ? (
-                        <span className="inline-flex items-center rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-bold text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
+                        <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-700 dark:bg-gray-800 dark:text-gray-300">
                           {row.dr_lbs}
                         </span>
                       ) : (
