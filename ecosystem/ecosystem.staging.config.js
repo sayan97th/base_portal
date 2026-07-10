@@ -4,6 +4,7 @@ module.exports = {
       name: "base-portal",
       script: "node_modules/.bin/next",
       args: "start",
+      interpreter: "none",
       cwd: "/var/www/clients.basesearchmarketing.com",
       instances: 1,
       exec_mode: "fork",
