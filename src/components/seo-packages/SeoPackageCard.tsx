@@ -19,24 +19,57 @@ const CheckIcon = () => (
   </svg>
 );
 
-const category_styles: Record<string, { badge: string; dot: string }> = {
-  Strategy: {
-    badge: "bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400",
-    dot: "bg-brand-500",
+interface CategoryStyle {
+  badge: string;
+  dot: string;
+}
+
+// Matched by prefix (not exact match) since admins can enter free-form category
+// names per package (e.g. "On-Page New Content"), as long as they start with one
+// of the four core pillars from SeoPackagesHeader.
+const category_style_rules: { prefix: string; style: CategoryStyle }[] = [
+  {
+    prefix: "strategy",
+    style: {
+      badge: "bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400",
+      dot: "bg-brand-500",
+    },
   },
-  "On-Page": {
-    badge: "bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400",
-    dot: "bg-violet-500",
+  {
+    prefix: "on-page",
+    style: {
+      badge: "bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400",
+      dot: "bg-violet-500",
+    },
   },
-  "Off-Page": {
-    badge: "bg-coral-50 text-coral-600 dark:bg-coral-500/15 dark:text-coral-400",
-    dot: "bg-coral-500",
+  {
+    prefix: "off-page",
+    style: {
+      badge: "bg-coral-50 text-coral-600 dark:bg-coral-500/15 dark:text-coral-400",
+      dot: "bg-coral-500",
+    },
   },
-  Technical: {
-    badge: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400",
-    dot: "bg-emerald-500",
+  {
+    prefix: "technical",
+    style: {
+      badge: "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400",
+      dot: "bg-emerald-500",
+    },
   },
+];
+
+const default_category_style: CategoryStyle = {
+  badge: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400",
+  dot: "bg-gray-400",
 };
+
+function getCategoryStyle(category: string): CategoryStyle {
+  const normalized_category = category.trim().toLowerCase();
+  const matched_rule = category_style_rules.find((rule) =>
+    normalized_category.startsWith(rule.prefix)
+  );
+  return matched_rule?.style ?? default_category_style;
+}
 
 const SeoPackageCard: React.FC<SeoPackageCardProps> = ({
   package: pkg,
@@ -93,22 +126,22 @@ const SeoPackageCard: React.FC<SeoPackageCardProps> = ({
       </div>
 
       {/* Feature list */}
-      <ul className="space-y-2.5">
-        {pkg.features.map((feature) => {
-          const styles = category_styles[feature.category] ?? {
-            badge: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400",
-            dot: "bg-gray-400",
-          };
+      <ul className="space-y-3">
+        {pkg.features.map((feature, feature_index) => {
+          const category_style = getCategoryStyle(feature.category);
           return (
-            <li key={feature.category} className="flex items-start gap-2">
+            <li key={`${feature.category}-${feature_index}`}>
               <span
-                className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${styles.badge}`}
+                className={`inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${category_style.badge}`}
               >
+                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${category_style.dot}`} />
                 {feature.category}
               </span>
-              <span className="text-xs leading-relaxed text-gray-600 dark:text-gray-400">
-                {feature.description}
-              </span>
+              {feature.description && (
+                <p className="mt-1.5 text-xs leading-relaxed text-gray-600 dark:text-gray-400">
+                  {feature.description}
+                </p>
+              )}
             </li>
           );
         })}
