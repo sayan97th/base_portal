@@ -8,6 +8,7 @@ import {
   parseBooleanCell,
   parsePastedGrid,
 } from "@/lib/pasted-grid";
+import PasteOverflowBanner from "@/components/shared/PasteOverflowBanner";
 
 export interface KeywordRow {
   keyword: string;
@@ -185,22 +186,14 @@ const KeywordEntryStep: React.FC<KeywordEntryStepProps> = ({
 
             {/* Paste overflow warning */}
             {overflow_count > 0 && (
-              <div className="flex items-start justify-between gap-3 border-b border-amber-100 bg-amber-50 px-5 py-2 dark:border-amber-500/20 dark:bg-amber-500/10">
-                <p className="text-xs text-amber-700 dark:text-amber-400">
-                  {overflow_count} pasted row{overflow_count !== 1 ? "s" : ""} could
-                  not fit — this tier only has {rows.length} placement
-                  {rows.length !== 1 ? "s" : ""}. Increase the quantity in the
-                  previous step to add more.
-                </p>
-                <button
-                  type="button"
-                  onClick={() =>
+              <div className="px-5 py-2">
+                <PasteOverflowBanner
+                  overflow_row_count={overflow_count}
+                  available_row_count={rows.length}
+                  onDismiss={() =>
                     setPasteOverflow((prev) => ({ ...prev, [item.id]: 0 }))
                   }
-                  className="shrink-0 text-xs font-medium text-amber-700 hover:text-amber-900 dark:text-amber-400 dark:hover:text-amber-200"
-                >
-                  Dismiss
-                </button>
+                />
               </div>
             )}
 

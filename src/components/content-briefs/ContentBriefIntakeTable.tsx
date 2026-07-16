@@ -1,26 +1,15 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import type { ContentOptimizationIntakeRow } from "@/types/client/unified-cart";
-import {
-  applyPastedGridToRows,
-  growRowsForPaste,
-  isBulkPaste,
-  parsePastedGrid,
-} from "@/lib/pasted-grid";
+import { applyPastedGridToRows, isBulkPaste, parsePastedGrid } from "@/lib/pasted-grid";
+import PasteOverflowBanner from "@/components/shared/PasteOverflowBanner";
 
 const CONTENT_BRIEF_ROW_FIELD_ORDER: ReadonlyArray<keyof ContentOptimizationIntakeRow> = [
   "primary_keyword",
   "secondary_keywords",
   "content_page_url",
 ];
-
-const empty_content_brief_row = (): ContentOptimizationIntakeRow => ({
-  primary_keyword: "",
-  secondary_keywords: "",
-  content_page_url: "",
-  notes: "",
-});
 
 interface ContentBriefIntakeTableProps {
   tier_name: string;
@@ -35,6 +24,8 @@ export default function ContentBriefIntakeTable({
   onChange,
   hide_actions = false,
 }: ContentBriefIntakeTableProps) {
+  const [overflow_row_count, setOverflowRowCount] = useState(0);
+
   const handleRowChange = useCallback(
     (row_index: number, field: keyof ContentOptimizationIntakeRow, value: string) => {
       onChange(
@@ -66,9 +57,8 @@ export default function ContentBriefIntakeTable({
         if (!isBulkPaste(grid)) return;
 
         event.preventDefault();
-        const grown_rows = growRowsForPaste(rows, row_index, grid, empty_content_brief_row);
-        const { rows: next_rows } = applyPastedGridToRows(
-          grown_rows,
+        const { rows: next_rows, overflow_row_count: overflow } = applyPastedGridToRows(
+          rows,
           row_index,
           field_index,
           CONTENT_BRIEF_ROW_FIELD_ORDER,
@@ -76,6 +66,7 @@ export default function ContentBriefIntakeTable({
         );
 
         onChange(next_rows);
+        setOverflowRowCount(overflow);
       },
     [rows, onChange]
   );
@@ -134,6 +125,12 @@ export default function ContentBriefIntakeTable({
         </button>
       </div>
 
+      <PasteOverflowBanner
+        overflow_row_count={overflow_row_count}
+        available_row_count={rows.length}
+        onDismiss={() => setOverflowRowCount(0)}
+      />
+
       {/* Table */}
       <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
         <table className="w-full table-fixed border-collapse">
@@ -177,7 +174,7 @@ export default function ContentBriefIntakeTable({
                 <td className="border-b border-r border-gray-200 p-1 dark:border-gray-700">
                   <input
                     type="text"
-                    value={row.primary_keyword}
+                    value={row.primary_keyword ?? ""}
                     onChange={(e) =>
                       handleRowChange(idx, "primary_keyword", e.target.value)
                     }
@@ -191,7 +188,7 @@ export default function ContentBriefIntakeTable({
                 <td className="border-b border-r border-gray-200 p-1 dark:border-gray-700">
                   <input
                     type="text"
-                    value={row.secondary_keywords}
+                    value={row.secondary_keywords ?? ""}
                     onChange={(e) =>
                       handleRowChange(idx, "secondary_keywords", e.target.value)
                     }
@@ -205,7 +202,7 @@ export default function ContentBriefIntakeTable({
                 <td className={`border-b border-gray-200 p-1 dark:border-gray-700 ${!hide_actions ? "border-r" : ""}`}>
                   <input
                     type="url"
-                    value={row.content_page_url}
+                    value={row.content_page_url ?? ""}
                     onChange={(e) =>
                       handleRowChange(idx, "content_page_url", e.target.value)
                     }
@@ -285,7 +282,7 @@ export default function ContentBriefIntakeTable({
       {/* Help text */}
       <p className="text-xs leading-relaxed text-gray-500 dark:text-gray-400">
         Enter one primary keyword per row with its corresponding live URL. Secondary keywords are optional but improve targeting.
-        Tip: paste rows copied from a spreadsheet directly into any cell to fill several rows at once — extra rows are added automatically.
+        Tip: paste rows copied from a spreadsheet directly into any cell to fill several rows at once.
       </p>
     </div>
   );

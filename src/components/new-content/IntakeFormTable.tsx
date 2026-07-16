@@ -1,13 +1,9 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import type { CartIntakeRow } from "@/types/client/unified-cart";
-import {
-  applyPastedGridToRows,
-  growRowsForPaste,
-  isBulkPaste,
-  parsePastedGrid,
-} from "@/lib/pasted-grid";
+import { applyPastedGridToRows, isBulkPaste, parsePastedGrid } from "@/lib/pasted-grid";
+import PasteOverflowBanner from "@/components/shared/PasteOverflowBanner";
 
 const CONTENT_TYPES = [
   "Blog Article",
@@ -30,13 +26,6 @@ function matchContentType(raw_value: string, current_value: string | null): stri
   return match ?? current_value;
 }
 
-const empty_intake_row = (): CartIntakeRow => ({
-  keyword_phrase: "",
-  secondary_keywords: "",
-  type_of_content: "",
-  notes: "",
-});
-
 interface IntakeFormTableProps {
   tier_name: string;
   form_index: number;
@@ -56,6 +45,8 @@ export default function IntakeFormTable({
   hide_actions = false,
   show_errors = false,
 }: IntakeFormTableProps) {
+  const [overflow_row_count, setOverflowRowCount] = useState(0);
+
   const handleRowChange = useCallback(
     (row_index: number, field: keyof CartIntakeRow, value: string) => {
       onChange(
@@ -86,9 +77,8 @@ export default function IntakeFormTable({
         if (!isBulkPaste(grid)) return;
 
         event.preventDefault();
-        const grown_rows = growRowsForPaste(rows, row_index, grid, empty_intake_row);
-        const { rows: next_rows } = applyPastedGridToRows(
-          grown_rows,
+        const { rows: next_rows, overflow_row_count: overflow } = applyPastedGridToRows(
+          rows,
           row_index,
           field_index,
           INTAKE_ROW_FIELD_ORDER,
@@ -100,6 +90,7 @@ export default function IntakeFormTable({
         );
 
         onChange(next_rows);
+        setOverflowRowCount(overflow);
       },
     [rows, onChange]
   );
@@ -114,6 +105,12 @@ export default function IntakeFormTable({
           {tier_name}
         </span>
       </div>
+
+      <PasteOverflowBanner
+        overflow_row_count={overflow_row_count}
+        available_row_count={rows.length}
+        onDismiss={() => setOverflowRowCount(0)}
+      />
 
       {/* Keyword table */}
       <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
@@ -277,7 +274,8 @@ export default function IntakeFormTable({
         <span className="text-gray-600 dark:text-gray-300">
           Blog Article, Product Page, Home Page, About Us Page.
         </span>{" "}
-        Tip: paste rows copied from a spreadsheet directly into any cell to fill several rows at once — extra rows are added automatically.
+        Tip: paste rows copied from a spreadsheet directly into any cell to fill
+        several rows at once.
       </p>
     </div>
   );

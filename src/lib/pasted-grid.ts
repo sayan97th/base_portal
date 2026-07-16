@@ -30,9 +30,9 @@ export interface ApplyPastedGridResult<T> {
 /**
  * Writes a pasted grid onto `rows`, starting at `start_row_index` /
  * `start_field_index`, mapping grid columns to `field_order` in sequence.
- * Rows beyond the end of `rows` are counted as overflow rather than dropped
- * silently, so callers can either grow the array first (see
- * `growRowsForPaste`) or warn the user.
+ * Row count in these tables is capped to the quantity purchased, so rows
+ * beyond the end of `rows` are counted as overflow and dropped rather than
+ * appended — callers should surface `overflow_row_count` to the user.
  */
 export function applyPastedGridToRows<T extends object>(
   rows: T[],
@@ -73,26 +73,6 @@ export function applyPastedGridToRows<T extends object>(
   });
 
   return { rows: next_rows, overflow_row_count };
-}
-
-/**
- * Extends `rows` with freshly-created empty rows so every row in `grid` has
- * somewhere to land, starting at `start_row_index`. Use this before
- * `applyPastedGridToRows` for tables where the row count isn't capped by a
- * purchased quantity (e.g. tables that already support deleting rows freely).
- */
-export function growRowsForPaste<T>(
-  rows: T[],
-  start_row_index: number,
-  grid: PastedGrid,
-  create_empty_row: () => T
-): T[] {
-  const required_length = start_row_index + grid.length;
-  if (required_length <= rows.length) return rows;
-  return [
-    ...rows,
-    ...Array.from({ length: required_length - rows.length }, create_empty_row),
-  ];
 }
 
 /** Interprets a pasted cell as a boolean (e.g. an "Exact Match" column). */

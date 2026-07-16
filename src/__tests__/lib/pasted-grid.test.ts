@@ -10,7 +10,6 @@
 
 import {
   applyPastedGridToRows,
-  growRowsForPaste,
   isBulkPaste,
   parseBooleanCell,
   parsePastedGrid,
@@ -179,6 +178,33 @@ describe("applyPastedGridToRows", () => {
     expect(overflow_row_count).toBe(2);
   });
 
+  it("regression: pasting 17 rows into a 7-row table (quantity purchased) keeps exactly 7 rows, never grows to 17", () => {
+    interface CoRow {
+      primary_keyword: string;
+      content_page_url: string;
+    }
+    const field_order: (keyof CoRow)[] = ["primary_keyword", "content_page_url"];
+    const rows: CoRow[] = Array.from({ length: 7 }, () => ({
+      primary_keyword: "",
+      content_page_url: "",
+    }));
+    const grid = parsePastedGrid(
+      Array.from({ length: 17 }, (_, i) => `Test\thttp://localhost:3000/link-building-${i}`).join("\n")
+    );
+
+    const { rows: next_rows, overflow_row_count } = applyPastedGridToRows(
+      rows,
+      0,
+      0,
+      field_order,
+      grid
+    );
+
+    expect(next_rows).toHaveLength(7);
+    expect(overflow_row_count).toBe(10);
+    expect(next_rows.every((row) => row.primary_keyword === "Test")).toBe(true);
+  });
+
   it("applies a custom cell parser (e.g. boolean exact_match column)", () => {
     const rows = makeRows(1);
     const grid = parsePastedGrid("kw1\thttps://a.com\tyes");
@@ -214,40 +240,5 @@ describe("applyPastedGridToRows", () => {
     );
 
     expect(next_rows[0]).toEqual({ primary_keyword: "kw1", type_of_content: "Blog Article" });
-  });
-});
-
-describe("growRowsForPaste", () => {
-  interface Row {
-    value: string;
-  }
-  const create_empty_row = (): Row => ({ value: "" });
-
-  it("does nothing when the existing rows already cover the pasted grid", () => {
-    const rows: Row[] = [{ value: "a" }, { value: "b" }];
-    const grid = parsePastedGrid("x");
-
-    expect(growRowsForPaste(rows, 0, grid, create_empty_row)).toBe(rows);
-  });
-
-  it("appends empty rows so every pasted row has a home", () => {
-    const rows: Row[] = [{ value: "a" }];
-    const grid = parsePastedGrid("x\ny\nz");
-
-    const grown = growRowsForPaste(rows, 0, grid, create_empty_row);
-
-    expect(grown).toHaveLength(3);
-    expect(grown[0]).toEqual({ value: "a" });
-    expect(grown[1]).toEqual({ value: "" });
-    expect(grown[2]).toEqual({ value: "" });
-  });
-
-  it("accounts for the starting row index when growing", () => {
-    const rows: Row[] = [{ value: "a" }, { value: "b" }];
-    const grid = parsePastedGrid("x\ny");
-
-    const grown = growRowsForPaste(rows, 1, grid, create_empty_row);
-
-    expect(grown).toHaveLength(3);
   });
 });
