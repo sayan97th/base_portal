@@ -1,7 +1,13 @@
 "use client";
 
-import React from "react";
+import React, { useCallback, useState } from "react";
 import { OrderSummaryItem } from "./LinkBuildingOrderSummary";
+import {
+  applyPastedGridToRows,
+  isBulkPaste,
+  parseBooleanCell,
+  parsePastedGrid,
+} from "@/lib/pasted-grid";
 
 export interface KeywordRow {
   keyword: string;
@@ -10,6 +16,12 @@ export interface KeywordRow {
 }
 
 export type KeywordData = Record<string, KeywordRow[]>;
+
+const KEYWORD_ROW_FIELD_ORDER: ReadonlyArray<keyof KeywordRow> = [
+  "keyword",
+  "landing_page",
+  "exact_match",
+];
 
 interface KeywordEntryStepProps {
   selected_items: OrderSummaryItem[];
@@ -22,6 +34,7 @@ interface KeywordEntryStepProps {
     field: keyof KeywordRow,
     value: string | boolean
   ) => void;
+  onKeywordsPaste: (tier_id: string, rows: KeywordRow[]) => void;
   onOrderTitleChange: (value: string) => void;
   onOrderNotesChange: (value: string) => void;
 }
@@ -96,9 +109,40 @@ const KeywordEntryStep: React.FC<KeywordEntryStepProps> = ({
   order_title,
   order_notes,
   onKeywordChange,
+  onKeywordsPaste,
   onOrderTitleChange,
   onOrderNotesChange,
 }) => {
+  const [paste_overflow, setPasteOverflow] = useState<Record<string, number>>({});
+
+  const handleCellPaste = useCallback(
+    (
+      tier_id: string,
+      rows: KeywordRow[],
+      row_index: number,
+      field_index: number
+    ) =>
+      (event: React.ClipboardEvent<HTMLInputElement>) => {
+        const grid = parsePastedGrid(event.clipboardData.getData("text/plain"));
+        if (!isBulkPaste(grid)) return;
+
+        event.preventDefault();
+        const { rows: next_rows, overflow_row_count } = applyPastedGridToRows(
+          rows,
+          row_index,
+          field_index,
+          KEYWORD_ROW_FIELD_ORDER,
+          grid,
+          (field, raw_value) =>
+            field === "exact_match" ? parseBooleanCell(raw_value) : raw_value
+        );
+
+        onKeywordsPaste(tier_id, next_rows);
+        setPasteOverflow((prev) => ({ ...prev, [tier_id]: overflow_row_count }));
+      },
+    [onKeywordsPaste]
+  );
+
   return (
     <div className="space-y-6">
       {/* Description banner */}
@@ -118,11 +162,14 @@ const KeywordEntryStep: React.FC<KeywordEntryStepProps> = ({
         </svg>
         <p className="text-sm text-blue-700 dark:text-blue-300">
           Enter your target keywords and landing pages for each placement.
+          Copy rows straight from a spreadsheet and paste them into any cell
+          below to fill multiple rows at once.
         </p>
       </div>
 
       {selected_items.map((item) => {
         const rows = keyword_data[item.id] ?? [];
+        const overflow_count = paste_overflow[item.id] ?? 0;
 
         return (
           <div
@@ -135,6 +182,27 @@ const KeywordEntryStep: React.FC<KeywordEntryStepProps> = ({
                 {item.label}
               </h3>
             </div>
+
+            {/* Paste overflow warning */}
+            {overflow_count > 0 && (
+              <div className="flex items-start justify-between gap-3 border-b border-amber-100 bg-amber-50 px-5 py-2 dark:border-amber-500/20 dark:bg-amber-500/10">
+                <p className="text-xs text-amber-700 dark:text-amber-400">
+                  {overflow_count} pasted row{overflow_count !== 1 ? "s" : ""} could
+                  not fit — this tier only has {rows.length} placement
+                  {rows.length !== 1 ? "s" : ""}. Increase the quantity in the
+                  previous step to add more.
+                </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPasteOverflow((prev) => ({ ...prev, [item.id]: 0 }))
+                  }
+                  className="shrink-0 text-xs font-medium text-amber-700 hover:text-amber-900 dark:text-amber-400 dark:hover:text-amber-200"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
 
             {/* Table */}
             <table className="w-full table-fixed">
@@ -185,6 +253,7 @@ const KeywordEntryStep: React.FC<KeywordEntryStepProps> = ({
                             e.target.value
                           )
                         }
+                        onPaste={handleCellPaste(item.id, rows, idx, 0)}
                         placeholder="Enter keyword..."
                         className={input_class}
                       />
@@ -201,6 +270,7 @@ const KeywordEntryStep: React.FC<KeywordEntryStepProps> = ({
                             e.target.value
                           )
                         }
+                        onPaste={handleCellPaste(item.id, rows, idx, 1)}
                         placeholder="https://"
                         className={input_class}
                       />

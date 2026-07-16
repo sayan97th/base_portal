@@ -2,6 +2,12 @@
 
 import { useCallback } from "react";
 import type { CartIntakeRow } from "@/types/client/unified-cart";
+import {
+  applyPastedGridToRows,
+  growRowsForPaste,
+  isBulkPaste,
+  parsePastedGrid,
+} from "@/lib/pasted-grid";
 
 const CONTENT_TYPES = [
   "Blog Article",
@@ -10,6 +16,26 @@ const CONTENT_TYPES = [
   "About Us Page",
   "Other",
 ];
+
+const INTAKE_ROW_FIELD_ORDER: ReadonlyArray<keyof CartIntakeRow> = [
+  "keyword_phrase",
+  "secondary_keywords",
+  "type_of_content",
+];
+
+function matchContentType(raw_value: string, current_value: string | null): string | null {
+  const match = CONTENT_TYPES.find(
+    (type) => type.toLowerCase() === raw_value.trim().toLowerCase()
+  );
+  return match ?? current_value;
+}
+
+const empty_intake_row = (): CartIntakeRow => ({
+  keyword_phrase: "",
+  secondary_keywords: "",
+  type_of_content: "",
+  notes: "",
+});
 
 interface IntakeFormTableProps {
   tier_name: string;
@@ -50,6 +76,31 @@ export default function IntakeFormTable({
     (row_index: number) => {
       onChange(rows.filter((_, i) => i !== row_index));
     },
+    [rows, onChange]
+  );
+
+  const handleCellPaste = useCallback(
+    (row_index: number, field_index: number) =>
+      (event: React.ClipboardEvent<HTMLInputElement>) => {
+        const grid = parsePastedGrid(event.clipboardData.getData("text/plain"));
+        if (!isBulkPaste(grid)) return;
+
+        event.preventDefault();
+        const grown_rows = growRowsForPaste(rows, row_index, grid, empty_intake_row);
+        const { rows: next_rows } = applyPastedGridToRows(
+          grown_rows,
+          row_index,
+          field_index,
+          INTAKE_ROW_FIELD_ORDER,
+          grid,
+          (field, raw_value, current_value) =>
+            field === "type_of_content"
+              ? matchContentType(raw_value, current_value as string | null)
+              : raw_value
+        );
+
+        onChange(next_rows);
+      },
     [rows, onChange]
   );
 
@@ -112,6 +163,7 @@ export default function IntakeFormTable({
                     onChange={(e) =>
                       handleRowChange(idx, "keyword_phrase", e.target.value)
                     }
+                    onPaste={handleCellPaste(idx, 0)}
                     placeholder="e.g. seo content strategy"
                     className="h-8 w-full rounded border-0 bg-transparent px-2.5 text-sm text-gray-700 placeholder:text-gray-300 focus:bg-blue-50/40 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-200 dark:text-white/80 dark:placeholder:text-white/20 dark:focus:bg-blue-950/20 dark:focus:ring-blue-900"
                   />
@@ -125,6 +177,7 @@ export default function IntakeFormTable({
                     onChange={(e) =>
                       handleRowChange(idx, "secondary_keywords", e.target.value)
                     }
+                    onPaste={handleCellPaste(idx, 1)}
                     placeholder="e.g. content marketing, seo tips"
                     className="h-8 w-full rounded border-0 bg-transparent px-2.5 text-sm text-gray-700 placeholder:text-gray-300 focus:bg-blue-50/40 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-200 dark:text-white/80 dark:placeholder:text-white/20 dark:focus:bg-blue-950/20 dark:focus:ring-blue-900"
                   />
@@ -223,7 +276,8 @@ export default function IntakeFormTable({
         Enter 1 primary keyword per article. Secondary keywords are optional. Choose a content type from:{" "}
         <span className="text-gray-600 dark:text-gray-300">
           Blog Article, Product Page, Home Page, About Us Page.
-        </span>
+        </span>{" "}
+        Tip: paste rows copied from a spreadsheet directly into any cell to fill several rows at once — extra rows are added automatically.
       </p>
     </div>
   );

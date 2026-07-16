@@ -206,6 +206,14 @@ const UnifiedIntakeStep = forwardRef<UnifiedIntakeStepHandle, UnifiedIntakeStepP
     [error, computed_keyword_rows, updateLinkBuildingKeywords]
   );
 
+  const handleKeywordsPaste = useCallback(
+    (tier_id: string, rows: KeywordRow[]) => {
+      if (error) setError(null);
+      updateLinkBuildingKeywords(tier_id, rows);
+    },
+    [error, updateLinkBuildingKeywords]
+  );
+
   const handleNcRowsChange = useCallback(
     (virtual_tier_id: string, rows: CartIntakeRow[]) => {
       if (error) setError(null);
@@ -422,6 +430,7 @@ const UnifiedIntakeStep = forwardRef<UnifiedIntakeStepHandle, UnifiedIntakeStepP
             order_title={order_title}
             order_notes={order_notes}
             onKeywordChange={handleKeywordChange}
+            onKeywordsPaste={handleKeywordsPaste}
             onOrderTitleChange={setOrderTitle}
             onOrderNotesChange={setOrderNotes}
           />

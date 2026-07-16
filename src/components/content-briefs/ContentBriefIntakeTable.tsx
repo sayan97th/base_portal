@@ -2,7 +2,25 @@
 
 import { useCallback } from "react";
 import type { ContentOptimizationIntakeRow } from "@/types/client/unified-cart";
+import {
+  applyPastedGridToRows,
+  growRowsForPaste,
+  isBulkPaste,
+  parsePastedGrid,
+} from "@/lib/pasted-grid";
 
+const CONTENT_BRIEF_ROW_FIELD_ORDER: ReadonlyArray<keyof ContentOptimizationIntakeRow> = [
+  "primary_keyword",
+  "secondary_keywords",
+  "content_page_url",
+];
+
+const empty_content_brief_row = (): ContentOptimizationIntakeRow => ({
+  primary_keyword: "",
+  secondary_keywords: "",
+  content_page_url: "",
+  notes: "",
+});
 
 interface ContentBriefIntakeTableProps {
   tier_name: string;
@@ -38,6 +56,27 @@ export default function ContentBriefIntakeTable({
       if (rows.length <= 1) return;
       onChange(rows.filter((_, i) => i !== row_index));
     },
+    [rows, onChange]
+  );
+
+  const handleCellPaste = useCallback(
+    (row_index: number, field_index: number) =>
+      (event: React.ClipboardEvent<HTMLInputElement>) => {
+        const grid = parsePastedGrid(event.clipboardData.getData("text/plain"));
+        if (!isBulkPaste(grid)) return;
+
+        event.preventDefault();
+        const grown_rows = growRowsForPaste(rows, row_index, grid, empty_content_brief_row);
+        const { rows: next_rows } = applyPastedGridToRows(
+          grown_rows,
+          row_index,
+          field_index,
+          CONTENT_BRIEF_ROW_FIELD_ORDER,
+          grid
+        );
+
+        onChange(next_rows);
+      },
     [rows, onChange]
   );
 
@@ -142,6 +181,7 @@ export default function ContentBriefIntakeTable({
                     onChange={(e) =>
                       handleRowChange(idx, "primary_keyword", e.target.value)
                     }
+                    onPaste={handleCellPaste(idx, 0)}
                     placeholder="e.g. seo content strategy"
                     className="h-8 w-full rounded border-0 bg-transparent px-2.5 text-sm text-gray-700 placeholder:text-gray-300 focus:bg-blue-50/40 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-200 dark:text-white/80 dark:placeholder:text-white/20 dark:focus:bg-blue-950/20 dark:focus:ring-blue-900"
                   />
@@ -155,6 +195,7 @@ export default function ContentBriefIntakeTable({
                     onChange={(e) =>
                       handleRowChange(idx, "secondary_keywords", e.target.value)
                     }
+                    onPaste={handleCellPaste(idx, 1)}
                     placeholder="e.g. content marketing, seo tips"
                     className="h-8 w-full rounded border-0 bg-transparent px-2.5 text-sm text-gray-700 placeholder:text-gray-300 focus:bg-blue-50/40 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-200 dark:text-white/80 dark:placeholder:text-white/20 dark:focus:bg-blue-950/20 dark:focus:ring-blue-900"
                   />
@@ -168,6 +209,7 @@ export default function ContentBriefIntakeTable({
                     onChange={(e) =>
                       handleRowChange(idx, "content_page_url", e.target.value)
                     }
+                    onPaste={handleCellPaste(idx, 2)}
                     placeholder="https://example.com/page"
                     className="h-8 w-full rounded border-0 bg-transparent px-2.5 text-sm text-gray-700 placeholder:text-gray-300 focus:bg-blue-50/40 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-200 dark:text-white/80 dark:placeholder:text-white/20 dark:focus:bg-blue-950/20 dark:focus:ring-blue-900"
                   />
@@ -243,6 +285,7 @@ export default function ContentBriefIntakeTable({
       {/* Help text */}
       <p className="text-xs leading-relaxed text-gray-500 dark:text-gray-400">
         Enter one primary keyword per row with its corresponding live URL. Secondary keywords are optional but improve targeting.
+        Tip: paste rows copied from a spreadsheet directly into any cell to fill several rows at once — extra rows are added automatically.
       </p>
     </div>
   );

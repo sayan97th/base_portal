@@ -573,6 +573,11 @@ const DashboardProducts: React.FC = () => {
     updateLinkBuildingKeywords(tier_id, base_rows);
   };
 
+  const handleKeywordsPaste = (tier_id: string, rows: KeywordRow[]) => {
+    if (keyword_step_error) setKeywordStepError(null);
+    updateLinkBuildingKeywords(tier_id, rows);
+  };
+
   const handleBillingChange = (
     field: keyof BillingAddress,
     value: string
@@ -975,6 +980,7 @@ const DashboardProducts: React.FC = () => {
                 order_title={order_title}
                 order_notes={order_notes}
                 onKeywordChange={handleKeywordChange}
+                onKeywordsPaste={handleKeywordsPaste}
                 onOrderTitleChange={setOrderTitle}
                 onOrderNotesChange={setOrderNotes}
               />
