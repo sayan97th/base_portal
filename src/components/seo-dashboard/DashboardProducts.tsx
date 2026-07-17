@@ -19,6 +19,7 @@ import CheckoutStep, {
   type CheckoutStepHandle,
 } from "@/components/shared/CheckoutStep";
 import UnifiedCartSummary from "@/components/shared/UnifiedCartSummary";
+import IntakeValidationBanner from "@/components/shared/IntakeValidationBanner";
 import { linkBuildingService } from "@/services/client/link-building.service";
 import { newContentService } from "@/services/client/new-content.service";
 import { contentOptimizationService } from "@/services/client/content-optimization.service";
@@ -948,42 +949,52 @@ const DashboardProducts: React.FC = () => {
                 Enter target keywords and landing pages for each placement.
               </p>
 
-              {keyword_step_error && (
-                <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-500/30 dark:bg-amber-500/10">
-                  <svg
-                    className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"
-                    />
-                  </svg>
-                  <div>
-                    <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-                      Incomplete keyword data
-                    </p>
-                    <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">
-                      {keyword_step_error}
-                    </p>
-                  </div>
-                </div>
-              )}
+              {keyword_step_error && <IntakeValidationBanner message={keyword_step_error} />}
 
               <KeywordEntryStep
                 selected_items={lb_selected_items}
                 keyword_data={computed_keyword_rows}
-                order_title={order_title}
-                order_notes={order_notes}
                 onKeywordChange={handleKeywordChange}
                 onKeywordsPaste={handleKeywordsPaste}
-                onOrderTitleChange={setOrderTitle}
-                onOrderNotesChange={setOrderNotes}
               />
+
+              <div className="grid gap-6 sm:grid-cols-2">
+                <div>
+                  <div className="mb-1.5 flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Order Title
+                    </label>
+                    <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                      optional
+                    </span>
+                  </div>
+                  <input
+                    type="text"
+                    value={order_title}
+                    onChange={(e) => setOrderTitle(e.target.value)}
+                    placeholder="Optional"
+                    className="h-11 w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-300 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/20 dark:focus:border-brand-800"
+                  />
+                </div>
+
+                <div>
+                  <div className="mb-1.5 flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Order Notes
+                    </label>
+                    <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                      optional
+                    </span>
+                  </div>
+                  <textarea
+                    value={order_notes}
+                    onChange={(e) => setOrderNotes(e.target.value)}
+                    placeholder="Optional"
+                    rows={2}
+                    className="w-full resize-y rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-300 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/20 dark:focus:border-brand-800"
+                  />
+                </div>
+              </div>
             </div>
           )}
 
