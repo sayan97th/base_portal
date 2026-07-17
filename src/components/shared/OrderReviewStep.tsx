@@ -416,10 +416,11 @@ export default function OrderReviewStep({
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
           </svg>
           <p className="text-sm text-amber-700 dark:text-amber-300">
-            Some intake details are still missing. You can complete your purchase now, and the order
-            will be marked <span className="font-semibold">Pending Details</span> so you (or your
-            team) can add the remaining details later from My Orders. The turnaround clock starts
-            once the details are submitted.
+            Some intake details are still missing. You can complete your purchase now, and the
+            order will be marked{" "}
+            <span className="font-semibold">Pending Details</span>{" "}
+            so you (or your team) can add the remaining details later from My Orders. The
+            turnaround clock starts once the details are submitted.
           </p>
         </div>
       )}

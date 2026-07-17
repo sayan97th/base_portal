@@ -432,8 +432,9 @@ const UnifiedIntakeStep = forwardRef<UnifiedIntakeStepHandle, UnifiedIntakeStepP
             </svg>
             <p className="text-sm text-amber-700 dark:text-amber-300">
               Not ready to fill these in? Complete your purchase now, and your order will be marked{" "}
-              <span className="font-semibold">Pending Details</span> so you (or your team) can add
-              the details later from My Orders. The turnaround clock starts once they&apos;re submitted.
+              <span className="font-semibold">Pending Details</span>{" "}
+              so you (or your team) can add the details later from My Orders. The turnaround clock
+              starts once they&apos;re submitted.
             </p>
           </div>
           <button
