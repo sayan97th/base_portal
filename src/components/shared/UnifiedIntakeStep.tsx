@@ -431,8 +431,8 @@ const UnifiedIntakeStep = forwardRef<UnifiedIntakeStepHandle, UnifiedIntakeStepP
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
             </svg>
             <p className="text-sm text-amber-700 dark:text-amber-300">
-              Not ready to fill these in? Complete your purchase now — your order will be marked{" "}
-              <span className="font-semibold">Pending Details</span> and you (or your team) can add
+              Not ready to fill these in? Complete your purchase now, and your order will be marked{" "}
+              <span className="font-semibold">Pending Details</span> so you (or your team) can add
               the details later from My Orders. The turnaround clock starts once they&apos;re submitted.
             </p>
           </div>
