@@ -6,6 +6,17 @@ import type {
   LinkBuildingDetailsPlacement,
   OrderDetailsResult,
 } from "@/services/client/order-details.service";
+import {
+  applyPastedGridToRows,
+  isBulkPaste,
+  parseBooleanCell,
+  parsePastedGrid,
+  type PastedGrid,
+} from "@/lib/pasted-grid";
+import type { IntakeImportColumn } from "@/lib/intake-import";
+import PasteOverflowBanner from "@/components/shared/PasteOverflowBanner";
+import IntakeImportButton from "@/components/shared/IntakeImportButton";
+import IntakeImportDialog from "@/components/shared/IntakeImportDialog";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -42,6 +53,25 @@ function formatDate(iso: string): string {
     month: "long",
     day: "numeric",
   });
+}
+
+const PLACEMENT_FIELD_ORDER: ReadonlyArray<keyof EditorPlacement> = [
+  "keyword",
+  "landing_page",
+  "exact_match",
+];
+
+const IMPORT_COLUMNS: IntakeImportColumn[] = [
+  { label: "Keyword", aliases: ["keyword", "keywords", "key phrase", "keyword / key phrase"] },
+  { label: "Landing Page", aliases: ["landing page", "landing", "url", "target url", "target page"] },
+  { label: "Exact Match", aliases: ["exact match", "exact", "match"] },
+];
+
+function parsePlacementCell(
+  field: keyof EditorPlacement,
+  raw_value: string
+): EditorPlacement[keyof EditorPlacement] {
+  return field === "exact_match" ? parseBooleanCell(raw_value) : raw_value;
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -96,6 +126,58 @@ export default function LinkBuildingIntakeEditor({
     if (saved) setSaved(false);
     setRows((prev) => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
   };
+
+  // ── Bulk copy/paste ─────────────────────────────────────────────────────────
+  // Row count per item is capped to the quantity purchased, so pasted grids are
+  // applied against that item's placements only and any overflow is surfaced.
+
+  const [overflow_by_item, setOverflowByItem] = useState<Record<string, number>>({});
+  const [import_open_item_id, setImportOpenItemId] = useState<string | null>(null);
+
+  const applyRowsToItem = (item: EditorItem, next_rows: EditorPlacement[]) => {
+    if (error) setError(null);
+    if (saved) setSaved(false);
+    setRows((prev) => {
+      const next = { ...prev };
+      item.placements.forEach((placement, index) => {
+        next[placement.id] = next_rows[index];
+      });
+      return next;
+    });
+  };
+
+  const handleImport = (item: EditorItem) => (grid: PastedGrid) => {
+    const item_rows = item.placements.map((placement) => rows[placement.id]);
+    const { rows: next_rows, overflow_row_count } = applyPastedGridToRows(
+      item_rows,
+      0,
+      0,
+      PLACEMENT_FIELD_ORDER,
+      grid,
+      parsePlacementCell
+    );
+    applyRowsToItem(item, next_rows);
+    setOverflowByItem((prev) => ({ ...prev, [item.id]: overflow_row_count }));
+  };
+
+  const handleCellPaste = (item: EditorItem, row_index: number, field_index: number) =>
+    (event: React.ClipboardEvent<HTMLInputElement>) => {
+      const grid = parsePastedGrid(event.clipboardData.getData("text/plain"));
+      if (!isBulkPaste(grid)) return;
+
+      event.preventDefault();
+      const item_rows = item.placements.map((placement) => rows[placement.id]);
+      const { rows: next_rows, overflow_row_count } = applyPastedGridToRows(
+        item_rows,
+        row_index,
+        field_index,
+        PLACEMENT_FIELD_ORDER,
+        grid,
+        parsePlacementCell
+      );
+      applyRowsToItem(item, next_rows);
+      setOverflowByItem((prev) => ({ ...prev, [item.id]: overflow_row_count }));
+    };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -210,15 +292,34 @@ export default function LinkBuildingIntakeEditor({
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-coral-100 text-sm font-bold text-coral-700 dark:bg-coral-500/20 dark:text-coral-300">
                 {item_index + 1}
               </div>
-              <div className="flex flex-1 flex-wrap items-center gap-3">
-                <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-                  {item.label}
-                </h2>
-                <span className="inline-flex items-center rounded-full border border-coral-200 bg-coral-50 px-2.5 py-0.5 text-xs font-medium text-coral-700 dark:border-coral-500/30 dark:bg-coral-500/10 dark:text-coral-300">
-                  {item.placements.length} {item.placements.length === 1 ? "link" : "links"}
-                </span>
+              <div className="flex flex-1 flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                    {item.label}
+                  </h2>
+                  <span className="inline-flex items-center rounded-full border border-coral-200 bg-coral-50 px-2.5 py-0.5 text-xs font-medium text-coral-700 dark:border-coral-500/30 dark:bg-coral-500/10 dark:text-coral-300">
+                    {item.placements.length} {item.placements.length === 1 ? "link" : "links"}
+                  </span>
+                </div>
+                <IntakeImportButton onClick={() => setImportOpenItemId(item.id)} />
               </div>
             </div>
+
+            <IntakeImportDialog
+              is_open={import_open_item_id === item.id}
+              on_close={() => setImportOpenItemId(null)}
+              title={`Import Keywords — ${item.label}`}
+              accent="coral"
+              columns={IMPORT_COLUMNS}
+              available_row_count={item.placements.length}
+              on_import={handleImport(item)}
+            />
+
+            <PasteOverflowBanner
+              overflow_row_count={overflow_by_item[item.id] ?? 0}
+              available_row_count={item.placements.length}
+              onDismiss={() => setOverflowByItem((prev) => ({ ...prev, [item.id]: 0 }))}
+            />
 
             <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
               <table className="w-full border-collapse text-sm">
@@ -260,6 +361,7 @@ export default function LinkBuildingIntakeEditor({
                             type="text"
                             value={row.keyword}
                             onChange={(e) => handleChange(placement.id, "keyword", e.target.value)}
+                            onPaste={handleCellPaste(item, row_index, 0)}
                             placeholder="e.g. best running shoes"
                             className="h-9 w-full rounded-md border border-transparent bg-transparent px-2 text-sm text-gray-800 placeholder:text-gray-300 focus:border-brand-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:text-white/90 dark:placeholder:text-white/20 dark:focus:bg-gray-800"
                           />
@@ -269,6 +371,7 @@ export default function LinkBuildingIntakeEditor({
                             type="text"
                             value={row.landing_page}
                             onChange={(e) => handleChange(placement.id, "landing_page", e.target.value)}
+                            onPaste={handleCellPaste(item, row_index, 1)}
                             placeholder="https://example.com/page"
                             className="h-9 w-full rounded-md border border-transparent bg-transparent px-2 text-sm text-gray-800 placeholder:text-gray-300 focus:border-brand-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:text-white/90 dark:placeholder:text-white/20 dark:focus:bg-gray-800"
                           />

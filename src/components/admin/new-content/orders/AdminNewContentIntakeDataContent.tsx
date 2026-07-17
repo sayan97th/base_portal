@@ -6,35 +6,13 @@ import { getAdminNewContentOrder } from "@/services/admin/new-content.service";
 import { adminOrderDetailsService } from "@/services/admin/order-details.service";
 import type { NewContentDetailsItem } from "@/services/client/order-details.service";
 import type { AdminOrder } from "@/types/admin";
+import NewContentIntakeSection, {
+  type NewContentEditableItem,
+  type NewContentEditableRow,
+} from "@/components/shared/intake-data/NewContentIntakeSection";
 
 interface AdminNewContentIntakeDataContentProps {
   order_id: string;
-}
-
-// ── Constants ──────────────────────────────────────────────────────────────────
-
-const CONTENT_TYPE_OPTIONS = [
-  "Blog Article",
-  "Product Page",
-  "Home Page",
-  "About Us Page",
-  "Other",
-];
-
-// ── Editable row model ───────────────────────────────────────────────────────────
-
-interface NewContentEditableRow {
-  keyword_phrase: string;
-  secondary_keywords: string;
-  type_of_content: string;
-  notes: string;
-}
-
-interface NewContentEditableItem {
-  item_id: string;
-  label: string;
-  quantity: number;
-  rows: NewContentEditableRow[];
 }
 
 // ── Formatters ─────────────────────────────────────────────────────────────────
@@ -180,6 +158,14 @@ export default function AdminNewContentIntakeDataContent({
             }
           : item
       )
+    );
+  };
+
+  const handleRowsPaste = (item_id: string, next_rows: NewContentEditableRow[]) => {
+    if (save_error) setSaveError(null);
+    if (saved) setSaved(false);
+    setEditableItems((prev) =>
+      prev.map((item) => (item.item_id === item_id ? { ...item, rows: next_rows } : item))
     );
   };
 
@@ -339,110 +325,15 @@ export default function AdminNewContentIntakeDataContent({
           {/* Intake sections */}
           <div className="space-y-10">
             {editable_items.map((item, item_index) => (
-              <div key={item.item_id} className="space-y-4">
-                {/* Section header */}
-                <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-sm font-bold text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">
-                    {item_index + 1}
-                  </div>
-                  <div className="flex flex-1 flex-wrap items-center gap-3">
-                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-                      {item.label}
-                    </h2>
-                    <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300">
-                      {item.rows.length} {item.rows.length === 1 ? "article" : "articles"}
-                    </span>
-                    <span className="text-xs text-gray-400 dark:text-gray-500">
-                      Qty ordered: {item.quantity}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Intake table */}
-                <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
-                  <table className="w-full border-collapse text-sm">
-                    <colgroup>
-                      <col className="w-12" />
-                      <col className="w-[26%]" />
-                      <col className="w-[24%]" />
-                      <col className="w-48" />
-                      <col />
-                    </colgroup>
-                    <thead>
-                      <tr className="bg-gray-50 dark:bg-gray-800/60">
-                        <th className="border-b border-r border-gray-200 py-2 text-center text-xs font-semibold text-gray-400 dark:border-gray-700 dark:text-gray-500">
-                          #
-                        </th>
-                        <th className="border-b border-r border-gray-200 px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:border-gray-700 dark:text-gray-400">
-                          Keyword Phrase
-                        </th>
-                        <th className="border-b border-r border-gray-200 px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:border-gray-700 dark:text-gray-400">
-                          Secondary Keywords
-                        </th>
-                        <th className="border-b border-r border-gray-200 px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:border-gray-700 dark:text-gray-400">
-                          Type of Content
-                        </th>
-                        <th className="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:border-gray-700 dark:text-gray-400">
-                          Notes
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {item.rows.map((row, row_index) => (
-                        <tr
-                          key={row_index}
-                          className="border-b border-gray-100 bg-white last:border-b-0 dark:border-gray-800 dark:bg-gray-900"
-                        >
-                          <td className="border-r border-gray-200 py-1 text-center text-xs font-medium text-gray-400 dark:border-gray-700 dark:text-gray-500">
-                            {row_index + 1}
-                          </td>
-                          <td className="border-r border-gray-200 px-2 py-1 dark:border-gray-700">
-                            <input
-                              type="text"
-                              value={row.keyword_phrase}
-                              onChange={(e) => handleChange(item.item_id, row_index, "keyword_phrase", e.target.value)}
-                              placeholder="e.g. best running shoes"
-                              className="h-9 w-full rounded-md border border-transparent bg-transparent px-2 text-sm text-gray-800 placeholder:text-gray-300 focus:border-brand-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:text-white/90 dark:placeholder:text-white/20 dark:focus:bg-gray-800"
-                            />
-                          </td>
-                          <td className="border-r border-gray-200 px-2 py-1 dark:border-gray-700">
-                            <input
-                              type="text"
-                              value={row.secondary_keywords}
-                              onChange={(e) => handleChange(item.item_id, row_index, "secondary_keywords", e.target.value)}
-                              placeholder="Comma-separated keywords"
-                              className="h-9 w-full rounded-md border border-transparent bg-transparent px-2 text-sm text-gray-800 placeholder:text-gray-300 focus:border-brand-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:text-white/90 dark:placeholder:text-white/20 dark:focus:bg-gray-800"
-                            />
-                          </td>
-                          <td className="border-r border-gray-200 px-2 py-1 dark:border-gray-700">
-                            <select
-                              value={row.type_of_content}
-                              onChange={(e) => handleChange(item.item_id, row_index, "type_of_content", e.target.value)}
-                              className="h-9 w-full rounded-md border border-transparent bg-transparent px-2 text-sm text-gray-800 focus:border-brand-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:text-white/90 dark:focus:bg-gray-800"
-                            >
-                              <option value="">Select type…</option>
-                              {CONTENT_TYPE_OPTIONS.map((option) => (
-                                <option key={option} value={option}>
-                                  {option}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="px-2 py-1">
-                            <input
-                              type="text"
-                              value={row.notes}
-                              onChange={(e) => handleChange(item.item_id, row_index, "notes", e.target.value)}
-                              placeholder="Optional notes"
-                              className="h-9 w-full rounded-md border border-transparent bg-transparent px-2 text-sm text-gray-800 placeholder:text-gray-300 focus:border-brand-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:text-white/90 dark:placeholder:text-white/20 dark:focus:bg-gray-800"
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <NewContentIntakeSection
+                key={item.item_id}
+                item_index={item_index}
+                item={item}
+                onRowChange={(row_index, field, value) =>
+                  handleChange(item.item_id, row_index, field, value)
+                }
+                onRowsPaste={(next_rows) => handleRowsPaste(item.item_id, next_rows)}
+              />
             ))}
           </div>
 

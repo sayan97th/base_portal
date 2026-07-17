@@ -6,25 +6,13 @@ import { getAdminContentBriefOrder } from "@/services/admin/content-briefs.servi
 import { adminOrderDetailsService } from "@/services/admin/order-details.service";
 import type { KeywordUrlDetailsItem } from "@/services/client/order-details.service";
 import type { AdminOrder } from "@/types/admin";
+import KeywordUrlIntakeSection, {
+  type KeywordUrlEditableItem,
+  type KeywordUrlEditableRow,
+} from "@/components/shared/intake-data/KeywordUrlIntakeSection";
 
 interface AdminContentBriefIntakeDataContentProps {
   order_id: string;
-}
-
-// ── Editable row model ───────────────────────────────────────────────────────────
-
-interface KeywordUrlEditableRow {
-  primary_keyword: string;
-  secondary_keywords: string;
-  content_page_url: string;
-  notes: string;
-}
-
-interface KeywordUrlEditableItem {
-  item_id: string;
-  label: string;
-  quantity: number;
-  rows: KeywordUrlEditableRow[];
 }
 
 // ── Formatters ─────────────────────────────────────────────────────────────────
@@ -174,6 +162,14 @@ export default function AdminContentBriefIntakeDataContent({
             }
           : item
       )
+    );
+  };
+
+  const handleRowsPaste = (item_id: string, next_rows: KeywordUrlEditableRow[]) => {
+    if (save_error) setSaveError(null);
+    if (saved) setSaved(false);
+    setEditableItems((prev) =>
+      prev.map((item) => (item.item_id === item_id ? { ...item, rows: next_rows } : item))
     );
   };
 
@@ -329,105 +325,20 @@ export default function AdminContentBriefIntakeDataContent({
           {/* Intake sections */}
           <div className="space-y-10">
             {editable_items.map((item, item_index) => (
-              <div key={item.item_id} className="space-y-4">
-                {/* Section header */}
-                <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-sm font-bold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
-                    {item_index + 1}
-                  </div>
-                  <div className="flex flex-1 flex-wrap items-center gap-3">
-                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-                      {item.label}
-                    </h2>
-                    <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
-                      {item.rows.length} {item.rows.length === 1 ? "page" : "pages"}
-                    </span>
-                    <span className="text-xs text-gray-400 dark:text-gray-500">
-                      Qty ordered: {item.quantity}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Intake table */}
-                <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
-                  <table className="w-full border-collapse text-sm">
-                    <colgroup>
-                      <col className="w-12" />
-                      <col className="w-[24%]" />
-                      <col className="w-[24%]" />
-                      <col className="w-[28%]" />
-                      <col />
-                    </colgroup>
-                    <thead>
-                      <tr className="bg-gray-50 dark:bg-gray-800/60">
-                        <th className="border-b border-r border-gray-200 py-2 text-center text-xs font-semibold text-gray-400 dark:border-gray-700 dark:text-gray-500">
-                          #
-                        </th>
-                        <th className="border-b border-r border-gray-200 px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:border-gray-700 dark:text-gray-400">
-                          Primary Target Keyword
-                        </th>
-                        <th className="border-b border-r border-gray-200 px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:border-gray-700 dark:text-gray-400">
-                          Secondary Keyword(s)
-                        </th>
-                        <th className="border-b border-r border-gray-200 px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:border-gray-700 dark:text-gray-400">
-                          Current Live URL
-                        </th>
-                        <th className="border-b border-gray-200 px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:border-gray-700 dark:text-gray-400">
-                          Notes
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {item.rows.map((row, row_index) => (
-                        <tr
-                          key={row_index}
-                          className="border-b border-gray-100 bg-white last:border-b-0 dark:border-gray-800 dark:bg-gray-900"
-                        >
-                          <td className="border-r border-gray-200 py-1 text-center text-xs font-medium text-gray-400 dark:border-gray-700 dark:text-gray-500">
-                            {row_index + 1}
-                          </td>
-                          <td className="border-r border-gray-200 px-2 py-1 dark:border-gray-700">
-                            <input
-                              type="text"
-                              value={row.primary_keyword}
-                              onChange={(e) => handleChange(item.item_id, row_index, "primary_keyword", e.target.value)}
-                              placeholder="e.g. best running shoes"
-                              className="h-9 w-full rounded-md border border-transparent bg-transparent px-2 text-sm text-gray-800 placeholder:text-gray-300 focus:border-brand-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:text-white/90 dark:placeholder:text-white/20 dark:focus:bg-gray-800"
-                            />
-                          </td>
-                          <td className="border-r border-gray-200 px-2 py-1 dark:border-gray-700">
-                            <input
-                              type="text"
-                              value={row.secondary_keywords}
-                              onChange={(e) => handleChange(item.item_id, row_index, "secondary_keywords", e.target.value)}
-                              placeholder="Comma-separated keywords"
-                              className="h-9 w-full rounded-md border border-transparent bg-transparent px-2 text-sm text-gray-800 placeholder:text-gray-300 focus:border-brand-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:text-white/90 dark:placeholder:text-white/20 dark:focus:bg-gray-800"
-                            />
-                          </td>
-                          <td className="border-r border-gray-200 px-2 py-1 dark:border-gray-700">
-                            <input
-                              type="text"
-                              value={row.content_page_url}
-                              onChange={(e) => handleChange(item.item_id, row_index, "content_page_url", e.target.value)}
-                              placeholder="https://example.com/page"
-                              className="h-9 w-full rounded-md border border-transparent bg-transparent px-2 text-sm text-gray-800 placeholder:text-gray-300 focus:border-brand-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:text-white/90 dark:placeholder:text-white/20 dark:focus:bg-gray-800"
-                            />
-                          </td>
-                          <td className="px-2 py-1">
-                            <input
-                              type="text"
-                              value={row.notes}
-                              onChange={(e) => handleChange(item.item_id, row_index, "notes", e.target.value)}
-                              placeholder="Optional notes"
-                              className="h-9 w-full rounded-md border border-transparent bg-transparent px-2 text-sm text-gray-800 placeholder:text-gray-300 focus:border-brand-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/10 dark:text-white/90 dark:placeholder:text-white/20 dark:focus:bg-gray-800"
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <KeywordUrlIntakeSection
+                key={item.item_id}
+                item_index={item_index}
+                item={item}
+                accent="emerald"
+                primary_keyword_label="Primary Target Keyword"
+                secondary_keywords_label="Secondary Keyword(s)"
+                content_page_url_label="Current Live URL"
+                row_noun="page"
+                onRowChange={(row_index, field, value) =>
+                  handleChange(item.item_id, row_index, field, value)
+                }
+                onRowsPaste={(next_rows) => handleRowsPaste(item.item_id, next_rows)}
+              />
             ))}
           </div>
 
