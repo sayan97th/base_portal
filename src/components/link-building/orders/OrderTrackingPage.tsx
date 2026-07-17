@@ -117,6 +117,20 @@ const STAGE_CONFIG: Record<OrderStatus, StageCfg> = {
       </svg>
     ),
   },
+  pending_details: {
+    label: "Pending Details",
+    description: "Your order is awaiting payment confirmation.",
+    color: "text-warning-600 dark:text-warning-400",
+    bg: "bg-warning-50 dark:bg-warning-500/10",
+    ring: "ring-warning-300 dark:ring-warning-500/40",
+    dot: "bg-warning-500",
+    glow: "shadow-warning-500/20",
+    icon: (
+      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+      </svg>
+    ),
+  },
 };
 
 // ─── Icons ─────────────────────────────────────────────────────────────────────

@@ -42,7 +42,7 @@ export interface PaginatedResponse<T> {
 
 // ── Orders ────────────────────────────────────────────────────────────────────
 
-export type OrderStatus = "new_request" | "pending" | "processing" | "completed" | "cancelled" | "payment_pending";
+export type OrderStatus = "new_request" | "pending" | "processing" | "completed" | "cancelled" | "payment_pending" | "pending_details";
 
 export type AdminOrderProductType =
   | "link_building"

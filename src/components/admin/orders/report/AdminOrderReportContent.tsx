@@ -109,6 +109,12 @@ const STATUS_CONFIG: Record<OrderStatus, { label: string; bg: string; text: stri
     text: "text-amber-700 dark:text-amber-400",
     dot: "bg-amber-500",
   },
+  pending_details: {
+    label: "Pending Details",
+    bg: "bg-amber-50 dark:bg-amber-500/10",
+    text: "text-amber-700 dark:text-amber-400",
+    dot: "bg-amber-500",
+  },
 };
 
 function OrderStatusBadge({ status }: { status: OrderStatus }) {

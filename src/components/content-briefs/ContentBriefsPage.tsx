@@ -209,6 +209,7 @@ const ContentBriefsPage: React.FC = () => {
               ref={intake_step_ref}
               onBack={() => { setCurrentStep("selection"); scrollToTop(); }}
               onNext={handleProceedToReview}
+              onSkip={handleProceedToReview}
               back_label="Back to Selection"
             />
           </div>

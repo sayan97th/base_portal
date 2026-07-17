@@ -55,10 +55,13 @@ function getStatusConfig(status: OrderStatus): {
       return { color: "error", label: "Cancelled", dot: "bg-error-500" };
     case "payment_pending":
       return { color: "warning", label: "Payment Pending", dot: "bg-amber-500" };
+    case "pending_details":
+      return { color: "warning", label: "Pending Details", dot: "bg-amber-500" };
   }
 }
 
 const PRODUCT_TYPE_INTAKE_PATH: Partial<Record<AdminOrderProductType, string>> = {
+  link_building: "link-building",
   new_content: "new-content",
   content_optimization: "content-optimization",
   content_brief: "content-briefs",

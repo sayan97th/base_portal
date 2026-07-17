@@ -122,6 +122,12 @@ const STATUS_CFG: Record<OrderStatus, { label: string; dot: string; badge: strin
     badge: "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
     border_l: "border-l-amber-400",
   },
+  pending_details: {
+    label: "Pending Details",
+    dot: "bg-amber-500",
+    badge: "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
+    border_l: "border-l-amber-400",
+  },
 };
 
 const UPDATE_STATUS_OPTS: OrderStatus[] = ["new_request", "processing", "completed", "cancelled"];

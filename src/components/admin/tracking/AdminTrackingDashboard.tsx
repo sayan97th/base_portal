@@ -113,6 +113,11 @@ const STATUS_CFG: Record<OrderStatus, { label: string; dot: string; badge: strin
     dot: "bg-amber-500",
     badge: "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
   },
+  pending_details: {
+    label: "Pending Details",
+    dot: "bg-amber-500",
+    badge: "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
+  },
 };
 
 const ALL_STATUSES: OrderStatus[] = ["new_request", "pending", "processing", "completed", "cancelled", "payment_pending"];

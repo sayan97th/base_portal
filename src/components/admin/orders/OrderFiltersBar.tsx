@@ -65,6 +65,7 @@ const STATUS_OPTIONS: { value: OrderStatus | ""; label: string; dot_class: strin
   { value: "processing",  label: "Processing",   dot_class: "bg-brand-500" },
   { value: "completed",   label: "Completed",    dot_class: "bg-success-500" },
   { value: "cancelled",   label: "Cancelled",    dot_class: "bg-error-500" },
+  { value: "pending_details", label: "Pending Details", dot_class: "bg-amber-500" },
 ];
 
 // ── Props ─────────────────────────────────────────────────────────────────────

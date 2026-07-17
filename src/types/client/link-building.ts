@@ -54,7 +54,7 @@ export interface CreateOrderPayload {
   };
 }
 
-export type OrderStatus = "new_request" | "pending" | "processing" | "completed" | "cancelled" | "payment_pending";
+export type OrderStatus = "new_request" | "pending" | "processing" | "completed" | "cancelled" | "payment_pending" | "pending_details";
 
 /** Admin-side placement statuses set directly on LinkBuildingOrderPlacement records. */
 export type PlacementStatus =

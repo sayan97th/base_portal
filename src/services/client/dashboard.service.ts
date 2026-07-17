@@ -128,6 +128,7 @@ const order_status_to_display: Record<OrderStatus, DisplayStatus> = {
   new_request:     "New request",
   pending:         "New request",
   payment_pending: "New request",
+  pending_details: "New request",
   processing:      "Writing article",
   completed:       "Live",
   cancelled:       "Cancelled",

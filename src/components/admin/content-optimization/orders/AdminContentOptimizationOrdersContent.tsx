@@ -70,6 +70,12 @@ const STATUS_CONFIG: Record<
     bg: "bg-amber-50 dark:bg-amber-500/10",
     text: "text-amber-700 dark:text-amber-400",
   },
+  pending_details: {
+    label: "Pending Details",
+    dot: "bg-amber-500",
+    bg: "bg-amber-50 dark:bg-amber-500/10",
+    text: "text-amber-700 dark:text-amber-400",
+  },
 };
 
 const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
@@ -78,6 +84,7 @@ const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
   { value: "processing", label: "Processing" },
   { value: "completed", label: "Completed" },
   { value: "cancelled", label: "Cancelled" },
+  { value: "pending_details", label: "Pending Details" },
 ];
 
 // ── Date picker ────────────────────────────────────────────────────────────────

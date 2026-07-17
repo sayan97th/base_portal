@@ -21,6 +21,12 @@ export interface UnifiedIntakeStepHandle {
 interface UnifiedIntakeStepProps {
   onBack: () => void;
   onNext: () => void;
+  /**
+   * Skip filling in the intake details now and continue to review/checkout.
+   * The resulting order is created in a "Pending Details" state and the
+   * details can be submitted later from My Orders (client) or the admin side.
+   */
+  onSkip?: () => void;
   back_label?: string;
 }
 
@@ -82,7 +88,7 @@ const SECTION_ICONS = {
 
 const UnifiedIntakeStep = forwardRef<UnifiedIntakeStepHandle, UnifiedIntakeStepProps>(
   function UnifiedIntakeStep(
-    { onBack, onNext, back_label = "Back to Selection" }: UnifiedIntakeStepProps,
+    { onBack, onNext, onSkip, back_label = "Back to Selection" }: UnifiedIntakeStepProps,
     ref
   ) {
   const {
@@ -518,8 +524,52 @@ const UnifiedIntakeStep = forwardRef<UnifiedIntakeStepHandle, UnifiedIntakeStepP
         </div>
       )}
 
-      {/* Review button */}
-      <div className="flex items-center justify-end pt-2">
+      {/* Defer-details helper: place the order now, add details later */}
+      {onSkip && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 dark:border-amber-500/25 dark:bg-amber-500/8">
+          <svg
+            className="mt-0.5 h-4 w-4 shrink-0 text-amber-500 dark:text-amber-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+          </svg>
+          <p className="text-sm text-amber-700 dark:text-amber-300">
+            Not ready to fill these in?{" "}
+            <button
+              type="button"
+              onClick={onSkip}
+              className="font-semibold underline underline-offset-2 hover:no-underline"
+            >
+              Skip for now
+            </button>{" "}
+            and complete your purchase. Your order will be marked{" "}
+            <span className="font-semibold">Pending Details</span> and you (or your team) can add
+            the details later from My Orders. The turnaround clock starts once the details are
+            submitted.
+          </p>
+        </div>
+      )}
+
+      {/* Navigation buttons */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+        {onSkip ? (
+          <button
+            type="button"
+            onClick={onSkip}
+            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.06]"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+            Skip for now — add details later
+          </button>
+        ) : (
+          <span />
+        )}
+
         <button
           type="button"
           onClick={handleNext}

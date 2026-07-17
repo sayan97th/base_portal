@@ -124,6 +124,17 @@ const STATUS_CONFIG: Record<OrderStatus, StatusConfig> = {
       </svg>
     ),
   },
+  pending_details: {
+    label: "Pending Details",
+    dot: "bg-amber-500",
+    badge: "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20",
+    border: "border-amber-200 dark:border-amber-500/30",
+    icon: (
+      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+      </svg>
+    ),
+  },
 };
 
 // ─── Icons ─────────────────────────────────────────────────────────────────────

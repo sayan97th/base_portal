@@ -19,6 +19,7 @@ const order_status_config: Record<
   completed:       { label: "Completed", color: "success", dot: "bg-success-500" },
   cancelled:       { label: "Cancelled", color: "error", dot: "bg-error-500" },
   payment_pending: { label: "Payment Pending", color: "light", dot: "bg-gray-400" },
+  pending_details: { label: "Pending Details", color: "light", dot: "bg-gray-400" },
 };
 
 const row_status_config: Record<

@@ -15,7 +15,7 @@ import type { PurchaseGroup } from "@/types/client/purchase-groups";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-type OrderStatus = "pending" | "processing" | "completed" | "cancelled" | "payment_pending" | "new_request";
+type OrderStatus = "pending" | "processing" | "completed" | "cancelled" | "payment_pending" | "new_request" | "pending_details";
 type FilterTab = "all" | CartProductType;
 
 interface UnifiedOrder {
@@ -122,7 +122,7 @@ function buildPageButtons(current: number, last: number): (number | "...")[] {
   return pages;
 }
 
-function getStatusConfig(status: string): {
+function getStatusConfig(status: string, product_type?: CartProductType): {
   color: "warning" | "info" | "success" | "error";
   label: string;
   dot: string;
@@ -139,13 +139,19 @@ function getStatusConfig(status: string): {
       return { color: "error", label: "Cancelled", dot: "bg-error-500" };
     case "payment_pending":
       return { color: "warning", label: "Payment Pending", dot: "bg-amber-500" };
+    case "pending_details":
+      return {
+        color: "warning",
+        label: product_type === "link_building" ? "Pending Link Details" : "Pending Details",
+        dot: "bg-amber-500",
+      };
     default:
       return { color: "info", label: status, dot: "bg-gray-400" };
   }
 }
 
 function getGroupOverallStatus(orders: UnifiedOrder[]): string {
-  const priority: OrderStatus[] = ["payment_pending", "processing", "new_request", "pending", "cancelled", "completed"];
+  const priority: OrderStatus[] = ["payment_pending", "pending_details", "processing", "new_request", "pending", "cancelled", "completed"];
   for (const s of priority) {
     if (orders.some((o) => o.status === s)) return s;
   }
@@ -169,6 +175,9 @@ function getReportLink(order: UnifiedOrder): string {
 }
 
 function getKeywordsLink(order: UnifiedOrder): string | null {
+  if (order.product_type === "link_building") {
+    return `/link-building/orders/${order.id}/intake`;
+  }
   if (order.product_type === "new_content") {
     return `/new-content/orders/${order.id}/intake`;
   }
@@ -339,8 +348,9 @@ interface OrderItemRowProps {
 }
 
 function OrderItemRow({ order, is_last, compact = false }: OrderItemRowProps) {
-  const status_config = getStatusConfig(order.status);
+  const status_config = getStatusConfig(order.status, order.product_type);
   const is_active = order.status === "pending" || order.status === "new_request" || order.status === "processing";
+  const is_pending_details = order.status === "pending_details";
   const has_updates = (order.updates_count ?? 0) > 0;
   const type_config = PRODUCT_TYPE_CONFIG[order.product_type];
   const tracking_link = getTrackingLink(order);
@@ -446,7 +456,16 @@ function OrderItemRow({ order, is_last, compact = false }: OrderItemRowProps) {
             <ReportIcon />
             Report
           </Link>
-          {keywords_link && (
+          {keywords_link && is_pending_details && (
+            <Link
+              href={keywords_link}
+              className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-500 px-2.5 py-1 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-amber-600 dark:border-amber-500/40"
+            >
+              <KeywordsIcon />
+              Add Details
+            </Link>
+          )}
+          {keywords_link && !is_pending_details && (
             <Link
               href={keywords_link}
               className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-500 hover:text-white dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500 dark:hover:text-white"

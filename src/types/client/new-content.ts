@@ -64,6 +64,7 @@ export interface NewContentOrdersResponse {
 
 export interface NewContentIntakeRow {
   keyword_phrase: string;
+  secondary_keywords?: string;
   type_of_content: string;
   notes: string;
 }

@@ -346,6 +346,16 @@ export default function OrderReviewStep({
 
   const has_discount = bulk_discount_amount > 0 || total_discount > 0;
 
+  // Whether any placement/row is missing its required intake details. When true,
+  // the order can still be purchased and will be parked in "Pending Details".
+  const has_missing_details = useMemo(() => {
+    const lb_missing = lb_rows.some((r) => !r.keyword.trim() || !r.landing_page.trim());
+    const nc_missing = nc_rows.some((r) => !r.keyword_phrase.trim() || !r.type_of_content.trim());
+    const co_missing = co_rows.some((r) => !r.primary_keyword.trim() || !r.content_page_url.trim());
+    const cb_missing = cb_rows.some((r) => !r.primary_keyword.trim() || !r.content_page_url.trim());
+    return lb_missing || nc_missing || co_missing || cb_missing;
+  }, [lb_rows, nc_rows, co_rows, cb_rows]);
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -392,6 +402,27 @@ export default function OrderReviewStep({
           to make changes before completing payment.
         </p>
       </div>
+
+      {/* Pending-details banner */}
+      {has_missing_details && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 dark:border-amber-500/25 dark:bg-amber-500/8">
+          <svg
+            className="mt-0.5 h-4 w-4 shrink-0 text-amber-500 dark:text-amber-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+          </svg>
+          <p className="text-sm text-amber-700 dark:text-amber-300">
+            Some intake details are still missing. You can complete your purchase now — the order
+            will be marked <span className="font-semibold">Pending Details</span> and you (or your
+            team) can add the remaining details later from My Orders. The turnaround clock starts
+            once the details are submitted.
+          </p>
+        </div>
+      )}
 
       {/* Order title & notes */}
       {(order_title || order_notes) && (

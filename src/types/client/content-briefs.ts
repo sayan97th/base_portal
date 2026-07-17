@@ -61,6 +61,7 @@ export interface ContentBriefIntakeRow {
   primary_keyword: string;
   secondary_keywords: string;
   content_page_url: string;
+  notes?: string;
 }
 
 export interface ContentBriefOrderItemDetail {
