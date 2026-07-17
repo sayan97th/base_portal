@@ -56,6 +56,8 @@ export default function ModalShell({
         <div className="flex min-h-full items-center justify-center p-4 sm:p-6">
           {/* Modal card */}
           <div
+            role="dialog"
+            aria-modal="true"
             className={`relative w-full ${max_width} rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-900`}
             onClick={(e) => e.stopPropagation()}
           >

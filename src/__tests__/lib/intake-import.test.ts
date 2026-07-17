@@ -8,12 +8,28 @@
  * in that cleaning behavior across the four intake table shapes.
  */
 
+import * as XLSX from "xlsx";
 import {
   formatFileSize,
   isAcceptedImportFile,
+  parseSpreadsheetFile,
   prepareImportGrid,
   type IntakeImportColumn,
 } from "@/lib/intake-import";
+
+/** Builds an .xlsx File in memory from a 2D array of cell values. */
+function makeXlsxFile(rows: (string | number)[][], name = "import.xlsx"): File {
+  const worksheet = XLSX.utils.aoa_to_sheet(rows);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
+  const buffer = XLSX.write(workbook, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+  return new File([buffer], name);
+}
+
+/** Builds a .csv File in memory from raw CSV text. */
+function makeCsvFile(text: string, name = "import.csv"): File {
+  return new File([text], name, { type: "text/csv" });
+}
 
 const KEYWORD_COLUMNS: IntakeImportColumn[] = [
   { label: "Keyword", aliases: ["keyword", "key phrase"] },
@@ -117,6 +133,61 @@ describe("prepareImportGrid", () => {
       had_header: false,
       had_index_column: false,
     });
+  });
+});
+
+describe("parseSpreadsheetFile", () => {
+  it("reads a CSV file into a trimmed string grid", async () => {
+    const file = makeCsvFile("Keyword,Landing Page\n  seo tips ,https://a.com\nlink building,https://b.com");
+    const grid = await parseSpreadsheetFile(file);
+
+    expect(grid).toEqual([
+      ["Keyword", "Landing Page"],
+      ["seo tips", "https://a.com"],
+      ["link building", "https://b.com"],
+    ]);
+  });
+
+  it("reads an .xlsx file from the first worksheet", async () => {
+    const file = makeXlsxFile([
+      ["Keyword", "Landing Page", "Exact Match"],
+      ["seo tips", "https://a.com", "yes"],
+      ["link building", "https://b.com", "no"],
+    ]);
+    const grid = await parseSpreadsheetFile(file);
+
+    expect(grid[0]).toEqual(["Keyword", "Landing Page", "Exact Match"]);
+    expect(grid[1]).toEqual(["seo tips", "https://a.com", "yes"]);
+    expect(grid[2]).toEqual(["link building", "https://b.com", "no"]);
+  });
+
+  it("stringifies numeric cells (e.g. an index column)", async () => {
+    const file = makeXlsxFile([
+      ["#", "Keyword"],
+      [1, "seo tips"],
+      [2, "link building"],
+    ]);
+    const grid = await parseSpreadsheetFile(file);
+
+    expect(grid[1]).toEqual(["1", "seo tips"]);
+    expect(grid[2]).toEqual(["2", "link building"]);
+  });
+
+  it("feeds cleanly into prepareImportGrid to yield ready-to-apply data rows", async () => {
+    const file = makeXlsxFile([
+      ["#", "Keyword", "Landing Page", "Exact Match"],
+      [1, "seo tips", "https://a.com", "yes"],
+      [2, "link building", "https://b.com", "no"],
+    ]);
+    const grid = await parseSpreadsheetFile(file);
+    const prepared = prepareImportGrid(grid, KEYWORD_COLUMNS);
+
+    expect(prepared.had_header).toBe(true);
+    expect(prepared.had_index_column).toBe(true);
+    expect(prepared.rows).toEqual([
+      ["seo tips", "https://a.com", "yes"],
+      ["link building", "https://b.com", "no"],
+    ]);
   });
 });
 
