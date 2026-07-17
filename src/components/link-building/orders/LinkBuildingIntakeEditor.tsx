@@ -276,18 +276,21 @@ export default function LinkBuildingIntakeEditor({
                         <td className="px-4 py-1 text-center">
                           <button
                             type="button"
+                            role="checkbox"
+                            aria-checked={row.exact_match}
+                            aria-label="Exact match"
                             onClick={() => handleChange(placement.id, "exact_match", !row.exact_match)}
-                            className={`relative h-6 w-11 rounded-full transition-colors ${
-                              row.exact_match ? "bg-brand-500" : "bg-gray-200 dark:bg-gray-700"
+                            className={`inline-flex h-5 w-5 items-center justify-center rounded-md border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 ${
+                              row.exact_match
+                                ? "border-brand-500 bg-brand-500 text-white"
+                                : "border-gray-300 bg-white hover:border-brand-400 dark:border-gray-600 dark:bg-gray-800"
                             }`}
-                            aria-pressed={row.exact_match}
-                            aria-label="Toggle exact match"
                           >
-                            <span
-                              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-                                row.exact_match ? "translate-x-5" : "translate-x-0.5"
-                              }`}
-                            />
+                            {row.exact_match && (
+                              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                              </svg>
+                            )}
                           </button>
                         </td>
                       </tr>
