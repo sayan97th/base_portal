@@ -61,6 +61,8 @@ const NewContentPage: React.FC = () => {
   const [stripe_payment_error, setStripePaymentError] = useState<string | null>(null);
   const [credits_to_apply, setCreditsToApply] = useState(0);
   const [is_applying_credits, setIsApplyingCredits] = useState(false);
+  // True when the client chose "Skip for now" — all orders are parked as pending.
+  const [details_deferred, setDetailsDeferred] = useState(false);
 
   const handleCreditsChange = useCallback((is_applying: boolean, credits: number) => {
     setIsApplyingCredits(is_applying);
@@ -134,12 +136,22 @@ const NewContentPage: React.FC = () => {
   };
 
   const handleProceedToReview = useCallback(() => {
+    // Reaching Review by filling the form clears any earlier "Skip" intent.
+    setDetailsDeferred(false);
     setCurrentStep("review");
     scrollToTop();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleProceedFromReview = useCallback(() => {
+    applyBillingIfEmpty();
+    setCurrentStep("checkout");
+    scrollToTop();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [has_saved_address, saved_billing_address, billing_address]);
+
+  const handleSkipIntake = useCallback(() => {
+    setDetailsDeferred(true);
     applyBillingIfEmpty();
     setCurrentStep("checkout");
     scrollToTop();
@@ -169,10 +181,11 @@ const NewContentPage: React.FC = () => {
         payment_intent_id,
         is_using_saved_method,
         billing_address,
-        credits_amount
+        credits_amount,
+        details_deferred
       );
     },
-    [executeCheckout, billing_address]
+    [executeCheckout, billing_address, details_deferred]
   );
 
   return (
@@ -239,7 +252,7 @@ const NewContentPage: React.FC = () => {
                 ref={intake_step_ref}
                 onBack={() => { setCurrentStep("selection"); scrollToTop(); }}
                 onNext={handleProceedToReview}
-                onSkip={handleProceedFromReview}
+                onSkip={handleSkipIntake}
                 back_label="Back to Selection"
               />
             </div>
@@ -286,7 +299,7 @@ const NewContentPage: React.FC = () => {
                   onBillingChange={handleBillingChange}
                   onPrevious={handlePrevious}
                   onComplete={handleComplete}
-                  onPayLater={handlePayLater}
+                  onPayLater={() => handlePayLater(details_deferred)}
                   is_loading={is_submitting}
                   error_message={submit_error}
                   total_amount={is_applying_credits ? subtotal : total}

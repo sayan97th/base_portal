@@ -74,9 +74,10 @@ export interface UseUnifiedCheckoutReturn {
     payment_intent_id: string,
     is_using_saved_method: boolean,
     billing_address: BillingAddress,
-    credits_amount?: number
+    credits_amount?: number,
+    defer_details?: boolean
   ) => Promise<void>;
-  handlePayLater: () => Promise<void>;
+  handlePayLater: (defer_details?: boolean) => Promise<void>;
 }
 
 /**
@@ -105,7 +106,8 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
       payment_intent_id: string,
       is_using_saved_method: boolean,
       billing_address: BillingAddress,
-      credits_amount?: number
+      credits_amount?: number,
+      defer_details?: boolean
     ) => {
       setIsSubmitting(true);
       setSubmitError(null);
@@ -169,6 +171,7 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
           billing,
           order_title: order_title || null,
           order_notes: order_notes || null,
+          ...(defer_details ? { defer_details: true } : {}),
           link_building_items:
             lb_items.length > 0
               ? lb_items.map((item) => {
@@ -295,7 +298,7 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
     [items, applied_coupons, total, order_title, order_notes, clearCart, addNotification, router]
   );
 
-  const handlePayLater = useCallback(async () => {
+  const handlePayLater = useCallback(async (defer_details?: boolean) => {
     setIsSubmitting(true);
     setSubmitError(null);
 
@@ -319,6 +322,7 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
         coupon_ids,
         order_title: order_title || null,
         order_notes: order_notes || null,
+        ...(defer_details ? { defer_details: true } : {}),
         link_building_items:
           lb_items.length > 0
             ? lb_items.map((item) => {

@@ -119,6 +119,8 @@ export interface UnifiedCheckoutPayload {
   billing: UnifiedCheckoutBilling;
   order_title?: string | null;
   order_notes?: string | null;
+  /** "Skip for now": park every created order in pending_details for later. */
+  defer_details?: boolean;
   link_building_items?: UnifiedCheckoutLinkBuildingItem[];
   content_optimization_items?: UnifiedCheckoutContentOptimizationItem[];
   new_content_items?: UnifiedCheckoutNewContentItem[];
@@ -144,6 +146,8 @@ export interface UnifiedDeferredCheckoutPayload {
   coupon_ids?: string[] | null;
   order_title?: string | null;
   order_notes?: string | null;
+  /** "Skip for now": park intake details as pending for later. */
+  defer_details?: boolean;
   link_building_items?: UnifiedCheckoutLinkBuildingItem[];
   content_optimization_items?: UnifiedCheckoutContentOptimizationItem[];
   new_content_items?: UnifiedCheckoutNewContentItem[];
