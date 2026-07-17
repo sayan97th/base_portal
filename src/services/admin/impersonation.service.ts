@@ -1,5 +1,5 @@
 import { apiClient, setToken, getToken, removeToken } from "@/lib/api-client";
-import { setPrimaryRoleCookie } from "@/lib/roles";
+import { getPrimaryRole, isStaffRole, setPrimaryRoleCookie, ROLES } from "@/lib/roles";
 import type { ImpersonationResponse, ImpersonationMeta } from "@/types/auth";
 
 const ADMIN_TOKEN_KEY = "impersonation_admin_token";
@@ -25,15 +25,22 @@ export const impersonationService = {
       localStorage.setItem(ADMIN_EXPIRES_KEY, admin_expires_at);
     }
 
+    // Derive the impersonated account's primary role so routing and the
+    // role cookie reflect who we are now acting as (client vs admin-side user).
+    const target_role = getPrimaryRole(data.impersonated_user.roles) ?? ROLES.CLIENT;
+    const target_is_staff = isStaffRole(target_role);
+
     const meta: ImpersonationMeta = {
       admin_id: data.admin_user.id,
       admin_first_name: data.admin_user.first_name,
       admin_last_name: data.admin_user.last_name,
       admin_email: data.admin_user.email,
-      client_id: data.impersonated_user.id,
-      client_first_name: data.impersonated_user.first_name,
-      client_last_name: data.impersonated_user.last_name,
-      client_email: data.impersonated_user.email,
+      target_id: data.impersonated_user.id,
+      target_first_name: data.impersonated_user.first_name,
+      target_last_name: data.impersonated_user.last_name,
+      target_email: data.impersonated_user.email,
+      target_role,
+      target_is_staff,
       started_at: new Date().toISOString(),
     };
     localStorage.setItem(IMPERSONATION_META_KEY, JSON.stringify(meta));
@@ -41,9 +48,17 @@ export const impersonationService = {
     setToken(data.impersonation_token);
     const expires_at = Date.now() + data.expires_in * 1000;
     localStorage.setItem("token_expires_at", expires_at.toString());
-    setPrimaryRoleCookie("client");
+    setPrimaryRoleCookie(target_role);
 
     return data;
+  },
+
+  /**
+   * Landing path to redirect to after starting an impersonation session,
+   * based on the impersonated account's primary role.
+   */
+  getLandingPath(target_is_staff: boolean): string {
+    return target_is_staff ? "/admin/dashboard" : "/";
   },
 
   async stopImpersonation(): Promise<void> {

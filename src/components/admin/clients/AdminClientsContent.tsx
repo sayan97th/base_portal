@@ -11,7 +11,7 @@ import BanUserModal from "@/components/admin/users/BanUserModal";
 import ClientFiltersBar from "@/components/admin/clients/ClientFiltersBar";
 import AddClientModal from "@/components/admin/clients/AddClientModal";
 import ClientActionsDropdown from "@/components/admin/clients/ClientActionsDropdown";
-import ImpersonationDialog from "@/components/admin/clients/ImpersonationDialog";
+import ImpersonationDialog from "@/components/admin/impersonation/ImpersonationDialog";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -652,7 +652,8 @@ export default function AdminClientsContent() {
       {/* ── Impersonation dialog ── */}
       {impersonate_target && (
         <ImpersonationDialog
-          client={impersonate_target}
+          user={impersonate_target}
+          variant="client"
           is_open={!!impersonate_target}
           is_loading={is_impersonating}
           onConfirm={handleImpersonateConfirm}

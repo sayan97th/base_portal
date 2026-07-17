@@ -5,7 +5,12 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import Badge from "@/components/ui/badge/Badge";
 import { getAdminUser, listAdminUserOrders } from "@/services/admin/user.service";
+import { impersonationService } from "@/services/admin/impersonation.service";
+import { useAuth } from "@/context/AuthContext";
+import { getPrimaryRole, isStaffRole, ROLES } from "@/lib/roles";
+import ImpersonationDialog from "@/components/admin/impersonation/ImpersonationDialog";
 import type { AdminUser, AdminUserOrderSummary, OrderStatus, PaginatedResponse } from "@/types/admin";
+import type { ApiError } from "@/types/auth";
 
 interface AdminUserDetailContentProps {
   user_id: number;
@@ -335,9 +340,16 @@ const AdminUserDetailContent: React.FC<AdminUserDetailContentProps> = ({ user_id
   const back_href = from_source === "clients" ? "/admin/clients" : "/admin/users";
   const back_label = from_source === "clients" ? "Back to Clients" : "Back to Users";
 
+  const { user: current_user, hasRole } = useAuth();
+
   const [user, setUser] = useState<AdminUser | null>(null);
   const [is_loading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // ── Impersonation state ────────────────────────────────────────────────────
+  const [show_impersonate_dialog, setShowImpersonateDialog] = useState(false);
+  const [is_impersonating, setIsImpersonating] = useState(false);
+  const [impersonation_error, setImpersonationError] = useState<string | null>(null);
 
   const [orders, setOrders] = useState<AdminUserOrderSummary[]>([]);
   const [orders_loading, setOrdersLoading] = useState(true);
@@ -381,6 +393,26 @@ const AdminUserDetailContent: React.FC<AdminUserDetailContentProps> = ({ user_id
   useEffect(() => {
     fetchOrders(orders_page);
   }, [fetchOrders, orders_page]);
+
+  // ── Impersonation handler ──────────────────────────────────────────────────
+  const handleImpersonateConfirm = async () => {
+    if (!user) return;
+    setIsImpersonating(true);
+    setImpersonationError(null);
+    try {
+      const data = await impersonationService.startImpersonation(user.id);
+      const target_role = getPrimaryRole(data.impersonated_user.roles);
+      window.location.href = impersonationService.getLandingPath(
+        target_role ? isStaffRole(target_role) : false
+      );
+    } catch (err: unknown) {
+      const api_error = err as ApiError;
+      setImpersonationError(
+        api_error.message || "Failed to start impersonation. Please try again."
+      );
+      setIsImpersonating(false);
+    }
+  };
 
   // ── Loading state ──────────────────────────────────────────────────────────
   if (is_loading) {
@@ -447,6 +479,18 @@ const AdminUserDetailContent: React.FC<AdminUserDetailContentProps> = ({ user_id
   const role_names = user.roles.map((r) => (typeof r === "string" ? r : r.display_name));
   const is_email_verified = !!user.email_verified_at;
   const initials = getInitials(user.first_name, user.last_name);
+
+  // ── Impersonation eligibility ──────────────────────────────────────────────
+  // Only super admins may impersonate admin-side users. The target must be
+  // active, must not be the acting user, and super admin accounts cannot be
+  // impersonated.
+  const target_primary_role = getPrimaryRole(user.roles);
+  const target_is_staff = target_primary_role ? isStaffRole(target_primary_role) : false;
+  const can_impersonate =
+    hasRole(ROLES.SUPER_ADMIN) &&
+    user.is_active &&
+    current_user?.id !== user.id &&
+    target_primary_role !== ROLES.SUPER_ADMIN;
 
   return (
     <div className="space-y-6">
@@ -523,14 +567,40 @@ const AdminUserDetailContent: React.FC<AdminUserDetailContentProps> = ({ user_id
               )}
             </div>
 
-            {/* User ID chip */}
-            <div className="shrink-0 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-center dark:border-gray-700 dark:bg-gray-800">
-              <p className="text-xs text-gray-400 dark:text-gray-500">User ID</p>
-              <p className="mt-0.5 font-mono text-sm font-semibold text-gray-700 dark:text-gray-300">
-                #{user.id}
-              </p>
+            {/* User ID chip + actions */}
+            <div className="flex shrink-0 flex-col items-end gap-3">
+              <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-center dark:border-gray-700 dark:bg-gray-800">
+                <p className="text-xs text-gray-400 dark:text-gray-500">User ID</p>
+                <p className="mt-0.5 font-mono text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  #{user.id}
+                </p>
+              </div>
+
+              {can_impersonate && (
+                <button
+                  onClick={() => {
+                    setImpersonationError(null);
+                    setShowImpersonateDialog(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-700 shadow-xs transition-colors hover:bg-violet-100 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-400 dark:hover:bg-violet-500/20"
+                  title="Impersonate this user"
+                >
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                  </svg>
+                  Impersonate
+                </button>
+              )}
             </div>
           </div>
+
+          {/* Impersonation error */}
+          {impersonation_error && (
+            <div className="mt-4 rounded-xl bg-violet-50 px-4 py-3 text-sm text-violet-700 dark:bg-violet-500/10 dark:text-violet-400">
+              {impersonation_error}
+            </div>
+          )}
 
           {/* Stats row */}
           <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -788,6 +858,20 @@ const AdminUserDetailContent: React.FC<AdminUserDetailContentProps> = ({ user_id
           )}
         </div>
       </div>
+
+      {/* Impersonation dialog */}
+      {can_impersonate && (
+        <ImpersonationDialog
+          user={user}
+          variant={target_is_staff ? "staff" : "client"}
+          is_open={show_impersonate_dialog}
+          is_loading={is_impersonating}
+          onConfirm={handleImpersonateConfirm}
+          onClose={() => {
+            if (!is_impersonating) setShowImpersonateDialog(false);
+          }}
+        />
+      )}
     </div>
   );
 };

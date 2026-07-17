@@ -3,8 +3,12 @@
 import React, { useEffect } from "react";
 import type { AdminUser } from "@/types/admin";
 
+type ImpersonationVariant = "client" | "staff";
+
 interface ImpersonationDialogProps {
-  client: AdminUser;
+  user: AdminUser;
+  /** Adjusts the copy for the type of account being impersonated. Defaults to "client". */
+  variant?: ImpersonationVariant;
   is_open: boolean;
   is_loading: boolean;
   onConfirm: () => void;
@@ -28,8 +32,40 @@ function getInitials(first_name: string, last_name: string): string {
   return `${first_name.charAt(0)}${last_name.charAt(0)}`.toUpperCase();
 }
 
+interface VariantCopy {
+  title: string;
+  description: string;
+  see_line: React.ReactNode;
+}
+
+const VARIANT_COPY: Record<ImpersonationVariant, VariantCopy> = {
+  client: {
+    title: "Impersonate Client Account",
+    description:
+      "Step into this account and experience the platform exactly as this client does.",
+    see_line: (
+      <span>
+        You will <strong>see the platform exactly as this client sees it</strong> — their orders,
+        invoices, credits, and settings.
+      </span>
+    ),
+  },
+  staff: {
+    title: "Impersonate Team Member",
+    description:
+      "Step into this admin-side account and see the platform exactly as this team member does.",
+    see_line: (
+      <span>
+        You will <strong>see the admin panel exactly as this team member sees it</strong> — their
+        dashboard, tools, and permissions.
+      </span>
+    ),
+  },
+};
+
 export default function ImpersonationDialog({
-  client,
+  user,
+  variant = "client",
   is_open,
   is_loading,
   onConfirm,
@@ -44,6 +80,8 @@ export default function ImpersonationDialog({
   }, [is_open, is_loading, onClose]);
 
   if (!is_open) return null;
+
+  const copy = VARIANT_COPY[variant];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -78,10 +116,10 @@ export default function ImpersonationDialog({
             </div>
             <div className="min-w-0 pr-6">
               <h2 className="text-base font-semibold text-violet-700 dark:text-violet-400">
-                Impersonate Client Account
+                {copy.title}
               </h2>
               <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
-                Step into this account and experience the platform exactly as this client does.
+                {copy.description}
               </p>
             </div>
           </div>
@@ -90,23 +128,23 @@ export default function ImpersonationDialog({
         {/* Body */}
         <div className="space-y-5 px-6 py-5">
 
-          {/* Client info card */}
+          {/* User info card */}
           <div className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 p-3 dark:border-gray-800 dark:bg-white/[0.03]">
             <div
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${getAvatarColor(client.id)}`}
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${getAvatarColor(user.id)}`}
             >
-              {getInitials(client.first_name, client.last_name)}
+              {getInitials(user.first_name, user.last_name)}
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
-                {client.first_name} {client.last_name}
+                {user.first_name} {user.last_name}
               </p>
               <p className="truncate text-xs text-gray-500 dark:text-gray-400">
-                {client.email}
+                {user.email}
               </p>
-              {client.organization && (
+              {user.organization && (
                 <p className="truncate text-xs text-gray-400 dark:text-gray-500">
-                  {client.organization.name}
+                  {user.organization.name}
                 </p>
               )}
             </div>
@@ -131,7 +169,7 @@ export default function ImpersonationDialog({
                     <path d="M3.5 6.5L1 4l.7-.7 1.8 1.8 3.8-3.8.7.7z" />
                   </svg>
                 </span>
-                <span>You will <strong>see the platform exactly as this client sees it</strong> — their orders, invoices, credits, and settings.</span>
+                {copy.see_line}
               </li>
               <li className="flex items-start gap-2.5">
                 <span className="mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-600 dark:bg-violet-500/20 dark:text-violet-400">
@@ -155,7 +193,7 @@ export default function ImpersonationDialog({
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
                   </svg>
                 </span>
-                <span>Use this feature <strong>responsibly</strong>. Only impersonate to assist clients or diagnose issues on their behalf.</span>
+                <span>Use this feature <strong>responsibly</strong>. Only impersonate to assist users or diagnose issues on their behalf.</span>
               </li>
             </ul>
           </div>

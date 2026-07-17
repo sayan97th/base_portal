@@ -44,12 +44,13 @@ export default function ImpersonationBanner() {
   async function handleStop() {
     if (is_stopping) return;
     setIsStopping(true);
+    const return_path = meta?.target_is_staff ? "/admin/users" : "/admin/clients";
     try {
       await impersonationService.stopImpersonation();
     } catch {
       impersonationService.clearImpersonation();
     } finally {
-      window.location.href = "/admin/clients";
+      window.location.href = return_path;
     }
   }
 
@@ -75,12 +76,12 @@ export default function ImpersonationBanner() {
               <span className="text-xs font-medium text-white">
                 Viewing as{" "}
                 <strong className="font-semibold">
-                  {meta.client_first_name} {meta.client_last_name}
+                  {meta.target_first_name} {meta.target_last_name}
                 </strong>
               </span>
               <span className="hidden h-3.5 w-px bg-white/30 sm:block" />
               <span className="hidden text-xs text-white/70 sm:inline">
-                {meta.client_email}
+                {meta.target_email}
               </span>
             </div>
             <p className="mt-0.5 text-xs text-white/60">

@@ -268,9 +268,13 @@ export interface ImpersonationMeta {
   admin_first_name: string;
   admin_last_name: string;
   admin_email: string;
-  client_id: number;
-  client_first_name: string;
-  client_last_name: string;
-  client_email: string;
+  target_id: number;
+  target_first_name: string;
+  target_last_name: string;
+  target_email: string;
+  /** Primary role of the impersonated account (e.g. "client", "admin", "staff"). */
+  target_role: string;
+  /** True when the impersonated account belongs to the internal staff team. */
+  target_is_staff: boolean;
   started_at: string;
 }

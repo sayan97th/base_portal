@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import AppHeader from "@/layout/AppHeader";
 import AdminSidebar from "@/layout/AdminSidebar";
 import Backdrop from "@/layout/Backdrop";
+import ImpersonationBanner from "@/components/ImpersonationBanner";
 import { AdminNotificationsProvider } from "@/context/AdminNotificationsContext";
 
 export default function AdminLayout({
@@ -48,6 +49,8 @@ export default function AdminLayout({
         <div
           className={`flex-1 min-w-0 overflow-x-hidden transition-all duration-300 ease-in-out ${main_content_margin}`}
         >
+          {/* Impersonation Banner — shown when a super admin is impersonating a team member */}
+          <ImpersonationBanner />
           <AppHeader />
           <div className="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
             {children}
