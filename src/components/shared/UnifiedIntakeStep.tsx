@@ -417,6 +417,38 @@ const UnifiedIntakeStep = forwardRef<UnifiedIntakeStepHandle, UnifiedIntakeStepP
         </button>
       </div>
 
+      {/* Defer-details helper (top): place the order now, add details later */}
+      {onSkip && (
+        <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 dark:border-amber-500/25 dark:bg-amber-500/8 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <svg
+              className="mt-0.5 h-4 w-4 shrink-0 text-amber-500 dark:text-amber-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+            <p className="text-sm text-amber-700 dark:text-amber-300">
+              Not ready to fill these in? Complete your purchase now — your order will be marked{" "}
+              <span className="font-semibold">Pending Details</span> and you (or your team) can add
+              the details later from My Orders. The turnaround clock starts once they&apos;re submitted.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onSkip}
+            className="inline-flex shrink-0 items-center gap-2 self-start rounded-lg border border-amber-300 bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-amber-600 dark:border-amber-500/40 sm:self-auto"
+          >
+            Skip for now
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+            </svg>
+          </button>
+        </div>
+      )}
+
       {/* Global validation error */}
       {error && <IntakeValidationBanner message={error} />}
 
@@ -524,52 +556,8 @@ const UnifiedIntakeStep = forwardRef<UnifiedIntakeStepHandle, UnifiedIntakeStepP
         </div>
       )}
 
-      {/* Defer-details helper: place the order now, add details later */}
-      {onSkip && (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 dark:border-amber-500/25 dark:bg-amber-500/8">
-          <svg
-            className="mt-0.5 h-4 w-4 shrink-0 text-amber-500 dark:text-amber-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={2}
-            stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-          </svg>
-          <p className="text-sm text-amber-700 dark:text-amber-300">
-            Not ready to fill these in?{" "}
-            <button
-              type="button"
-              onClick={onSkip}
-              className="font-semibold underline underline-offset-2 hover:no-underline"
-            >
-              Skip for now
-            </button>{" "}
-            and complete your purchase. Your order will be marked{" "}
-            <span className="font-semibold">Pending Details</span> and you (or your team) can add
-            the details later from My Orders. The turnaround clock starts once the details are
-            submitted.
-          </p>
-        </div>
-      )}
-
-      {/* Navigation buttons */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-        {onSkip ? (
-          <button
-            type="button"
-            onClick={onSkip}
-            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.06]"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-            </svg>
-            Skip for now — add details later
-          </button>
-        ) : (
-          <span />
-        )}
-
+      {/* Review button */}
+      <div className="flex items-center justify-end pt-2">
         <button
           type="button"
           onClick={handleNext}

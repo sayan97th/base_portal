@@ -265,7 +265,7 @@ const LinkBuildingPage: React.FC = () => {
                 ref={intake_step_ref}
                 onBack={() => { setCurrentStep("selection"); scrollToTop(); }}
                 onNext={handleProceedToReview}
-                onSkip={handleProceedToReview}
+                onSkip={handleProceedFromReview}
                 back_label="Back to Selection"
               />
             </div>
