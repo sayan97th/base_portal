@@ -2,11 +2,19 @@
 
 import { useCallback, useState } from "react";
 import type { CartIntakeRow } from "@/types/client/unified-cart";
-import { applyPastedGridToRows, isBulkPaste, parsePastedGrid } from "@/lib/pasted-grid";
+import {
+  applyPastedGridToRows,
+  isBulkPaste,
+  parsePastedGrid,
+  type PastedGrid,
+} from "@/lib/pasted-grid";
+import type { IntakeImportColumn } from "@/lib/intake-import";
 import { downloadCsv } from "@/lib/exportCsv";
 import PasteOverflowBanner from "@/components/shared/PasteOverflowBanner";
 import IntakeTierCard from "@/components/shared/IntakeTierCard";
 import IntakeExportCsvButton from "@/components/shared/IntakeExportCsvButton";
+import IntakeImportButton from "@/components/shared/IntakeImportButton";
+import IntakeImportDialog from "@/components/shared/IntakeImportDialog";
 import IntakeDeleteRowButton from "@/components/shared/IntakeDeleteRowButton";
 import {
   INTAKE_INPUT_CLASS,
@@ -40,6 +48,12 @@ const INTAKE_ROW_FIELD_ORDER: ReadonlyArray<keyof CartIntakeRow> = [
   "type_of_content",
 ];
 
+const IMPORT_COLUMNS: IntakeImportColumn[] = [
+  { label: "Primary Keyword", aliases: ["keyword", "keyword phrase", "primary keyword", "key phrase"] },
+  { label: "Secondary Keywords", aliases: ["secondary keywords", "secondary", "secondary keyword"] },
+  { label: "Type of Content", aliases: ["type of content", "content type", "type"] },
+];
+
 function matchContentType(raw_value: string, current_value: string | null): string | null {
   const match = CONTENT_TYPES.find(
     (type) => type.toLowerCase() === raw_value.trim().toLowerCase()
@@ -67,6 +81,27 @@ export default function IntakeFormTable({
   show_errors = false,
 }: IntakeFormTableProps) {
   const [overflow_row_count, setOverflowRowCount] = useState(0);
+  const [import_open, setImportOpen] = useState(false);
+
+  const handleImport = useCallback(
+    (grid: PastedGrid) => {
+      const { rows: next_rows, overflow_row_count: overflow } = applyPastedGridToRows(
+        rows,
+        0,
+        0,
+        INTAKE_ROW_FIELD_ORDER,
+        grid,
+        (field, raw_value, current_value) =>
+          field === "type_of_content"
+            ? matchContentType(raw_value, current_value as string | null)
+            : raw_value
+      );
+
+      onChange(next_rows);
+      setOverflowRowCount(overflow);
+    },
+    [rows, onChange]
+  );
 
   const handleRowChange = useCallback(
     (row_index: number, field: keyof CartIntakeRow, value: string) => {
@@ -138,8 +173,27 @@ export default function IntakeFormTable({
       tier_name={tier_name}
       form_index={form_index}
       total_forms={total_forms}
-      action={!hide_actions && <IntakeExportCsvButton onClick={handleExportCsv} />}
+      action={
+        !hide_actions && (
+          <div className="flex items-center gap-4">
+            <IntakeImportButton onClick={() => setImportOpen(true)} />
+            <IntakeExportCsvButton onClick={handleExportCsv} />
+          </div>
+        )
+      }
     >
+      {!hide_actions && (
+        <IntakeImportDialog
+          is_open={import_open}
+          on_close={() => setImportOpen(false)}
+          title={`Import Content Rows — ${tier_name}`}
+          accent="blue"
+          columns={IMPORT_COLUMNS}
+          available_row_count={rows.length}
+          on_import={handleImport}
+        />
+      )}
+
       <div className="space-y-4">
         <PasteOverflowBanner
           overflow_row_count={overflow_row_count}

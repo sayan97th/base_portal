@@ -40,7 +40,8 @@ const KeywordEntryStep: React.FC<KeywordEntryStepProps> = ({
     <div className="space-y-6">
       <IntakeInfoBanner>
         Enter your target keyword and landing page for each placement. Paste rows from a
-        spreadsheet into any cell to fill multiple rows at once.
+        spreadsheet into any cell, or use <strong>Import</strong> to upload an Excel/CSV file
+        and fill every row at once.
       </IntakeInfoBanner>
 
       {selected_items.map((item, idx) => (

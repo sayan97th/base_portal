@@ -6,11 +6,15 @@ import {
   isBulkPaste,
   parseBooleanCell,
   parsePastedGrid,
+  type PastedGrid,
 } from "@/lib/pasted-grid";
+import type { IntakeImportColumn } from "@/lib/intake-import";
 import { downloadCsv } from "@/lib/exportCsv";
 import PasteOverflowBanner from "@/components/shared/PasteOverflowBanner";
 import IntakeTierCard from "@/components/shared/IntakeTierCard";
 import IntakeExportCsvButton from "@/components/shared/IntakeExportCsvButton";
+import IntakeImportButton from "@/components/shared/IntakeImportButton";
+import IntakeImportDialog from "@/components/shared/IntakeImportDialog";
 import {
   INTAKE_INPUT_CLASS,
   INTAKE_ROW_CLASS,
@@ -37,6 +41,12 @@ const KEYWORD_ROW_FIELD_ORDER: ReadonlyArray<keyof KeywordRow> = [
   "keyword",
   "landing_page",
   "exact_match",
+];
+
+const IMPORT_COLUMNS: IntakeImportColumn[] = [
+  { label: "Keyword", aliases: ["keyword", "keywords", "key phrase", "keyword / key phrase"] },
+  { label: "Landing Page", aliases: ["landing page", "landing", "url", "target url", "target page"] },
+  { label: "Exact Match", aliases: ["exact match", "exact", "match"] },
 ];
 
 const EXACT_MATCH_TOOLTIP =
@@ -118,6 +128,25 @@ export default function LinkBuildingIntakeTable({
   onRowsPaste,
 }: LinkBuildingIntakeTableProps) {
   const [overflow_row_count, setOverflowRowCount] = useState(0);
+  const [import_open, setImportOpen] = useState(false);
+
+  const handleImport = useCallback(
+    (grid: PastedGrid) => {
+      const { rows: next_rows, overflow_row_count: overflow } = applyPastedGridToRows(
+        rows,
+        0,
+        0,
+        KEYWORD_ROW_FIELD_ORDER,
+        grid,
+        (field, raw_value) =>
+          field === "exact_match" ? parseBooleanCell(raw_value) : raw_value
+      );
+
+      onRowsPaste(next_rows);
+      setOverflowRowCount(overflow);
+    },
+    [rows, onRowsPaste]
+  );
 
   const handleCellPaste = useCallback(
     (row_index: number, field_index: number) =>
@@ -160,8 +189,23 @@ export default function LinkBuildingIntakeTable({
       tier_name={tier_name}
       form_index={form_index}
       total_forms={total_forms}
-      action={<IntakeExportCsvButton onClick={handleExportCsv} />}
+      action={
+        <div className="flex items-center gap-4">
+          <IntakeImportButton onClick={() => setImportOpen(true)} />
+          <IntakeExportCsvButton onClick={handleExportCsv} />
+        </div>
+      }
     >
+      <IntakeImportDialog
+        is_open={import_open}
+        on_close={() => setImportOpen(false)}
+        title={`Import Keywords — ${tier_name}`}
+        accent="coral"
+        columns={IMPORT_COLUMNS}
+        available_row_count={rows.length}
+        on_import={handleImport}
+      />
+
       <div className="space-y-4">
         <PasteOverflowBanner
           overflow_row_count={overflow_row_count}
