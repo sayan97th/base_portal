@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { authService } from "@/services/auth.service";
+import { impersonationService } from "@/services/admin/impersonation.service";
 import { getToken } from "@/lib/api-client";
 import { resetEcho } from "@/lib/echo";
 import { getPrimaryRole, isStaffRole, setPrimaryRoleCookie } from "@/lib/roles";
@@ -130,6 +131,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { requires_two_factor: true, two_factor_token: data.two_factor_token };
     }
 
+    // A fresh login always starts a clean session — drop any stale impersonation
+    // state left over from an expired session.
+    impersonationService.clearImpersonation();
+
     const auth_data = data as AuthResponse;
     setUser(auth_data.user);
     try {
@@ -144,6 +149,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithTwoFactor = async (two_factor_token: string, code: string): Promise<void> => {
     const data = await authService.loginWithTwoFactor({ two_factor_token, code });
+    impersonationService.clearImpersonation();
     setUser(data.user);
     try {
       const meData = await authService.getMe();
@@ -182,6 +188,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // persist across sessions.
     resetEcho();
     await authService.logout();
+    impersonationService.clearImpersonation();
     setUser(null);
     setPermissions([]);
     if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);

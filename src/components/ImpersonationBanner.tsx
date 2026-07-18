@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { impersonationService } from "@/services/admin/impersonation.service";
+import { useAuth } from "@/context/AuthContext";
 import type { ImpersonationMeta } from "@/types/auth";
 
 function computeElapsed(started_at: string): string {
@@ -27,16 +28,33 @@ function useElapsedTime(started_at: string): string {
 }
 
 export default function ImpersonationBanner() {
+  const { user, isLoading } = useAuth();
   const [meta, setMeta] = useState<ImpersonationMeta | null>(null);
   const [is_stopping, setIsStopping] = useState(false);
 
   useEffect(() => {
-    setMeta(
-      impersonationService.isImpersonating()
-        ? impersonationService.getImpersonationMeta()
-        : null
-    );
-  }, []);
+    // Wait until auth has resolved before deciding whether the session is real.
+    if (isLoading) return;
+
+    if (!impersonationService.isImpersonating()) {
+      setMeta(null);
+      return;
+    }
+
+    const stored = impersonationService.getImpersonationMeta();
+
+    // The banner is only valid while the authenticated user IS the impersonated
+    // target. If the impersonation token expired (or was invalidated) and the
+    // admin logged back in with their own credentials, the stored data is stale.
+    // Clear it so the banner disappears instead of showing a phantom session.
+    if (!stored || !user || user.id !== stored.target_id) {
+      impersonationService.clearImpersonation();
+      setMeta(null);
+      return;
+    }
+
+    setMeta(stored);
+  }, [isLoading, user]);
   const elapsed = useElapsedTime(meta?.started_at ?? new Date().toISOString());
 
   if (!meta) return null;
