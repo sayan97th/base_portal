@@ -686,7 +686,7 @@ export default function CreateInvoiceContent() {
                 checked={send_admin_notification}
                 on_change={setSendAdminNotification}
                 label="Notify admin team"
-                description="Send an internal notification to the admin team about this invoice"
+                description="Send an internal notification to the admin recipients configured in Email Notification Settings"
               />
             </div>
           </div>
