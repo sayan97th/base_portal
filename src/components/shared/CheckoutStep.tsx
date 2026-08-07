@@ -666,15 +666,27 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
   const trySaveCard = useCallback(async (payment_method_id: string | { id: string }) => {
     try {
       const pm_id = typeof payment_method_id === "string" ? payment_method_id : payment_method_id.id;
+      const country_code = country_code_map[billing_address.country] ?? "US";
       await paymentProfileService.createPaymentProfile({
         stripe_payment_method_id: pm_id,
         cardholder_name: name_on_card.trim() || null,
         is_default: payment_profiles.length === 0,
+        billing_address: {
+          address_line1: billing_address.address.trim() || null,
+          city: billing_address.city.trim() || null,
+          state: billing_address.state.trim() || null,
+          postal_code: billing_address.postal_code.trim() || null,
+          country: country_code,
+          company: billing_address.company.trim() || null,
+        },
       });
-    } catch {
-      // Don't block the order if card saving fails
+    } catch (err: unknown) {
+      // Don't block the order if card saving fails, since the payment already
+      // succeeded. Logged so a failed save (e.g. a Stripe customer mismatch)
+      // is still visible for debugging instead of disappearing silently.
+      console.error("[CheckoutStep] Failed to save card for future use.", err);
     }
-  }, [name_on_card, payment_profiles.length]);
+  }, [name_on_card, payment_profiles.length, billing_address]);
 
   // ── Main submit handler ───────────────────────────────────────
 

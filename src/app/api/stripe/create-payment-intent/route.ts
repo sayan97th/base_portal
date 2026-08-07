@@ -35,10 +35,17 @@ export async function POST(req: NextRequest) {
     }
 
     // When the user wants to save the card for future purchases, we must:
-    //  1. Find or create a Stripe Customer for this user so the PM can be attached.
+    //  1. Resolve the user's Stripe Customer so the PM can be attached.
     //  2. Create the PI with setup_future_usage so Stripe marks the PM as reusable.
     //  3. Use payment_method_types: ['card'] instead of automatic_payment_methods
     //     so the resulting PM can be directly attached to the Customer afterward.
+    //
+    // The customer is always resolved through the Laravel API (which persists it
+    // on users.stripe_customer_id) rather than looked up or created here directly.
+    // A local lookup-by-email would risk creating a second, divergent Customer for
+    // a user who hasn't gone through checkout yet. The resulting PaymentMethod
+    // would then be attached to a customer the backend doesn't recognize, and
+    // saving the card afterward would fail.
     if (save_for_future && !stripe_customer_id) {
       const auth_header = req.headers.get("Authorization");
 
@@ -47,41 +54,21 @@ export async function POST(req: NextRequest) {
           const api_base =
             process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
-          const me_response = await fetch(`${api_base}/api/auth/me`, {
+          const customer_response = await fetch(`${api_base}/api/stripe/customer`, {
+            method: "POST",
             headers: {
               Authorization: auth_header,
               Accept: "application/json",
             },
           });
 
-          if (me_response.ok) {
-            const me_data = await me_response.json();
-            const user = me_data.user ?? me_data.data ?? me_data;
-
-            const existing_customers = await stripe.customers.list({
-              email: user.email,
-              limit: 1,
-            });
-
-            if (existing_customers.data.length > 0) {
-              stripe_customer_id = existing_customers.data[0].id;
-            } else {
-              const full_name = [user.first_name, user.last_name]
-                .filter(Boolean)
-                .join(" ");
-
-              const customer = await stripe.customers.create({
-                email: user.email,
-                name: full_name || undefined,
-                metadata: { user_id: String(user.id) },
-              });
-
-              stripe_customer_id = customer.id;
-            }
+          if (customer_response.ok) {
+            const customer_data = await customer_response.json();
+            stripe_customer_id = customer_data.stripe_customer_id;
           }
         } catch {
-          // If customer lookup fails, proceed without customer — card can still
-          // be charged; saving will be attempted post-payment via direct attach.
+          // If customer resolution fails, proceed without customer. The card can
+          // still be charged; saving will be attempted post-payment via direct attach.
         }
       }
     }

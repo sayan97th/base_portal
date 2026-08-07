@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   CardNumberElement,
   CardExpiryElement,
@@ -412,6 +412,9 @@ interface PaymentMethodFormProps {
   is_first_card: boolean;
   onBack: () => void;
   onSuccess: (profile: PaymentProfile) => void;
+  /** Requests a brand new SetupIntent client_secret. Used to transparently
+   *  recover when the current one is found to already be confirmed. */
+  onRequestFreshSecret: () => Promise<string>;
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -421,10 +424,27 @@ const PaymentMethodForm: React.FC<PaymentMethodFormProps> = ({
   is_first_card,
   onBack,
   onSuccess,
+  onRequestFreshSecret,
 }) => {
   const stripe = useStripe();
   const elements = useElements();
   const { saved_billing_address, has_saved_address } = useBillingAddress();
+
+  // The SetupIntent client_secret currently in use. Starts as the prop but is
+  // replaced if the active one turns out to already be confirmed (see
+  // handleSubmit) so the user can retry without leaving this page.
+  const [active_client_secret, setActiveClientSecret] = useState(client_secret);
+
+  // Once Stripe confirms the SetupIntent, its PaymentMethod is recorded here.
+  // A SetupIntent can only be confirmed once, so if the backend save step
+  // below fails (network error, transient 500, etc.) a retry must reuse this
+  // id and skip re-confirming with Stripe entirely, rather than resubmitting
+  // the same client_secret and hitting "setup_intent_unexpected_state".
+  const [confirmed_payment_method_id, setConfirmedPaymentMethodId] = useState<string | null>(null);
+
+  // Synchronous mutex against double submission (e.g. a fast double-click),
+  // which `is_submitting` state alone cannot guard against within the same tick.
+  const is_submitting_ref = useRef(false);
 
   // ── Card detail state ──────────────────────────────────────────────────────
   const [cardholder_name, setCardholderName] = useState("");
@@ -516,49 +536,77 @@ const PaymentMethodForm: React.FC<PaymentMethodFormProps> = ({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (is_submitting_ref.current) return;
     if (!stripe || !elements || !isCardComplete()) return;
     if (!validateBillingAddress()) return;
 
-    const card_number_element = elements.getElement(CardNumberElement);
-    if (!card_number_element) return;
-
+    is_submitting_ref.current = true;
     setIsSubmitting(true);
     setSubmitError(null);
 
     try {
       const country_code = country_code_map[billing_address.country] ?? "US";
 
-      // Confirm the SetupIntent — billing address is stored with the payment method in Stripe
-      const { setupIntent, error: stripe_error } = await stripe.confirmCardSetup(client_secret, {
-        payment_method: {
-          card: card_number_element,
-          billing_details: {
-            name: cardholder_name.trim() || undefined,
-            address: {
-              line1: billing_address.address.trim() || undefined,
-              city: billing_address.city.trim() || undefined,
-              state: billing_address.state.trim() || undefined,
-              postal_code: billing_address.postal_code.trim() || undefined,
-              country: country_code,
+      // A SetupIntent can only be confirmed once. If a previous attempt in
+      // this session already confirmed it (Stripe succeeded but the backend
+      // save below failed), reuse that PaymentMethod and go straight to the
+      // save step instead of re-confirming. Stripe would reject a second
+      // confirmation of the same SetupIntent with "setup_intent_unexpected_state".
+      let stripe_payment_method_id = confirmed_payment_method_id;
+
+      if (!stripe_payment_method_id) {
+        const card_number_element = elements.getElement(CardNumberElement);
+        if (!card_number_element) return;
+
+        // Confirm the SetupIntent. Billing address is stored with the payment method in Stripe.
+        const { setupIntent, error: stripe_error } = await stripe.confirmCardSetup(active_client_secret, {
+          payment_method: {
+            card: card_number_element,
+            billing_details: {
+              name: cardholder_name.trim() || undefined,
+              address: {
+                line1: billing_address.address.trim() || undefined,
+                city: billing_address.city.trim() || undefined,
+                state: billing_address.state.trim() || undefined,
+                postal_code: billing_address.postal_code.trim() || undefined,
+                country: country_code,
+              },
             },
           },
-        },
-      });
+        });
 
-      if (stripe_error) {
-        setSubmitError(stripe_error.message ?? "Card verification failed.");
-        return;
+        if (stripe_error) {
+          // The client_secret we hold is stale (e.g. reused from a stray
+          // duplicate request). Recover transparently with a fresh SetupIntent
+          // instead of leaving the user stuck on a form that can never submit.
+          if (stripe_error.code === "setup_intent_unexpected_state") {
+            try {
+              const fresh_secret = await onRequestFreshSecret();
+              setActiveClientSecret(fresh_secret);
+              setSubmitError("Your session timed out. Please try submitting again.");
+            } catch {
+              setSubmitError("Your session expired. Please go back and try again.");
+            }
+            return;
+          }
+
+          setSubmitError(stripe_error.message ?? "Card verification failed.");
+          return;
+        }
+
+        if (!setupIntent?.payment_method) {
+          setSubmitError("Something went wrong. Please try again.");
+          return;
+        }
+
+        stripe_payment_method_id =
+          typeof setupIntent.payment_method === "string"
+            ? setupIntent.payment_method
+            : setupIntent.payment_method.id;
+
+        // Remember this so a retry after a backend failure skips re-confirming.
+        setConfirmedPaymentMethodId(stripe_payment_method_id);
       }
-
-      if (!setupIntent?.payment_method) {
-        setSubmitError("Something went wrong. Please try again.");
-        return;
-      }
-
-      const stripe_payment_method_id =
-        typeof setupIntent.payment_method === "string"
-          ? setupIntent.payment_method
-          : setupIntent.payment_method.id;
 
       // Save the payment method + billing address to our backend
       const profile = await paymentProfileService.createPaymentProfile({
@@ -583,6 +631,7 @@ const PaymentMethodForm: React.FC<PaymentMethodFormProps> = ({
           : "Failed to save payment method. Please try again.";
       setSubmitError(message);
     } finally {
+      is_submitting_ref.current = false;
       setIsSubmitting(false);
     }
   }

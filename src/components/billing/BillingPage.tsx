@@ -38,24 +38,33 @@ const BillingPage: React.FC = () => {
     fetchPaymentProfiles();
   }, [fetchPaymentProfiles]);
 
+  // Requests a fresh SetupIntent client_secret. A SetupIntent can only be
+  // confirmed once, so this is called both to open the "Add Payment Method"
+  // form and, if a retry ever finds the current SetupIntent already
+  // confirmed, to transparently replace it without losing the form state.
+  const fetchSetupIntentSecret = useCallback(async (): Promise<string> => {
+    const token = getToken();
+    const response = await fetch("/api/stripe/setup-intent", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to initialize payment form.");
+    }
+
+    const data = await response.json();
+    return data.client_secret as string;
+  }, []);
+
   async function handleShowAddForm() {
     setError(null);
     try {
-      const token = getToken();
-      const response = await fetch("/api/stripe/setup-intent", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to initialize payment form.");
-      }
-
-      const data = await response.json();
-      setSetupClientSecret(data.client_secret);
+      const client_secret = await fetchSetupIntentSecret();
+      setSetupClientSecret(client_secret);
       setCurrentView("add");
     } catch {
       setError("Unable to open the payment form. Please try again.");
@@ -113,6 +122,7 @@ const BillingPage: React.FC = () => {
           is_first_card={payment_methods.length === 0}
           onBack={handleBack}
           onSuccess={handlePaymentMethodAdded}
+          onRequestFreshSecret={fetchSetupIntentSecret}
         />
       </Elements>
     );
