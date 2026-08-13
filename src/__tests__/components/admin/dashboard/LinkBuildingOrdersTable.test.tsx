@@ -1,9 +1,11 @@
 /**
- * Tests for the admin "Link Building Orders" table's editable Order ID (BL-XXXXX)
- * column: format validation, uniqueness errors surfaced from the API, and the
- * guard that keeps order_id out of the PUT payload unless that specific cell was
- * the one edited (so a client-purchased row's UUID-derived fallback display id is
- * never silently persisted as a side effect of editing an unrelated field).
+ * Tests for the admin "Link Building Orders" table:
+ *  - the editable Order ID (BL-XXXXX) column: format validation, uniqueness errors
+ *    surfaced from the API, and the guard that keeps order_id out of the PUT payload
+ *    unless that specific cell was the one edited;
+ *  - undo/redo (Ctrl+Z / Ctrl+Y and the toolbar buttons) for single-cell edits and
+ *    bulk pastes;
+ *  - Excel-style multi-cell range selection, copy (Ctrl+C) and paste (Ctrl+V).
  */
 
 import React from "react";
@@ -14,6 +16,7 @@ import {
   updateLinkBuildingOrder,
   listAdminUsersForSelect,
   listClientUsersForSelect,
+  batchUpdateLinkBuildingOrderCells,
 } from "@/services/admin/link-building-dashboard.service";
 import type { LinkBuildingOrderRow } from "@/types/admin/link-building-order";
 
@@ -29,6 +32,7 @@ jest.mock("@/services/admin/link-building-dashboard.service", () => {
     deleteLinkBuildingOrder:     jest.fn(),
     exportLinkBuildingOrders:    jest.fn(),
     batchUpdateLinkBuildingOrders: jest.fn(),
+    batchUpdateLinkBuildingOrderCells: jest.fn(),
     listAdminUsersForSelect:    jest.fn(),
     listClientUsersForSelect:   jest.fn(),
   };
@@ -101,6 +105,7 @@ const mockListLinkBuildingOrders = listLinkBuildingOrders as jest.MockedFunction
 const mockUpdateLinkBuildingOrder = updateLinkBuildingOrder as jest.MockedFunction<typeof updateLinkBuildingOrder>;
 const mockListAdminUsersForSelect = listAdminUsersForSelect as jest.MockedFunction<typeof listAdminUsersForSelect>;
 const mockListClientUsersForSelect = listClientUsersForSelect as jest.MockedFunction<typeof listClientUsersForSelect>;
+const mockBatchUpdateLinkBuildingOrderCells = batchUpdateLinkBuildingOrderCells as jest.MockedFunction<typeof batchUpdateLinkBuildingOrderCells>;
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -170,6 +175,33 @@ async function renderTableWithRow(row: LinkBuildingOrderRow): Promise<void> {
   await screen.findByText(row.order_id);
 }
 
+/**
+ * Opens a cell for editing. The table's Excel-style drag-to-select gesture starts
+ * editing from a mousedown/mouseup pair with no movement in between (see
+ * handleCellMouseDown/handleCellMouseUp in the component), not from a click handler,
+ * so a plain fireEvent.click never opens the cell.
+ */
+function openCellForEditing(display_text: string): void {
+  const cell = screen.getByText(display_text).closest("td");
+  if (!cell) throw new Error(`No <td> ancestor found for text "${display_text}"`);
+  fireEvent.mouseDown(cell);
+  fireEvent.mouseUp(cell);
+}
+
+/**
+ * Simulates a click-and-drag range selection from one cell's display text to another's.
+ * React derives onMouseEnter from bubbling "mouseover" events (not the non-bubbling
+ * native "mouseenter"), so mouseOver is what actually reaches the handler in jsdom.
+ */
+function dragSelectRange(from_display_text: string, to_display_text: string): void {
+  const from_cell = screen.getByText(from_display_text).closest("td");
+  const to_cell = screen.getByText(to_display_text).closest("td");
+  if (!from_cell || !to_cell) throw new Error("Could not locate range endpoints");
+  fireEvent.mouseDown(from_cell);
+  fireEvent.mouseOver(to_cell);
+  fireEvent.mouseUp(to_cell);
+}
+
 // ─── Order ID editing ────────────────────────────────────────────────────────
 
 describe("LinkBuildingOrdersTable — Order ID (BL-XXXXX) editing", () => {
@@ -181,7 +213,7 @@ describe("LinkBuildingOrdersTable — Order ID (BL-XXXXX) editing", () => {
       data: { ...row, order_id: "BL-25143" },
     });
 
-    fireEvent.click(screen.getByText("BL-1"));
+    openCellForEditing("BL-1");
     const input = screen.getByDisplayValue("BL-1");
     fireEvent.change(input, { target: { value: "BL-25143" } });
     fireEvent.blur(input);
@@ -197,7 +229,7 @@ describe("LinkBuildingOrdersTable — Order ID (BL-XXXXX) editing", () => {
     const row = makeRow({ order_id: "BL-1" });
     await renderTableWithRow(row);
 
-    fireEvent.click(screen.getByText("BL-1"));
+    openCellForEditing("BL-1");
     const input = screen.getByDisplayValue("BL-1");
     fireEvent.change(input, { target: { value: "not-a-valid-id" } });
     fireEvent.blur(input);
@@ -214,7 +246,7 @@ describe("LinkBuildingOrdersTable — Order ID (BL-XXXXX) editing", () => {
       errors: { order_id: ["The order id has already been taken."] },
     });
 
-    fireEvent.click(screen.getByText("BL-1"));
+    openCellForEditing("BL-1");
     const input = screen.getByDisplayValue("BL-1");
     fireEvent.change(input, { target: { value: "BL-9999" } });
     fireEvent.blur(input);
@@ -231,7 +263,7 @@ describe("LinkBuildingOrdersTable — Order ID (BL-XXXXX) editing", () => {
       data: { ...row, keyword: "local seo" },
     });
 
-    fireEvent.click(screen.getByText("seo tools"));
+    openCellForEditing("seo tools");
     const input = screen.getByDisplayValue("seo tools");
     fireEvent.change(input, { target: { value: "local seo" } });
     fireEvent.blur(input);
@@ -241,5 +273,260 @@ describe("LinkBuildingOrdersTable — Order ID (BL-XXXXX) editing", () => {
     const [, payload] = mockUpdateLinkBuildingOrder.mock.calls[0];
     expect(payload).not.toHaveProperty("order_id");
     expect(payload).toMatchObject({ keyword: "local seo" });
+  });
+});
+
+// ─── Undo / redo ─────────────────────────────────────────────────────────────
+
+describe("LinkBuildingOrdersTable — undo / redo", () => {
+  it("keeps the Undo button disabled and ignores Ctrl+Z when no edit has happened yet", async () => {
+    const row = makeRow({ id: "uuid-1" });
+    await renderTableWithRow(row);
+
+    expect(screen.getByRole("button", { name: /nothing to undo/i })).toBeDisabled();
+
+    fireEvent.keyDown(document, { key: "z", ctrlKey: true });
+
+    expect(mockBatchUpdateLinkBuildingOrderCells).not.toHaveBeenCalled();
+  });
+
+  it("Ctrl+Z reverts a saved single-cell edit, and Ctrl+Y re-applies it", async () => {
+    const row = makeRow({ id: "uuid-1", keyword: "seo tools" });
+    await renderTableWithRow(row);
+
+    mockUpdateLinkBuildingOrder.mockResolvedValue({
+      message: "Updated",
+      data: { ...row, keyword: "local seo" },
+    });
+
+    openCellForEditing("seo tools");
+    fireEvent.change(screen.getByDisplayValue("seo tools"), { target: { value: "local seo" } });
+    fireEvent.blur(screen.getByDisplayValue("local seo"));
+
+    await waitFor(() => expect(mockUpdateLinkBuildingOrder).toHaveBeenCalledTimes(1));
+    await screen.findByText("local seo");
+
+    // Undo: value should revert to "seo tools" and re-sync through batch-update-cells.
+    mockBatchUpdateLinkBuildingOrderCells.mockResolvedValueOnce({
+      message: "1 row(s) updated successfully.",
+      updated_count: 1,
+      data: [{ ...row, keyword: "seo tools" }],
+    });
+
+    fireEvent.keyDown(document, { key: "z", ctrlKey: true });
+
+    await waitFor(() => expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledTimes(1));
+    expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenNthCalledWith(1, [
+      { id: "uuid-1", fields: { keyword: "seo tools" } },
+    ]);
+    await screen.findByText("seo tools");
+
+    // Redo: value should move forward again to "local seo".
+    mockBatchUpdateLinkBuildingOrderCells.mockResolvedValueOnce({
+      message: "1 row(s) updated successfully.",
+      updated_count: 1,
+      data: [{ ...row, keyword: "local seo" }],
+    });
+
+    fireEvent.keyDown(document, { key: "y", ctrlKey: true });
+
+    await waitFor(() => expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledTimes(2));
+    expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenNthCalledWith(2, [
+      { id: "uuid-1", fields: { keyword: "local seo" } },
+    ]);
+    await screen.findByText("local seo");
+  });
+
+  it("enables the Undo toolbar button after an edit, and clicking it works the same as Ctrl+Z", async () => {
+    const row = makeRow({ id: "uuid-1", keyword: "seo tools" });
+    await renderTableWithRow(row);
+
+    mockUpdateLinkBuildingOrder.mockResolvedValue({
+      message: "Updated",
+      data: { ...row, keyword: "local seo" },
+    });
+    mockBatchUpdateLinkBuildingOrderCells.mockResolvedValue({
+      message: "1 row(s) updated successfully.",
+      updated_count: 1,
+      data: [{ ...row, keyword: "seo tools" }],
+    });
+
+    openCellForEditing("seo tools");
+    fireEvent.change(screen.getByDisplayValue("seo tools"), { target: { value: "local seo" } });
+    fireEvent.blur(screen.getByDisplayValue("local seo"));
+    await waitFor(() => expect(mockUpdateLinkBuildingOrder).toHaveBeenCalledTimes(1));
+
+    // Buttons carry a count badge (e.g. "1") once history exists, which becomes their
+    // accessible name-from-content and shadows the descriptive `title`, so assert via
+    // getByTitle rather than getByRole's accessible-name matching.
+    const undo_button = await screen.findByTitle(/undo: cell edit/i);
+    expect(undo_button).toBeEnabled();
+
+    fireEvent.click(undo_button);
+
+    await waitFor(() => expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledTimes(1));
+    await screen.findByTitle(/nothing to undo/i);
+    expect(await screen.findByTitle(/redo: cell edit/i)).toBeEnabled();
+  });
+
+  it("clears the redo stack once a new edit is made after an undo", async () => {
+    const row = makeRow({ id: "uuid-1", keyword: "seo tools", notes: "old note" });
+    await renderTableWithRow(row);
+
+    mockUpdateLinkBuildingOrder
+      .mockResolvedValueOnce({ message: "Updated", data: { ...row, keyword: "local seo" } })
+      .mockResolvedValueOnce({ message: "Updated", data: { ...row, keyword: "local seo", notes: "new note" } });
+    mockBatchUpdateLinkBuildingOrderCells.mockResolvedValue({
+      message: "1 row(s) updated successfully.",
+      updated_count: 1,
+      data: [{ ...row, keyword: "seo tools" }],
+    });
+
+    openCellForEditing("seo tools");
+    fireEvent.change(screen.getByDisplayValue("seo tools"), { target: { value: "local seo" } });
+    fireEvent.blur(screen.getByDisplayValue("local seo"));
+    await waitFor(() => expect(mockUpdateLinkBuildingOrder).toHaveBeenCalledTimes(1));
+
+    fireEvent.keyDown(document, { key: "z", ctrlKey: true });
+    await waitFor(() => expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledTimes(1));
+    await screen.findByTitle(/redo: cell edit/i);
+
+    openCellForEditing("old note");
+    fireEvent.change(screen.getByDisplayValue("old note"), { target: { value: "new note" } });
+    fireEvent.blur(screen.getByDisplayValue("new note"));
+    await waitFor(() => expect(mockUpdateLinkBuildingOrder).toHaveBeenCalledTimes(2));
+
+    expect(screen.getByTitle(/nothing to redo/i)).toBeDisabled();
+  });
+
+  it("undoing a bulk grid paste reverts every changed cell across multiple rows in one action", async () => {
+    const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", keyword: "seo tools", landing_page: "https://acme.com/old" });
+    const row2 = makeRow({ id: "uuid-2", order_id: "BL-2", keyword: "ppc ads", landing_page: "https://acme.com/old2" });
+    mockListLinkBuildingOrders.mockResolvedValue(mockSearchResponse([row1, row2]));
+    render(<LinkBuildingOrdersTable />);
+    await screen.findByText("BL-1");
+
+    mockBatchUpdateLinkBuildingOrderCells.mockResolvedValueOnce({
+      message: "2 row(s) updated successfully.",
+      updated_count: 2,
+      data: [
+        { ...row1, keyword: "new kw1", landing_page: "https://new1.com" },
+        { ...row2, keyword: "new kw2", landing_page: "https://new2.com" },
+      ],
+    });
+
+    // The paste originates from row1's "keyword" input, which stays open afterward
+    // (a bulk paste does not close the cell it was triggered from), so its new value
+    // shows up as an input value rather than plain text; row2's cell was never opened
+    // for editing, so it re-renders as normal display text.
+    openCellForEditing("seo tools");
+    fireEvent.paste(screen.getByDisplayValue("seo tools"), {
+      clipboardData: { getData: () => "new kw1\thttps://new1.com\nnew kw2\thttps://new2.com" },
+    });
+
+    await waitFor(() => expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByDisplayValue("new kw1")).toBeInTheDocument());
+    await screen.findByText("new kw2");
+
+    mockBatchUpdateLinkBuildingOrderCells.mockResolvedValueOnce({
+      message: "2 row(s) updated successfully.",
+      updated_count: 2,
+      data: [row1, row2],
+    });
+
+    const undo_button = await screen.findByTitle(/undo: bulk paste/i);
+    fireEvent.click(undo_button);
+
+    await waitFor(() => expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledTimes(2));
+    const revert_call = mockBatchUpdateLinkBuildingOrderCells.mock.calls[1][0];
+    expect(revert_call).toEqual(
+      expect.arrayContaining([
+        { id: "uuid-1", fields: { keyword: "seo tools", landing_page: "https://acme.com/old" } },
+        { id: "uuid-2", fields: { keyword: "ppc ads", landing_page: "https://acme.com/old2" } },
+      ])
+    );
+    await waitFor(() => expect(screen.getByDisplayValue("seo tools")).toBeInTheDocument());
+    await screen.findByText("ppc ads");
+  });
+});
+
+// ─── Multi-cell range select, copy (Ctrl+C) & paste (Ctrl+V) ────────────────
+
+describe("LinkBuildingOrdersTable — multi-cell range copy & paste", () => {
+  beforeEach(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: jest.fn().mockResolvedValue(undefined),
+        readText: jest.fn().mockResolvedValue(""),
+      },
+    });
+  });
+
+  it("Ctrl+C copies a dragged rectangular range to the clipboard as tab/newline-delimited text", async () => {
+    const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", client: "Acme Corp", keyword: "seo tools" });
+    const row2 = makeRow({ id: "uuid-2", order_id: "BL-2", client: "Globex Inc", keyword: "ppc ads" });
+    mockListLinkBuildingOrders.mockResolvedValue(mockSearchResponse([row1, row2]));
+    render(<LinkBuildingOrdersTable />);
+    await screen.findByText("BL-1");
+
+    dragSelectRange("Acme Corp", "ppc ads");
+    await screen.findByText(/4 cells selected/i);
+
+    fireEvent.keyDown(document, { key: "c", ctrlKey: true });
+
+    await waitFor(() =>
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("Acme Corp\tseo tools\nGlobex Inc\tppc ads")
+    );
+  });
+
+  it("Ctrl+V pastes clipboard text into every cell of the selected range", async () => {
+    const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", client: "Acme Corp", keyword: "seo tools" });
+    const row2 = makeRow({ id: "uuid-2", order_id: "BL-2", client: "Globex Inc", keyword: "ppc ads" });
+    mockListLinkBuildingOrders.mockResolvedValue(mockSearchResponse([row1, row2]));
+    render(<LinkBuildingOrdersTable />);
+    await screen.findByText("BL-1");
+
+    (navigator.clipboard.readText as jest.Mock).mockResolvedValue(
+      "New Client A\tNew Kw A\nNew Client B\tNew Kw B"
+    );
+    mockBatchUpdateLinkBuildingOrderCells.mockResolvedValue({
+      message: "2 row(s) updated successfully.",
+      updated_count: 2,
+      data: [
+        { ...row1, client: "New Client A", keyword: "New Kw A" },
+        { ...row2, client: "New Client B", keyword: "New Kw B" },
+      ],
+    });
+
+    dragSelectRange("Acme Corp", "ppc ads");
+    await screen.findByText(/4 cells selected/i);
+
+    fireEvent.keyDown(document, { key: "v", ctrlKey: true });
+
+    await waitFor(() => expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledTimes(1));
+    expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        { id: "uuid-1", fields: { client: "New Client A", keyword: "New Kw A" } },
+        { id: "uuid-2", fields: { client: "New Client B", keyword: "New Kw B" } },
+      ])
+    );
+    await screen.findByText("New Client A");
+    await screen.findByText("New Kw B");
+  });
+
+  it("Escape clears an active range selection without copying or pasting", async () => {
+    const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", client: "Acme Corp", keyword: "seo tools" });
+    const row2 = makeRow({ id: "uuid-2", order_id: "BL-2", client: "Globex Inc", keyword: "ppc ads" });
+    mockListLinkBuildingOrders.mockResolvedValue(mockSearchResponse([row1, row2]));
+    render(<LinkBuildingOrdersTable />);
+    await screen.findByText("BL-1");
+
+    dragSelectRange("Acme Corp", "ppc ads");
+    await screen.findByText(/4 cells selected/i);
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    await waitFor(() => expect(screen.queryByText(/cells selected/i)).not.toBeInTheDocument());
   });
 });
