@@ -71,6 +71,25 @@ interface ColumnDef {
 /** Identifies a single cell by row + column key, used by the Excel-style range selection. */
 type CellRef = { row_id: string; col_key: string };
 
+/** A single field's before/after value, recorded for the undo/redo history stack. */
+type CellHistoryValue = string | number | null;
+
+interface CellHistoryChange {
+  row_id: string;
+  col_key: keyof LinkBuildingOrderRow;
+  old_value: CellHistoryValue;
+  new_value: CellHistoryValue;
+}
+
+/** One undo/redo unit: every cell touched by a single user action (a cell edit, a
+ * bulk paste, or a batch fill), applied and reverted together. */
+interface HistoryEntry {
+  changes: CellHistoryChange[];
+  label: string;
+}
+
+const MAX_HISTORY_ENTRIES = 50;
+
 // ── Column definitions ─────────────────────────────────────────────────────────
 
 const LINK_TYPE_OPTIONS = [
@@ -748,6 +767,11 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   /** In-memory copy of the last range copied from this table, used as a fallback for Ctrl+V when the OS clipboard can't be read. */
   const [range_clipboard, setRangeClipboard] = useState<PastedGrid | null>(null);
 
+  // ── Undo / redo history ──────────────────────────────────────────────────────
+  const [undo_stack, setUndoStack] = useState<HistoryEntry[]>([]);
+  const [redo_stack, setRedoStack] = useState<HistoryEntry[]>([]);
+  const [is_undo_redo_saving, setIsUndoRedoSaving] = useState(false);
+
   const { sort_rules, toggleSort, clearSort } = useTableSort(DEFAULT_SORT_RULES);
   const {
     column_filters,
@@ -784,6 +808,16 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
   const range_clipboard_kbd_ref = useRef(range_clipboard);
   range_clipboard_kbd_ref.current = range_clipboard;
+
+  const undo_stack_kbd_ref = useRef(undo_stack);
+  undo_stack_kbd_ref.current = undo_stack;
+
+  const redo_stack_kbd_ref = useRef(redo_stack);
+  redo_stack_kbd_ref.current = redo_stack;
+
+  /** Snapshot of a cell's value taken the moment it starts editing, so `stopEditing` can
+   * diff against it to build an undo entry (by then `rows_ref` only holds the new value). */
+  const edit_start_value_ref = useRef<{ row_id: string; col_key: string; old_value: string } | null>(null);
 
   // Tracks an in-progress drag: the cell where the mouse went down, and whether
   // the pointer has since entered a different cell (i.e. an actual drag, not a click).
@@ -1120,9 +1154,96 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     }
   }, [refreshNeedsApprovalCount]);
 
+  // ── Undo / redo ─────────────────────────────────────────────────────────────
+  // Every user action that changes one or more persisted cells (a single cell edit,
+  // a bulk paste, or a batch fill) pushes one HistoryEntry here. Undo/redo replay
+  // the same cell-level API call (batchUpdateLinkBuildingOrderCells) used by bulk
+  // paste, so reverting a change is just another normal, broadcastable update.
+
+  const pushHistoryEntry = useCallback((changes: CellHistoryChange[], label: string) => {
+    if (changes.length === 0) return;
+    setUndoStack((prev) => {
+      const next = [...prev, { changes, label }];
+      return next.length > MAX_HISTORY_ENTRIES ? next.slice(next.length - MAX_HISTORY_ENTRIES) : next;
+    });
+    setRedoStack([]);
+  }, []);
+
+  const applyCellChanges = useCallback(async (changes: CellHistoryChange[], use: "old_value" | "new_value") => {
+    const touched_row_ids = new Set(changes.map((c) => c.row_id));
+
+    setRows((prev) =>
+      prev.map((row) => {
+        if (!touched_row_ids.has(row.id)) return row;
+        let next_row = row;
+        for (const change of changes) {
+          if (change.row_id !== row.id) continue;
+          next_row = { ...next_row, [change.col_key]: use === "old_value" ? change.old_value : change.new_value };
+        }
+        return next_row;
+      })
+    );
+
+    const fields_by_row_id: Record<string, Partial<Record<keyof LinkBuildingOrderRow, string | null>>> = {};
+    changes.forEach((change) => {
+      if (new_row_ids_ref.current.has(change.row_id)) return;
+      const value = use === "old_value" ? change.old_value : change.new_value;
+      fields_by_row_id[change.row_id] = {
+        ...(fields_by_row_id[change.row_id] ?? {}),
+        [change.col_key]: value === null ? null : String(value),
+      };
+    });
+
+    const persisted_row_ids = Object.keys(fields_by_row_id);
+    if (persisted_row_ids.length === 0) return;
+
+    setIsUndoRedoSaving(true);
+    setSaveError(null);
+    try {
+      const res = await batchUpdateLinkBuildingOrderCells(
+        persisted_row_ids.map((id) => ({ id, fields: fields_by_row_id[id] }))
+      );
+      const updated_by_id = new Map(res.data.map((r) => [r.id, r]));
+      setRows((prev) => prev.map((r) => updated_by_id.get(r.id) ?? r));
+      on_order_mutated_ref.current?.();
+      refreshNeedsApprovalCount();
+    } catch (err) {
+      const api_message = parseApiErrorMessage(err, COLUMN_LABELS);
+      setSaveError(`Failed to sync the change, please try again: ${api_message}`);
+    } finally {
+      setIsUndoRedoSaving(false);
+    }
+  }, [refreshNeedsApprovalCount]);
+
+  const undo = useCallback(() => {
+    const stack = undo_stack_kbd_ref.current;
+    if (stack.length === 0) return;
+    const entry = stack[stack.length - 1];
+    setUndoStack((prev) => prev.slice(0, -1));
+    setRedoStack((prev) => [...prev, entry]);
+    applyCellChanges(entry.changes, "old_value");
+    const n = entry.changes.length;
+    setNotificationBanner(`Undid ${n} cell change${n !== 1 ? "s" : ""} (${entry.label}).`);
+  }, [applyCellChanges]);
+
+  const redo = useCallback(() => {
+    const stack = redo_stack_kbd_ref.current;
+    if (stack.length === 0) return;
+    const entry = stack[stack.length - 1];
+    setRedoStack((prev) => prev.slice(0, -1));
+    setUndoStack((prev) => [...prev, entry]);
+    applyCellChanges(entry.changes, "new_value");
+    const n = entry.changes.length;
+    setNotificationBanner(`Redid ${n} cell change${n !== 1 ? "s" : ""} (${entry.label}).`);
+  }, [applyCellChanges]);
+
   // ── Editing ─────────────────────────────────────────────────────────────────
 
   const startEditing = useCallback((row_id: string, col_key: string) => {
+    const row = rows_ref.current.find((r) => r.id === row_id);
+    edit_start_value_ref.current = row
+      ? { row_id, col_key, old_value: String(row[col_key as keyof LinkBuildingOrderRow] ?? "") }
+      : null;
     setEditingCell({ row_id, col_key });
   }, []);
 
@@ -1191,12 +1312,22 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       }
     }
 
+    const edit_start = edit_start_value_ref.current;
+    edit_start_value_ref.current = null;
+
     if (is_draft_row) {
       persistNewRow(row);
     } else {
+      const new_value = String(row[cell.col_key as keyof LinkBuildingOrderRow] ?? "");
+      if (edit_start && edit_start.row_id === row.id && edit_start.col_key === cell.col_key && edit_start.old_value !== new_value) {
+        pushHistoryEntry(
+          [{ row_id: row.id, col_key: cell.col_key as keyof LinkBuildingOrderRow, old_value: edit_start.old_value, new_value }],
+          "cell edit"
+        );
+      }
       persistRowUpdate(row, cell.col_key);
     }
-  }, [persistNewRow, persistRowUpdate]);
+  }, [persistNewRow, persistRowUpdate, pushHistoryEntry]);
 
   const updateCell = useCallback(
     (row_id: string, col_key: keyof LinkBuildingOrderRow, value: string) => {
@@ -1308,9 +1439,15 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     if (new_row_ids_ref.current.has(row_id)) {
       persistNewRow(updated_row);
     } else {
+      if (base_row.assigned_admin_user_id !== numeric_val) {
+        pushHistoryEntry(
+          [{ row_id, col_key: "assigned_admin_user_id", old_value: base_row.assigned_admin_user_id ?? null, new_value: numeric_val }],
+          "assign to"
+        );
+      }
       persistRowUpdate(updated_row, "assigned_admin_user_id");
     }
-  }, [persistNewRow, persistRowUpdate]);
+  }, [persistNewRow, persistRowUpdate, pushHistoryEntry]);
 
   const cancelAssignEdit = useCallback(() => {
     setEditingCell(null);
@@ -1332,9 +1469,15 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     if (new_row_ids_ref.current.has(row_id)) {
       persistNewRow(updated_row);
     } else {
+      if (base_row.user_id !== numeric_val) {
+        pushHistoryEntry(
+          [{ row_id, col_key: "user_id", old_value: base_row.user_id ?? null, new_value: numeric_val }],
+          "client account assign"
+        );
+      }
       persistRowUpdate(updated_row, "user_id");
     }
-  }, [persistNewRow, persistRowUpdate]);
+  }, [persistNewRow, persistRowUpdate, pushHistoryEntry]);
 
   // ── Column visibility ───────────────────────────────────────────────────────
 
@@ -1497,6 +1640,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     // Diff against the previous rows to find exactly which cells changed, so only
     // the affected fields are sent to the server instead of the whole row.
     const changed_fields_by_row_id: Record<string, Partial<Record<keyof LinkBuildingOrderRow, string>>> = {};
+    const history_changes: CellHistoryChange[] = [];
     let changed_cell_count = 0;
 
     grid.forEach((grid_row, row_offset) => {
@@ -1511,6 +1655,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         const new_value = String(next_rows[target_row_index][field] ?? "");
         if (old_value === new_value) return;
         changed_fields_by_row_id[row_id] = { ...(changed_fields_by_row_id[row_id] ?? {}), [field]: new_value };
+        if (!new_row_ids_ref.current.has(row_id)) {
+          history_changes.push({ row_id, col_key: field, old_value, new_value });
+        }
         changed_cell_count += 1;
       });
     });
@@ -1547,6 +1694,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         setRows((prev) => prev.map((r) => updated_by_id.get(r.id) ?? r));
         on_order_mutated_ref.current?.();
         refreshNeedsApprovalCount();
+        pushHistoryEntry(history_changes, "bulk paste");
       } catch (err) {
         const api_message = parseApiErrorMessage(err, COLUMN_LABELS);
         setSaveError(`Bulk paste failed to save: ${api_message}`);
@@ -1560,7 +1708,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       `Pasted ${changed_cell_count} cell${changed_cell_count !== 1 ? "s" : ""} across ${row_count} row${row_count !== 1 ? "s" : ""}.` +
       (overflow_row_count > 0 ? ` ${overflow_row_count} row(s) beyond the visible table were skipped.` : "")
     );
-  }, [filtered_rows, visible_columns, persistNewRow, refreshNeedsApprovalCount]);
+  }, [filtered_rows, visible_columns, persistNewRow, refreshNeedsApprovalCount, pushHistoryEntry]);
 
   // ── Range copy/paste: Ctrl+C / Ctrl+V on an active multi-cell selection ──────
 
@@ -1642,6 +1790,12 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         (id) => !new_row_ids_ref.current.has(id)
       );
 
+      const old_values_by_row_id = new Map(
+        rows_ref.current
+          .filter((r) => persisted_ids.includes(r.id))
+          .map((r) => [r.id, r[batch_field as keyof LinkBuildingOrderRow] ?? null] as const)
+      );
+
       if (persisted_ids.length > 0) {
         await batchUpdateLinkBuildingOrders(persisted_ids, {
           [batch_field]: api_value,
@@ -1653,6 +1807,16 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
           selected_row_ids.has(r.id) ? { ...r, [batch_field]: api_value } : r
         )
       );
+
+      const history_changes: CellHistoryChange[] = persisted_ids
+        .map((id) => ({
+          row_id: id,
+          col_key: batch_field as keyof LinkBuildingOrderRow,
+          old_value: old_values_by_row_id.get(id) ?? null,
+          new_value: api_value,
+        }))
+        .filter((c) => String(c.old_value ?? "") !== String(c.new_value ?? ""));
+      pushHistoryEntry(history_changes, "batch fill");
 
       let display_value: string;
       if (batch_value === "__unassign__") {
@@ -1687,7 +1851,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     } finally {
       setIsBatchSaving(false);
     }
-  }, [batch_field, batch_value, selected_row_ids, clearSelection, client_users, admin_users, refreshNeedsApprovalCount]);
+  }, [batch_field, batch_value, selected_row_ids, clearSelection, client_users, admin_users, refreshNeedsApprovalCount, pushHistoryEntry]);
 
   const handlePasteClipboard = useCallback(async () => {
     if (!clipboard_cell || selected_row_ids.size === 0) return;
@@ -1697,6 +1861,12 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     try {
       const persisted_ids = Array.from(selected_row_ids).filter(
         (id) => !new_row_ids_ref.current.has(id)
+      );
+
+      const old_values_by_row_id = new Map(
+        rows_ref.current
+          .filter((r) => persisted_ids.includes(r.id))
+          .map((r) => [r.id, r[clipboard_cell.col_key as keyof LinkBuildingOrderRow] ?? null] as const)
       );
 
       if (persisted_ids.length > 0) {
@@ -1712,6 +1882,16 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
             : r
         )
       );
+
+      const history_changes: CellHistoryChange[] = persisted_ids
+        .map((id) => ({
+          row_id: id,
+          col_key: clipboard_cell.col_key as keyof LinkBuildingOrderRow,
+          old_value: old_values_by_row_id.get(id) ?? null,
+          new_value: clipboard_cell.value,
+        }))
+        .filter((c) => String(c.old_value ?? "") !== String(c.new_value ?? ""));
+      pushHistoryEntry(history_changes, "paste to selection");
 
       const col_label = COLUMNS.find((c) => c.key === clipboard_cell.col_key)?.label ?? clipboard_cell.col_key;
       const short_val = clipboard_cell.value.length > 30
@@ -1729,9 +1909,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     } finally {
       setIsBatchSaving(false);
     }
-  }, [clipboard_cell, selected_row_ids, clearSelection, refreshNeedsApprovalCount]);
+  }, [clipboard_cell, selected_row_ids, clearSelection, refreshNeedsApprovalCount, pushHistoryEntry]);
 
-  // ── Global keyboard shortcuts: Ctrl+C = copy cell, Ctrl+V = paste to selected ──
+  // ── Global keyboard shortcuts: Ctrl+C = copy, Ctrl+V = paste, Ctrl+Z = undo, Ctrl+Y / Ctrl+Shift+Z = redo ──
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1813,12 +1993,34 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
         e.preventDefault();
         handlePasteClipboard();
+        return;
+      }
+
+      // Ctrl+Z undoes the last cell change; Ctrl+Shift+Z and Ctrl+Y both redo it,
+      // covering both the Windows/Sheets and the Mac/Docs conventions.
+      if (key === "z" || key === "y") {
+        const is_redo = key === "y" || (key === "z" && e.shiftKey);
+
+        // Let the browser handle native undo/redo while typing inside a cell.
+        const active_el = document.activeElement;
+        if (
+          active_el instanceof HTMLInputElement ||
+          active_el instanceof HTMLSelectElement ||
+          active_el instanceof HTMLTextAreaElement
+        ) return;
+
+        e.preventDefault();
+        if (is_redo) {
+          redo();
+        } else {
+          undo();
+        }
       }
     };
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [handlePasteClipboard, copyRangeToClipboard, pasteIntoRange]);
+  }, [handlePasteClipboard, copyRangeToClipboard, pasteIntoRange, undo, redo]);
 
   // Opening a cell for editing through any path (Client Account / Assigned To cells,
   // Tab/Enter navigation, etc. — not only the drag handlers above) always drops a
@@ -1951,6 +2153,47 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {/* Undo / redo — Ctrl+Z / Ctrl+Y, reverts or replays the last cell edit, bulk paste, or batch fill */}
+          <div className="flex h-8 items-center overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
+            <button
+              onClick={undo}
+              disabled={undo_stack.length === 0 || is_undo_redo_saving}
+              title={
+                undo_stack.length > 0
+                  ? `Undo: ${undo_stack[undo_stack.length - 1].label} (Ctrl+Z)`
+                  : "Nothing to undo"
+              }
+              className="flex h-8 items-center gap-1 border-r border-gray-200 bg-white px-2.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+              </svg>
+              {undo_stack.length > 0 && (
+                <span className="rounded-full bg-gray-100 px-1 text-[10px] font-bold text-gray-500 dark:bg-gray-700 dark:text-gray-300">
+                  {undo_stack.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={redo}
+              disabled={redo_stack.length === 0 || is_undo_redo_saving}
+              title={
+                redo_stack.length > 0
+                  ? `Redo: ${redo_stack[redo_stack.length - 1].label} (Ctrl+Y)`
+                  : "Nothing to redo"
+              }
+              className="flex h-8 items-center gap-1 bg-white px-2.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 15l6-6m0 0l-6-6m6 6H9a6 6 0 000 12h3" />
+              </svg>
+              {redo_stack.length > 0 && (
+                <span className="rounded-full bg-gray-100 px-1 text-[10px] font-bold text-gray-500 dark:bg-gray-700 dark:text-gray-300">
+                  {redo_stack.length}
+                </span>
+              )}
+            </button>
+          </div>
           {/* Search */}
           <div className="relative">
             <svg
