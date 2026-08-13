@@ -17,6 +17,7 @@ import {
   listAdminUsersForSelect,
   listClientUsersForSelect,
   batchUpdateLinkBuildingOrderCells,
+  getLinkBuildingOrderColumnValues,
 } from "@/services/admin/link-building-dashboard.service";
 import type { LinkBuildingOrderRow } from "@/types/admin/link-building-order";
 
@@ -33,6 +34,7 @@ jest.mock("@/services/admin/link-building-dashboard.service", () => {
     exportLinkBuildingOrders:    jest.fn(),
     batchUpdateLinkBuildingOrders: jest.fn(),
     batchUpdateLinkBuildingOrderCells: jest.fn(),
+    getLinkBuildingOrderColumnValues: jest.fn(),
     listAdminUsersForSelect:    jest.fn(),
     listClientUsersForSelect:   jest.fn(),
   };
@@ -106,6 +108,7 @@ const mockUpdateLinkBuildingOrder = updateLinkBuildingOrder as jest.MockedFuncti
 const mockListAdminUsersForSelect = listAdminUsersForSelect as jest.MockedFunction<typeof listAdminUsersForSelect>;
 const mockListClientUsersForSelect = listClientUsersForSelect as jest.MockedFunction<typeof listClientUsersForSelect>;
 const mockBatchUpdateLinkBuildingOrderCells = batchUpdateLinkBuildingOrderCells as jest.MockedFunction<typeof batchUpdateLinkBuildingOrderCells>;
+const mockGetLinkBuildingOrderColumnValues = getLinkBuildingOrderColumnValues as jest.MockedFunction<typeof getLinkBuildingOrderColumnValues>;
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -528,5 +531,136 @@ describe("LinkBuildingOrdersTable — multi-cell range copy & paste", () => {
     fireEvent.keyDown(document, { key: "Escape" });
 
     await waitFor(() => expect(screen.queryByText(/cells selected/i)).not.toBeInTheDocument());
+  });
+
+  it("Shift+Click extends a range from the cell just opened for editing, without dragging", async () => {
+    const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", client: "Acme Corp", keyword: "seo tools" });
+    const row2 = makeRow({ id: "uuid-2", order_id: "BL-2", client: "Globex Inc", keyword: "ppc ads" });
+    mockListLinkBuildingOrders.mockResolvedValue(mockSearchResponse([row1, row2]));
+    render(<LinkBuildingOrdersTable />);
+    await screen.findByText("BL-1");
+
+    // A plain click on "Acme Corp" opens it for editing (no range yet).
+    openCellForEditing("Acme Corp");
+    expect(screen.getByDisplayValue("Acme Corp")).toBeInTheDocument();
+
+    // Shift+Click on "ppc ads" (row 2, keyword column) must extend the range from
+    // the cell that was just being edited, covering the full 2×2 rectangle between
+    // them — not just select "ppc ads" alone.
+    const target_cell = screen.getByText("ppc ads").closest("td");
+    if (!target_cell) throw new Error("Could not locate target cell");
+    fireEvent.mouseDown(target_cell, { shiftKey: true });
+    fireEvent.mouseUp(target_cell);
+
+    await screen.findByText(/4 cells selected/i);
+
+    fireEvent.keyDown(document, { key: "c", ctrlKey: true });
+
+    await waitFor(() =>
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("Acme Corp\tseo tools\nGlobex Inc\tppc ads")
+    );
+  });
+
+  it("pasting a single copied value onto a larger selection fills every cell in it", async () => {
+    const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", client: "Acme Corp", keyword: "seo tools" });
+    const row2 = makeRow({ id: "uuid-2", order_id: "BL-2", client: "Globex Inc", keyword: "ppc ads" });
+    mockListLinkBuildingOrders.mockResolvedValue(mockSearchResponse([row1, row2]));
+    render(<LinkBuildingOrdersTable />);
+    await screen.findByText("BL-1");
+
+    // A single value on the clipboard, pasted onto a 2×2 selection, should fill
+    // every cell in the selection with that same value — matching Excel.
+    (navigator.clipboard.readText as jest.Mock).mockResolvedValue("Reviewing");
+    mockBatchUpdateLinkBuildingOrderCells.mockResolvedValue({
+      message: "2 row(s) updated successfully.",
+      updated_count: 2,
+      data: [
+        { ...row1, client: "Reviewing", keyword: "Reviewing" },
+        { ...row2, client: "Reviewing", keyword: "Reviewing" },
+      ],
+    });
+
+    dragSelectRange("Acme Corp", "ppc ads");
+    await screen.findByText(/4 cells selected/i);
+
+    fireEvent.keyDown(document, { key: "v", ctrlKey: true });
+
+    await waitFor(() => expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledTimes(1));
+    expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        { id: "uuid-1", fields: { client: "Reviewing", keyword: "Reviewing" } },
+        { id: "uuid-2", fields: { client: "Reviewing", keyword: "Reviewing" } },
+      ])
+    );
+  });
+});
+
+// ─── Copy entire column (e.g. every domain, for pasting into Ahrefs) ────────
+
+describe("LinkBuildingOrdersTable — copy entire column", () => {
+  beforeEach(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: jest.fn().mockResolvedValue(undefined),
+        readText: jest.fn().mockResolvedValue(""),
+      },
+    });
+  });
+
+  it("copies every value in the column to the clipboard, respecting the current filters", async () => {
+    const row = makeRow({ id: "uuid-1", order_id: "BL-1", landing_page: "https://acme.com" });
+    await renderTableWithRow(row);
+
+    mockGetLinkBuildingOrderColumnValues.mockResolvedValue([
+      "https://acme.com",
+      "https://globex.com",
+    ]);
+
+    fireEvent.click(
+      screen.getByTitle(/Copy all "Landing Page" values matching the current filters/i)
+    );
+
+    await waitFor(() => expect(mockGetLinkBuildingOrderColumnValues).toHaveBeenCalledTimes(1));
+    const [column, , row_ids] = mockGetLinkBuildingOrderColumnValues.mock.calls[0];
+    expect(column).toBe("landing_page");
+    expect(row_ids).toBeUndefined();
+
+    await waitFor(() =>
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("https://acme.com\nhttps://globex.com")
+    );
+    await screen.findByText(/Copied 2 values from "Landing Page"/i);
+  });
+
+  it("restricts the copy to the checked rows instead of the current filters when rows are selected", async () => {
+    const row = makeRow({ id: "uuid-1", order_id: "BL-1", landing_page: "https://acme.com" });
+    await renderTableWithRow(row);
+
+    mockGetLinkBuildingOrderColumnValues.mockResolvedValue(["https://acme.com"]);
+
+    // Checkbox index 0 is the header "select all"; index 1 is this single row's.
+    fireEvent.click(screen.getAllByRole("checkbox")[1]);
+
+    const copy_button = await screen.findByTitle(
+      /Copy all "Landing Page" values from the 1 selected row/i
+    );
+    fireEvent.click(copy_button);
+
+    await waitFor(() => expect(mockGetLinkBuildingOrderColumnValues).toHaveBeenCalledTimes(1));
+    const [, , row_ids] = mockGetLinkBuildingOrderColumnValues.mock.calls[0];
+    expect(row_ids).toEqual(["uuid-1"]);
+  });
+
+  it("shows a friendly message instead of a blank copy when the column has no values", async () => {
+    const row = makeRow({ id: "uuid-1", order_id: "BL-1", landing_page: "" });
+    await renderTableWithRow(row);
+
+    mockGetLinkBuildingOrderColumnValues.mockResolvedValue([]);
+
+    fireEvent.click(
+      screen.getByTitle(/Copy all "Landing Page" values matching the current filters/i)
+    );
+
+    await screen.findByText(/No values to copy from "Landing Page"/i);
   });
 });

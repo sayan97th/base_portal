@@ -24,6 +24,8 @@ import {
   updateLinkBuildingOrder,
   deleteLinkBuildingOrder,
   batchUpdateLinkBuildingOrders,
+  batchUpdateLinkBuildingOrderCells,
+  getLinkBuildingOrderColumnValues,
   buildLboPayload,
   parseApiErrorMessage,
   getMissingLboFields,
@@ -231,6 +233,94 @@ describe("batchUpdateLinkBuildingOrders", () => {
     const [url, body] = mocked.post.mock.calls[0];
     expect(url).toBe("/api/admin/link-building-orders/batch-update");
     expect(body).toEqual({ row_ids: ["a", "b"], updates: { status: "Live" } });
+  });
+});
+
+// ─── batchUpdateLinkBuildingOrderCells ────────────────────────────────────────
+
+describe("batchUpdateLinkBuildingOrderCells", () => {
+  it("POSTs an array of per-row field maps to the batch-update-cells endpoint", async () => {
+    mocked.post.mockResolvedValueOnce({
+      message: "2 row(s) updated successfully.",
+      updated_count: 2,
+      data: [makeRow({ id: "uuid-1" }), makeRow({ id: "uuid-2" })],
+    } as never);
+
+    const updates = [
+      { id: "uuid-1", fields: { keyword: "new kw 1", landing_page: "https://new1.com" } },
+      { id: "uuid-2", fields: { keyword: "new kw 2" } },
+    ];
+    await batchUpdateLinkBuildingOrderCells(updates);
+
+    const [url, body] = mocked.post.mock.calls[0];
+    expect(url).toBe("/api/admin/link-building-orders/batch-update-cells");
+    expect(body).toEqual({ updates });
+  });
+
+  it("returns the full response, including the reconciled row data", async () => {
+    const updated_row = makeRow({ id: "uuid-1", keyword: "new kw" });
+    mocked.post.mockResolvedValueOnce({
+      message: "1 row(s) updated successfully.",
+      updated_count: 1,
+      data: [updated_row],
+    } as never);
+
+    const result = await batchUpdateLinkBuildingOrderCells([
+      { id: "uuid-1", fields: { keyword: "new kw" } },
+    ]);
+
+    expect(result.updated_count).toBe(1);
+    expect(result.data).toEqual([updated_row]);
+  });
+});
+
+// ─── getLinkBuildingOrderColumnValues ─────────────────────────────────────────
+// Powers the "copy entire column" header button (e.g. copying every Landing Page
+// so an admin can paste the list of domains into a tool like Ahrefs).
+
+describe("getLinkBuildingOrderColumnValues", () => {
+  it("POSTs the column plus the current filters when no row_ids are given", async () => {
+    mocked.post.mockResolvedValueOnce({
+      data: ["https://acme.com", "https://globex.com"],
+      count: 2,
+    } as never);
+
+    await getLinkBuildingOrderColumnValues("landing_page", { status: "Live" });
+
+    const [url, body] = mocked.post.mock.calls[0];
+    expect(url).toBe("/api/admin/link-building-orders/column-values");
+    expect(body).toEqual({ column: "landing_page", status: "Live" });
+  });
+
+  it("POSTs only the column and row_ids when row_ids are given, ignoring other filters", async () => {
+    mocked.post.mockResolvedValueOnce({ data: ["https://acme.com"], count: 1 } as never);
+
+    await getLinkBuildingOrderColumnValues(
+      "landing_page",
+      { status: "Live", search: "acme" },
+      ["uuid-1", "uuid-2"]
+    );
+
+    const [, body] = mocked.post.mock.calls[0];
+    expect(body).toEqual({ column: "landing_page", row_ids: ["uuid-1", "uuid-2"] });
+  });
+
+  it("treats an empty row_ids array the same as not providing one", async () => {
+    mocked.post.mockResolvedValueOnce({ data: [], count: 0 } as never);
+
+    await getLinkBuildingOrderColumnValues("keyword", { status: "Live" }, []);
+
+    const [, body] = mocked.post.mock.calls[0];
+    expect(body).toEqual({ column: "keyword", status: "Live" });
+  });
+
+  it("returns only the data array, not the full response envelope", async () => {
+    const values = ["https://acme.com", "https://globex.com"];
+    mocked.post.mockResolvedValueOnce({ data: values, count: 2 } as never);
+
+    const result = await getLinkBuildingOrderColumnValues("landing_page");
+
+    expect(result).toEqual(values);
   });
 });
 

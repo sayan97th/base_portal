@@ -1254,14 +1254,19 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   // instead, so the click-to-edit behavior every admin already relies on is unchanged.
 
   const handleCellMouseDown = useCallback((row_id: string, col_key: string, shift_key: boolean) => {
-    // Shift+Click extends the range from the existing anchor (or starts a fresh
-    // one-cell range) — a discrete action, not the start of a drag.
+    // Shift+Click extends the range from an existing anchor — either an already
+    // active range, or (the common case) the single cell that was just clicked
+    // into edit mode — falling back to a fresh one-cell range only when neither
+    // exists yet. A discrete action, not the start of a drag.
     if (shift_key) {
+      const existing_range_anchor = cell_range_kbd_ref.current?.anchor;
+      const editing_anchor = editing_cell_ref.current
+        ? { row_id: editing_cell_ref.current.row_id, col_key: editing_cell_ref.current.col_key }
+        : null;
+      const anchor = existing_range_anchor ?? editing_anchor ?? { row_id, col_key };
+
       setEditingCell(null);
-      setCellRange((prev) => ({
-        anchor: prev?.anchor ?? { row_id, col_key },
-        focus: { row_id, col_key },
-      }));
+      setCellRange({ anchor, focus: { row_id, col_key } });
       return;
     }
     range_mouse_down_ref.current = { row_id, col_key };
