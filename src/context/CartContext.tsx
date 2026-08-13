@@ -22,6 +22,7 @@ import type {
 } from "@/types/client/unified-cart";
 import { unifiedCartService } from "@/services/client/unified-cart.service";
 import { getActiveDiscounts } from "@/services/client/discounts.service";
+import { getToken } from "@/lib/api-client";
 import type { Discount, BulkDiscountDetail } from "@/types/admin/discounts";
 
 const CART_STORAGE_KEY = "unified_cart_v1";
@@ -166,31 +167,37 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         setOrderNotes(local.order_notes ?? "");
       }
 
-      try {
-        const server = await unifiedCartService.fetchCart();
+      // Skip the server round trip entirely for anonymous visitors (e.g. the
+      // public guest order flow) — the cart endpoints require auth, so an
+      // anonymous request would only 401 and waste a request. localStorage
+      // already covers the guest case above.
+      if (getToken()) {
+        try {
+          const server = await unifiedCartService.fetchCart();
 
-        if (server && server.items.length > 0) {
-          setItems(server.items);
-          setAppliedCoupons(server.applied_coupons ?? []);
-          setCouponInputCode(server.coupon_input_code ?? "");
-          setOrderTitle(server.order_title ?? "");
-          setOrderNotes(server.order_notes ?? "");
-          writeLocalSnapshot(server);
-        } else if (local && local.items.length > 0) {
-          // Server is empty but we have a local snapshot — push it up so other
-          // devices can see it on their next login.
-          unifiedCartService
-            .saveCart({
-              items: local.items,
-              applied_coupons: local.applied_coupons ?? [],
-              coupon_input_code: local.coupon_input_code ?? "",
-              order_title: local.order_title ?? "",
-              order_notes: local.order_notes ?? "",
-            })
-            .catch(() => {});
+          if (server && server.items.length > 0) {
+            setItems(server.items);
+            setAppliedCoupons(server.applied_coupons ?? []);
+            setCouponInputCode(server.coupon_input_code ?? "");
+            setOrderTitle(server.order_title ?? "");
+            setOrderNotes(server.order_notes ?? "");
+            writeLocalSnapshot(server);
+          } else if (local && local.items.length > 0) {
+            // Server is empty but we have a local snapshot — push it up so other
+            // devices can see it on their next login.
+            unifiedCartService
+              .saveCart({
+                items: local.items,
+                applied_coupons: local.applied_coupons ?? [],
+                coupon_input_code: local.coupon_input_code ?? "",
+                order_title: local.order_title ?? "",
+                order_notes: local.order_notes ?? "",
+              })
+              .catch(() => {});
+          }
+        } catch {
+          // Server unavailable — localStorage fallback already applied above.
         }
-      } catch {
-        // Server unavailable — localStorage fallback already applied above.
       }
 
       setIsCartReady(true);
@@ -232,16 +239,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (cart_is_empty) {
       removeLocalSnapshot();
       if (save_timer.current) clearTimeout(save_timer.current);
-      unifiedCartService.deleteCart().catch(() => {});
+      if (getToken()) unifiedCartService.deleteCart().catch(() => {});
       return;
     }
 
     writeLocalSnapshot(payload);
 
     if (save_timer.current) clearTimeout(save_timer.current);
-    save_timer.current = setTimeout(() => {
-      unifiedCartService.saveCart(payload).catch(() => {});
-    }, SERVER_SYNC_DEBOUNCE_MS);
+    if (getToken()) {
+      save_timer.current = setTimeout(() => {
+        unifiedCartService.saveCart(payload).catch(() => {});
+      }, SERVER_SYNC_DEBOUNCE_MS);
+    }
   }, [is_cart_ready, items, applied_coupons, coupon_input_code, order_title, order_notes]);
 
   const setItemQuantity = useCallback(
@@ -375,7 +384,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setOrderNotes("");
     if (save_timer.current) clearTimeout(save_timer.current);
     removeLocalSnapshot();
-    unifiedCartService.deleteCart().catch(() => {});
+    if (getToken()) unifiedCartService.deleteCart().catch(() => {});
   }, []);
 
   const getQuantitiesForProductType = useCallback(

@@ -81,12 +81,24 @@ export interface UseUnifiedCheckoutReturn {
 }
 
 /**
+ * Builds the post-checkout redirect path. Defaults to the standard order
+ * session confirmation page; callers (e.g. the public guest order flow) can
+ * override this to land somewhere else, such as the dashboard.
+ */
+export type SuccessRedirectBuilder = (session_id: string) => string;
+
+const default_success_redirect: SuccessRedirectBuilder = (session_id) =>
+  `/orders/session/${session_id}`;
+
+/**
  * Handles the unified checkout flow shared across all 4 product pages.
  * After Stripe confirms the payment, it submits all cart items to
  * POST /api/cart/checkout, which creates one order per product type
  * atomically. On success it clears the cart and redirects.
  */
-export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
+export function useUnifiedCheckout(
+  getSuccessRedirect: SuccessRedirectBuilder = default_success_redirect
+): UseUnifiedCheckoutReturn {
   const router = useRouter();
   const { addNotification } = useNotifications();
   const {
@@ -288,14 +300,14 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
 
         clearCart();
 
-        router.push(`/orders/session/${confirmed_group_id}`);
+        router.push(getSuccessRedirect(confirmed_group_id));
       } catch (err: unknown) {
         setSubmitError(extractApiErrorMessage(err));
       } finally {
         setIsSubmitting(false);
       }
     },
-    [items, applied_coupons, total, order_title, order_notes, clearCart, addNotification, router]
+    [items, applied_coupons, total, order_title, order_notes, clearCart, addNotification, router, getSuccessRedirect]
   );
 
   const handlePayLater = useCallback(async (defer_details?: boolean) => {
@@ -417,13 +429,13 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
       }
 
       clearCart();
-      router.push(`/orders/session/${confirmed_group_id}`);
+      router.push(getSuccessRedirect(confirmed_group_id));
     } catch (err: unknown) {
       setSubmitError(extractApiErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }
-  }, [items, applied_coupons, total, order_title, order_notes, clearCart, addNotification, router]);
+  }, [items, applied_coupons, total, order_title, order_notes, clearCart, addNotification, router, getSuccessRedirect]);
 
   return { is_submitting, submit_error, setSubmitError, handleComplete, handlePayLater };
 }

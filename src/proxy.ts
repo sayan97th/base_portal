@@ -6,6 +6,9 @@ const auth_routes = ["/signin", "/signup"];
 const invitation_routes = ["/accept-invitation", "/client-invitation"];
 const password_reset_routes = ["/reset-password"];
 const google_callback_route = "/auth/google/callback";
+// Public guest checkout wizard, reachable from basesearchmarketing.com without
+// a session — account creation happens as one of its own steps.
+const public_order_routes = ["/order"];
 
 function matchesAny(pathname: string, prefixes: string[]): boolean {
   return prefixes.some((p) => pathname === p || pathname.startsWith(p + "/"));
@@ -26,16 +29,19 @@ export function proxy(request: NextRequest) {
   const is_password_reset_route = matchesAny(pathname, password_reset_routes);
   const is_admin_route = pathname === "/admin" || pathname.startsWith("/admin/");
   const is_public_invoice_route = isPublicInvoiceRoute(pathname);
+  const is_public_order_route = matchesAny(pathname, public_order_routes);
 
   // ── Unauthenticated users ─────────────────────────────────────────────────
 
   if (!token) {
-    // Allow access to auth pages, invitation acceptance, password reset, and public invoice views.
+    // Allow access to auth pages, invitation acceptance, password reset, public
+    // invoice views, and the public guest order/checkout wizard.
     if (
       is_auth_route ||
       is_invitation_route ||
       is_password_reset_route ||
       is_public_invoice_route ||
+      is_public_order_route ||
       pathname === google_callback_route
     ) {
       return NextResponse.next();
