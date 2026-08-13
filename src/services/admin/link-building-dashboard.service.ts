@@ -109,6 +109,16 @@ export async function listClientUsersForSelect(): Promise<ClientUserOption[]> {
   return res.data;
 }
 
+/**
+ * GET /api/admin/link-building-orders/needs-approval-count
+ * Returns the number of "Live" orders that still have no LB TL Approval value,
+ * used to badge the "Needs LB TL Approval" filter toggle.
+ */
+export async function getNeedsLbTlApprovalCount(): Promise<number> {
+  const res = await apiClient.get<{ count: number }>("/api/admin/link-building-orders/needs-approval-count");
+  return res.count;
+}
+
 // ── Link Building Orders Dashboard ────────────────────────────────────────────
 
 /**

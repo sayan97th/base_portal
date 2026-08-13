@@ -15,6 +15,7 @@ import {
   batchUpdateLinkBuildingOrders,
   listAdminUsersForSelect,
   listClientUsersForSelect,
+  getNeedsLbTlApprovalCount,
   parseApiErrorMessage,
   type AdminUserOption,
   type ClientUserOption,
@@ -671,6 +672,8 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   const [link_type_filter, setLinkTypeFilter] = useState<string>("");
   const [client_account_filter, setClientAccountFilter] = useState<number | null>(null);
   const [assigned_user_id_filter, setAssignedUserIdFilter] = useState<number | null>(null);
+  const [needs_approval_filter, setNeedsApprovalFilter] = useState(false);
+  const [needs_approval_count, setNeedsApprovalCount] = useState<number | null>(null);
   const [open_special_filter, setOpenSpecialFilter] = useState<"client_account" | "assigned_to" | null>(null);
   const [special_filter_anchor_el, setSpecialFilterAnchorEl] = useState<HTMLElement | null>(null);
   const [show_filter_panel, setShowFilterPanel] = useState(false);
@@ -737,6 +740,14 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   const on_order_mutated_ref = useRef(onOrderMutated);
   on_order_mutated_ref.current = onOrderMutated;
 
+  const refreshNeedsApprovalCount = useCallback(() => {
+    getNeedsLbTlApprovalCount().then(setNeedsApprovalCount).catch(() => {/* non-critical */ });
+  }, []);
+
+  useEffect(() => {
+    refreshNeedsApprovalCount();
+  }, [refreshNeedsApprovalCount]);
+
   // ── Real-time collaboration ─────────────────────────────────────────────────
 
   const handleRemoteRowUpdated = useCallback(
@@ -757,8 +768,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         })
       );
       on_order_mutated_ref.current?.();
+      refreshNeedsApprovalCount();
     },
-    []
+    [refreshNeedsApprovalCount]
   );
 
   const handleRemoteRowCreated = useCallback(
@@ -771,8 +783,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       });
       setTotal((prev) => prev + 1);
       on_order_mutated_ref.current?.();
+      refreshNeedsApprovalCount();
     },
-    []
+    [refreshNeedsApprovalCount]
   );
 
   const handleRemoteRowDeleted = useCallback(
@@ -784,8 +797,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       setRows((prev) => prev.filter((r) => r.id !== row_id));
       setTotal((prev) => Math.max(0, prev - 1));
       on_order_mutated_ref.current?.();
+      refreshNeedsApprovalCount();
     },
-    []
+    [refreshNeedsApprovalCount]
   );
 
   const { user } = useAuth();
@@ -896,6 +910,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       client: debounced_client_filter.trim() || undefined,
       client_user_id: client_account_filter ?? undefined,
       assigned_user_id: assigned_user_id_filter ?? undefined,
+      needs_lb_tl_approval: needs_approval_filter || undefined,
       sort_rules: sort_rules.length > 0 ? sort_rules : undefined,
       column_filters: active_col_filters.length > 0 ? active_col_filters : undefined,
     };
@@ -910,6 +925,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     debounced_client_filter,
     client_account_filter,
     assigned_user_id_filter,
+    needs_approval_filter,
     sort_rules,
     column_filters,
     per_page,
@@ -978,6 +994,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       );
       saveDraftsToStorage(remaining);
       on_order_mutated_ref.current?.();
+      refreshNeedsApprovalCount();
     } catch (err) {
       const all_drafts = rows_ref.current.filter((r) => new_row_ids_ref.current.has(r.id));
       saveDraftsToStorage(all_drafts);
@@ -987,7 +1004,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     } finally {
       unmarkSaving(row.id);
     }
-  }, []);
+  }, [refreshNeedsApprovalCount]);
 
   const persistRowUpdate = useCallback(async (row: LinkBuildingOrderRow, changed_col_key?: string) => {
     markSaving(row.id);
@@ -1016,13 +1033,14 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         }
       }
       on_order_mutated_ref.current?.();
+      refreshNeedsApprovalCount();
     } catch (err) {
       const api_message = parseApiErrorMessage(err, COLUMN_LABELS);
       setSaveError(`Failed to save row "${row.order_id}": ${api_message}`);
     } finally {
       unmarkSaving(row.id);
     }
-  }, []);
+  }, [refreshNeedsApprovalCount]);
 
   // ── Editing ─────────────────────────────────────────────────────────────────
 
@@ -1141,12 +1159,13 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       await deleteLinkBuildingOrder(row_id);
       setRows((prev) => prev.filter((r) => r.id !== row_id));
       on_order_mutated_ref.current?.();
+      refreshNeedsApprovalCount();
     } catch {
       setSaveError("Failed to delete row. Please try again.");
     } finally {
       unmarkSaving(row_id);
     }
-  }, []);
+  }, [refreshNeedsApprovalCount]);
 
   // ── Assign user ─────────────────────────────────────────────────────────────
 
@@ -1223,6 +1242,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     link_type_filter !== "" ||
     client_account_filter !== null ||
     assigned_user_id_filter !== null ||
+    needs_approval_filter ||
     hidden_columns.size > 0 ||
     active_filter_count > 0 ||
     sort_is_non_default;
@@ -1234,10 +1254,21 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     setLinkTypeFilter("");
     setClientAccountFilter(null);
     setAssignedUserIdFilter(null);
+    setNeedsApprovalFilter(false);
     setHiddenColumns(new Set());
     clearColumnFilters();
     clearSort();
   }, [clearColumnFilters, clearSort]);
+
+  const toggleNeedsApprovalFilter = useCallback(() => {
+    setNeedsApprovalFilter((prev) => {
+      const next = !prev;
+      // The "Needs LB TL Approval" toggle already implies status = Live, so clear
+      // any conflicting status dropdown selection to avoid an impossible AND.
+      if (next) setStatusFilter("");
+      return next;
+    });
+  }, []);
 
   const handlePerPageChange = useCallback((option: PerPageOption) => {
     setPerPage(option);
@@ -1319,6 +1350,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       setNotificationBanner(
         `"${col_label}" set to "${display_value}" for ${selected_row_ids.size} row${selected_row_ids.size !== 1 ? "s" : ""}.`
       );
+      if (batch_field === "status" || batch_field === "lb_tl_approval") {
+        refreshNeedsApprovalCount();
+      }
       clearSelection();
       setBatchField("");
       setBatchValue("");
@@ -1328,7 +1362,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     } finally {
       setIsBatchSaving(false);
     }
-  }, [batch_field, batch_value, selected_row_ids, clearSelection, client_users, admin_users]);
+  }, [batch_field, batch_value, selected_row_ids, clearSelection, client_users, admin_users, refreshNeedsApprovalCount]);
 
   const handlePasteClipboard = useCallback(async () => {
     if (!clipboard_cell || selected_row_ids.size === 0) return;
@@ -1361,13 +1395,16 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       setNotificationBanner(
         `Pasted "${short_val}" → "${col_label}" for ${selected_row_ids.size} row${selected_row_ids.size !== 1 ? "s" : ""}.`
       );
+      if (clipboard_cell.col_key === "status" || clipboard_cell.col_key === "lb_tl_approval") {
+        refreshNeedsApprovalCount();
+      }
       clearSelection();
     } catch {
       setSaveError("Batch paste failed. Please try again.");
     } finally {
       setIsBatchSaving(false);
     }
-  }, [clipboard_cell, selected_row_ids, clearSelection]);
+  }, [clipboard_cell, selected_row_ids, clearSelection, refreshNeedsApprovalCount]);
 
   // ── Global keyboard shortcuts: Ctrl+C = copy cell, Ctrl+V = paste to selected ──
 
@@ -1474,7 +1511,8 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
   const handleImportComplete = useCallback(() => {
     fetchRows(1, current_body_ref.current);
-  }, [fetchRows]);
+    refreshNeedsApprovalCount();
+  }, [fetchRows, refreshNeedsApprovalCount]);
 
   // ── Export ──────────────────────────────────────────────────────────────────
 
@@ -1559,9 +1597,11 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
           </div>
           {/* Status filter */}
           <select
-            value={status_filter}
+            value={needs_approval_filter ? "Live" : status_filter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="h-8 rounded-lg border border-gray-200 bg-gray-50 px-2 text-xs outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+            disabled={needs_approval_filter}
+            title={needs_approval_filter ? "Status is locked to Live while \"Needs LB TL Approval\" is active" : undefined}
+            className="h-8 rounded-lg border border-gray-200 bg-gray-50 px-2 text-xs outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
           >
             <option value="">All Statuses</option>
             {STATUS_OPTIONS.map((s) => (
@@ -1587,6 +1627,25 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
             onChange={(e) => setClientFilter(e.target.value)}
             className="h-8 rounded-lg border border-gray-200 bg-gray-50 px-3 text-xs outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
           />
+          {/* Needs LB TL Approval — quick filter for Live orders that haven't been reviewed yet */}
+          <button
+            onClick={toggleNeedsApprovalFilter}
+            title="Show Live orders that still need LB TL Approval"
+            className={`flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors ${needs_approval_filter
+              ? "border-amber-400 bg-amber-100 text-amber-800 dark:border-amber-600 dark:bg-amber-900/40 dark:text-amber-300"
+              : "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-900/10 dark:text-amber-400 dark:hover:bg-amber-900/30"
+              }`}
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+            Needs LB TL Approval
+            {needs_approval_count !== null && needs_approval_count > 0 && (
+              <span className="inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-amber-600 px-1 text-[10px] font-bold text-white">
+                {needs_approval_count}
+              </span>
+            )}
+          </button>
           {/* Clear all filters */}
           {has_active_filters && (
             <button

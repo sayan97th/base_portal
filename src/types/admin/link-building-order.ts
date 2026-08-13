@@ -141,6 +141,8 @@ export interface LinkBuildingOrderSearchBody {
   client_user_id?: number | null;
   /** Filter by assigned admin user (assigned_admin_user_id). */
   assigned_user_id?: number | null;
+  /** When true, restricts results to "Live" orders whose lb_tl_approval is still empty. */
+  needs_lb_tl_approval?: boolean;
   sort_rules?: SortRulePayload[];
   column_filters?: ColumnFilterPayload[];
 }
