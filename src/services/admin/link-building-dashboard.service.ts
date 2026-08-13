@@ -181,6 +181,46 @@ export async function batchUpdateLinkBuildingOrders(
 }
 
 /**
+ * POST /api/admin/link-building-orders/batch-update-cells
+ * Applies a per-row map of field → value updates in a single request. Used when
+ * pasting a multi-row/multi-column block of clipboard data (e.g. copied from
+ * Excel or Google Sheets) into the dashboard grid, where each row may end up
+ * with different values instead of one shared value applied to every row.
+ */
+export async function batchUpdateLinkBuildingOrderCells(
+  updates: {
+    id: string;
+    fields: Partial<Record<keyof LinkBuildingOrderRow, string | null>>;
+  }[]
+): Promise<{ message: string; updated_count: number; data: LinkBuildingOrderRow[] }> {
+  return apiClient.post("/api/admin/link-building-orders/batch-update-cells", {
+    updates,
+  });
+}
+
+/**
+ * POST /api/admin/link-building-orders/column-values
+ * Returns every non-empty value found in a single column across rows matching
+ * the current search/filters, or an explicit row_ids list when provided. Used
+ * to copy an entire column (e.g. Landing Page) to the clipboard for pasting
+ * into an external tool such as Ahrefs.
+ */
+export async function getLinkBuildingOrderColumnValues(
+  column: keyof LinkBuildingOrderRow,
+  body: LinkBuildingOrderSearchBody = {},
+  row_ids?: string[]
+): Promise<string[]> {
+  const request_body =
+    row_ids && row_ids.length > 0 ? { column, row_ids } : { column, ...body };
+
+  const res = await apiClient.post<{ data: string[]; count: number }>(
+    "/api/admin/link-building-orders/column-values",
+    request_body
+  );
+  return res.data;
+}
+
+/**
  * DELETE /api/admin/link-building-orders/{id}
  * Permanently removes a link building order row.
  */

@@ -13,6 +13,8 @@ import {
   buildLboPayload,
   exportLinkBuildingOrders,
   batchUpdateLinkBuildingOrders,
+  batchUpdateLinkBuildingOrderCells,
+  getLinkBuildingOrderColumnValues,
   listAdminUsersForSelect,
   listClientUsersForSelect,
   getNeedsLbTlApprovalCount,
@@ -20,6 +22,7 @@ import {
   type AdminUserOption,
   type ClientUserOption,
 } from "@/services/admin/link-building-dashboard.service";
+import { parsePastedGrid, isBulkPaste, applyPastedGridToRows, type PastedGrid } from "@/lib/pasted-grid";
 import LinkBuildingOrderImportModal from "./LinkBuildingOrderImportModal";
 import LinkBuildingMetricsUpdateModal from "./LinkBuildingMetricsUpdateModal";
 import UserSelectFilterDropdown from "./UserSelectFilterDropdown";
@@ -65,6 +68,8 @@ interface ColumnDef {
   sticky?: boolean;
 }
 
+/** Identifies a single cell by row + column key, used by the Excel-style range selection. */
+type CellRef = { row_id: string; col_key: string };
 
 // ── Column definitions ─────────────────────────────────────────────────────────
 
@@ -363,7 +368,6 @@ interface EditableCellProps {
   is_first_col?: boolean;
   row_editors?: CollaboratorPresence[];
   cell_editors?: CollaboratorPresence[];
-  onStartEdit: () => void;
   onUpdate: (value: string) => void;
   onStopEdit: () => void;
   onKeyNav: (direction: "next" | "prev" | "down") => void;
@@ -371,6 +375,16 @@ interface EditableCellProps {
   onSelectImmediateSave?: (value: string) => void;
   /** When provided, shows a copy-to-clipboard icon on cell hover. */
   onCopy?: (value: string) => void;
+  /** Fires when a multi-cell (tab/newline delimited) block is pasted into this cell's input. */
+  onBulkPaste?: (grid: PastedGrid) => void;
+  /** Mouse-down on the display cell — starts either a click-to-edit or an Excel-style drag range selection. */
+  onCellMouseDown?: (shift_key: boolean) => void;
+  /** Mouse-enter while a drag is in progress — extends the active range selection to this cell. */
+  onCellMouseEnter?: () => void;
+  /** Mouse-up on the display cell — ends the drag, resolving it into either an edit or a finished range selection. */
+  onCellMouseUp?: () => void;
+  /** True when this cell falls within the active multi-cell range selection. */
+  is_range_selected?: boolean;
   is_sticky?: boolean;
   sticky_left?: number;
   sticky_bg_class?: string;
@@ -385,12 +399,16 @@ function EditableCell({
   is_first_col = false,
   row_editors = [],
   cell_editors = [],
-  onStartEdit,
   onUpdate,
   onStopEdit,
   onKeyNav,
   onSelectImmediateSave,
   onCopy,
+  onBulkPaste,
+  onCellMouseDown,
+  onCellMouseEnter,
+  onCellMouseUp,
+  is_range_selected = false,
   is_sticky = false,
   sticky_left = 0,
   sticky_bg_class = "bg-white dark:bg-gray-900",
@@ -407,6 +425,16 @@ function EditableCell({
     onCopy(value);
     setJustCopied(true);
     setTimeout(() => setJustCopied(false), 1200);
+  };
+
+  const handleInputPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    if (!onBulkPaste) return;
+    const text = e.clipboardData.getData("text/plain");
+    const grid = parsePastedGrid(text);
+    // A single-cell paste falls through to the browser's native input paste behavior.
+    if (!isBulkPaste(grid)) return;
+    e.preventDefault();
+    onBulkPaste(grid);
   };
 
   useEffect(() => {
@@ -481,6 +509,7 @@ function EditableCell({
           onChange={(e) => onUpdate(e.target.value)}
           onBlur={onStopEdit}
           onKeyDown={handleKeyDown}
+          onPaste={handleInputPaste}
           className="h-full w-full border-2 border-brand-500 bg-white px-2 py-1.5 text-xs outline-none dark:bg-gray-800 dark:text-white"
           style={{ minWidth: col.min_width }}
         />
@@ -503,6 +532,7 @@ function EditableCell({
           rel="noopener noreferrer"
           className="text-blue-500 hover:underline"
           onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
           title={value}
         >
           {label}
@@ -561,10 +591,12 @@ function EditableCell({
 
   return (
     <td
-      className={`group/cell relative cursor-pointer whitespace-nowrap px-2 py-1.5 text-xs text-gray-700 transition-colors dark:text-gray-300 ${
+      className={`group/cell relative cursor-pointer select-none whitespace-nowrap px-2 py-1.5 text-xs text-gray-700 transition-colors dark:text-gray-300 ${
         is_required_error
           ? "bg-red-50/80 ring-1 ring-inset ring-red-300 hover:bg-red-100/60 dark:bg-red-900/20 dark:ring-red-700"
-          : `hover:bg-blue-50 dark:hover:bg-blue-900/20${is_sticky ? ` ${sticky_bg_class}` : ""}`
+          : is_range_selected
+            ? "bg-indigo-100 ring-1 ring-inset ring-indigo-300 dark:bg-indigo-900/40 dark:ring-indigo-600"
+            : `hover:bg-blue-50 dark:hover:bg-blue-900/20${is_sticky ? ` ${sticky_bg_class}` : ""}`
       }${is_sticky && show_shadow ? " shadow-[4px_0_6px_-3px_rgba(0,0,0,0.35)]" : ""}`}
       style={{
         ...(has_cell_editors
@@ -572,8 +604,16 @@ function EditableCell({
           : {}),
         ...(is_sticky ? { position: "sticky", left: sticky_left, zIndex: 1 } : {}),
       }}
-      onClick={onStartEdit}
-      title={is_required_error ? `Required: ${col.label} must be filled to save this row` : "Click to edit · Ctrl+C to copy cell value · Hover for copy icon"}
+      onMouseDown={(e) => {
+        // No preventDefault here: doing so would also suppress the browser's default
+        // blur of a currently-focused input in another cell, which is what triggers
+        // that cell's save-on-click-away. select-none on this cell is what stops the
+        // native text-selection highlight while dragging instead.
+        onCellMouseDown?.(e.shiftKey);
+      }}
+      onMouseEnter={onCellMouseEnter}
+      onMouseUp={onCellMouseUp}
+      title={is_required_error ? `Required: ${col.label} must be filled to save this row` : "Click to edit · Click+drag to select multiple cells · Ctrl+C to copy · Ctrl+V to paste"}
     >
       {show_row_floater && <RowPresenceFloater editors={row_editors} />}
       {has_cell_editors && <CellPresenceOverlay editors={cell_editors} />}
@@ -592,6 +632,7 @@ function EditableCell({
           className={`absolute right-0.5 top-1/2 -translate-y-1/2 rounded p-0.5 opacity-0 transition-all group-hover:opacity-20 group-hover/cell:opacity-70 hover:!opacity-100 hover:bg-white dark:hover:bg-gray-700 ${just_copied ? "!opacity-100 text-green-500" : "text-gray-400"
             }`}
           onClick={handleCopy}
+          onMouseDown={(e) => e.stopPropagation()}
           title="Copy cell value"
         >
           {just_copied ? (
@@ -700,6 +741,12 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   const [batch_value, setBatchValue] = useState<string>("");
   const [is_batch_saving, setIsBatchSaving] = useState(false);
   const [batch_select_anchor_el, setBatchSelectAnchorEl] = useState<HTMLElement | null>(null);
+  const [copying_column_key, setCopyingColumnKey] = useState<string | null>(null);
+
+  // ── Excel-style multi-cell range selection ──────────────────────────────────
+  const [cell_range, setCellRange] = useState<{ anchor: CellRef; focus: CellRef } | null>(null);
+  /** In-memory copy of the last range copied from this table, used as a fallback for Ctrl+V when the OS clipboard can't be read. */
+  const [range_clipboard, setRangeClipboard] = useState<PastedGrid | null>(null);
 
   const { sort_rules, toggleSort, clearSort } = useTableSort(DEFAULT_SORT_RULES);
   const {
@@ -731,6 +778,17 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
   const selected_row_ids_kbd_ref = useRef(selected_row_ids);
   selected_row_ids_kbd_ref.current = selected_row_ids;
+
+  const cell_range_kbd_ref = useRef(cell_range);
+  cell_range_kbd_ref.current = cell_range;
+
+  const range_clipboard_kbd_ref = useRef(range_clipboard);
+  range_clipboard_kbd_ref.current = range_clipboard;
+
+  // Tracks an in-progress drag: the cell where the mouse went down, and whether
+  // the pointer has since entered a different cell (i.e. an actual drag, not a click).
+  const range_mouse_down_ref = useRef<CellRef | null>(null);
+  const range_dragged_ref = useRef(false);
 
   const debounced_search = useDebounce(search, 400);
   const debounced_client_filter = useDebounce(client_filter, 400);
@@ -956,6 +1014,26 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     [visible_columns]
   );
 
+  // Resolves the active anchor/focus cell range into row/column index bounds so
+  // every cell in the rectangle (inclusive) can be highlighted and later copied.
+  const range_bounds = useMemo(() => {
+    if (!cell_range) return null;
+    const anchor_row = filtered_rows.findIndex((r) => r.id === cell_range.anchor.row_id);
+    const focus_row = filtered_rows.findIndex((r) => r.id === cell_range.focus.row_id);
+    const anchor_col = visible_columns.findIndex((c) => c.key === cell_range.anchor.col_key);
+    const focus_col = visible_columns.findIndex((c) => c.key === cell_range.focus.col_key);
+    if (anchor_row === -1 || focus_row === -1 || anchor_col === -1 || focus_col === -1) return null;
+    return {
+      min_row: Math.min(anchor_row, focus_row),
+      max_row: Math.max(anchor_row, focus_row),
+      min_col: Math.min(anchor_col, focus_col),
+      max_col: Math.max(anchor_col, focus_col),
+    };
+  }, [cell_range, filtered_rows, visible_columns]);
+
+  const range_bounds_kbd_ref = useRef(range_bounds);
+  range_bounds_kbd_ref.current = range_bounds;
+
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
   const markSaving = (row_id: string) =>
@@ -1047,6 +1125,53 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   const startEditing = useCallback((row_id: string, col_key: string) => {
     setEditingCell({ row_id, col_key });
   }, []);
+
+  // ── Excel-style drag-to-select ───────────────────────────────────────────────
+  // A plain click (mouse down + up on the same cell, no movement in between) opens
+  // the cell for editing, exactly as before. Moving the pointer to a different cell
+  // while the button is held turns the gesture into a rectangular range selection
+  // instead, so the click-to-edit behavior every admin already relies on is unchanged.
+
+  const handleCellMouseDown = useCallback((row_id: string, col_key: string, shift_key: boolean) => {
+    // Shift+Click extends the range from the existing anchor (or starts a fresh
+    // one-cell range) — a discrete action, not the start of a drag.
+    if (shift_key) {
+      setEditingCell(null);
+      setCellRange((prev) => ({
+        anchor: prev?.anchor ?? { row_id, col_key },
+        focus: { row_id, col_key },
+      }));
+      return;
+    }
+    range_mouse_down_ref.current = { row_id, col_key };
+    range_dragged_ref.current = false;
+  }, []);
+
+  const handleCellMouseEnter = useCallback((row_id: string, col_key: string) => {
+    const start = range_mouse_down_ref.current;
+    if (!start) return;
+    const is_origin_cell = start.row_id === row_id && start.col_key === col_key;
+    // Ignore the very first mouseenter (re-entering the origin cell before any
+    // movement) so a plain click never flashes a one-cell range. Once an actual
+    // drag is underway, moving back over the origin correctly shrinks it to 1×1.
+    if (is_origin_cell && !range_dragged_ref.current) return;
+    range_dragged_ref.current = true;
+    setCellRange({ anchor: start, focus: { row_id, col_key } });
+    if (editing_cell_ref.current) setEditingCell(null);
+  }, []);
+
+  const handleCellMouseUp = useCallback(() => {
+    const start = range_mouse_down_ref.current;
+    range_mouse_down_ref.current = null;
+    if (!start) return;
+    if (!range_dragged_ref.current) {
+      // No movement occurred — treat it as a normal click-to-edit and drop any
+      // previously selected range, matching spreadsheet click behavior.
+      setCellRange(null);
+      startEditing(start.row_id, start.col_key);
+    }
+    range_dragged_ref.current = false;
+  }, [startEditing]);
 
   const stopEditing = useCallback(() => {
     const cell = editing_cell_ref.current;
@@ -1300,6 +1425,206 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     setClipboardCell({ value, col_key });
   }, []);
 
+  // ── Copy entire column (e.g. all domains, for pasting into Ahrefs) ─────────
+
+  const handleCopyColumn = useCallback(async (col_key: keyof LinkBuildingOrderRow) => {
+    setCopyingColumnKey(col_key);
+    setSaveError(null);
+    try {
+      const values = await getLinkBuildingOrderColumnValues(
+        col_key,
+        current_body_ref.current,
+        selected_row_ids.size > 0 ? Array.from(selected_row_ids) : undefined
+      );
+      await navigator.clipboard.writeText(values.join("\n"));
+
+      const col_label = COLUMNS.find((c) => c.key === col_key)?.label ?? String(col_key);
+      const scope = selected_row_ids.size > 0 ? `${selected_row_ids.size} selected row${selected_row_ids.size !== 1 ? "s" : ""}` : "the current filters";
+      setNotificationBanner(
+        values.length > 0
+          ? `Copied ${values.length} value${values.length !== 1 ? "s" : ""} from "${col_label}" (${scope}) to the clipboard.`
+          : `No values to copy from "${col_label}".`
+      );
+    } catch {
+      setSaveError("Failed to copy column values. Please try again.");
+    } finally {
+      setCopyingColumnKey(null);
+    }
+  }, [selected_row_ids]);
+
+  // ── Bulk grid paste: fills a rectangular block of cells from clipboard data ──
+
+  const handleBulkPaste = useCallback(async (start_row_id: string, start_col_key: string, grid: PastedGrid) => {
+    const start_row_index = filtered_rows.findIndex((r) => r.id === start_row_id);
+    const start_col_index = visible_columns.findIndex((c) => c.key === start_col_key);
+    if (start_row_index === -1 || start_col_index === -1) return;
+
+    const field_order = visible_columns.map((c) => c.key);
+
+    const parseCellForPaste = (
+      field: keyof LinkBuildingOrderRow,
+      raw_value: string,
+      current_value: LinkBuildingOrderRow[keyof LinkBuildingOrderRow]
+    ): LinkBuildingOrderRow[keyof LinkBuildingOrderRow] => {
+      const col_def = COLUMNS.find((c) => c.key === field);
+      // order_id must stay unique per row and is server-generated, so it is never
+      // overwritten by a bulk paste — same rule the batch-update endpoint enforces.
+      if (!col_def || col_def.locked || field === "order_id") return current_value;
+
+      const trimmed = raw_value.trim();
+
+      if (col_def.type === "select" && col_def.options) {
+        const match = col_def.options.find((opt) => opt.toLowerCase() === trimmed.toLowerCase());
+        return (match ?? current_value) as LinkBuildingOrderRow[keyof LinkBuildingOrderRow];
+      }
+
+      if (col_def.type === "url" && trimmed !== "" && !/^https?:\/\//i.test(trimmed)) {
+        return `https://${trimmed}` as LinkBuildingOrderRow[keyof LinkBuildingOrderRow];
+      }
+
+      return trimmed as LinkBuildingOrderRow[keyof LinkBuildingOrderRow];
+    };
+
+    const { rows: next_rows, overflow_row_count } = applyPastedGridToRows(
+      filtered_rows,
+      start_row_index,
+      start_col_index,
+      field_order,
+      grid,
+      parseCellForPaste
+    );
+
+    // Diff against the previous rows to find exactly which cells changed, so only
+    // the affected fields are sent to the server instead of the whole row.
+    const changed_fields_by_row_id: Record<string, Partial<Record<keyof LinkBuildingOrderRow, string>>> = {};
+    let changed_cell_count = 0;
+
+    grid.forEach((grid_row, row_offset) => {
+      const target_row_index = start_row_index + row_offset;
+      if (target_row_index >= filtered_rows.length) return;
+      const row_id = filtered_rows[target_row_index].id;
+
+      grid_row.forEach((_raw_value, col_offset) => {
+        const field = field_order[start_col_index + col_offset];
+        if (!field) return;
+        const old_value = String(filtered_rows[target_row_index][field] ?? "");
+        const new_value = String(next_rows[target_row_index][field] ?? "");
+        if (old_value === new_value) return;
+        changed_fields_by_row_id[row_id] = { ...(changed_fields_by_row_id[row_id] ?? {}), [field]: new_value };
+        changed_cell_count += 1;
+      });
+    });
+
+    if (changed_cell_count === 0) {
+      if (overflow_row_count > 0) {
+        setNotificationBanner(`Paste did not fit — ${overflow_row_count} row(s) beyond the visible table were skipped.`);
+      }
+      return;
+    }
+
+    setRows(next_rows);
+    const drafts_after_paste = next_rows.filter((r) => new_row_ids_ref.current.has(r.id));
+    saveDraftsToStorage(drafts_after_paste);
+
+    const changed_row_ids = Object.keys(changed_fields_by_row_id);
+    const draft_row_ids = changed_row_ids.filter((id) => new_row_ids_ref.current.has(id));
+    const persisted_row_ids = changed_row_ids.filter((id) => !new_row_ids_ref.current.has(id));
+
+    draft_row_ids.forEach((row_id) => {
+      const row = next_rows.find((r) => r.id === row_id);
+      if (row) persistNewRow(row);
+    });
+
+    setSaveError(null);
+
+    if (persisted_row_ids.length > 0) {
+      setIsBatchSaving(true);
+      try {
+        const res = await batchUpdateLinkBuildingOrderCells(
+          persisted_row_ids.map((id) => ({ id, fields: changed_fields_by_row_id[id] }))
+        );
+        const updated_by_id = new Map(res.data.map((r) => [r.id, r]));
+        setRows((prev) => prev.map((r) => updated_by_id.get(r.id) ?? r));
+        on_order_mutated_ref.current?.();
+        refreshNeedsApprovalCount();
+      } catch (err) {
+        const api_message = parseApiErrorMessage(err, COLUMN_LABELS);
+        setSaveError(`Bulk paste failed to save: ${api_message}`);
+      } finally {
+        setIsBatchSaving(false);
+      }
+    }
+
+    const row_count = changed_row_ids.length;
+    setNotificationBanner(
+      `Pasted ${changed_cell_count} cell${changed_cell_count !== 1 ? "s" : ""} across ${row_count} row${row_count !== 1 ? "s" : ""}.` +
+      (overflow_row_count > 0 ? ` ${overflow_row_count} row(s) beyond the visible table were skipped.` : "")
+    );
+  }, [filtered_rows, visible_columns, persistNewRow, refreshNeedsApprovalCount]);
+
+  // ── Range copy/paste: Ctrl+C / Ctrl+V on an active multi-cell selection ──────
+
+  const copyRangeToClipboard = useCallback(() => {
+    const bounds = range_bounds_kbd_ref.current;
+    if (!bounds) return;
+
+    const lines: string[] = [];
+    for (let r = bounds.min_row; r <= bounds.max_row; r++) {
+      const row = filtered_rows[r];
+      if (!row) continue;
+      const cells: string[] = [];
+      for (let c = bounds.min_col; c <= bounds.max_col; c++) {
+        const col = visible_columns[c];
+        cells.push(col ? String(row[col.key] ?? "") : "");
+      }
+      lines.push(cells.join("\t"));
+    }
+    const text = lines.join("\n");
+
+    navigator.clipboard.writeText(text).catch(() => { });
+    setRangeClipboard(parsePastedGrid(text));
+
+    const n_rows = bounds.max_row - bounds.min_row + 1;
+    const n_cols = bounds.max_col - bounds.min_col + 1;
+    const n_cells = n_rows * n_cols;
+    setNotificationBanner(
+      `Copied ${n_cells} cell${n_cells !== 1 ? "s" : ""} (${n_rows}×${n_cols}) — press Ctrl+V on a cell to paste here, or paste into Excel/Sheets`
+    );
+  }, [filtered_rows, visible_columns]);
+
+  const pasteIntoRange = useCallback(async () => {
+    const bounds = range_bounds_kbd_ref.current;
+    if (!bounds) return;
+
+    let grid: PastedGrid | null = null;
+    try {
+      // Reading the OS clipboard lets a block copied from Excel/Sheets be pasted
+      // straight into a selected range, not just into one cell at a time.
+      const text = await navigator.clipboard.readText();
+      if (text) grid = parsePastedGrid(text);
+    } catch {
+      // Blocked by the browser's clipboard-read permission — fall back below.
+    }
+    if (!grid) grid = range_clipboard_kbd_ref.current;
+    if (!grid) return;
+
+    const range_rows = bounds.max_row - bounds.min_row + 1;
+    const range_cols = bounds.max_col - bounds.min_col + 1;
+
+    // Pasting a single copied value onto a larger selection fills the whole
+    // selection with it, matching the behavior admins already expect from Excel.
+    if (grid.length === 1 && grid[0].length === 1 && (range_rows > 1 || range_cols > 1)) {
+      const single_value = grid[0][0];
+      grid = Array.from({ length: range_rows }, () => Array.from({ length: range_cols }, () => single_value));
+    }
+
+    const start_row = filtered_rows[bounds.min_row];
+    const start_col = visible_columns[bounds.min_col];
+    if (!start_row || !start_col) return;
+
+    handleBulkPaste(start_row.id, start_col.key, grid);
+  }, [filtered_rows, visible_columns, handleBulkPaste]);
+
   const handleBatchApply = useCallback(async () => {
     if (!batch_field || !batch_value || selected_row_ids.size === 0) return;
 
@@ -1410,11 +1735,27 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Escape drops the active multi-cell range selection (mirrors editing's own
+      // Escape handling, which is local to the cell's input and never reaches here).
+      if (e.key === "Escape" && cell_range_kbd_ref.current) {
+        setCellRange(null);
+        return;
+      }
+
       if (!e.ctrlKey && !e.metaKey) return;
       const key = e.key.toLowerCase();
 
       if (key === "c") {
+        const range = cell_range_kbd_ref.current;
         const cell = editing_cell_ref.current;
+
+        // A drag/shift-click range selection takes priority over the single-cell
+        // clipboard when one is active and no cell is currently being edited.
+        if (range && !cell) {
+          copyRangeToClipboard();
+          return;
+        }
+
         if (!cell) return;
 
         // If the user has text selected inside an input, let the browser handle it
@@ -1443,6 +1784,21 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       }
 
       if (key === "v") {
+        const range = cell_range_kbd_ref.current;
+
+        if (range && !editing_cell_ref.current) {
+          const active_el = document.activeElement;
+          if (
+            active_el instanceof HTMLInputElement ||
+            active_el instanceof HTMLSelectElement ||
+            active_el instanceof HTMLTextAreaElement
+          ) return;
+
+          e.preventDefault();
+          pasteIntoRange();
+          return;
+        }
+
         const clip = clipboard_cell_kbd_ref.current;
         const selected = selected_row_ids_kbd_ref.current;
         if (!clip || selected.size === 0) return;
@@ -1462,7 +1818,26 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [handlePasteClipboard]);
+  }, [handlePasteClipboard, copyRangeToClipboard, pasteIntoRange]);
+
+  // Opening a cell for editing through any path (Client Account / Assigned To cells,
+  // Tab/Enter navigation, etc. — not only the drag handlers above) always drops a
+  // stale range selection, keeping "one cell is being edited" and "a range is
+  // selected" mutually exclusive regardless of how editing was entered.
+  useEffect(() => {
+    if (editing_cell) setCellRange(null);
+  }, [editing_cell]);
+
+  // Safety net: if the mouse button is released outside any cell (e.g. dragged off
+  // the table), clear the in-progress drag state so the next click isn't misread.
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      range_mouse_down_ref.current = null;
+      range_dragged_ref.current = false;
+    };
+    document.addEventListener("mouseup", handleGlobalMouseUp);
+    return () => document.removeEventListener("mouseup", handleGlobalMouseUp);
+  }, []);
 
   // ── Indeterminate state for select-all checkbox ─────────────────────────────
 
@@ -1676,6 +2051,37 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
               </span>
             )}
           </button>
+          {/* Range selection badge — shows while a drag/shift-click multi-cell range is active */}
+          {cell_range && range_bounds && (() => {
+            const n_rows = range_bounds.max_row - range_bounds.min_row + 1;
+            const n_cols = range_bounds.max_col - range_bounds.min_col + 1;
+            const n_cells = n_rows * n_cols;
+            return (
+              <div
+                className="flex items-center gap-1.5 rounded-lg border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs text-teal-700 dark:border-teal-800 dark:bg-teal-900/20 dark:text-teal-300"
+                title="Click and drag across cells (or Shift+Click) to select a range, then Ctrl+C to copy or Ctrl+V to paste"
+              >
+                <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h12A2.25 2.25 0 0120.25 6v12A2.25 2.25 0 0118 20.25H6A2.25 2.25 0 013.75 18V6zM3.75 9h16.5M3.75 15h16.5M9 3.75v16.5M15 3.75v16.5" />
+                </svg>
+                <span className="font-semibold">
+                  {n_cells} cell{n_cells !== 1 ? "s" : ""} selected
+                </span>
+                <span className="opacity-70">({n_rows}×{n_cols})</span>
+                <kbd className="rounded bg-teal-100 px-1 py-0.5 font-mono text-[9px] text-teal-600 dark:bg-teal-800 dark:text-teal-300">Ctrl+C</kbd>
+                <kbd className="rounded bg-teal-100 px-1 py-0.5 font-mono text-[9px] text-teal-600 dark:bg-teal-800 dark:text-teal-300">Ctrl+V</kbd>
+                <button
+                  onClick={() => setCellRange(null)}
+                  className="ml-0.5 rounded p-0.5 opacity-50 transition-opacity hover:opacity-100"
+                  title="Clear selection"
+                >
+                  <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            );
+          })()}
           {/* Clipboard badge — shows when a cell value has been copied */}
           {clipboard_cell && (
             <div
@@ -2449,6 +2855,31 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                             <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                           </svg>
                         </button>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopyColumn(col.key);
+                          }}
+                          disabled={copying_column_key === col.key}
+                          title={
+                            selected_row_ids.size > 0
+                              ? `Copy all "${col.label}" values from the ${selected_row_ids.size} selected row${selected_row_ids.size !== 1 ? "s" : ""} to the clipboard`
+                              : `Copy all "${col.label}" values matching the current filters to the clipboard`
+                          }
+                          className="shrink-0 rounded p-0.5 opacity-30 transition-opacity hover:opacity-80 disabled:opacity-100"
+                        >
+                          {copying_column_key === col.key ? (
+                            <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                            </svg>
+                          ) : (
+                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                          )}
+                        </button>
                       </div>
                     </th>
                   );
@@ -2601,6 +3032,10 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                           editing_cell?.row_id === row.id &&
                           editing_cell?.col_key === col.key;
                         const is_first_col = col_idx === 0;
+                        const is_range_selected =
+                          !!range_bounds &&
+                          row_idx >= range_bounds.min_row && row_idx <= range_bounds.max_row &&
+                          col_idx >= range_bounds.min_col && col_idx <= range_bounds.max_col;
                         return (
                           <EditableCell
                             key={col.key}
@@ -2613,12 +3048,16 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                             cell_editors={row_collaborators.filter(
                               (c) => c.focused_col_key === col.key
                             )}
-                            onStartEdit={() => startEditing(row.id, col.key)}
                             onUpdate={(val) => updateCell(row.id, col.key, val)}
                             onStopEdit={stopEditing}
                             onKeyNav={(dir) => navigateCell(row.id, col.key, dir)}
                             onSelectImmediateSave={undefined}
                             onCopy={(val) => copyCellValue(val, col.key)}
+                            onBulkPaste={(grid) => handleBulkPaste(row.id, col.key, grid)}
+                            onCellMouseDown={(shift_key) => handleCellMouseDown(row.id, col.key, shift_key)}
+                            onCellMouseEnter={() => handleCellMouseEnter(row.id, col.key)}
+                            onCellMouseUp={handleCellMouseUp}
+                            is_range_selected={is_range_selected}
                             is_sticky={col.sticky}
                             sticky_left={col.sticky ? sticky_left_offsets[col.key] : undefined}
                             sticky_bg_class={col.sticky ? sticky_row_bg_class : undefined}
