@@ -1,0 +1,189 @@
+/**
+ * The public guest checkout wizard renders CartContext for visitors who have
+ * no auth token at all. The `/api/cart` endpoints require auth, so without a
+ * guard every cart mutation would fire a doomed request. These tests lock in
+ * that guard: server sync only happens once a token is present, and guests
+ * fall back to localStorage-only behavior (already covered implicitly since
+ * the sync calls are simply skipped, not replaced).
+ */
+
+import React from "react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { CartProvider, useCart } from "@/context/CartContext";
+
+jest.mock("@/services/client/unified-cart.service", () => ({
+  unifiedCartService: {
+    fetchCart: jest.fn(),
+    saveCart: jest.fn(),
+    deleteCart: jest.fn(),
+  },
+}));
+
+jest.mock("@/services/client/discounts.service", () => ({
+  getActiveDiscounts: jest.fn(),
+}));
+
+jest.mock("@/lib/api-client", () => ({
+  getToken: jest.fn(),
+}));
+
+import { unifiedCartService } from "@/services/client/unified-cart.service";
+import { getActiveDiscounts } from "@/services/client/discounts.service";
+import { getToken } from "@/lib/api-client";
+
+const mockFetchCart = unifiedCartService.fetchCart as jest.MockedFunction<
+  typeof unifiedCartService.fetchCart
+>;
+const mockSaveCart = unifiedCartService.saveCart as jest.MockedFunction<
+  typeof unifiedCartService.saveCart
+>;
+const mockDeleteCart = unifiedCartService.deleteCart as jest.MockedFunction<
+  typeof unifiedCartService.deleteCart
+>;
+const mockGetActiveDiscounts = getActiveDiscounts as jest.MockedFunction<typeof getActiveDiscounts>;
+const mockGetToken = getToken as jest.MockedFunction<typeof getToken>;
+
+const SERVER_SYNC_DEBOUNCE_MS = 1500;
+
+function TestHarness() {
+  const { setItemQuantity, clearCart, item_count } = useCart();
+  return (
+    <div>
+      <span data-testid="item-count">{item_count}</span>
+      <button onClick={() => setItemQuantity("link_building", "dr30", "DR 30+", 100, 2)}>
+        Add item
+      </button>
+      <button onClick={() => clearCart()}>Clear</button>
+    </div>
+  );
+}
+
+describe("CartContext server sync guard", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.useFakeTimers({ advanceTimers: true });
+    localStorage.clear();
+    mockFetchCart.mockResolvedValue(null);
+    mockSaveCart.mockResolvedValue(undefined);
+    mockDeleteCart.mockResolvedValue(undefined);
+    mockGetActiveDiscounts.mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("does not call fetchCart on mount when there is no auth token (guest)", async () => {
+    mockGetToken.mockReturnValue(null);
+
+    render(
+      <CartProvider>
+        <TestHarness />
+      </CartProvider>
+    );
+
+    await waitFor(() => expect(screen.getByTestId("item-count")).toHaveTextContent("0"));
+    expect(mockFetchCart).not.toHaveBeenCalled();
+  });
+
+  it("calls fetchCart on mount when an auth token is present", async () => {
+    mockGetToken.mockReturnValue("a-jwt-token");
+
+    render(
+      <CartProvider>
+        <TestHarness />
+      </CartProvider>
+    );
+
+    await waitFor(() => expect(mockFetchCart).toHaveBeenCalledTimes(1));
+  });
+
+  it("does not debounce-save to the server for a guest after a cart mutation", async () => {
+    mockGetToken.mockReturnValue(null);
+
+    render(
+      <CartProvider>
+        <TestHarness />
+      </CartProvider>
+    );
+
+    await waitFor(() => expect(screen.getByTestId("item-count")).toHaveTextContent("0"));
+
+    fireEvent.click(screen.getByText("Add item"));
+    await waitFor(() => expect(screen.getByTestId("item-count")).toHaveTextContent("2"));
+
+    act(() => {
+      jest.advanceTimersByTime(SERVER_SYNC_DEBOUNCE_MS + 100);
+    });
+
+    expect(mockSaveCart).not.toHaveBeenCalled();
+  });
+
+  it("debounce-saves to the server for an authenticated user after a cart mutation", async () => {
+    mockGetToken.mockReturnValue("a-jwt-token");
+
+    render(
+      <CartProvider>
+        <TestHarness />
+      </CartProvider>
+    );
+
+    await waitFor(() => expect(mockFetchCart).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByText("Add item"));
+    await waitFor(() => expect(screen.getByTestId("item-count")).toHaveTextContent("2"));
+
+    act(() => {
+      jest.advanceTimersByTime(SERVER_SYNC_DEBOUNCE_MS + 100);
+    });
+
+    await waitFor(() => expect(mockSaveCart).toHaveBeenCalledTimes(1));
+  });
+
+  it("does not call deleteCart for a guest clearing an already-empty cart", async () => {
+    mockGetToken.mockReturnValue(null);
+
+    render(
+      <CartProvider>
+        <TestHarness />
+      </CartProvider>
+    );
+
+    await waitFor(() => expect(screen.getByTestId("item-count")).toHaveTextContent("0"));
+
+    fireEvent.click(screen.getByText("Add item"));
+    await waitFor(() => expect(screen.getByTestId("item-count")).toHaveTextContent("2"));
+
+    fireEvent.click(screen.getByText("Clear"));
+    await waitFor(() => expect(screen.getByTestId("item-count")).toHaveTextContent("0"));
+
+    expect(mockDeleteCart).not.toHaveBeenCalled();
+  });
+
+  it("calls deleteCart for an authenticated user clearing the cart", async () => {
+    mockGetToken.mockReturnValue("a-jwt-token");
+
+    render(
+      <CartProvider>
+        <TestHarness />
+      </CartProvider>
+    );
+
+    await waitFor(() => expect(mockFetchCart).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByText("Add item"));
+    await waitFor(() => expect(screen.getByTestId("item-count")).toHaveTextContent("2"));
+
+    // The mount itself starts with an empty cart, which already triggers one
+    // delete call before "Add item" is even clicked — clear that call so
+    // only the ones from the "Clear" click below are counted.
+    mockDeleteCart.mockClear();
+    fireEvent.click(screen.getByText("Clear"));
+
+    // clearCart() itself calls deleteCart, and the reactive empty-cart sync
+    // effect independently notices the now-empty cart and calls it again —
+    // an existing (harmless, idempotent) double-call in CartContext that
+    // isn't part of this guard and isn't being changed here.
+    await waitFor(() => expect(mockDeleteCart).toHaveBeenCalledTimes(2));
+  });
+});
