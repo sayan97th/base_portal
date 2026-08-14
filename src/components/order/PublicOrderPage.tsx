@@ -3,18 +3,15 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Elements } from "@stripe/react-stripe-js";
-import UnifiedIntakeStep, {
-  type UnifiedIntakeStepHandle,
-} from "@/components/shared/UnifiedIntakeStep";
-import UnifiedCartSummary from "@/components/shared/UnifiedCartSummary";
+import UnifiedIntakeStep from "@/components/shared/UnifiedIntakeStep";
 import OrderReviewStep from "@/components/shared/OrderReviewStep";
 import CheckoutStep, {
   BillingAddress,
   type CheckoutStepHandle,
 } from "@/components/shared/CheckoutStep";
 import PublicAccountStep from "./PublicAccountStep";
+import PublicOrderSummary from "./PublicOrderSummary";
 import { useCart } from "@/context/CartContext";
-import { useAuth } from "@/context/AuthContext";
 import { useUnifiedCheckout } from "@/hooks/useUnifiedCheckout";
 import { useBillingAddress } from "@/hooks/useBillingAddress";
 import { getStripe } from "@/lib/stripe";
@@ -37,7 +34,6 @@ const PublicOrderPage: React.FC = () => {
     setItemQuantity,
     is_cart_ready,
   } = useCart();
-  const { isAuthenticated } = useAuth();
   const { saved_billing_address } = useBillingAddress();
 
   const [current_step, setCurrentStep] = useState<Step>("intake");
@@ -63,16 +59,13 @@ const PublicOrderPage: React.FC = () => {
   } = useUnifiedCheckout(getSuccessRedirect);
 
   const checkout_ref = useRef<CheckoutStepHandle>(null);
-  const intake_step_ref = useRef<UnifiedIntakeStepHandle>(null);
   const [checkout_is_processing, setCheckoutIsProcessing] = useState(false);
   const [stripe_payment_error, setStripePaymentError] = useState<string | null>(null);
-  const [credits_to_apply, setCreditsToApply] = useState(0);
   const [is_applying_credits, setIsApplyingCredits] = useState(false);
   const [details_deferred, setDetailsDeferred] = useState(false);
 
-  const handleCreditsChange = useCallback((is_applying: boolean, credits: number) => {
+  const handleCreditsChange = useCallback((is_applying: boolean) => {
     setIsApplyingCredits(is_applying);
-    setCreditsToApply(credits);
   }, []);
 
   const has_intake_items = useMemo(
@@ -197,116 +190,86 @@ const PublicOrderPage: React.FC = () => {
     );
   }
 
+  const display_total = is_applying_credits ? subtotal : total;
+  const payment_error = stripe_payment_error ?? submit_error;
+
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-4 py-10 sm:px-6 lg:px-8">
-      {/* Intake form step */}
-      {current_step === "intake" && (
-        <div className="grid grid-cols-12 gap-6">
-          <div className="col-span-12 space-y-6 lg:col-span-8">
+    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
+      <div className="overflow-hidden rounded-3xl bg-white shadow-xl dark:bg-gray-900 md:flex">
+        <PublicOrderSummary className="md:w-[320px]" />
+
+        <div className="min-w-0 flex-1 p-6 sm:p-8 lg:p-10">
+          {/* Intake form step */}
+          {current_step === "intake" && (
             <UnifiedIntakeStep
-              ref={intake_step_ref}
               onBack={() => { window.location.href = MARKETING_SITE_URL; }}
               onNext={handleProceedToReview}
               onSkip={handleSkipIntake}
               back_label="Back to basesearchmarketing.com"
             />
-          </div>
-          <div className="col-span-12 lg:col-span-4">
-            <UnifiedCartSummary
-              action_label="Continue"
-              onAction={() => intake_step_ref.current?.triggerNext()}
-              is_action_disabled={!has_intake_items}
-            />
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* Order review step */}
-      {current_step === "review" && (
-        <div className="grid grid-cols-12 gap-6">
-          <div className="col-span-12 space-y-6 lg:col-span-8">
+          {/* Order review step */}
+          {current_step === "review" && (
             <OrderReviewStep
               onBack={() => { setCurrentStep("intake"); scrollToTop(); }}
               onNext={handleProceedToAccount}
               back_label="Back to Intake Form"
             />
-          </div>
-          <div className="col-span-12 lg:col-span-4">
-            <UnifiedCartSummary
-              action_label="Continue"
-              onAction={handleProceedToAccount}
-              is_quantity_locked
-              on_back={() => { setCurrentStep("intake"); scrollToTop(); }}
-              back_label="Back to Intake Form"
-            />
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* Order summary + create account step */}
-      {current_step === "account" && (
-        <div className="grid grid-cols-12 gap-6">
-          <div className="col-span-12 space-y-6 lg:col-span-8">
+          {/* Order summary + create account step */}
+          {current_step === "account" && (
             <PublicAccountStep
               onNext={handleProceedToCheckout}
               onBack={() => setCurrentStep(has_intake_items ? "review" : "intake")}
               back_label={has_intake_items ? "Back to Order Review" : "Back to Order Details"}
             />
-          </div>
-          <div className="col-span-12 lg:col-span-4">
-            <UnifiedCartSummary
-              action_label="Complete the form to continue"
-              is_action_disabled
-              is_quantity_locked
-              on_back={() => setCurrentStep(has_intake_items ? "review" : "intake")}
-              back_label={has_intake_items ? "Back to Order Review" : "Back to Order Details"}
-            />
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* Checkout step */}
-      {current_step === "checkout" && (
-        <Elements stripe={getStripe()}>
-          <div className="grid grid-cols-12 gap-6">
-            <div className="col-span-12 lg:col-span-8">
-              <CheckoutStep
-                ref={checkout_ref}
-                billing_address={billing_address}
-                onBillingChange={handleBillingChange}
-                onPrevious={handlePrevious}
-                onComplete={handleComplete}
-                onPayLater={() => handlePayLater(details_deferred)}
-                is_loading={is_submitting}
-                error_message={submit_error}
-                total_amount={is_applying_credits ? subtotal : total}
-                saved_billing_address={saved_billing_address}
-                onApplySavedAddress={handleApplySavedAddress}
-                back_label="Back to Create Account"
-                onProcessingChange={setCheckoutIsProcessing}
-                onCreditsChange={handleCreditsChange}
-                onStripeError={setStripePaymentError}
-              />
-            </div>
-            <div className="col-span-12 lg:col-span-4">
-              <UnifiedCartSummary
-                show_coupon_field
-                checkout_action={{
-                  total,
-                  is_processing: checkout_is_processing || is_submitting,
-                  onSubmit: () => checkout_ref.current?.triggerSubmit(),
-                }}
-                is_applying_credits={is_applying_credits}
-                credits_to_apply={credits_to_apply}
-                is_quantity_locked
-                on_back={handlePrevious}
-                back_label="Back to Create Account"
-                payment_error={stripe_payment_error ?? submit_error}
-              />
-            </div>
-          </div>
-        </Elements>
-      )}
+          {/* Checkout step */}
+          {current_step === "checkout" && (
+            <Elements stripe={getStripe()}>
+              <div className="space-y-6">
+                <CheckoutStep
+                  ref={checkout_ref}
+                  billing_address={billing_address}
+                  onBillingChange={handleBillingChange}
+                  onPrevious={handlePrevious}
+                  onComplete={handleComplete}
+                  onPayLater={() => handlePayLater(details_deferred)}
+                  is_loading={is_submitting}
+                  error_message={submit_error}
+                  total_amount={display_total}
+                  saved_billing_address={saved_billing_address}
+                  onApplySavedAddress={handleApplySavedAddress}
+                  back_label="Back to Create Account"
+                  onProcessingChange={setCheckoutIsProcessing}
+                  onCreditsChange={handleCreditsChange}
+                  onStripeError={setStripePaymentError}
+                />
+
+                {payment_error && (
+                  <div className="rounded-lg bg-error-50 p-3 text-sm text-error-600 dark:bg-error-500/10 dark:text-error-400">
+                    {payment_error}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => checkout_ref.current?.triggerSubmit()}
+                  disabled={checkout_is_processing || is_submitting}
+                  className="w-full rounded-full bg-coral-500 px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-coral-600 disabled:cursor-not-allowed disabled:bg-coral-300"
+                >
+                  {checkout_is_processing || is_submitting
+                    ? "Processing…"
+                    : `Pay $${display_total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                </button>
+              </div>
+            </Elements>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
