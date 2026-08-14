@@ -46,17 +46,15 @@ const PublicOrderPage: React.FC = () => {
     company: "",
   });
 
-  const getSuccessRedirect = useCallback(
-    (session_id: string) => `/?welcome=1&order_session=${session_id}`,
-    []
-  );
-
+  // No custom redirect is passed here, so once the payment workflow completes
+  // useUnifiedCheckout falls back to its default target, `/orders/session/{id}`,
+  // the same order receipt view every other checkout flow in the app lands on.
   const {
     is_submitting,
     submit_error,
     handleComplete: executeCheckout,
     handlePayLater,
-  } = useUnifiedCheckout(getSuccessRedirect);
+  } = useUnifiedCheckout();
 
   const checkout_ref = useRef<CheckoutStepHandle>(null);
   const [checkout_is_processing, setCheckoutIsProcessing] = useState(false);
