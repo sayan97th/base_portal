@@ -61,11 +61,11 @@ const PublicOrderSummary: React.FC<PublicOrderSummaryProps> = ({ className = "" 
     <div
       className={`flex shrink-0 flex-col bg-gradient-to-br from-cyan-400 via-teal-500 to-teal-700 p-7 text-white sm:p-9 ${className}`}
     >
-      <div className="flex flex-1 flex-col">
+      <div>
         <h2 className="text-lg font-bold text-white">Order Summary</h2>
 
         {has_items ? (
-          <div className="mt-6 flex-1 space-y-5">
+          <div className="mt-6 space-y-5">
             {sorted_items.map((item) => (
               <ItemGroup key={item.cart_item_id} item={item} />
             ))}
@@ -74,7 +74,7 @@ const PublicOrderSummary: React.FC<PublicOrderSummaryProps> = ({ className = "" 
           <p className="mt-6 text-sm text-white/75">Your order is empty.</p>
         )}
 
-        <div className="mt-8 border-t border-white/20 pt-5">
+        <div className="mt-6 border-t border-white/20 pt-5">
           <p className="text-xs text-white/70">Total</p>
           <p className="text-2xl font-bold text-white">${formatCurrency(total)}</p>
         </div>
