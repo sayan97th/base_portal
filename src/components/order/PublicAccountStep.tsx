@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { EyeCloseIcon, EyeIcon } from "@/icons";
 import { useAuth } from "@/context/AuthContext";
+import OtpInput from "@/components/auth/OtpInput";
 import type { ApiError } from "@/types/auth";
 
 interface PublicAccountStepProps {
@@ -11,6 +12,9 @@ interface PublicAccountStepProps {
   onBack: () => void;
   back_label?: string;
 }
+
+type AccountMode = "register" | "login";
+type LoginView = "credentials" | "two_factor";
 
 interface UnderlineFieldProps {
   label: string;
@@ -51,13 +55,25 @@ const UnderlineField: React.FC<UnderlineFieldProps> = ({
   </div>
 );
 
+const GoogleIcon: React.FC = () => (
+  <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M18.7511 10.1944C18.7511 9.47495 18.6915 8.94995 18.5626 8.40552H10.1797V11.6527H15.1003C15.0011 12.4597 14.4654 13.675 13.2749 14.4916L13.2582 14.6003L15.9087 16.6126L16.0924 16.6305C17.7788 15.1041 18.7511 12.8583 18.7511 10.1944Z" fill="#4285F4" />
+    <path d="M10.1788 18.75C12.5895 18.75 14.6133 17.9722 16.0915 16.6305L13.274 14.4916C12.5201 15.0068 11.5081 15.3666 10.1788 15.3666C7.81773 15.3666 5.81379 13.8402 5.09944 11.7305L4.99473 11.7392L2.23868 13.8295L2.20264 13.9277C3.67087 16.786 6.68674 18.75 10.1788 18.75Z" fill="#34A853" />
+    <path d="M5.10014 11.7305C4.91165 11.186 4.80257 10.6027 4.80257 9.99992C4.80257 9.3971 4.91165 8.81379 5.09022 8.26935L5.08523 8.1534L2.29464 6.02954L2.20333 6.0721C1.5982 7.25823 1.25098 8.5902 1.25098 9.99992C1.25098 11.4096 1.5982 12.7415 2.20333 13.9277L5.10014 11.7305Z" fill="#FBBC05" />
+    <path d="M10.1789 4.63331C11.8554 4.63331 12.9864 5.34303 13.6312 5.93612L16.1511 3.525C14.6035 2.11528 12.5895 1.25 10.1789 1.25C6.68676 1.25 3.67088 3.21387 2.20264 6.07218L5.08953 8.26943C5.81381 6.15972 7.81776 4.63331 10.1789 4.63331Z" fill="#EB4335" />
+  </svg>
+);
+
 const PublicAccountStep: React.FC<PublicAccountStepProps> = ({
   onNext,
   onBack,
   back_label = "Back to Review",
 }) => {
-  const { isAuthenticated, isLoading, register } = useAuth();
+  const { isAuthenticated, isLoading, register, login, loginWithTwoFactor } = useAuth();
 
+  const [mode, setMode] = useState<AccountMode>("register");
+
+  // ── Register form state ──────────────────────────────────────────────────
   const [first_name, setFirstName] = useState("");
   const [last_name, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -66,6 +82,20 @@ const PublicAccountStep: React.FC<PublicAccountStepProps> = ({
   const [show_password, setShowPassword] = useState(false);
   const [show_password_confirmation, setShowPasswordConfirmation] = useState(false);
   const [is_checked, setIsChecked] = useState(false);
+
+  // ── Login form state ─────────────────────────────────────────────────────
+  const [login_view, setLoginView] = useState<LoginView>("credentials");
+  const [login_email, setLoginEmail] = useState("");
+  const [login_password, setLoginPassword] = useState("");
+  const [show_login_password, setShowLoginPassword] = useState(false);
+
+  // ── Two-factor state (login only) ────────────────────────────────────────
+  const [two_factor_token, setTwoFactorToken] = useState("");
+  const [otp_code, setOtpCode] = useState("");
+  const [otp_error, setOtpError] = useState("");
+  const [is_verifying, setIsVerifying] = useState(false);
+
+  // ── Shared state ──────────────────────────────────────────────────────────
   const [error, setError] = useState("");
   const [field_errors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [is_submitting, setIsSubmitting] = useState(false);
@@ -79,18 +109,28 @@ const PublicAccountStep: React.FC<PublicAccountStepProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, isAuthenticated]);
 
+  const switchMode = (next_mode: AccountMode) => {
+    if (next_mode === mode) return;
+    setMode(next_mode);
+    setError("");
+    setFieldErrors({});
+    setLoginView("credentials");
+    setOtpError("");
+  };
+
   // Note: the Google OAuth round trip always lands on the dashboard, not back
   // on this wizard, since GoogleAuthController::redirect has no callback-url
   // parameter to preserve. The cart itself is safe (persisted in
   // localStorage), so the guest can resume checkout afterward, but they will
-  // not be dropped straight back into this flow.
-  const handleGoogleSignUp = () => {
+  // not be dropped straight back into this flow. Google works for both new
+  // and existing accounts (GoogleAuthController finds-or-creates the user).
+  const handleGoogleAuth = () => {
     setIsGoogleLoading(true);
     const api_url = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
     window.location.href = `${api_url}/api/auth/google/redirect`;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setFieldErrors({});
@@ -122,10 +162,124 @@ const PublicAccountStep: React.FC<PublicAccountStepProps> = ({
     }
   };
 
+  const handleLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setFieldErrors({});
+    setIsSubmitting(true);
+
+    try {
+      const result = await login({ email: login_email, password: login_password });
+
+      if (result.requires_two_factor) {
+        setTwoFactorToken(result.two_factor_token);
+        setLoginView("two_factor");
+        return;
+      }
+
+      onNext();
+    } catch (err: unknown) {
+      const api_error = err as ApiError;
+      if (api_error.errors) {
+        setFieldErrors(api_error.errors);
+      }
+      setError(api_error.message || "Invalid email or password.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleTwoFactorSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean_code = otp_code.replace(/\s/g, "");
+    if (clean_code.length < 6) {
+      setOtpError("Please enter the full 6-digit code.");
+      return;
+    }
+    setOtpError("");
+    setIsVerifying(true);
+
+    try {
+      await loginWithTwoFactor(two_factor_token, clean_code);
+      onNext();
+    } catch (err: unknown) {
+      const api_error = err as ApiError;
+      setOtpError(api_error.message || "Invalid verification code. Please try again.");
+      setOtpCode("");
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleBackToCredentials = () => {
+    setLoginView("credentials");
+    setOtpCode("");
+    setOtpError("");
+    setTwoFactorToken("");
+  };
+
   if (isLoading || isAuthenticated) {
     return (
       <div className="flex items-center justify-center py-24">
         <span className="h-6 w-6 animate-spin rounded-full border-2 border-gray-200 border-t-brand-500" />
+      </div>
+    );
+  }
+
+  // ── Two-factor step (login only) ──────────────────────────────────────────
+  if (login_view === "two_factor") {
+    return (
+      <div>
+        <div className="mb-8 flex flex-col items-center text-center">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-50 dark:bg-brand-500/10">
+            <svg className="h-8 w-8 text-brand-600 dark:text-brand-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+            </svg>
+          </div>
+          <h1 className="mb-2 text-2xl font-bold text-gray-900 dark:text-white">
+            Two-Factor Authentication
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Enter the 6-digit code from your authenticator app to continue.
+          </p>
+        </div>
+
+        <form onSubmit={handleTwoFactorSubmit}>
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <OtpInput value={otp_code} onChange={setOtpCode} error={!!otp_error} />
+              {otp_error && (
+                <p className="flex items-center justify-center gap-1.5 text-sm text-error-600 dark:text-error-400">
+                  <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                  </svg>
+                  {otp_error}
+                </p>
+              )}
+              <p className="text-center text-xs text-gray-400 dark:text-gray-500">
+                The code refreshes every 30 seconds.
+              </p>
+            </div>
+
+            <button
+              type="submit"
+              disabled={is_verifying || otp_code.replace(/\s/g, "").length < 6}
+              className="w-full rounded-full bg-coral-500 px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-coral-600 disabled:cursor-not-allowed disabled:bg-coral-300"
+            >
+              {is_verifying ? "Verifying…" : "Verify & Sign In"}
+            </button>
+          </div>
+        </form>
+
+        <div className="mt-6 text-center">
+          <button
+            type="button"
+            onClick={handleBackToCredentials}
+            className="text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+          >
+            ← Use a different account
+          </button>
+        </div>
       </div>
     );
   }
@@ -143,26 +297,55 @@ const PublicAccountStep: React.FC<PublicAccountStepProps> = ({
         {back_label}
       </button>
 
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Create Account</h1>
+      {/* Mode switcher: keep the guest's cart in place while they choose to
+          register or sign in, instead of navigating them away to /signin. */}
+      <div className="mb-6 grid grid-cols-2 rounded-full bg-gray-100 p-1 dark:bg-white/5">
+        <button
+          type="button"
+          onClick={() => switchMode("register")}
+          className={`rounded-full py-2.5 text-sm font-semibold transition-colors ${
+            mode === "register"
+              ? "bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white"
+              : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          }`}
+        >
+          Create Account
+        </button>
+        <button
+          type="button"
+          onClick={() => switchMode("login")}
+          className={`rounded-full py-2.5 text-sm font-semibold transition-colors ${
+            mode === "login"
+              ? "bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white"
+              : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          }`}
+        >
+          Sign In
+        </button>
+      </div>
+
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+        {mode === "register" ? "Create Account" : "Welcome Back"}
+      </h1>
+      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        {mode === "register"
+          ? "Save your order details and track every purchase from your account."
+          : "Sign in to pick up right where you left off."}
+      </p>
 
       <div className="mt-6 grid grid-cols-2 gap-3">
         <button
           type="button"
-          onClick={handleGoogleSignUp}
+          onClick={handleGoogleAuth}
           disabled={is_google_loading}
           className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-white/5 dark:text-white/90 dark:hover:bg-white/10"
         >
           {is_google_loading ? (
             <span className="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-gray-700 dark:border-white/20 dark:border-t-white" />
           ) : (
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M18.7511 10.1944C18.7511 9.47495 18.6915 8.94995 18.5626 8.40552H10.1797V11.6527H15.1003C15.0011 12.4597 14.4654 13.675 13.2749 14.4916L13.2582 14.6003L15.9087 16.6126L16.0924 16.6305C17.7788 15.1041 18.7511 12.8583 18.7511 10.1944Z" fill="#4285F4" />
-              <path d="M10.1788 18.75C12.5895 18.75 14.6133 17.9722 16.0915 16.6305L13.274 14.4916C12.5201 15.0068 11.5081 15.3666 10.1788 15.3666C7.81773 15.3666 5.81379 13.8402 5.09944 11.7305L4.99473 11.7392L2.23868 13.8295L2.20264 13.9277C3.67087 16.786 6.68674 18.75 10.1788 18.75Z" fill="#34A853" />
-              <path d="M5.10014 11.7305C4.91165 11.186 4.80257 10.6027 4.80257 9.99992C4.80257 9.3971 4.91165 8.81379 5.09022 8.26935L5.08523 8.1534L2.29464 6.02954L2.20333 6.0721C1.5982 7.25823 1.25098 8.5902 1.25098 9.99992C1.25098 11.4096 1.5982 12.7415 2.20333 13.9277L5.10014 11.7305Z" fill="#FBBC05" />
-              <path d="M10.1789 4.63331C11.8554 4.63331 12.9864 5.34303 13.6312 5.93612L16.1511 3.525C14.6035 2.11528 12.5895 1.25 10.1789 1.25C6.68676 1.25 3.67088 3.21387 2.20264 6.07218L5.08953 8.26943C5.81381 6.15972 7.81776 4.63331 10.1789 4.63331Z" fill="#EB4335" />
-            </svg>
+            <GoogleIcon />
           )}
-          {is_google_loading ? "Redirecting…" : "Login with Google"}
+          {is_google_loading ? "Redirecting…" : "Continue with Google"}
         </button>
 
         <button
@@ -174,7 +357,7 @@ const PublicAccountStep: React.FC<PublicAccountStepProps> = ({
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
             <path d="M22 12a10 10 0 1 0-11.56 9.88v-6.99H7.9V12h2.54V9.8c0-2.5 1.49-3.89 3.77-3.89 1.09 0 2.23.2 2.23.2v2.45h-1.26c-1.24 0-1.63.77-1.63 1.56V12h2.78l-.45 2.89h-2.33v6.99A10 10 0 0 0 22 12Z" />
           </svg>
-          Login with Facebook
+          Continue with Facebook
         </button>
       </div>
 
@@ -193,92 +376,131 @@ const PublicAccountStep: React.FC<PublicAccountStepProps> = ({
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-5">
-        <div className="grid grid-cols-2 gap-5">
+      {mode === "register" ? (
+        <form onSubmit={handleRegisterSubmit} className="space-y-5">
+          <div className="grid grid-cols-2 gap-5">
+            <UnderlineField
+              label="First Name"
+              value={first_name}
+              onChange={setFirstName}
+              error={field_errors.first_name?.[0]}
+            />
+            <UnderlineField
+              label="Last Name"
+              value={last_name}
+              onChange={setLastName}
+              error={field_errors.last_name?.[0]}
+            />
+          </div>
+
           <UnderlineField
-            label="First Name"
-            value={first_name}
-            onChange={setFirstName}
-            error={field_errors.first_name?.[0]}
+            label="Email Address"
+            type="email"
+            value={email}
+            onChange={setEmail}
+            error={field_errors.email?.[0]}
           />
+
           <UnderlineField
-            label="Last Name"
-            value={last_name}
-            onChange={setLastName}
-            error={field_errors.last_name?.[0]}
+            label="Password"
+            type={show_password ? "text" : "password"}
+            value={password}
+            onChange={setPassword}
+            error={field_errors.password?.[0]}
+            right_adornment={
+              <span onClick={() => setShowPassword((v) => !v)} className="cursor-pointer">
+                {show_password ? (
+                  <EyeIcon className="h-4 w-4 fill-gray-400" />
+                ) : (
+                  <EyeCloseIcon className="h-4 w-4 fill-gray-400" />
+                )}
+              </span>
+            }
           />
-        </div>
 
-        <UnderlineField
-          label="Email Address"
-          type="email"
-          value={email}
-          onChange={setEmail}
-          error={field_errors.email?.[0]}
-        />
-
-        <UnderlineField
-          label="Password"
-          type={show_password ? "text" : "password"}
-          value={password}
-          onChange={setPassword}
-          error={field_errors.password?.[0]}
-          right_adornment={
-            <span onClick={() => setShowPassword((v) => !v)} className="cursor-pointer">
-              {show_password ? (
-                <EyeIcon className="h-4 w-4 fill-gray-400" />
-              ) : (
-                <EyeCloseIcon className="h-4 w-4 fill-gray-400" />
-              )}
-            </span>
-          }
-        />
-
-        <UnderlineField
-          label="Verify Password"
-          type={show_password_confirmation ? "text" : "password"}
-          value={password_confirmation}
-          onChange={setPasswordConfirmation}
-          error={field_errors.password_confirmation?.[0]}
-          right_adornment={
-            <span onClick={() => setShowPasswordConfirmation((v) => !v)} className="cursor-pointer">
-              {show_password_confirmation ? (
-                <EyeIcon className="h-4 w-4 fill-gray-400" />
-              ) : (
-                <EyeCloseIcon className="h-4 w-4 fill-gray-400" />
-              )}
-            </span>
-          }
-        />
-
-        <label className="flex items-start gap-2.5 pt-2">
-          <input
-            type="checkbox"
-            checked={is_checked}
-            onChange={(e) => setIsChecked(e.target.checked)}
-            className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700"
+          <UnderlineField
+            label="Verify Password"
+            type={show_password_confirmation ? "text" : "password"}
+            value={password_confirmation}
+            onChange={setPasswordConfirmation}
+            error={field_errors.password_confirmation?.[0]}
+            right_adornment={
+              <span onClick={() => setShowPasswordConfirmation((v) => !v)} className="cursor-pointer">
+                {show_password_confirmation ? (
+                  <EyeIcon className="h-4 w-4 fill-gray-400" />
+                ) : (
+                  <EyeCloseIcon className="h-4 w-4 fill-gray-400" />
+                )}
+              </span>
+            }
           />
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            Creating an account means you&apos;re okay with our Terms of Service, Privacy Policy,
-            and default Notification Settings.
-          </span>
-        </label>
 
-        <button
-          type="submit"
-          disabled={is_submitting}
-          className="w-full rounded-full bg-coral-500 px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-coral-600 disabled:cursor-not-allowed disabled:bg-coral-300"
-        >
-          {is_submitting ? "Creating account…" : "Create Account"}
-        </button>
-      </form>
+          <label className="flex items-start gap-2.5 pt-2">
+            <input
+              type="checkbox"
+              checked={is_checked}
+              onChange={(e) => setIsChecked(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700"
+            />
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              Creating an account means you&apos;re okay with our Terms of Service, Privacy Policy,
+              and default Notification Settings.
+            </span>
+          </label>
 
-      <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
-        Already have an account?{" "}
-        <Link href="/signin?callbackUrl=/order" className="font-medium text-brand-500 hover:text-brand-600 dark:text-brand-400">
-          Sign In
-        </Link>
-      </p>
+          <button
+            type="submit"
+            disabled={is_submitting}
+            className="w-full rounded-full bg-coral-500 px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-coral-600 disabled:cursor-not-allowed disabled:bg-coral-300"
+          >
+            {is_submitting ? "Creating account…" : "Create Account"}
+          </button>
+        </form>
+      ) : (
+        <form onSubmit={handleLoginSubmit} className="space-y-5">
+          <UnderlineField
+            label="Email Address"
+            type="email"
+            value={login_email}
+            onChange={setLoginEmail}
+            error={field_errors.email?.[0]}
+          />
+
+          <UnderlineField
+            label="Password"
+            type={show_login_password ? "text" : "password"}
+            value={login_password}
+            onChange={setLoginPassword}
+            error={field_errors.password?.[0]}
+            right_adornment={
+              <span onClick={() => setShowLoginPassword((v) => !v)} className="cursor-pointer">
+                {show_login_password ? (
+                  <EyeIcon className="h-4 w-4 fill-gray-400" />
+                ) : (
+                  <EyeCloseIcon className="h-4 w-4 fill-gray-400" />
+                )}
+              </span>
+            }
+          />
+
+          <div className="flex justify-end">
+            <Link
+              href="/reset-password"
+              className="text-xs font-medium text-brand-500 hover:text-brand-600 dark:text-brand-400"
+            >
+              Forgot password?
+            </Link>
+          </div>
+
+          <button
+            type="submit"
+            disabled={is_submitting}
+            className="w-full rounded-full bg-coral-500 px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-coral-600 disabled:cursor-not-allowed disabled:bg-coral-300"
+          >
+            {is_submitting ? "Signing in…" : "Sign In"}
+          </button>
+        </form>
+      )}
     </div>
   );
 };
