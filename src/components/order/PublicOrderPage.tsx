@@ -47,7 +47,7 @@ const PublicOrderPage: React.FC = () => {
   });
 
   const getSuccessRedirect = useCallback(
-    (session_id: string) => `/dashboard?welcome=1&order_session=${session_id}`,
+    (session_id: string) => `/?welcome=1&order_session=${session_id}`,
     []
   );
 
