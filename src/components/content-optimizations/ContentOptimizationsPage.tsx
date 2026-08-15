@@ -28,18 +28,34 @@ const ContentOptimizationsPage: React.FC = () => {
   const [is_loading_tiers, setIsLoadingTiers] = useState(true);
   const [tiers_error, setTiersError] = useState<string | null>(null);
 
+  const {
+    items,
+    getQuantitiesForProductType,
+    setItemQuantity,
+    syncItemPrices,
+    item_count,
+    subtotal,
+    total,
+  } = useCart();
+
   const fetchTiers = useCallback(async () => {
     setIsLoadingTiers(true);
     setTiersError(null);
     try {
       const data = await contentOptimizationService.fetchTiers();
       setTiers(data.sort((a, b) => a.sort_order - b.sort_order));
+      // Reconcile any cart items with the current admin-configured price so a
+      // price change is reflected immediately, even for items added earlier.
+      syncItemPrices(
+        "content_optimization",
+        Object.fromEntries(data.map((t) => [t.id, t.price]))
+      );
     } catch {
       setTiersError("Failed to load optimization tiers. Please refresh the page.");
     } finally {
       setIsLoadingTiers(false);
     }
-  }, []);
+  }, [syncItemPrices]);
 
   useEffect(() => {
     fetchTiers();
@@ -55,14 +71,6 @@ const ContentOptimizationsPage: React.FC = () => {
     company: "",
   });
 
-  const {
-    items,
-    getQuantitiesForProductType,
-    setItemQuantity,
-    item_count,
-    subtotal,
-    total,
-  } = useCart();
   const { saved_billing_address, has_saved_address } = useBillingAddress();
   const { is_submitting, submit_error, handleComplete: executeCheckout, handlePayLater } =
     useUnifiedCheckout();

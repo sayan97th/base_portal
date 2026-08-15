@@ -47,6 +47,7 @@ const NewContentPage: React.FC = () => {
     items,
     getQuantitiesForProductType,
     setItemQuantity,
+    syncItemPrices,
     item_count,
     subtotal,
     total,
@@ -75,6 +76,12 @@ const NewContentPage: React.FC = () => {
     try {
       const tiers = await newContentService.fetchNewContentTiers();
       setNewContentTiers(tiers.filter((t) => t.is_active));
+      // Reconcile any cart items with the current admin-configured price so a
+      // price change is reflected immediately, even for items added earlier.
+      syncItemPrices(
+        "new_content",
+        Object.fromEntries(tiers.map((t) => [t.id, t.price]))
+      );
     } catch {
       setNewContentTiersError(
         "Failed to load article tiers. Showing default catalog."
@@ -82,7 +89,7 @@ const NewContentPage: React.FC = () => {
     } finally {
       setNewContentTiersLoading(false);
     }
-  }, []);
+  }, [syncItemPrices]);
 
   useEffect(() => {
     loadNewContentTiers();

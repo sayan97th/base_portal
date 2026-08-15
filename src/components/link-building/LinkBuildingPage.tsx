@@ -44,6 +44,7 @@ const LinkBuildingPage: React.FC = () => {
     items,
     getQuantitiesForProductType,
     setItemQuantity,
+    syncItemPrices,
     item_count,
     subtotal,
     total,
@@ -73,12 +74,18 @@ const LinkBuildingPage: React.FC = () => {
     try {
       const tiers = await linkBuildingService.fetchDrTiers();
       setDrTiers(tiers.filter((t) => t.is_active));
+      // Reconcile any cart items with the current admin-configured price so a
+      // price change is reflected immediately, even for items added earlier.
+      syncItemPrices(
+        "link_building",
+        Object.fromEntries(tiers.map((t) => [t.id, t.price_per_link]))
+      );
     } catch {
       setDrTiersError("Failed to load DR tiers. Showing default catalog.");
     } finally {
       setDrTiersLoading(false);
     }
-  }, []);
+  }, [syncItemPrices]);
 
   useEffect(() => {
     loadDrTiers();

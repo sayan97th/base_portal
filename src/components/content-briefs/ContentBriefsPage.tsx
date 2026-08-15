@@ -41,6 +41,7 @@ const ContentBriefsPage: React.FC = () => {
     items,
     getQuantitiesForProductType,
     setItemQuantity,
+    syncItemPrices,
     item_count,
     subtotal,
     total,
@@ -68,6 +69,12 @@ const ContentBriefsPage: React.FC = () => {
       .fetchTiers()
       .then((data) => {
         setTiers(data.filter((t) => t.is_active && !t.is_hidden));
+        // Reconcile any cart items with the current admin-configured price so a
+        // price change is reflected immediately, even for items added earlier.
+        syncItemPrices(
+          "content_brief",
+          Object.fromEntries(data.map((t) => [t.id, t.price]))
+        );
       })
       .catch(() => {
         setTiersError("Failed to load available tiers. Please refresh the page.");
@@ -75,7 +82,7 @@ const ContentBriefsPage: React.FC = () => {
       .finally(() => {
         setTiersLoading(false);
       });
-  }, []);
+  }, [syncItemPrices]);
 
   const selected_quantities = getQuantitiesForProductType("content_brief");
 

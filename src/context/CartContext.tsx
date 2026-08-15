@@ -92,6 +92,13 @@ export interface CartContextType {
     unit_price: number,
     quantity: number
   ) => void;
+  /** Reconciles cart item prices with the tier catalog's current price so a
+   *  price change made on the admin side is reflected immediately, even for
+   *  items that were added to the cart before the change. */
+  syncItemPrices: (
+    product_type: CartProductType,
+    prices_by_tier_id: Record<string, number>
+  ) => void;
   updateLinkBuildingKeywords: (
     tier_id: string,
     keyword_data: CartKeywordRow[]
@@ -280,6 +287,29 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             unit_price,
           },
         ];
+      });
+    },
+    []
+  );
+
+  const syncItemPrices = useCallback(
+    (product_type: CartProductType, prices_by_tier_id: Record<string, number>) => {
+      setItems((prev) => {
+        let has_changed = false;
+
+        const updated = prev.map((item) => {
+          if (item.product_type !== product_type) return item;
+
+          const current_price = prices_by_tier_id[item.tier_id];
+          if (current_price === undefined || current_price === item.unit_price) {
+            return item;
+          }
+
+          has_changed = true;
+          return { ...item, unit_price: current_price };
+        });
+
+        return has_changed ? updated : prev;
       });
     },
     []
@@ -593,6 +623,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         order_notes,
         is_cart_ready,
         setItemQuantity,
+        syncItemPrices,
         updateLinkBuildingKeywords,
         updateNewContentIntakeData,
         getIntakeDataForTier,
