@@ -44,22 +44,30 @@ const ContentOptimizationsPage: React.FC = () => {
     try {
       const data = await contentOptimizationService.fetchTiers();
       setTiers(data.sort((a, b) => a.sort_order - b.sort_order));
-      // Reconcile any cart items with the current admin-configured price so a
-      // price change is reflected immediately, even for items added earlier.
-      syncItemPrices(
-        "content_optimization",
-        Object.fromEntries(data.map((t) => [t.id, t.price]))
-      );
     } catch {
       setTiersError("Failed to load optimization tiers. Please refresh the page.");
     } finally {
       setIsLoadingTiers(false);
     }
-  }, [syncItemPrices]);
+  }, []);
 
   useEffect(() => {
     fetchTiers();
   }, [fetchTiers]);
+
+  // Reconciles cart items with the current admin-configured price. Re-runs
+  // whenever the cart's own items change (not just when tiers load) because
+  // the cart's server-side sync can resolve after this page's tier fetch and
+  // silently overwrite items with the stale price stored in that payload.
+  // syncItemPrices is a no-op once prices already match, so this is safe to
+  // re-run on every items/tiers change.
+  useEffect(() => {
+    if (tiers.length === 0) return;
+    syncItemPrices(
+      "content_optimization",
+      Object.fromEntries(tiers.map((t) => [t.id, t.price]))
+    );
+  }, [tiers, items, syncItemPrices]);
 
   const [current_step, setCurrentStep] = useState<Step>("selection");
   const [billing_address, setBillingAddress] = useState<BillingAddress>({

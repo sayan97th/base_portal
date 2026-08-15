@@ -69,12 +69,6 @@ const ContentBriefsPage: React.FC = () => {
       .fetchTiers()
       .then((data) => {
         setTiers(data.filter((t) => t.is_active && !t.is_hidden));
-        // Reconcile any cart items with the current admin-configured price so a
-        // price change is reflected immediately, even for items added earlier.
-        syncItemPrices(
-          "content_brief",
-          Object.fromEntries(data.map((t) => [t.id, t.price]))
-        );
       })
       .catch(() => {
         setTiersError("Failed to load available tiers. Please refresh the page.");
@@ -82,7 +76,21 @@ const ContentBriefsPage: React.FC = () => {
       .finally(() => {
         setTiersLoading(false);
       });
-  }, [syncItemPrices]);
+  }, []);
+
+  // Reconciles cart items with the current admin-configured price. Re-runs
+  // whenever the cart's own items change (not just when tiers load) because
+  // the cart's server-side sync can resolve after this page's tier fetch and
+  // silently overwrite items with the stale price stored in that payload.
+  // syncItemPrices is a no-op once prices already match, so this is safe to
+  // re-run on every items/tiers change.
+  useEffect(() => {
+    if (tiers.length === 0) return;
+    syncItemPrices(
+      "content_brief",
+      Object.fromEntries(tiers.map((t) => [t.id, t.price]))
+    );
+  }, [tiers, items, syncItemPrices]);
 
   const selected_quantities = getQuantitiesForProductType("content_brief");
 

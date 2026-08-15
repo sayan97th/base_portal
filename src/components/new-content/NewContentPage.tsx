@@ -76,12 +76,6 @@ const NewContentPage: React.FC = () => {
     try {
       const tiers = await newContentService.fetchNewContentTiers();
       setNewContentTiers(tiers.filter((t) => t.is_active));
-      // Reconcile any cart items with the current admin-configured price so a
-      // price change is reflected immediately, even for items added earlier.
-      syncItemPrices(
-        "new_content",
-        Object.fromEntries(tiers.map((t) => [t.id, t.price]))
-      );
     } catch {
       setNewContentTiersError(
         "Failed to load article tiers. Showing default catalog."
@@ -89,11 +83,25 @@ const NewContentPage: React.FC = () => {
     } finally {
       setNewContentTiersLoading(false);
     }
-  }, [syncItemPrices]);
+  }, []);
 
   useEffect(() => {
     loadNewContentTiers();
   }, [loadNewContentTiers]);
+
+  // Reconciles cart items with the current admin-configured price. Re-runs
+  // whenever the cart's own items change (not just when tiers load) because
+  // the cart's server-side sync can resolve after this page's tier fetch and
+  // silently overwrite items with the stale price stored in that payload.
+  // syncItemPrices is a no-op once prices already match, so this is safe to
+  // re-run on every items/tiers change.
+  useEffect(() => {
+    if (new_content_tiers.length === 0) return;
+    syncItemPrices(
+      "new_content",
+      Object.fromEntries(new_content_tiers.map((t) => [t.id, t.price]))
+    );
+  }, [new_content_tiers, items, syncItemPrices]);
 
   const selected_quantities = getQuantitiesForProductType("new_content");
 
