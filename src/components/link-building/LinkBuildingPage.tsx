@@ -44,6 +44,7 @@ const LinkBuildingPage: React.FC = () => {
     items,
     getQuantitiesForProductType,
     setItemQuantity,
+    syncItemPrices,
     item_count,
     subtotal,
     total,
@@ -83,6 +84,20 @@ const LinkBuildingPage: React.FC = () => {
   useEffect(() => {
     loadDrTiers();
   }, [loadDrTiers]);
+
+  // Reconciles cart items with the current admin-configured price. Re-runs
+  // whenever the cart's own items change (not just when tiers load) because
+  // the cart's server-side sync can resolve after this page's tier fetch and
+  // silently overwrite items with the stale price stored in that payload.
+  // syncItemPrices is a no-op once prices already match, so this is safe to
+  // re-run on every items/tiers change.
+  useEffect(() => {
+    if (dr_tiers.length === 0) return;
+    syncItemPrices(
+      "link_building",
+      Object.fromEntries(dr_tiers.map((t) => [t.id, t.price_per_link]))
+    );
+  }, [dr_tiers, items, syncItemPrices]);
 
   const selected_quantities = getQuantitiesForProductType("link_building");
 
