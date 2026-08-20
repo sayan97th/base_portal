@@ -40,6 +40,12 @@ function buildAuthContext(overrides: Partial<ReturnType<typeof useAuth>> = {}): 
   } as ReturnType<typeof useAuth>;
 }
 
+// "Create Account" also labels the register/login tab switcher, so a plain
+// role+name query is ambiguous — narrow to the form's submit button.
+function getSubmitButton(name: string) {
+  return screen.getAllByRole("button", { name }).find((btn) => btn.getAttribute("type") === "submit")!;
+}
+
 async function fillValidForm() {
   fireEvent.change(screen.getByPlaceholderText("First Name"), { target: { value: "Guest" } });
   fireEvent.change(screen.getByPlaceholderText("Last Name"), { target: { value: "Tester" } });
@@ -87,7 +93,7 @@ describe("PublicAccountStep", () => {
     expect(screen.getByPlaceholderText("Email Address")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Password")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Verify Password")).toBeInTheDocument();
-    expect(screen.getByText("Login with Google")).toBeInTheDocument();
+    expect(screen.getByText("Continue with Google")).toBeInTheDocument();
     expect(on_next).not.toHaveBeenCalled();
   });
 
@@ -95,7 +101,7 @@ describe("PublicAccountStep", () => {
     mockUseAuth.mockReturnValue(buildAuthContext());
     render(<PublicAccountStep onNext={on_next} onBack={on_back} />);
 
-    expect(screen.getByText("Login with Facebook").closest("button")).toBeDisabled();
+    expect(screen.getByText("Continue with Facebook").closest("button")).toBeDisabled();
   });
 
   it("blocks submission and shows an error when the terms checkbox is unchecked", async () => {
@@ -113,7 +119,7 @@ describe("PublicAccountStep", () => {
       target: { value: "Password123!" },
     });
     // Terms checkbox intentionally left unchecked.
-    fireEvent.click(screen.getByRole("button", { name: "Create Account" }));
+    fireEvent.click(getSubmitButton("Create Account"));
 
     await waitFor(() =>
       expect(
@@ -130,7 +136,7 @@ describe("PublicAccountStep", () => {
     render(<PublicAccountStep onNext={on_next} onBack={on_back} />);
 
     await fillValidForm();
-    fireEvent.click(screen.getByRole("button", { name: "Create Account" }));
+    fireEvent.click(getSubmitButton("Create Account"));
 
     await waitFor(() => expect(on_next).toHaveBeenCalledTimes(1));
     expect(register).toHaveBeenCalledWith({
@@ -152,7 +158,7 @@ describe("PublicAccountStep", () => {
     render(<PublicAccountStep onNext={on_next} onBack={on_back} />);
 
     await fillValidForm();
-    fireEvent.click(screen.getByRole("button", { name: "Create Account" }));
+    fireEvent.click(getSubmitButton("Create Account"));
 
     await waitFor(() =>
       expect(screen.getByText("The email has already been taken.")).toBeInTheDocument()
@@ -169,13 +175,17 @@ describe("PublicAccountStep", () => {
     expect(on_back).toHaveBeenCalledTimes(1);
   });
 
-  it("links to sign-in with a callback back to the order wizard", () => {
+  it("switches to the inline sign-in form without navigating away from the wizard", () => {
     mockUseAuth.mockReturnValue(buildAuthContext());
     render(<PublicAccountStep onNext={on_next} onBack={on_back} />);
 
-    expect(screen.getByText("Sign In").closest("a")).toHaveAttribute(
-      "href",
-      "/signin?callbackUrl=/order"
-    );
+    // Before switching, the tab is the only "Sign In" element on screen.
+    fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
+
+    expect(screen.getByRole("heading", { name: "Welcome Back" })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Email Address")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Password")).toBeInTheDocument();
+    // Now the tab and the form's submit button both read "Sign In".
+    expect(getSubmitButton("Sign In")).toBeInTheDocument();
   });
 });
