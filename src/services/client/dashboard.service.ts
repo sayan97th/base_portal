@@ -186,7 +186,7 @@ export interface DashboardTableRow {
   status: DisplayStatus;
   /** Live link once the placement goes live (populated from future tracking data) */
   live_link: string;
-  /** ISO date string when order was marked completed */
+  /** MM/DD/YYYY date string when the placement's live link went live, used as the order's completion date */
   completed_date: string;
   /** Internal DR value from the admin Link Building Orders dashboard, populated once the placement's live link is set */
   dr_lbs: string | null;
