@@ -88,7 +88,7 @@ export interface UseUnifiedCheckoutReturn {
  */
 export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
   const router = useRouter();
-  const { addNotification } = useNotifications();
+  const { addNotification, fetchNotifications } = useNotifications();
   const {
     items,
     applied_coupons,
@@ -272,7 +272,16 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
         // Fire-and-forget: the localStorage cache is the fallback if this fails.
         purchaseGroupsService.createPurchaseGroup(purchase_group).catch(() => {});
 
+        // Link building orders already get their "order placed" notification
+        // (and email) from the backend via the LinkBuildingOrderPlaced event
+        // and SendLinkBuildingOrderNotification listener, fired inside
+        // POST /api/cart/checkout right after the order is created. Creating
+        // one here too sent the client two near-identical "Order Update"
+        // emails for the same order. The other product types have no
+        // equivalent backend event yet, so they still rely on this call.
         for (const order of result.orders) {
+          if (order.product_type === "link_building") continue;
+
           const label = PRODUCT_TYPE_LABELS[order.product_type];
           const formatted_amount = order.total_amount.toLocaleString("en-US", {
             minimumFractionDigits: 2,
@@ -286,6 +295,13 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
           });
         }
 
+        // Refresh from the server so the notification bell picks up the
+        // link building order's backend-created notification right away
+        // instead of waiting for the next background poll.
+        if (result.orders.some((order) => order.product_type === "link_building")) {
+          fetchNotifications();
+        }
+
         clearCart();
 
         router.push(`/orders/session/${confirmed_group_id}`);
@@ -295,7 +311,7 @@ export function useUnifiedCheckout(): UseUnifiedCheckoutReturn {
         setIsSubmitting(false);
       }
     },
-    [items, applied_coupons, total, order_title, order_notes, clearCart, addNotification, router]
+    [items, applied_coupons, total, order_title, order_notes, clearCart, addNotification, fetchNotifications, router]
   );
 
   const handlePayLater = useCallback(async (defer_details?: boolean) => {
