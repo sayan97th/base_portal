@@ -553,28 +553,28 @@ const EmailInterceptorContent: React.FC = () => {
         </div>
 
         <div className="overflow-x-auto border-t border-gray-100 dark:border-gray-800">
-          <table className="w-full min-w-[720px] text-left text-sm">
+          <table className="w-full min-w-[720px] text-left text-xs">
             <thead>
-              <tr className="border-b border-gray-100 text-xs uppercase tracking-wide text-gray-400 dark:border-gray-800 dark:text-gray-500">
-                <th className="px-6 py-3 font-medium">Email</th>
-                <th className="px-3 py-3 font-medium">Audience</th>
-                <th className="px-3 py-3 font-medium">Trigger</th>
-                <th className="px-6 py-3 font-medium">Delay</th>
+              <tr className="border-b border-gray-100 uppercase tracking-wide text-gray-400 dark:border-gray-800 dark:text-gray-500">
+                <th className="px-4 py-2 font-medium">Email</th>
+                <th className="px-2 py-2 font-medium">Audience</th>
+                <th className="px-2 py-2 font-medium">Trigger</th>
+                <th className="px-4 py-2 font-medium">Delay</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {filtered_catalog.map((entry) => (
                 <tr key={entry.name}>
-                  <td className="px-6 py-3.5 align-top font-medium text-gray-900 dark:text-white">
+                  <td className="whitespace-nowrap px-4 py-1.5 font-medium leading-snug text-gray-900 dark:text-white">
                     {entry.name}
                   </td>
-                  <td className="px-3 py-3.5 align-top">
+                  <td className="px-2 py-1.5 leading-snug">
                     <AudienceBadge audience={entry.audience} />
                   </td>
-                  <td className="px-3 py-3.5 align-top text-gray-600 dark:text-gray-400">
+                  <td className="px-2 py-1.5 leading-snug text-gray-600 dark:text-gray-400">
                     {entry.trigger}
                   </td>
-                  <td className="px-6 py-3.5 align-top text-gray-500 dark:text-gray-500">
+                  <td className="px-4 py-1.5 leading-snug text-gray-500 dark:text-gray-500">
                     {entry.delay}
                   </td>
                 </tr>
@@ -613,32 +613,32 @@ const EmailInterceptorContent: React.FC = () => {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] text-left text-sm">
+              <table className="w-full min-w-[720px] text-left text-xs">
                 <thead>
-                  <tr className="border-b border-gray-100 text-xs uppercase tracking-wide text-gray-400 dark:border-gray-800 dark:text-gray-500">
-                    <th className="px-6 py-3 font-medium">When</th>
-                    <th className="px-3 py-3 font-medium">Email</th>
-                    <th className="px-3 py-3 font-medium">Audience</th>
-                    <th className="px-3 py-3 font-medium">Original recipient</th>
-                    <th className="px-6 py-3 font-medium">Copied to</th>
+                  <tr className="border-b border-gray-100 uppercase tracking-wide text-gray-400 dark:border-gray-800 dark:text-gray-500">
+                    <th className="px-4 py-2 font-medium">When</th>
+                    <th className="px-2 py-2 font-medium">Email</th>
+                    <th className="px-2 py-2 font-medium">Audience</th>
+                    <th className="px-2 py-2 font-medium">Original recipient</th>
+                    <th className="px-4 py-2 font-medium">Copied to</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                   {logs.map((log_entry, index) => (
                     <tr key={`${log_entry.intercepted_at}-${index}`}>
-                      <td className="whitespace-nowrap px-6 py-3 text-gray-500 dark:text-gray-400">
+                      <td className="whitespace-nowrap px-4 py-1.5 leading-snug text-gray-500 dark:text-gray-400">
                         {formatTimestamp(log_entry.intercepted_at)}
                       </td>
-                      <td className="px-3 py-3 font-medium text-gray-900 dark:text-white">
+                      <td className="whitespace-nowrap px-2 py-1.5 font-medium leading-snug text-gray-900 dark:text-white">
                         {formatMailableName(log_entry.mailable_class)}
                       </td>
-                      <td className="px-3 py-3">
+                      <td className="px-2 py-1.5 leading-snug">
                         <AudienceBadge audience={log_entry.audience} />
                       </td>
-                      <td className="px-3 py-3 text-gray-600 dark:text-gray-400">
+                      <td className="whitespace-nowrap px-2 py-1.5 leading-snug text-gray-600 dark:text-gray-400">
                         {log_entry.original_recipient_email}
                       </td>
-                      <td className="px-6 py-3 text-gray-500 dark:text-gray-500">
+                      <td className="px-4 py-1.5 leading-snug text-gray-500 dark:text-gray-500">
                         {log_entry.copied_to_emails.join(", ")}
                       </td>
                     </tr>
