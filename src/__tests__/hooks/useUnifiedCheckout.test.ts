@@ -90,9 +90,10 @@ describe("useUnifiedCheckout success redirect", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseCart.mockReturnValue(baseCartMock());
-    mockUseNotifications.mockReturnValue({ addNotification: jest.fn() } as unknown as ReturnType<
-      typeof useNotifications
-    >);
+    mockUseNotifications.mockReturnValue({
+      addNotification: jest.fn(),
+      fetchNotifications: jest.fn(),
+    } as unknown as ReturnType<typeof useNotifications>);
     mockCheckout.mockResolvedValue({
       session_id: SESSION_ID,
       orders: [{ order_id: "BL-1", product_type: "link_building", total_amount: 100 }],
