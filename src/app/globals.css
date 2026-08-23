@@ -145,6 +145,9 @@
 
   --color-theme-purple-500: #7a5af8;
 
+  --color-theme-cyan-500: #00eff9;
+  --color-theme-cyan-900: #013a40;
+
   --shadow-theme-md:
     0px 4px 8px -2px rgba(16, 24, 40, 0.1),
     0px 2px 4px -2px rgba(16, 24, 40, 0.06);

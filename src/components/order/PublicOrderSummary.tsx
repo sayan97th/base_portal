@@ -59,7 +59,7 @@ const PublicOrderSummary: React.FC<PublicOrderSummaryProps> = ({ className = "" 
 
   return (
     <div
-      className={`flex shrink-0 flex-col bg-gradient-to-br from-cyan-400 via-teal-500 to-teal-700 p-7 text-white sm:p-9 ${className}`}
+      className={`flex shrink-0 flex-col bg-gradient-to-br from-theme-cyan-500 to-theme-cyan-900 p-7 text-white sm:p-9 ${className}`}
     >
       <div>
         <h2 className="text-lg font-bold text-white">Order Summary</h2>
