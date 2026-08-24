@@ -183,16 +183,52 @@ describe("PublicOrderPage", () => {
 
   it("hydrates the cart from the `cart` query param on mount", () => {
     const set_item_quantity = jest.fn();
+    const clear_cart = jest.fn();
     search_params_value = encodePublicOrderCart([
       { product_type: "link_building", tier_id: "dr40", tier_name: "DR 40+", unit_price: 130, quantity: 2 },
     ]);
     mockUseCart.mockReturnValue(
-      buildCartContext({ is_cart_ready: true, items: [], item_count: 0, setItemQuantity: set_item_quantity })
+      buildCartContext({
+        is_cart_ready: true,
+        items: [],
+        item_count: 0,
+        setItemQuantity: set_item_quantity,
+        clearCart: clear_cart,
+      })
     );
 
     render(<PublicOrderPage />);
 
     expect(set_item_quantity).toHaveBeenCalledWith("link_building", "dr40", "DR 40+", 130, 2);
+  });
+
+  it("clears any pre-existing cart before hydrating from the link, so a stale local/server cart can't carry extra items into checkout", () => {
+    const call_order: string[] = [];
+    const clear_cart = jest.fn(() => call_order.push("clearCart"));
+    const set_item_quantity = jest.fn(() => call_order.push("setItemQuantity"));
+
+    search_params_value = encodePublicOrderCart([
+      { product_type: "link_building", tier_id: "dr40", tier_name: "DR 40+", unit_price: 130, quantity: 2 },
+    ]);
+
+    // Simulate a leftover cart already sitting in the shared CartContext
+    // (e.g. a stale localStorage snapshot, or a previously logged-in
+    // account's saved server cart) at the moment this page hydrates.
+    mockUseCart.mockReturnValue(
+      buildCartContext({
+        is_cart_ready: true,
+        items: [makeCartItem({ tier_id: "stale-tier" })],
+        item_count: 5,
+        setItemQuantity: set_item_quantity,
+        clearCart: clear_cart,
+      })
+    );
+
+    render(<PublicOrderPage />);
+
+    expect(clear_cart).toHaveBeenCalledTimes(1);
+    expect(set_item_quantity).toHaveBeenCalledWith("link_building", "dr40", "DR 40+", 130, 2);
+    expect(call_order).toEqual(["clearCart", "setItemQuantity"]);
   });
 
   it("lands on the intake step when the cart has an item that needs intake details", () => {

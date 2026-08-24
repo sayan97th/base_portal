@@ -32,6 +32,7 @@ const PublicOrderPage: React.FC = () => {
     subtotal,
     total,
     setItemQuantity,
+    clearCart,
     is_cart_ready,
   } = useCart();
   const { saved_billing_address } = useBillingAddress();
@@ -81,11 +82,18 @@ const PublicOrderPage: React.FC = () => {
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
   // Hydrate the cart from the link's `cart` query param once, on first load.
+  // The link is the single source of truth for this order, so any cart the
+  // shared CartContext already holds (a leftover localStorage snapshot from a
+  // prior visit, or another order saved server-side against this browser's
+  // logged-in account) is cleared first rather than merged with the decoded
+  // items — merging was letting stale items ride along into checkout.
   useEffect(() => {
     if (!is_cart_ready || has_hydrated_cart.current) return;
     has_hydrated_cart.current = true;
 
     const decoded_items = decodePublicOrderCart(search_params.get("cart"));
+
+    clearCart();
     for (const decoded_item of decoded_items) {
       setItemQuantity(
         decoded_item.product_type,
@@ -95,7 +103,7 @@ const PublicOrderPage: React.FC = () => {
         decoded_item.quantity
       );
     }
-  }, [is_cart_ready, search_params, setItemQuantity]);
+  }, [is_cart_ready, search_params, setItemQuantity, clearCart]);
 
   // Once the cart has settled, land on "intake" if any item needs intake
   // details, otherwise skip straight to "review".
