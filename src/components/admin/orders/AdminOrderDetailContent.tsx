@@ -16,6 +16,7 @@ import type {
 } from "@/types/admin";
 import OrderTrackingPanel from "./OrderTrackingPanel";
 import AdminOrderComments from "./AdminOrderComments";
+import { ActionsDropdown, DeleteOrderDialog } from "./OrderActionDialogs";
 
 interface AdminOrderDetailContentProps {
   order_id?: string;
@@ -601,6 +602,7 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
   const [current_status, setCurrentStatus] = useState<OrderStatus | null>(null);
   const [is_loading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [delete_dialog_open, setDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -805,6 +807,9 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
               </p>
             </div>
             <div className="flex items-center gap-2">
+              {!is_session_view && (
+                <ActionsDropdown onSelect={() => setDeleteDialogOpen(true)} />
+              )}
               {!is_session_view && order.product_type && PRODUCT_TYPE_INTAKE_PATH[order.product_type] && (
                 <Link
                   href={`/admin/${PRODUCT_TYPE_INTAKE_PATH[order.product_type]}/orders/${order.id}/intake`}
@@ -1159,8 +1164,15 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
             </div>
           </div>
 
-          
         </>
+      )}
+
+      {delete_dialog_open && order && (
+        <DeleteOrderDialog
+          order={order}
+          onClose={() => setDeleteDialogOpen(false)}
+          onSuccess={() => setDeleteDialogOpen(false)}
+        />
       )}
     </div>
   );

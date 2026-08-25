@@ -54,6 +54,13 @@ export async function getAdminOrder(order_id: string): Promise<AdminOrder> {
 }
 
 /**
+ * Permanently deletes an order. Roles allowed: super_admin, admin.
+ */
+export async function deleteAdminOrder(order_id: string): Promise<void> {
+  return apiClient.delete<void>(`/api/admin/orders/${order_id}`);
+}
+
+/**
  * List link-building orders — admin filtered view (paginated).
  * Roles allowed: super_admin only.
  * Supports per_page and optional status filter.
