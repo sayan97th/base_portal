@@ -98,10 +98,21 @@ const triggerSubmit = jest.fn();
 
 jest.mock("@/components/shared/CheckoutStep", () => {
   const React = require("react");
-  const MockCheckoutStep = React.forwardRef((_props: unknown, ref: React.Ref<{ triggerSubmit: () => void }>) => {
-    React.useImperativeHandle(ref, () => ({ triggerSubmit }));
-    return <div data-testid="checkout-step" />;
-  });
+  const MockCheckoutStep = React.forwardRef(
+    (
+      props: { onPayLaterSelectionChange?: (is_pay_later_selected: boolean) => void },
+      ref: React.Ref<{ triggerSubmit: () => void }>
+    ) => {
+      React.useImperativeHandle(ref, () => ({ triggerSubmit }));
+      return (
+        <div data-testid="checkout-step">
+          <button type="button" onClick={() => props.onPayLaterSelectionChange?.(true)}>
+            MockSelectPayLater
+          </button>
+        </div>
+      );
+    }
+  );
   MockCheckoutStep.displayName = "MockCheckoutStep";
   return { __esModule: true, default: MockCheckoutStep };
 });
@@ -283,5 +294,26 @@ describe("PublicOrderPage", () => {
 
     fireEvent.click(screen.getByText("Pay $200.00"));
     expect(triggerSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it("relabels the submit button to Request Invoice once the Pay Later method is selected", async () => {
+    mockUseCart.mockReturnValue(
+      buildCartContext({ items: [makeCartItem()], item_count: 2, total: 200 })
+    );
+    render(<PublicOrderPage />);
+
+    fireEvent.click(screen.getByText("MockIntakeNext"));
+    await waitFor(() => screen.getByTestId("review-step"));
+    fireEvent.click(screen.getByText("MockReviewNext"));
+    await waitFor(() => screen.getByTestId("account-step"));
+    fireEvent.click(screen.getByText("MockAccountNext"));
+    await waitFor(() => screen.getByTestId("checkout-step"));
+
+    expect(screen.getByText("Pay $200.00")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("MockSelectPayLater"));
+
+    expect(screen.getByText("Request Invoice")).toBeInTheDocument();
+    expect(screen.queryByText("Pay $200.00")).not.toBeInTheDocument();
   });
 });

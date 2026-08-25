@@ -62,6 +62,7 @@ const PublicOrderPage: React.FC = () => {
   const [stripe_payment_error, setStripePaymentError] = useState<string | null>(null);
   const [is_applying_credits, setIsApplyingCredits] = useState(false);
   const [details_deferred, setDetailsDeferred] = useState(false);
+  const [is_pay_later_selected, setIsPayLaterSelected] = useState(false);
 
   const handleCreditsChange = useCallback((is_applying: boolean) => {
     setIsApplyingCredits(is_applying);
@@ -253,6 +254,7 @@ const PublicOrderPage: React.FC = () => {
                   onProcessingChange={setCheckoutIsProcessing}
                   onCreditsChange={handleCreditsChange}
                   onStripeError={setStripePaymentError}
+                  onPayLaterSelectionChange={setIsPayLaterSelected}
                 />
 
                 {payment_error && (
@@ -269,6 +271,8 @@ const PublicOrderPage: React.FC = () => {
                 >
                   {checkout_is_processing || is_submitting
                     ? "Processing…"
+                    : is_pay_later_selected
+                    ? "Request Invoice"
                     : `Pay $${display_total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 </button>
               </div>

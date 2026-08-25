@@ -84,7 +84,15 @@ const mockUseElements = useElements as jest.MockedFunction<typeof useElements>;
 
 // ─── Test harness: mirrors how the real product pages wire billing_address ────
 
-function Harness({ onComplete }: { onComplete: (payment_intent_id: string, is_using_saved: boolean) => void }) {
+function Harness({
+  onComplete,
+  onPayLater,
+  onPayLaterSelectionChange,
+}: {
+  onComplete: (payment_intent_id: string, is_using_saved: boolean) => void;
+  onPayLater?: () => void;
+  onPayLaterSelectionChange?: (is_pay_later_selected: boolean) => void;
+}) {
   const [billing_address, setBillingAddress] = useState<BillingAddress>({
     address: "",
     city: "",
@@ -103,6 +111,8 @@ function Harness({ onComplete }: { onComplete: (payment_intent_id: string, is_us
         onBillingChange={(field, value) => setBillingAddress((prev) => ({ ...prev, [field]: value }))}
         onPrevious={() => {}}
         onComplete={onComplete}
+        onPayLater={onPayLater}
+        onPayLaterSelectionChange={onPayLaterSelectionChange}
         total_amount={100}
       />
       <button onClick={() => checkout_ref.current?.triggerSubmit()}>Submit Checkout</button>
@@ -225,5 +235,46 @@ describe("CheckoutStep — save card for future purchases", () => {
     );
 
     console_error_spy.mockRestore();
+  });
+});
+
+describe("CheckoutStep — Pay Later selection", () => {
+  it("reports the Pay Later selection to the parent when chosen and cleared", async () => {
+    const on_pay_later_selection_change = jest.fn();
+    render(
+      <Harness
+        onComplete={jest.fn()}
+        onPayLater={jest.fn()}
+        onPayLaterSelectionChange={on_pay_later_selection_change}
+      />
+    );
+
+    await waitFor(() => expect(screen.getByText("Pay Later")).toBeInTheDocument());
+    on_pay_later_selection_change.mockClear();
+
+    fireEvent.click(screen.getByText("Pay Later"));
+    await waitFor(() => expect(on_pay_later_selection_change).toHaveBeenCalledWith(true));
+    on_pay_later_selection_change.mockClear();
+
+    // Clicking the selected Pay Later option again deselects it.
+    fireEvent.click(screen.getByText("Pay Later"));
+    await waitFor(() => expect(on_pay_later_selection_change).toHaveBeenCalledWith(false));
+  });
+
+  it("calls onPayLater instead of charging a card when Pay Later is selected and submitted", async () => {
+    const on_complete = jest.fn();
+    const on_pay_later = jest.fn();
+    render(<Harness onComplete={on_complete} onPayLater={on_pay_later} />);
+
+    await waitFor(() => expect(screen.getByText("Pay Later")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Pay Later"));
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("Submit Checkout"));
+    });
+
+    expect(on_pay_later).toHaveBeenCalledTimes(1);
+    expect(on_complete).not.toHaveBeenCalled();
+    expect(mockConfirmCardPayment).not.toHaveBeenCalled();
   });
 });

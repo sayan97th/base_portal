@@ -45,6 +45,10 @@ interface CheckoutStepProps {
   back_label?: string;
   onProcessingChange?: (is_processing: boolean) => void;
   onCreditsChange?: (is_applying: boolean, credits_to_apply: number) => void;
+  /** Called whenever the "Pay Later" payment method is selected or deselected.
+   *  Used by the parent to swap the outer submit button's label (e.g. to
+   *  "Request Invoice") when the client opts to pay later instead of now. */
+  onPayLaterSelectionChange?: (is_pay_later_selected: boolean) => void;
   /** Called whenever a Stripe-level payment error occurs or is cleared. Used by
    *  the parent to surface the error in the order summary panel next to the
    *  checkout button so the user sees it regardless of scroll position. */
@@ -411,6 +415,7 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
   onProcessingChange,
   onCreditsChange,
   onStripeError,
+  onPayLaterSelectionChange,
 }, ref) {
   const stripe = useStripe();
   const elements = useElements();
@@ -466,6 +471,10 @@ const CheckoutStep = forwardRef<CheckoutStepHandle, CheckoutStepProps>(function 
   const is_pay_later = selected_profile_id === "pay_later";
   const is_using_saved = selected_profile_id !== null && selected_profile_id !== "new" && !is_pay_later;
   const no_payment_method_selected = selected_profile_id === null;
+
+  useEffect(() => {
+    onPayLaterSelectionChange?.(is_pay_later);
+  }, [is_pay_later, onPayLaterSelectionChange]);
 
   useEffect(() => {
     async function loadProfiles() {
