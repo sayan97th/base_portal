@@ -33,6 +33,9 @@ interface CreateOrderApiResponse {
   data: CreateOrderResponse;
 }
 
+/** Bound used by fetchAllOrders() to keep the dashboard's single order-history request a prudent size. */
+const ORDERS_FETCH_LIMIT = 100;
+
 export const linkBuildingService = {
   async fetchDrTiers(): Promise<DrTier[]> {
     const response = await apiClient.get<DrTiersResponse>("/api/dr-tiers");
@@ -45,39 +48,24 @@ export const linkBuildingService = {
   },
 
   /**
-   * Fetches the client's complete order history by walking every page of
-   * GET /api/link-building/orders. A single-page request (the previous
-   * implementation) silently truncated to the endpoint's default per_page
-   * of 10, which made the dashboard's Order History widget and stats cards
-   * lose any order older than the 10 most recent, which is why an account
-   * with two years of history could appear to have no orders before last
-   * month.
+   * Fetches the client's order history for the dashboard's Order History
+   * widget and stats cards, in a single bounded request. The previous
+   * implementation called GET /api/link-building/orders with no page or
+   * per_page, which silently truncated to the endpoint's default of 10 and
+   * made any order older than the 10 most recent disappear.
+   *
+   * ORDERS_FETCH_LIMIT is intentionally a single, prudent page rather than
+   * a loop that walks every page of a client's full history. Order History
+   * only ever displays the last 6 months, so this stays a fixed, single
+   * request even for accounts with years of orders.
    */
   async fetchAllOrders(): Promise<LinkBuildingOrderSummary[]> {
-    const max_per_page = 200;
-    // Safety valve only: at 200 orders per page this allows up to 4000
-    // orders before giving up, far beyond what any real account should have.
-    const max_pages = 20;
+    const result = await linkBuildingService.fetchMyOrders({
+      page: 1,
+      per_page: ORDERS_FETCH_LIMIT,
+    });
 
-    let all_orders: LinkBuildingOrderSummary[] = [];
-    let page = 1;
-
-    while (page <= max_pages) {
-      const result = await linkBuildingService.fetchMyOrders({
-        page,
-        per_page: max_per_page,
-      });
-
-      all_orders = all_orders.concat(result.data);
-
-      if (page >= result.last_page || result.data.length === 0) {
-        break;
-      }
-
-      page += 1;
-    }
-
-    return all_orders;
+    return result.data;
   },
 
   async fetchMyOrders(

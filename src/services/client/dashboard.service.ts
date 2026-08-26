@@ -129,36 +129,6 @@ export const getMonthlyBreakdown = (
   return result;
 };
 
-/**
- * Decides how many months the Order History widget should render: at least
- * DEFAULT_MONTHLY_BREAKDOWN_MONTHS, extended to cover the account's full
- * lifetime for older accounts so historical spend is never cut off, capped
- * at MAX_MONTHLY_BREAKDOWN_MONTHS so the widget cannot grow unbounded.
- */
-export const getVisibleMonthsCount = (
-  account_created_at: string | null | undefined
-): number => {
-  if (!account_created_at) {
-    return DEFAULT_MONTHLY_BREAKDOWN_MONTHS;
-  }
-
-  const created = new Date(account_created_at);
-  if (Number.isNaN(created.getTime())) {
-    return DEFAULT_MONTHLY_BREAKDOWN_MONTHS;
-  }
-
-  const now = new Date();
-  const months_since_created =
-    (now.getFullYear() - created.getFullYear()) * 12 +
-    (now.getMonth() - created.getMonth()) +
-    1;
-
-  return Math.min(
-    MAX_MONTHLY_BREAKDOWN_MONTHS,
-    Math.max(DEFAULT_MONTHLY_BREAKDOWN_MONTHS, months_since_created)
-  );
-};
-
 // ── Status Mapping ────────────────────────────────────────────────────────────
 
 export type DisplayStatus =
@@ -391,6 +361,5 @@ export const dashboardService = {
   downloadOrderPlacements,
   computeStats,
   getMonthlyBreakdown,
-  getVisibleMonthsCount,
   mapOrderStatus,
 };
