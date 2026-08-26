@@ -8,6 +8,8 @@ import { getMonthlyBreakdown } from "@/services/client/dashboard.service";
 interface Props {
   orders: LinkBuildingOrderSummary[];
   is_loading: boolean;
+  /** Number of months to show, oldest-account-aware. See getVisibleMonthsCount(). */
+  months_count?: number;
 }
 
 function RowSkeleton() {
@@ -21,8 +23,12 @@ function RowSkeleton() {
   );
 }
 
-export default function OrderHistory({ orders, is_loading }: Props) {
-  const monthly_data = getMonthlyBreakdown(orders, 3);
+/** Rows beyond this count scroll instead of stretching the card taller than its neighbors. */
+const MAX_VISIBLE_ROWS_BEFORE_SCROLL = 6;
+
+export default function OrderHistory({ orders, is_loading, months_count = 6 }: Props) {
+  const monthly_data = getMonthlyBreakdown(orders, months_count);
+  const needs_scroll = monthly_data.length > MAX_VISIBLE_ROWS_BEFORE_SCROLL;
 
   return (
     <div className="flex h-full flex-col rounded-2xl border border-gray-200 bg-white px-5 pb-5 pt-5 dark:border-gray-800 dark:bg-white/3 sm:px-6 sm:pt-6">
@@ -48,7 +54,11 @@ export default function OrderHistory({ orders, is_loading }: Props) {
       </div>
 
       {/* Rows */}
-      <div className="space-y-4">
+      <div
+        className={`space-y-4 ${
+          needs_scroll ? "max-h-[280px] overflow-y-auto pr-1" : ""
+        }`}
+      >
         {is_loading ? (
           <>
             <RowSkeleton />

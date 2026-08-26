@@ -52,14 +52,41 @@ export interface MonthlyOrderData {
   is_current_month: boolean;
 }
 
+/** Default number of months shown when the caller does not request a specific window. */
+const DEFAULT_MONTHLY_BREAKDOWN_MONTHS = 6;
+
+/** Hard ceiling on how far back the breakdown will ever look, regardless of account age. */
+const MAX_MONTHLY_BREAKDOWN_MONTHS = 24;
+
+/**
+ * Some orders migrated from the previous platform carry a created_at that
+ * failed to parse, or a total_amount/items_count that was not fully
+ * reconciled during import. Those orders are excluded from the monthly
+ * bucketing below rather than allowed to throw or silently corrupt a
+ * month's totals with NaN.
+ */
+const isUsableOrder = (order: LinkBuildingOrderSummary): boolean => {
+  const parsed_date = new Date(order.created_at);
+  return (
+    !Number.isNaN(parsed_date.getTime()) &&
+    Number.isFinite(order.total_amount) &&
+    Number.isFinite(order.items_count)
+  );
+};
+
 export const getMonthlyBreakdown = (
   orders: LinkBuildingOrderSummary[],
-  months_count = 3
+  months_count = DEFAULT_MONTHLY_BREAKDOWN_MONTHS
 ): MonthlyOrderData[] => {
   const now = new Date();
   const result: MonthlyOrderData[] = [];
+  const usable_orders = orders.filter(isUsableOrder);
+  const clamped_months_count = Math.min(
+    Math.max(1, months_count),
+    MAX_MONTHLY_BREAKDOWN_MONTHS
+  );
 
-  for (let i = 0; i < months_count; i++) {
+  for (let i = 0; i < clamped_months_count; i++) {
     const target = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const month_key = `${target.getFullYear()}-${String(
       target.getMonth() + 1
@@ -69,7 +96,7 @@ export const getMonthlyBreakdown = (
       year: "numeric",
     });
 
-    const month_orders = orders.filter((o) => {
+    const month_orders = usable_orders.filter((o) => {
       const d = new Date(o.created_at);
       return (
         d.getFullYear() === target.getFullYear() &&
@@ -100,6 +127,36 @@ export const getMonthlyBreakdown = (
   }
 
   return result;
+};
+
+/**
+ * Decides how many months the Order History widget should render: at least
+ * DEFAULT_MONTHLY_BREAKDOWN_MONTHS, extended to cover the account's full
+ * lifetime for older accounts so historical spend is never cut off, capped
+ * at MAX_MONTHLY_BREAKDOWN_MONTHS so the widget cannot grow unbounded.
+ */
+export const getVisibleMonthsCount = (
+  account_created_at: string | null | undefined
+): number => {
+  if (!account_created_at) {
+    return DEFAULT_MONTHLY_BREAKDOWN_MONTHS;
+  }
+
+  const created = new Date(account_created_at);
+  if (Number.isNaN(created.getTime())) {
+    return DEFAULT_MONTHLY_BREAKDOWN_MONTHS;
+  }
+
+  const now = new Date();
+  const months_since_created =
+    (now.getFullYear() - created.getFullYear()) * 12 +
+    (now.getMonth() - created.getMonth()) +
+    1;
+
+  return Math.min(
+    MAX_MONTHLY_BREAKDOWN_MONTHS,
+    Math.max(DEFAULT_MONTHLY_BREAKDOWN_MONTHS, months_since_created)
+  );
 };
 
 // ── Status Mapping ────────────────────────────────────────────────────────────
@@ -334,5 +391,6 @@ export const dashboardService = {
   downloadOrderPlacements,
   computeStats,
   getMonthlyBreakdown,
+  getVisibleMonthsCount,
   mapOrderStatus,
 };

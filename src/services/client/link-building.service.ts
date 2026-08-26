@@ -23,10 +23,6 @@ interface ContentRefreshTiersResponse {
   data: ContentRefreshTier[];
 }
 
-interface OrdersListResponse {
-  data: LinkBuildingOrderSummary[];
-}
-
 interface PaginatedOrdersListResponse extends ClientPaginatedResponse<LinkBuildingOrderSummary> {}
 
 interface OrderDetailResponse {
@@ -48,11 +44,40 @@ export const linkBuildingService = {
     return response.data;
   },
 
+  /**
+   * Fetches the client's complete order history by walking every page of
+   * GET /api/link-building/orders. A single-page request (the previous
+   * implementation) silently truncated to the endpoint's default per_page
+   * of 10, which made the dashboard's Order History widget and stats cards
+   * lose any order older than the 10 most recent, which is why an account
+   * with two years of history could appear to have no orders before last
+   * month.
+   */
   async fetchAllOrders(): Promise<LinkBuildingOrderSummary[]> {
-    const response = await apiClient.get<OrdersListResponse>(
-      "/api/link-building/orders"
-    );
-    return response.data;
+    const max_per_page = 200;
+    // Safety valve only: at 200 orders per page this allows up to 4000
+    // orders before giving up, far beyond what any real account should have.
+    const max_pages = 20;
+
+    let all_orders: LinkBuildingOrderSummary[] = [];
+    let page = 1;
+
+    while (page <= max_pages) {
+      const result = await linkBuildingService.fetchMyOrders({
+        page,
+        per_page: max_per_page,
+      });
+
+      all_orders = all_orders.concat(result.data);
+
+      if (page >= result.last_page || result.data.length === 0) {
+        break;
+      }
+
+      page += 1;
+    }
+
+    return all_orders;
   },
 
   async fetchMyOrders(

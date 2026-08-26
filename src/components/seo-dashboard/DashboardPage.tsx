@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import { dashboardService } from "@/services/client/dashboard.service";
 import type { LinkBuildingOrderSummary } from "@/types/client/link-building";
 import type { DashboardTableRow } from "@/services/client/dashboard.service";
@@ -20,6 +21,15 @@ const TABLE_PER_PAGE = 10;
 export default function DashboardPage() {
   const search_params = useSearchParams();
   const active_tab = search_params.get("tab") ?? "overview";
+  const { user } = useAuth();
+
+  // Order History should cover at least the last 6 months, extended to the
+  // account's full lifetime for older accounts so historical spend is never
+  // hidden. See dashboardService.getVisibleMonthsCount().
+  const order_history_months_count = useMemo(
+    () => dashboardService.getVisibleMonthsCount(user?.created_at),
+    [user?.created_at]
+  );
 
   // ── Summary data (stats + order history cards) ─────────────────────────────
   const [orders, setOrders] = useState<LinkBuildingOrderSummary[]>([]);
@@ -211,7 +221,11 @@ export default function DashboardPage() {
           {/* Mid Row: Order History + News + Resources */}
           <div className="grid grid-cols-12 gap-4 md:gap-6">
             <div className="col-span-12 lg:col-span-5">
-              <OrderHistory orders={orders} is_loading={is_loading_summary} />
+              <OrderHistory
+                orders={orders}
+                is_loading={is_loading_summary}
+                months_count={order_history_months_count}
+              />
             </div>
             <div className="col-span-12 lg:col-span-4">
               <NewsCard />
