@@ -86,21 +86,31 @@ export const getMonthlyBreakdown = (
     MAX_MONTHLY_BREAKDOWN_MONTHS
   );
 
+  // The backend serializes created_at as a UTC timestamp. Bucketing it with
+  // local getters (getFullYear/getMonth) while walking "now" in the same
+  // local timezone still works most of the time, but an order created near
+  // midnight UTC can land in the wrong calendar month for any client whose
+  // timezone offset pushes that instant across a month boundary. Reading
+  // both sides with the UTC getters keeps a single, consistent reference
+  // frame so that never happens.
+  const current_year = now.getUTCFullYear();
+  const current_month = now.getUTCMonth();
+
   for (let i = 0; i < clamped_months_count; i++) {
-    const target = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const month_key = `${target.getFullYear()}-${String(
-      target.getMonth() + 1
-    ).padStart(2, "0")}`;
+    const target = new Date(Date.UTC(current_year, current_month - i, 1));
+    const target_year = target.getUTCFullYear();
+    const target_month = target.getUTCMonth();
+    const month_key = `${target_year}-${String(target_month + 1).padStart(2, "0")}`;
     const month_label = target.toLocaleString("en-US", {
       month: "long",
       year: "numeric",
+      timeZone: "UTC",
     });
 
     const month_orders = usable_orders.filter((o) => {
       const d = new Date(o.created_at);
       return (
-        d.getFullYear() === target.getFullYear() &&
-        d.getMonth() === target.getMonth()
+        d.getUTCFullYear() === target_year && d.getUTCMonth() === target_month
       );
     });
 
