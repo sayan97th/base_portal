@@ -728,6 +728,19 @@ const OrderDetailPage: React.FC<OrderDetailPageProps> = ({ order_id }) => {
     };
   }, [order_id]);
 
+  // The "Your order is complete!" email links to /orders/{id}#live-links. The order
+  // content below loads asynchronously, so the #live-links section does not exist yet
+  // when the browser tries to jump to it on the initial page load, and the native anchor
+  // scroll silently fails. Scroll to it manually once loading finishes instead, mirroring
+  // how OrderComments deep-links to a specific ?comment_id=.
+  useEffect(() => {
+    if (is_loading || !detected) return;
+    if (typeof window === "undefined" || window.location.hash !== "#live-links") return;
+
+    const element = document.getElementById("live-links");
+    element?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [is_loading, detected]);
+
   const product_type: CartProductType = detected?.product_type ?? "new_content";
   const type_cfg = PRODUCT_TYPE_CONFIG[product_type];
   const is_lb = detected?.product_type === "link_building";
