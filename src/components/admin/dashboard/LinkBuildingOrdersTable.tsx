@@ -1622,8 +1622,13 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       const trimmed = raw_value.trim();
 
       if (col_def.type === "select" && col_def.options) {
+        // Normalize to the dropdown's canonical casing when the pasted text matches
+        // one of the predefined options, but never discard a pasted value just
+        // because it isn't in that list (e.g. a status copied from the external BASE
+        // sheet that doesn't exist in the portal's list yet) — the cell still shows
+        // and keeps that free-text value, matching how every other column pastes.
         const match = col_def.options.find((opt) => opt.toLowerCase() === trimmed.toLowerCase());
-        return (match ?? current_value) as LinkBuildingOrderRow[keyof LinkBuildingOrderRow];
+        return (match ?? trimmed) as LinkBuildingOrderRow[keyof LinkBuildingOrderRow];
       }
 
       if (col_def.type === "url" && trimmed !== "" && !/^https?:\/\//i.test(trimmed)) {

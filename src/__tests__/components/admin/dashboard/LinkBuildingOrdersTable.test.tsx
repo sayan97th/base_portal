@@ -205,6 +205,21 @@ function dragSelectRange(from_display_text: string, to_display_text: string): vo
   fireEvent.mouseUp(to_cell);
 }
 
+/**
+ * Like screen.getByText, but for a status pill: the same label (e.g. "New Request")
+ * also appears as an <option> in the Status filter dropdown, so a plain getByText
+ * match is ambiguous. This narrows the match down to the one sitting inside a table
+ * cell.
+ */
+function getStatusTableCell(status_label: string): HTMLElement {
+  const cell = screen
+    .getAllByText(status_label)
+    .map((el) => el.closest("td"))
+    .find((td): td is HTMLTableCellElement => td !== null);
+  if (!cell) throw new Error(`No <td> ancestor found for status "${status_label}"`);
+  return cell;
+}
+
 // ─── Order ID editing ────────────────────────────────────────────────────────
 
 describe("LinkBuildingOrdersTable — Order ID (BL-XXXXX) editing", () => {
@@ -592,6 +607,81 @@ describe("LinkBuildingOrdersTable — multi-cell range copy & paste", () => {
         { id: "uuid-2", fields: { client: "Reviewing", keyword: "Reviewing" } },
       ])
     );
+  });
+
+  it("pastes a Status value that isn't in the preset dropdown list instead of silently dropping it", async () => {
+    // Regression test: the Status column is a <select> backed by a fixed list of
+    // options. Values copied from the external BASE link sheet don't always match
+    // that list, and a bulk paste used to fall back to the cell's current value
+    // whenever the pasted text didn't match — silently discarding the paste with no
+    // error shown to the admin.
+    const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", status: "New Request" });
+    const row2 = makeRow({ id: "uuid-2", order_id: "BL-2", status: "Reviewing" });
+    mockListLinkBuildingOrders.mockResolvedValue(mockSearchResponse([row1, row2]));
+    render(<LinkBuildingOrdersTable />);
+    await screen.findByText("BL-1");
+
+    (navigator.clipboard.readText as jest.Mock).mockResolvedValue(
+      "Needs Client Approval\nDone"
+    );
+    mockBatchUpdateLinkBuildingOrderCells.mockResolvedValue({
+      message: "2 row(s) updated successfully.",
+      updated_count: 2,
+      data: [
+        { ...row1, status: "Needs Client Approval" },
+        { ...row2, status: "Done" },
+      ],
+    });
+
+    // Both cells being dragged over sit in the Status column, so this is a 2-row x
+    // 1-col range confined to that single select-type column.
+    const from_cell = getStatusTableCell("New Request");
+    const to_cell = getStatusTableCell("Reviewing");
+    fireEvent.mouseDown(from_cell);
+    fireEvent.mouseOver(to_cell);
+    fireEvent.mouseUp(to_cell);
+    await screen.findByText(/2 cells selected/i);
+
+    fireEvent.keyDown(document, { key: "v", ctrlKey: true });
+
+    await waitFor(() => expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledTimes(1));
+    expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        { id: "uuid-1", fields: { status: "Needs Client Approval" } },
+        { id: "uuid-2", fields: { status: "Done" } },
+      ])
+    );
+    await screen.findByText("Needs Client Approval");
+    await screen.findByText("Done");
+  });
+
+  it("normalizes a pasted Status value to the dropdown's casing when it matches an existing option", async () => {
+    const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", status: "New Request" });
+    mockListLinkBuildingOrders.mockResolvedValue(mockSearchResponse([row1]));
+    render(<LinkBuildingOrdersTable />);
+    await screen.findByText("BL-1");
+
+    // Copied from a spreadsheet cell that happens to be lowercased.
+    (navigator.clipboard.readText as jest.Mock).mockResolvedValue("reviewing");
+    mockBatchUpdateLinkBuildingOrderCells.mockResolvedValue({
+      message: "1 row(s) updated successfully.",
+      updated_count: 1,
+      data: [{ ...row1, status: "Reviewing" }],
+    });
+
+    // Shift+Click on a single cell (with no prior range or editing state) selects a
+    // clean 1×1 range on that cell alone — see handleCellMouseDown's shift_key branch.
+    const status_cell = getStatusTableCell("New Request");
+    fireEvent.mouseDown(status_cell, { shiftKey: true });
+    fireEvent.mouseUp(status_cell);
+    await screen.findByText(/1 cell selected/i);
+
+    fireEvent.keyDown(document, { key: "v", ctrlKey: true });
+
+    await waitFor(() => expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledTimes(1));
+    expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledWith([
+      { id: "uuid-1", fields: { status: "Reviewing" } },
+    ]);
   });
 });
 
