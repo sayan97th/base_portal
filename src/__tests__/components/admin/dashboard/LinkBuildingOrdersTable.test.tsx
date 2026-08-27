@@ -220,6 +220,21 @@ function getTableCellByText(label: string): HTMLElement {
   return cell;
 }
 
+/**
+ * Locates an option row inside the floating CellOptionsDropdown panel (rendered via
+ * a portal into document.body) by its visible label — disambiguated from any other
+ * element carrying the same text by requiring a <button> ancestor, since the panel's
+ * rows are the only buttons in the tree that render a plain option label.
+ */
+function getDropdownOptionButton(label: string): HTMLElement {
+  const button = screen
+    .getAllByText(label)
+    .map((el) => el.closest("button"))
+    .find((btn): btn is HTMLButtonElement => btn !== null);
+  if (!button) throw new Error(`No dropdown option button found for "${label}"`);
+  return button;
+}
+
 // ─── Order ID editing ────────────────────────────────────────────────────────
 
 describe("LinkBuildingOrdersTable — Order ID (BL-XXXXX) editing", () => {
@@ -791,6 +806,153 @@ describe("LinkBuildingOrdersTable — bulk paste value handling per column type"
     expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledWith([
       { id: "uuid-1", fields: { link_type: "DR 80+ External" } },
     ]);
+  });
+});
+
+// ─── Editable select-cell combobox (Status, Link Type, Exact Match, Currency) ─
+// A select-type cell opens as a free-text input backed by a floating options
+// panel (CellOptionsDropdown), not a native <select> — so it can always keep a
+// typed or pasted value that isn't in the column's preset list, the same way a
+// plain text cell already can.
+
+describe("LinkBuildingOrdersTable — editable select-cell combobox", () => {
+  it("typing a value outside the preset list and pressing Enter saves it as free text", async () => {
+    const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", status: "New Request" });
+    await renderTableWithRow(row1);
+    mockUpdateLinkBuildingOrder.mockResolvedValue({
+      message: "Updated",
+      data: { ...row1, status: "Needs Client Approval" },
+    });
+
+    const status_cell = getTableCellByText("New Request");
+    fireEvent.mouseDown(status_cell);
+    fireEvent.mouseUp(status_cell);
+
+    const input = screen.getByDisplayValue("New Request");
+    fireEvent.change(input, { target: { value: "Needs Client Approval" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => expect(mockUpdateLinkBuildingOrder).toHaveBeenCalledTimes(1));
+    const [id, payload] = mockUpdateLinkBuildingOrder.mock.calls[0];
+    expect(id).toBe("uuid-1");
+    expect(payload).toMatchObject({ status: "Needs Client Approval" });
+  });
+
+  it("shows a floating panel with every preset option while a Status cell is being edited", async () => {
+    const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", status: "New Request" });
+    await renderTableWithRow(row1);
+
+    const status_cell = getTableCellByText("New Request");
+    fireEvent.mouseDown(status_cell);
+    fireEvent.mouseUp(status_cell);
+
+    // "New Request" matches the cell's current value, so every other preset option
+    // (not yet typed over) should still be listed below it.
+    expect(getDropdownOptionButton("Cancelled")).toBeInTheDocument();
+    expect(getDropdownOptionButton("Live")).toBeInTheDocument();
+  });
+
+  it("clicking a preset option in the dropdown saves it immediately", async () => {
+    const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", status: "New Request" });
+    await renderTableWithRow(row1);
+    mockUpdateLinkBuildingOrder.mockResolvedValue({
+      message: "Updated",
+      data: { ...row1, status: "Reviewing" },
+    });
+
+    const status_cell = getTableCellByText("New Request");
+    fireEvent.mouseDown(status_cell);
+    fireEvent.mouseUp(status_cell);
+
+    fireEvent.click(getDropdownOptionButton("Reviewing"));
+
+    await waitFor(() => expect(mockUpdateLinkBuildingOrder).toHaveBeenCalledTimes(1));
+    const [, payload] = mockUpdateLinkBuildingOrder.mock.calls[0];
+    expect(payload).toMatchObject({ status: "Reviewing" });
+  });
+
+  it('offers a "Use ..." row for text that does not match any preset option, and clicking it saves that text', async () => {
+    const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", status: "New Request" });
+    await renderTableWithRow(row1);
+    mockUpdateLinkBuildingOrder.mockResolvedValue({
+      message: "Updated",
+      data: { ...row1, status: "Needs Client Approval" },
+    });
+
+    const status_cell = getTableCellByText("New Request");
+    fireEvent.mouseDown(status_cell);
+    fireEvent.mouseUp(status_cell);
+
+    const input = screen.getByDisplayValue("New Request");
+    fireEvent.change(input, { target: { value: "Needs Client Approval" } });
+
+    const use_custom_row = await screen.findByText(/Use\s/i);
+    fireEvent.click(use_custom_row.closest("button")!);
+
+    await waitFor(() => expect(mockUpdateLinkBuildingOrder).toHaveBeenCalledTimes(1));
+    const [, payload] = mockUpdateLinkBuildingOrder.mock.calls[0];
+    expect(payload).toMatchObject({ status: "Needs Client Approval" });
+  });
+
+  it("does not offer a custom-value row once the typed text exactly matches a preset option", async () => {
+    const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", status: "New Request" });
+    await renderTableWithRow(row1);
+
+    const status_cell = getTableCellByText("New Request");
+    fireEvent.mouseDown(status_cell);
+    fireEvent.mouseUp(status_cell);
+
+    const input = screen.getByDisplayValue("New Request");
+    fireEvent.change(input, { target: { value: "Reviewing" } });
+
+    expect(screen.queryByText(/Use\s/i)).not.toBeInTheDocument();
+  });
+
+  it("ArrowDown highlights options and Enter saves the highlighted one", async () => {
+    const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", status: "New Request" });
+    await renderTableWithRow(row1);
+    mockUpdateLinkBuildingOrder.mockResolvedValue({
+      message: "Updated",
+      data: { ...row1, status: "Reviewing" },
+    });
+
+    const status_cell = getTableCellByText("New Request");
+    fireEvent.mouseDown(status_cell);
+    fireEvent.mouseUp(status_cell);
+
+    const input = screen.getByDisplayValue("New Request");
+    // Clear the cell first so every preset option is listed from the top —
+    // STATUS_OPTIONS starts with "New Request", so two ArrowDown presses land on
+    // "Reviewing", the second entry.
+    fireEvent.change(input, { target: { value: "" } });
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => expect(mockUpdateLinkBuildingOrder).toHaveBeenCalledTimes(1));
+    const [, payload] = mockUpdateLinkBuildingOrder.mock.calls[0];
+    expect(payload).toMatchObject({ status: "Reviewing" });
+  });
+
+  it("Link Type cell also opens as a free-text combobox, not a native <select>", async () => {
+    const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", link_type: "DR 30+ External" });
+    await renderTableWithRow(row1);
+    mockUpdateLinkBuildingOrder.mockResolvedValue({
+      message: "Updated",
+      data: { ...row1, link_type: "Guest Post External" },
+    });
+
+    const link_type_cell = getTableCellByText("DR 30+ External");
+    fireEvent.mouseDown(link_type_cell);
+    fireEvent.mouseUp(link_type_cell);
+
+    const input = screen.getByDisplayValue("DR 30+ External");
+    fireEvent.change(input, { target: { value: "Guest Post External" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => expect(mockUpdateLinkBuildingOrder).toHaveBeenCalledTimes(1));
+    const [, payload] = mockUpdateLinkBuildingOrder.mock.calls[0];
+    expect(payload).toMatchObject({ link_type: "Guest Post External" });
   });
 });
 

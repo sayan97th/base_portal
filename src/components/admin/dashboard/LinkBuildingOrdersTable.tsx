@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { flushSync } from "react-dom";
 import type { LinkBuildingOrderRow } from "@/types/admin/link-building-order";
 import { useTableSort } from "@/hooks/useTableSort";
 import { useColumnFilters, isFilterActive } from "@/hooks/useColumnFilters";
@@ -29,6 +30,7 @@ import UserSelectFilterDropdown from "./UserSelectFilterDropdown";
 import ClientAssignCell from "./ClientAssignCell";
 import ClientSearchableSelect from "./ClientSearchableSelect";
 import AdminSearchableSelect from "./AdminSearchableSelect";
+import CellOptionsDropdown from "./CellOptionsDropdown";
 import type { LinkBuildingOrderSearchBody, ColumnFilterPayload, SortRulePayload, LinkBuildingOrderPayload } from "@/types/admin/link-building-order";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useAuth } from "@/context/AuthContext";
@@ -390,8 +392,6 @@ interface EditableCellProps {
   onUpdate: (value: string) => void;
   onStopEdit: () => void;
   onKeyNav: (direction: "next" | "prev" | "down") => void;
-  /** When provided on a select column, fires immediately on change and saves without waiting for blur. */
-  onSelectImmediateSave?: (value: string) => void;
   /** When provided, shows a copy-to-clipboard icon on cell hover. */
   onCopy?: (value: string) => void;
   /** Fires when a multi-cell (tab/newline delimited) block is pasted into this cell's input. */
@@ -421,7 +421,6 @@ function EditableCell({
   onUpdate,
   onStopEdit,
   onKeyNav,
-  onSelectImmediateSave,
   onCopy,
   onBulkPaste,
   onCellMouseDown,
@@ -434,8 +433,14 @@ function EditableCell({
   show_shadow = false,
 }: EditableCellProps) {
   const input_ref = useRef<HTMLInputElement>(null);
-  const select_ref = useRef<HTMLSelectElement>(null);
   const [just_copied, setJustCopied] = useState(false);
+  /** Index into the options dropdown's [custom-value row?, ...filtered options] list. */
+  const [highlighted_idx, setHighlightedIdx] = useState(-1);
+  // A callback ref (state, not useRef) so the dropdown's anchor_el is available the
+  // very first render the <td> mounts on — reading a useRef's .current in that same
+  // render would still be null, since refs only attach during the commit that just
+  // happened, one render behind.
+  const [combobox_anchor_el, setComboboxAnchorEl] = useState<HTMLTableCellElement | null>(null);
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -456,11 +461,32 @@ function EditableCell({
     onBulkPaste(grid);
   };
 
+  // Stays false until the admin's first keystroke in a select-type cell — the
+  // dropdown filters by this cell's typed text, but the text starts out prefilled
+  // with the current value, and filtering by it immediately would hide every other
+  // preset option the moment the cell opens (unlike a native <select>, which always
+  // shows the full list). Until something is actually typed, the dropdown is shown
+  // unfiltered instead.
+  const [has_typed, setHasTyped] = useState(false);
+
+  // Resets the combobox's transient UI state the moment a cell starts editing.
+  // Adjusted directly during render — React's documented pattern for "reset state
+  // when a prop changes" (tracked via its own useState, not a ref, since a plain
+  // ref read/write during render isn't allowed) — rather than in the effect below,
+  // which handles focusing the input, a genuine DOM side effect, and nothing else.
+  const [was_editing, setWasEditing] = useState(is_editing);
+  if (was_editing !== is_editing) {
+    setWasEditing(is_editing);
+    if (is_editing) {
+      if (highlighted_idx !== -1) setHighlightedIdx(-1);
+      if (has_typed) setHasTyped(false);
+    }
+  }
+
   useEffect(() => {
     if (is_editing) {
       input_ref.current?.focus();
       input_ref.current?.select();
-      select_ref.current?.focus();
     }
   }, [is_editing]);
 
@@ -479,39 +505,97 @@ function EditableCell({
 
   if (is_editing) {
     if (col.type === "select" && col.options) {
-      const has_current_value = !value || col.options.includes(value);
+      // A select-type cell is still a free-text input under the hood — the floating
+      // panel below it offers the column's preset options plus, when the typed text
+      // doesn't match any of them, a "Use ..." row for keeping that text verbatim.
+      // This is what lets a value pasted or typed from outside the preset list (e.g.
+      // copied from the external BASE sheet) always stick, the same as any other
+      // column, instead of being silently rejected like a native <select> would.
+      const dropdown_query = has_typed ? value.trim() : "";
+      const filtered_options =
+        dropdown_query === ""
+          ? col.options
+          : col.options.filter((opt) => opt.toLowerCase().includes(dropdown_query.toLowerCase()));
+      const has_exact_match = col.options.some((opt) => opt.toLowerCase() === dropdown_query.toLowerCase());
+      const show_custom_row = dropdown_query !== "" && !has_exact_match;
+      const dropdown_items = show_custom_row ? [dropdown_query, ...filtered_options] : filtered_options;
+
+      // Committing a value picked from the dropdown updates and stops editing in the
+      // same synchronous handler (a click, or Enter/Tab on a highlighted row) —
+      // flushSync forces the row-state update to land before onStopEdit reads it
+      // back, since onStopEdit persists whatever the latest row state holds rather
+      // than taking the new value as an argument.
+      const commitDropdownValue = (chosen_value: string) => {
+        flushSync(() => onUpdate(chosen_value));
+        onStopEdit();
+      };
+
+      const handleComboboxKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          setHighlightedIdx((prev) => Math.min(prev + 1, dropdown_items.length - 1));
+          return;
+        }
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          setHighlightedIdx((prev) => Math.max(prev - 1, -1));
+          return;
+        }
+        if (e.key === "Escape") {
+          onStopEdit();
+          return;
+        }
+        if (e.key === "Enter") {
+          e.preventDefault();
+          if (highlighted_idx >= 0 && dropdown_items[highlighted_idx] !== undefined) {
+            commitDropdownValue(dropdown_items[highlighted_idx]);
+          } else {
+            onStopEdit();
+          }
+          onKeyNav("down");
+          return;
+        }
+        if (e.key === "Tab") {
+          e.preventDefault();
+          if (highlighted_idx >= 0 && dropdown_items[highlighted_idx] !== undefined) {
+            commitDropdownValue(dropdown_items[highlighted_idx]);
+          } else {
+            onStopEdit();
+          }
+          onKeyNav(e.shiftKey ? "prev" : "next");
+        }
+      };
+
       return (
         <td
+          ref={setComboboxAnchorEl}
           className={`p-0${is_sticky ? ` ${sticky_bg_class}` : ""}`}
           style={is_sticky ? { position: "sticky", left: sticky_left, zIndex: 1 } : undefined}
         >
-          <select
-            ref={select_ref}
+          <input
+            ref={input_ref}
+            type="text"
             value={value}
             onChange={(e) => {
-              if (onSelectImmediateSave) {
-                onSelectImmediateSave(e.target.value);
-              } else {
-                onUpdate(e.target.value);
-              }
+              setHighlightedIdx(-1);
+              setHasTyped(true);
+              onUpdate(e.target.value);
             }}
-            onBlur={onSelectImmediateSave ? undefined : onStopEdit}
-            onKeyDown={handleKeyDown}
+            onBlur={onStopEdit}
+            onKeyDown={handleComboboxKeyDown}
+            onPaste={handleInputPaste}
             className="h-full w-full border-2 border-brand-500 bg-white px-2 py-1.5 text-xs outline-none dark:bg-gray-800 dark:text-white"
             style={{ minWidth: col.min_width }}
-          >
-            <option value="">-- Select --</option>
-            {!has_current_value && (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            )}
-            {col.options.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
-              </option>
-            ))}
-          </select>
+          />
+          <CellOptionsDropdown
+            options={col.options}
+            query={dropdown_query}
+            current_value={value}
+            highlighted_idx={highlighted_idx}
+            anchor_el={combobox_anchor_el}
+            onHighlightChange={setHighlightedIdx}
+            onSelect={commitDropdownValue}
+          />
         </td>
       );
     }
@@ -3304,7 +3388,6 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                             onUpdate={(val) => updateCell(row.id, col.key, val)}
                             onStopEdit={stopEditing}
                             onKeyNav={(dir) => navigateCell(row.id, col.key, dir)}
-                            onSelectImmediateSave={undefined}
                             onCopy={(val) => copyCellValue(val, col.key)}
                             onBulkPaste={(grid) => handleBulkPaste(row.id, col.key, grid)}
                             onCellMouseDown={(shift_key) => handleCellMouseDown(row.id, col.key, shift_key)}
