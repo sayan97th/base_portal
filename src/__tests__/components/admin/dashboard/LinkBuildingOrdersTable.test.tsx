@@ -956,6 +956,57 @@ describe("LinkBuildingOrdersTable — editable select-cell combobox", () => {
   });
 });
 
+// ─── Status cell save: the "client email notification queued" banner ────────
+// The backend only ever queues a client email when the status actually changed
+// (see update() on LinkBuildingOrdersDashboardController, which compares old vs.
+// new status before notifying). The banner shown here must stay in sync with
+// that — simply opening and closing the Status combobox without picking a
+// different value must not claim an email was queued.
+
+describe("LinkBuildingOrdersTable — Status cell save notification banner", () => {
+  it("does not claim a client email was queued when the Status cell is closed without changing its value", async () => {
+    const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", status: "New Request", user_id: 42 });
+    await renderTableWithRow(row1);
+    // The row is eligible for the notification path (user_id is set), but the
+    // saved status comes back unchanged — this is what the backend also does
+    // for a no-op save.
+    mockUpdateLinkBuildingOrder.mockResolvedValue({
+      message: "Updated",
+      data: { ...row1, status: "New Request" },
+    });
+
+    const status_cell = getTableCellByText("New Request");
+    fireEvent.mouseDown(status_cell);
+    fireEvent.mouseUp(status_cell);
+
+    const input = screen.getByDisplayValue("New Request");
+    fireEvent.blur(input);
+
+    await waitFor(() => expect(mockUpdateLinkBuildingOrder).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText(/client email notification queued/i)).not.toBeInTheDocument();
+  });
+
+  it("shows the notification banner when the Status cell's value actually changes", async () => {
+    const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", status: "New Request", user_id: 42 });
+    await renderTableWithRow(row1);
+    mockUpdateLinkBuildingOrder.mockResolvedValue({
+      message: "Updated",
+      data: { ...row1, status: "Reviewing" },
+    });
+
+    const status_cell = getTableCellByText("New Request");
+    fireEvent.mouseDown(status_cell);
+    fireEvent.mouseUp(status_cell);
+
+    const input = screen.getByDisplayValue("New Request");
+    fireEvent.change(input, { target: { value: "Reviewing" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => expect(mockUpdateLinkBuildingOrder).toHaveBeenCalledTimes(1));
+    await screen.findByText(/client email notification queued/i);
+  });
+});
+
 // ─── Copy entire column (e.g. every domain, for pasting into Ahrefs) ────────
 
 describe("LinkBuildingOrdersTable — copy entire column", () => {

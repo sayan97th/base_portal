@@ -1202,7 +1202,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     }
   }, [refreshNeedsApprovalCount]);
 
-  const persistRowUpdate = useCallback(async (row: LinkBuildingOrderRow, changed_col_key?: string) => {
+  const persistRowUpdate = useCallback(async (row: LinkBuildingOrderRow, changed_col_key?: string, value_changed = true) => {
     markSaving(row.id);
     setSaveError(null);
     try {
@@ -1216,8 +1216,15 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       const res = await updateLinkBuildingOrder(row.id, payload);
       replaceRow(row.id, res.data);
 
+      // The backend only ever queues a client email when the status actually
+      // changed (see update() on LinkBuildingOrdersDashboardController — it
+      // compares old vs. new status before notifying). Requiring value_changed
+      // here keeps this banner in sync with that: opening a Status cell and
+      // closing it without picking anything else must not claim an email was
+      // queued when nothing was actually saved as different.
       const triggers_notification =
         changed_col_key === "status" &&
+        value_changed &&
         (res.data.user_id != null || res.data.parent_order_status != null);
 
       if (triggers_notification) {
@@ -1408,13 +1415,15 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       persistNewRow(row);
     } else {
       const new_value = String(row[cell.col_key as keyof LinkBuildingOrderRow] ?? "");
-      if (edit_start && edit_start.row_id === row.id && edit_start.col_key === cell.col_key && edit_start.old_value !== new_value) {
+      const value_changed =
+        !!edit_start && edit_start.row_id === row.id && edit_start.col_key === cell.col_key && edit_start.old_value !== new_value;
+      if (value_changed) {
         pushHistoryEntry(
-          [{ row_id: row.id, col_key: cell.col_key as keyof LinkBuildingOrderRow, old_value: edit_start.old_value, new_value }],
+          [{ row_id: row.id, col_key: cell.col_key as keyof LinkBuildingOrderRow, old_value: edit_start!.old_value, new_value }],
           "cell edit"
         );
       }
-      persistRowUpdate(row, cell.col_key);
+      persistRowUpdate(row, cell.col_key, value_changed);
     }
   }, [persistNewRow, persistRowUpdate, pushHistoryEntry]);
 
