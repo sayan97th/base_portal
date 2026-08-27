@@ -7,7 +7,8 @@ export type NotificationType =
   | "order"
   | "order_comment"
   | "user_registration"
-  | "invoice";
+  | "invoice"
+  | "ticket";
 
 export interface Notification {
   id: number;

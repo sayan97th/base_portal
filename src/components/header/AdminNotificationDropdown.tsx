@@ -98,6 +98,19 @@ const TYPE_ICON_CONFIG: Record<
       </svg>
     ),
   },
+  ticket: {
+    bg: "bg-purple-50 dark:bg-purple-500/10",
+    icon_color: "text-purple-600 dark:text-purple-400",
+    icon: (
+      <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+        <path
+          fillRule="evenodd"
+          clipRule="evenodd"
+          d="M2 6a2 2 0 012-2h12a2 2 0 012 2v2a1 1 0 100 4v2a2 2 0 01-2 2H4a2 2 0 01-2-2v-2a1 1 0 100-4V6zm7 1a1 1 0 012 0v1a1 1 0 11-2 0V7zm1 3.5a1 1 0 00-1 1V13a1 1 0 102 0v-1.5a1 1 0 00-1-1z"
+        />
+      </svg>
+    ),
+  },
 };
 
 function getTypeConfig(type: AdminNotificationType) {

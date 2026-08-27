@@ -15,6 +15,7 @@ const TYPE_FILTERS: { label: string; value: AdminNotificationType | "all" }[] = 
   { label: "All", value: "all" },
   { label: "Orders", value: "order" },
   { label: "Payments", value: "payment" },
+  { label: "Tickets", value: "ticket" },
   { label: "New Users", value: "user_registration" },
   { label: "System", value: "system" },
 ];

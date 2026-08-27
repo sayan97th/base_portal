@@ -7,7 +7,8 @@ export type AdminNotificationType =
   | "user_registration"
   | "order_comment"
   | "invoice"
-  | "post";
+  | "post"
+  | "ticket";
 
 export interface AdminNotificationUser {
   id: number;
