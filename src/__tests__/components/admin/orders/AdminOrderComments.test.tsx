@@ -82,7 +82,7 @@ describe("AdminOrderComments deep-link scrolling", () => {
     });
 
     const target = container.querySelector("#comment-2");
-    expect(target?.className).toEqual(expect.stringContaining("ring-brand-400"));
+    expect(target?.className).toEqual(expect.stringContaining("comment-highlight-flash"));
   });
 
   it("fetches comments for a multi-purchase session via the admin session endpoint", async () => {

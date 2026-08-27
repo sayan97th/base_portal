@@ -84,10 +84,10 @@ describe("OrderComments deep-link scrolling", () => {
 
     const target = container.querySelector("#comment-2");
     expect(target).not.toBeNull();
-    expect(target?.className).toEqual(expect.stringContaining("ring-brand-400"));
+    expect(target?.className).toEqual(expect.stringContaining("comment-highlight-flash"));
 
     const other = container.querySelector("#comment-1");
-    expect(other?.className).not.toEqual(expect.stringContaining("ring-brand-400"));
+    expect(other?.className).not.toEqual(expect.stringContaining("comment-highlight-flash"));
   });
 
   it("scrolls to and highlights a matching reply nested under a top-level comment", async () => {
@@ -106,7 +106,7 @@ describe("OrderComments deep-link scrolling", () => {
 
     await waitFor(() => {
       const target = container.querySelector("#comment-10");
-      expect(target?.className).toEqual(expect.stringContaining("ring-brand-400"));
+      expect(target?.className).toEqual(expect.stringContaining("comment-highlight-flash"));
     });
   });
 
