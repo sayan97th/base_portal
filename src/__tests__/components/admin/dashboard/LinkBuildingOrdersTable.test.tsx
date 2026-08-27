@@ -206,17 +206,17 @@ function dragSelectRange(from_display_text: string, to_display_text: string): vo
 }
 
 /**
- * Like screen.getByText, but for a status pill: the same label (e.g. "New Request")
- * also appears as an <option> in the Status filter dropdown, so a plain getByText
- * match is ambiguous. This narrows the match down to the one sitting inside a table
- * cell.
+ * Like screen.getByText, but for a value that also appears as an <option> in one of
+ * the toolbar's filter dropdowns (Status, Link Type) — a plain getByText match is
+ * ambiguous there. This narrows the match down to the one sitting inside a table
+ * <td>, i.e. the actual cell rendering that value.
  */
-function getStatusTableCell(status_label: string): HTMLElement {
+function getTableCellByText(label: string): HTMLElement {
   const cell = screen
-    .getAllByText(status_label)
+    .getAllByText(label)
     .map((el) => el.closest("td"))
     .find((td): td is HTMLTableCellElement => td !== null);
-  if (!cell) throw new Error(`No <td> ancestor found for status "${status_label}"`);
+  if (!cell) throw new Error(`No <td> ancestor found for "${label}"`);
   return cell;
 }
 
@@ -635,8 +635,8 @@ describe("LinkBuildingOrdersTable — multi-cell range copy & paste", () => {
 
     // Both cells being dragged over sit in the Status column, so this is a 2-row x
     // 1-col range confined to that single select-type column.
-    const from_cell = getStatusTableCell("New Request");
-    const to_cell = getStatusTableCell("Reviewing");
+    const from_cell = getTableCellByText("New Request");
+    const to_cell = getTableCellByText("Reviewing");
     fireEvent.mouseDown(from_cell);
     fireEvent.mouseOver(to_cell);
     fireEvent.mouseUp(to_cell);
@@ -671,7 +671,7 @@ describe("LinkBuildingOrdersTable — multi-cell range copy & paste", () => {
 
     // Shift+Click on a single cell (with no prior range or editing state) selects a
     // clean 1×1 range on that cell alone — see handleCellMouseDown's shift_key branch.
-    const status_cell = getStatusTableCell("New Request");
+    const status_cell = getTableCellByText("New Request");
     fireEvent.mouseDown(status_cell, { shiftKey: true });
     fireEvent.mouseUp(status_cell);
     await screen.findByText(/1 cell selected/i);
@@ -681,6 +681,115 @@ describe("LinkBuildingOrdersTable — multi-cell range copy & paste", () => {
     await waitFor(() => expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledTimes(1));
     expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledWith([
       { id: "uuid-1", fields: { status: "Reviewing" } },
+    ]);
+  });
+});
+
+// ─── Bulk paste value handling per column type (DR, Status, Link Type) ──────
+
+describe("LinkBuildingOrdersTable — bulk paste value handling per column type", () => {
+  beforeEach(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: jest.fn().mockResolvedValue(undefined),
+        readText: jest.fn().mockResolvedValue(""),
+      },
+    });
+  });
+
+  it("pastes a DR value copied from a spreadsheet, formatting and all, into the DR column", async () => {
+    // The DR column is a plain text field (not a <select>), so a bulk paste there was
+    // never filtered against a fixed list. This guards that it keeps accepting
+    // whatever text is pasted, including the extra formatting a metrics tool like
+    // Ahrefs or Moz tends to add when a cell is copied out of a spreadsheet.
+    const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", dr_lbs: "30" });
+    const row2 = makeRow({ id: "uuid-2", order_id: "BL-2", dr_lbs: "40" });
+    mockListLinkBuildingOrders.mockResolvedValue(mockSearchResponse([row1, row2]));
+    render(<LinkBuildingOrdersTable />);
+    await screen.findByText("BL-1");
+
+    mockBatchUpdateLinkBuildingOrderCells.mockResolvedValueOnce({
+      message: "2 row(s) updated successfully.",
+      updated_count: 2,
+      data: [
+        { ...row1, dr_lbs: "45 (Ahrefs)" },
+        { ...row2, dr_lbs: "52 (Moz)" },
+      ],
+    });
+
+    openCellForEditing("30");
+    fireEvent.paste(screen.getByDisplayValue("30"), {
+      clipboardData: { getData: () => "45 (Ahrefs)\n52 (Moz)" },
+    });
+
+    await waitFor(() => expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledTimes(1));
+    expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        { id: "uuid-1", fields: { dr_lbs: "45 (Ahrefs)" } },
+        { id: "uuid-2", fields: { dr_lbs: "52 (Moz)" } },
+      ])
+    );
+    await screen.findByText("52 (Moz)");
+  });
+
+  it("pasting a blank spreadsheet cell onto a Status cell clears it instead of leaving the old value", async () => {
+    const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", status: "Reviewing" });
+    mockListLinkBuildingOrders.mockResolvedValue(mockSearchResponse([row1]));
+    render(<LinkBuildingOrdersTable />);
+    await screen.findByText("BL-1");
+
+    // A blank spreadsheet cell lands on the clipboard as whitespace, not a
+    // completely empty string — an entirely empty clipboard read is treated by the
+    // range-paste handler as "nothing to read" and it falls back to the in-memory
+    // clipboard instead, which is a separate, pre-existing behavior this test isn't
+    // targeting.
+    (navigator.clipboard.readText as jest.Mock).mockResolvedValue(" ");
+    mockBatchUpdateLinkBuildingOrderCells.mockResolvedValue({
+      message: "1 row(s) updated successfully.",
+      updated_count: 1,
+      data: [{ ...row1, status: "" }],
+    });
+
+    const status_cell = getTableCellByText("Reviewing");
+    fireEvent.mouseDown(status_cell, { shiftKey: true });
+    fireEvent.mouseUp(status_cell);
+    await screen.findByText(/1 cell selected/i);
+
+    fireEvent.keyDown(document, { key: "v", ctrlKey: true });
+
+    await waitFor(() => expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledTimes(1));
+    expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledWith([
+      { id: "uuid-1", fields: { status: "" } },
+    ]);
+  });
+
+  it("pastes a Link Type value that isn't in the preset dropdown list instead of silently dropping it", async () => {
+    // Link Type is a <select> column just like Status, backed by its own fixed
+    // LINK_TYPE_OPTIONS list — the fix in parseCellForPaste is generic to every
+    // select-type column, not special-cased to Status alone.
+    const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", link_type: "DR 30+ External" });
+    mockListLinkBuildingOrders.mockResolvedValue(mockSearchResponse([row1]));
+    render(<LinkBuildingOrdersTable />);
+    await screen.findByText("BL-1");
+
+    (navigator.clipboard.readText as jest.Mock).mockResolvedValue("DR 80+ External");
+    mockBatchUpdateLinkBuildingOrderCells.mockResolvedValue({
+      message: "1 row(s) updated successfully.",
+      updated_count: 1,
+      data: [{ ...row1, link_type: "DR 80+ External" }],
+    });
+
+    const link_type_cell = getTableCellByText("DR 30+ External");
+    fireEvent.mouseDown(link_type_cell, { shiftKey: true });
+    fireEvent.mouseUp(link_type_cell);
+    await screen.findByText(/1 cell selected/i);
+
+    fireEvent.keyDown(document, { key: "v", ctrlKey: true });
+
+    await waitFor(() => expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledTimes(1));
+    expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledWith([
+      { id: "uuid-1", fields: { link_type: "DR 80+ External" } },
     ]);
   });
 });
