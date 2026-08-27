@@ -303,6 +303,64 @@
   80% { transform: translateX(4px); }
 }
 
+/*
+  Slack-style deep-link flash: the target comment lights up in the brand color
+  the instant it comes into view, holds briefly so the eye can find it, then
+  fades smoothly back to a plain comment. Colors are expressed as raw rgba()
+  (rather than the --color-brand-400 token) so the same keyframes can animate
+  both background-color and box-shadow without relying on color-mix() support.
+*/
+@keyframes comment-highlight-fade {
+  0% {
+    background-color: rgba(240, 102, 161, 0.18);
+    box-shadow: 0 0 0 2px rgba(240, 102, 161, 0.55);
+  }
+  55% {
+    background-color: rgba(240, 102, 161, 0.18);
+    box-shadow: 0 0 0 2px rgba(240, 102, 161, 0.55);
+  }
+  100% {
+    background-color: rgba(240, 102, 161, 0);
+    box-shadow: 0 0 0 2px rgba(240, 102, 161, 0);
+  }
+}
+
+@keyframes comment-highlight-fade-dark {
+  0% {
+    background-color: rgba(240, 102, 161, 0.24);
+    box-shadow: 0 0 0 2px rgba(240, 102, 161, 0.65);
+  }
+  55% {
+    background-color: rgba(240, 102, 161, 0.24);
+    box-shadow: 0 0 0 2px rgba(240, 102, 161, 0.65);
+  }
+  100% {
+    background-color: rgba(240, 102, 161, 0);
+    box-shadow: 0 0 0 2px rgba(240, 102, 161, 0);
+  }
+}
+
+.comment-highlight-flash {
+  animation: comment-highlight-fade 2.6s ease-out forwards;
+}
+
+.dark .comment-highlight-flash {
+  animation-name: comment-highlight-fade-dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .comment-highlight-flash {
+    animation: none;
+    background-color: rgba(240, 102, 161, 0.16);
+    box-shadow: 0 0 0 2px rgba(240, 102, 161, 0.55);
+  }
+
+  .dark .comment-highlight-flash {
+    background-color: rgba(240, 102, 161, 0.24);
+    box-shadow: 0 0 0 2px rgba(240, 102, 161, 0.65);
+  }
+}
+
 @layer utilities {
   /* For Remove Date Icon */
   input[type="date"]::-webkit-inner-spin-button,

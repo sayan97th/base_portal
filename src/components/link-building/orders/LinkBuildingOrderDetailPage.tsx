@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import Badge from "@/components/ui/badge/Badge";
 import {
   Table,
@@ -344,6 +345,9 @@ const LinkBuildingOrderDetailPage: React.FC<
   const [order, setOrder] = useState<LinkBuildingOrderDetail | null>(null);
   const [is_loading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const search_params = useSearchParams();
+  const comment_id_param = search_params.get("comment_id");
+  const target_comment_id = comment_id_param ? Number(comment_id_param) : null;
 
   useEffect(() => {
     async function load() {
@@ -701,7 +705,11 @@ const LinkBuildingOrderDetailPage: React.FC<
           </div>
 
           {/* Order Discussion */}
-          <OrderComments purchase_type="single_order" order_id={order.id} />
+          <OrderComments
+            purchase_type="single_order"
+            order_id={order.id}
+            target_comment_id={target_comment_id}
+          />
         </>
       )}
     </div>

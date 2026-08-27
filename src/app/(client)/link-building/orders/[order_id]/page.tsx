@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import LinkBuildingOrderDetailPage from "@/components/link-building/orders/LinkBuildingOrderDetailPage";
 
 interface OrderDetailParams {
@@ -19,5 +20,9 @@ export default async function LinkBuildingOrderDetail({
   params,
 }: OrderDetailParams) {
   const { order_id } = await params;
-  return <LinkBuildingOrderDetailPage order_id={order_id} />;
+  return (
+    <Suspense>
+      <LinkBuildingOrderDetailPage order_id={order_id} />
+    </Suspense>
+  );
 }

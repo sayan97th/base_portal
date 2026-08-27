@@ -496,11 +496,9 @@ function AdminCommentItem({
   return (
     <div
       id={`comment-${comment.id}`}
-      className={
-        is_highlighted
-          ? "rounded-xl ring-2 ring-brand-400 ring-offset-2 ring-offset-white dark:ring-offset-gray-900 transition-shadow duration-1000"
-          : ""
-      }
+      className={`rounded-xl -mx-2 -my-1.5 px-2 py-1.5 ${
+        is_highlighted ? "comment-highlight-flash" : ""
+      }`}
     >
       <div
         className={`flex gap-3 ${
@@ -708,8 +706,10 @@ const AdminOrderComments: React.FC<AdminOrderCommentsProps> = ({
   }, [purchase_type, session_id, order_id]);
 
   // Deep-linking support: a notification or email button can point straight at a specific
-  // comment via ?comment_id=. Once the thread has loaded, scroll to it and flash a highlight,
-  // mirroring how Slack lands you on a linked message.
+  // comment via ?comment_id=. Once the thread has loaded, scroll to it and flash a highlight
+  // that fades away, mirroring how Slack lands you on a linked message. The timeout here is
+  // just state cleanup; the fade itself is driven by the comment-highlight-flash CSS animation
+  // so the color transition stays smooth regardless of React's render timing.
   useEffect(() => {
     if (is_loading || !target_comment_id) return;
     const element = document.getElementById(`comment-${target_comment_id}`);
@@ -717,7 +717,7 @@ const AdminOrderComments: React.FC<AdminOrderCommentsProps> = ({
 
     element.scrollIntoView({ behavior: "smooth", block: "center" });
     setHighlightedId(target_comment_id);
-    const timeout = setTimeout(() => setHighlightedId(null), 2500);
+    const timeout = setTimeout(() => setHighlightedId(null), 2800);
     return () => clearTimeout(timeout);
   }, [is_loading, target_comment_id, comments]);
 
