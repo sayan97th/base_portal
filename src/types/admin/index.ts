@@ -15,6 +15,12 @@ export type {
 
 export type { OrderUpdate, OrderUpdatesResponse, CreateOrderUpdatePayload, UpdateAuthor, TrackingOrderSummary, TrackingOrdersResponse } from "./order-tracking";
 
+export type {
+  NotificationRedirectTargetUser,
+  NotificationRedirectContext,
+  NotificationRedirectContextResponse,
+} from "./notification-redirect";
+
 export type { Role, Organization };
 
 // AdminUser is the same as User but with strongly-typed roles

@@ -19,6 +19,12 @@ function isPublicInvoiceRoute(pathname: string): boolean {
   return /^\/invoices\/[^/]+(\/view|\/pay)$/.test(pathname);
 }
 
+// Notification emails (e.g. the client-side "View Invoice" button) tag their
+// action URL with this param so an admin/staff visitor can be routed through the
+// impersonation gate below instead of being silently bounced. Only accept a
+// plain positive integer, this value is forwarded straight into a redirect URL.
+const NOTIFICATION_ID_PATTERN = /^[1-9][0-9]*$/;
+
 export function proxy(request: NextRequest) {
   const token = request.cookies.get("access_token")?.value;
   const primary_role = request.cookies.get(ROLE_COOKIE_NAME)?.value;
@@ -77,8 +83,18 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Redirect admin/staff away from ALL client-portal routes to their dashboard.
+  // Redirect admin/staff away from ALL client-portal routes to their dashboard,
+  // unless the link carries a notification_id. That marker means this request
+  // came from a client-side notification email (e.g. the "View Invoice" button),
+  // and should be routed through the impersonation gate instead of silently
+  // bouncing to the dashboard with no explanation.
   if (is_staff) {
+    const notification_id = request.nextUrl.searchParams.get("notification_id");
+    if (notification_id && NOTIFICATION_ID_PATTERN.test(notification_id)) {
+      const gate_url = new URL("/admin/notifications/redirect", request.url);
+      gate_url.searchParams.set("notification_id", notification_id);
+      return NextResponse.redirect(gate_url);
+    }
     return NextResponse.redirect(new URL("/admin/dashboard", request.url));
   }
 

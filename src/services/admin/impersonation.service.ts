@@ -6,51 +6,71 @@ const ADMIN_TOKEN_KEY = "impersonation_admin_token";
 const ADMIN_EXPIRES_KEY = "impersonation_admin_expires_at";
 const IMPERSONATION_META_KEY = "impersonation_meta";
 
+/**
+ * Persists the outcome of a successful impersonation call (token swap, role
+ * cookie, banner metadata). Shared by every entry point that can start an
+ * impersonation session, the general admin-panel flow and the notification
+ * redirect gate, so the client-side session state behaves identically no
+ * matter which screen triggered it.
+ */
+function applyImpersonationSession(data: ImpersonationResponse): void {
+  const admin_token = getToken();
+  const admin_expires_at =
+    typeof window !== "undefined"
+      ? localStorage.getItem("token_expires_at")
+      : null;
+
+  if (admin_token) {
+    localStorage.setItem(ADMIN_TOKEN_KEY, admin_token);
+  }
+  if (admin_expires_at) {
+    localStorage.setItem(ADMIN_EXPIRES_KEY, admin_expires_at);
+  }
+
+  // Derive the impersonated account's primary role so routing and the
+  // role cookie reflect who we are now acting as (client vs admin-side user).
+  const target_role = getPrimaryRole(data.impersonated_user.roles) ?? ROLES.CLIENT;
+  const target_is_staff = isStaffRole(target_role);
+
+  const meta: ImpersonationMeta = {
+    admin_id: data.admin_user.id,
+    admin_first_name: data.admin_user.first_name,
+    admin_last_name: data.admin_user.last_name,
+    admin_email: data.admin_user.email,
+    target_id: data.impersonated_user.id,
+    target_first_name: data.impersonated_user.first_name,
+    target_last_name: data.impersonated_user.last_name,
+    target_email: data.impersonated_user.email,
+    target_role,
+    target_is_staff,
+    started_at: new Date().toISOString(),
+  };
+  localStorage.setItem(IMPERSONATION_META_KEY, JSON.stringify(meta));
+
+  setToken(data.impersonation_token);
+  const expires_at = Date.now() + data.expires_in * 1000;
+  localStorage.setItem("token_expires_at", expires_at.toString());
+  setPrimaryRoleCookie(target_role);
+}
+
 export const impersonationService = {
   async startImpersonation(user_id: number): Promise<ImpersonationResponse> {
     const data = await apiClient.post<ImpersonationResponse>(
       `/api/admin/users/${user_id}/impersonate`
     );
-
-    const admin_token = getToken();
-    const admin_expires_at =
-      typeof window !== "undefined"
-        ? localStorage.getItem("token_expires_at")
-        : null;
-
-    if (admin_token) {
-      localStorage.setItem(ADMIN_TOKEN_KEY, admin_token);
-    }
-    if (admin_expires_at) {
-      localStorage.setItem(ADMIN_EXPIRES_KEY, admin_expires_at);
-    }
-
-    // Derive the impersonated account's primary role so routing and the
-    // role cookie reflect who we are now acting as (client vs admin-side user).
-    const target_role = getPrimaryRole(data.impersonated_user.roles) ?? ROLES.CLIENT;
-    const target_is_staff = isStaffRole(target_role);
-
-    const meta: ImpersonationMeta = {
-      admin_id: data.admin_user.id,
-      admin_first_name: data.admin_user.first_name,
-      admin_last_name: data.admin_user.last_name,
-      admin_email: data.admin_user.email,
-      target_id: data.impersonated_user.id,
-      target_first_name: data.impersonated_user.first_name,
-      target_last_name: data.impersonated_user.last_name,
-      target_email: data.impersonated_user.email,
-      target_role,
-      target_is_staff,
-      started_at: new Date().toISOString(),
-    };
-    localStorage.setItem(IMPERSONATION_META_KEY, JSON.stringify(meta));
-
-    setToken(data.impersonation_token);
-    const expires_at = Date.now() + data.expires_in * 1000;
-    localStorage.setItem("token_expires_at", expires_at.toString());
-    setPrimaryRoleCookie(target_role);
-
+    applyImpersonationSession(data);
     return data;
+  },
+
+  /**
+   * Starts an impersonation session using an already-issued impersonation
+   * response, e.g. one obtained through the notification redirect gate's own
+   * scoped endpoint (see notificationRedirectService.impersonate). Keeps the
+   * token/role/banner bookkeeping in this single place instead of duplicating
+   * it at every call site.
+   */
+  applyImpersonationResponse(data: ImpersonationResponse): void {
+    applyImpersonationSession(data);
   },
 
   /**
