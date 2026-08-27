@@ -101,6 +101,20 @@ describe("AdminNotificationsContent", () => {
     expect(screen.getByText("Payment received.")).toBeInTheDocument();
   });
 
+  it("shows only ticket notifications under the Tickets filter tab", () => {
+    mockNotifications([
+      buildNotification({ id: 1, type: "ticket", message: "A client opened a new support ticket." }),
+      buildNotification({ id: 2, type: "order", message: "Order status changed." }),
+    ]);
+
+    render(<AdminNotificationsContent />);
+
+    fireEvent.click(screen.getByText("Tickets"));
+
+    expect(screen.getByText("A client opened a new support ticket.")).toBeInTheDocument();
+    expect(screen.queryByText("Order status changed.")).not.toBeInTheDocument();
+  });
+
   it("marks a notification as read and navigates to its link when clicked", async () => {
     mockNotifications([
       buildNotification({ id: 2, type: "order_comment", message: "A client posted a comment.", link: "/admin/orders/abc?comment_id=5#comment-5" }),

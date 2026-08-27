@@ -131,4 +131,22 @@ describe("AdminNotificationDropdown", () => {
 
     expect(screen.getByText("No notifications")).toBeInTheDocument();
   });
+
+  it("renders a ticket notification and navigates to its admin support link", async () => {
+    const notification = buildNotification({
+      type: "ticket",
+      message: "Amanda Reyes opened a new support ticket: \"Billing question\".",
+      link: "/admin/support-tickets/42",
+      user: null,
+    });
+    mockNotifications([notification]);
+
+    const { container } = render(<AdminNotificationDropdown />);
+    openDropdown(container);
+
+    fireEvent.click(screen.getByText(notification.message));
+
+    expect(mark_as_read).toHaveBeenCalledWith(1);
+    await waitFor(() => expect(push_mock).toHaveBeenCalledWith("/admin/support-tickets/42"));
+  });
 });
