@@ -71,8 +71,12 @@ const DR_OPTIONS: { value: string; label: string }[] = [
   { value: "DR 70+", label: "DR 70+" },
 ];
 
+// Keyed by the known DisplayStatus labels only — a status without an entry here
+// (free text set on the admin dashboard, not one of the known values) falls
+// back to "info" below rather than requiring exhaustive coverage of every
+// possible string.
 const status_badge_color: Record<
-  DisplayStatus,
+  string,
   "success" | "error" | "warning" | "info" | "primary"
 > = {
   Live: "success",

@@ -15,7 +15,7 @@ jest.mock("@/services/client/link-building.service", () => ({
 }));
 
 import { linkBuildingService } from "@/services/client/link-building.service";
-import { dashboardService } from "@/services/client/dashboard.service";
+import { dashboardService, mapOrderStatus } from "@/services/client/dashboard.service";
 import type { OrderPlacementRow } from "@/types/client/link-building";
 
 const mocked_fetch = linkBuildingService.fetchMyOrderPlacements as jest.Mock;
@@ -87,5 +87,51 @@ describe("dashboardService.fetchPaginatedTableRows", () => {
       sort_by: "completed_date",
       sort_direction: "desc",
     });
+  });
+});
+
+/**
+ * Regression coverage for a bug this uncovered: the admin Link Building Orders
+ * dashboard now lets a placement's status be free text (e.g. pasted from the
+ * external BASE sheet) instead of only the fixed preset list. mapOrderStatus
+ * used to silently relabel any status it didn't recognize as "New request" —
+ * so a client viewing their dashboard would see the wrong status for a
+ * placement the admin had genuinely moved into some other, non-preset state.
+ * It must now show that free-text status verbatim instead.
+ */
+describe("mapOrderStatus", () => {
+  it("maps a known order-level status to its display label", () => {
+    expect(mapOrderStatus("completed")).toBe("Live");
+    expect(mapOrderStatus("cancelled")).toBe("Cancelled");
+  });
+
+  it("maps a known admin placement status to its display label", () => {
+    expect(mapOrderStatus("Reviewing")).toBe("Reviewing");
+    expect(mapOrderStatus("Quality Control")).toBe("Quality Control");
+  });
+
+  it("returns a free-text status verbatim instead of mislabeling it as 'New request'", () => {
+    expect(mapOrderStatus("Needs Client Approval XYZ")).toBe("Needs Client Approval XYZ");
+  });
+
+  it("returns a differently-cased known status verbatim, since matching is case-sensitive", () => {
+    // "reviewing" (lowercase) does not match the "Reviewing" key in either map,
+    // so it falls through to the same free-text passthrough as any other
+    // unrecognized value.
+    expect(mapOrderStatus("reviewing")).toBe("reviewing");
+  });
+
+  it("passes a free-text status through fetchPaginatedTableRows unchanged", async () => {
+    mocked_fetch.mockResolvedValueOnce({
+      data: [{ ...base_row, status: "Needs Client Approval XYZ" as OrderPlacementRow["status"] }],
+      current_page: 1,
+      last_page: 1,
+      per_page: 10,
+      total: 1,
+    });
+
+    const result = await dashboardService.fetchPaginatedTableRows();
+
+    expect(result.data[0].status).toBe("Needs Client Approval XYZ");
   });
 });

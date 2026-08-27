@@ -141,6 +141,10 @@ export const getMonthlyBreakdown = (
 
 // ── Status Mapping ────────────────────────────────────────────────────────────
 
+// The admin Link Building Orders dashboard lets a placement's status be set to
+// free text copied from the external BASE sheet, not just one of the known
+// values below — so this can no longer be a closed union. `(string & {})`
+// keeps IDE autocomplete for the known labels while still accepting anything.
 export type DisplayStatus =
   // Mapped from order-level statuses (legacy + purchased orders)
   | "Live"
@@ -159,7 +163,8 @@ export type DisplayStatus =
   | "Not Approved"
   | "Ready"
   | "Rejected"
-  | "Scheduled";
+  | "Scheduled"
+  | (string & {});
 
 const order_status_to_display: Record<OrderStatus, DisplayStatus> = {
   new_request:     "New request",
@@ -194,7 +199,12 @@ export const mapOrderStatus = (api_status: string): DisplayStatus => {
   if (api_status in placement_status_to_display) {
     return placement_status_to_display[api_status as PlacementStatus];
   }
-  return "New request";
+  // A status set on the admin dashboard that doesn't match any known value
+  // (e.g. free text pasted from the external BASE sheet) is shown to the
+  // client as-is, rather than mislabeled as a specific known status like
+  // "New request" — the client would otherwise see a placement's real,
+  // custom status silently replaced with the wrong one.
+  return api_status;
 };
 
 // ── Dashboard Table Rows ──────────────────────────────────────────────────────

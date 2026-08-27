@@ -123,3 +123,34 @@ describe("OrderStatusTable — Completed Date column", () => {
     expect(onSortChange).toHaveBeenCalledWith("completed_date", "asc");
   });
 });
+
+/**
+ * Regression coverage: the admin Link Building Orders dashboard now lets a
+ * placement's Status and Link Type be free text instead of only a fixed
+ * preset list (an admin can type or paste anything, e.g. copied from the
+ * external BASE sheet). Neither column here is backed by a lookup that could
+ * throw on an unrecognized value — this locks that in.
+ */
+describe("OrderStatusTable — free-text Status and DR Type values", () => {
+  it("renders a Status value outside the known preset list without crashing", () => {
+    renderTable([makeRow({ status: "Needs Client Approval XYZ" })]);
+
+    expect(screen.getByText("Needs Client Approval XYZ")).toBeInTheDocument();
+  });
+
+  it("renders a DR Type (Link Type-derived) value outside the known preset list without crashing", () => {
+    renderTable([makeRow({ dr_type: "Guest Post" })]);
+
+    expect(screen.getByText("Guest Post")).toBeInTheDocument();
+  });
+
+  it("renders distinct free-text statuses per row, each shown verbatim", () => {
+    renderTable([
+      makeRow({ id: "p1", order_id: "BL-25001", status: "Needs Client Approval XYZ" }),
+      makeRow({ id: "p2", order_id: "BL-25002", status: "Reviewing" }),
+    ]);
+
+    expect(screen.getByText("Needs Client Approval XYZ")).toBeInTheDocument();
+    expect(screen.getByText("Reviewing")).toBeInTheDocument();
+  });
+});
