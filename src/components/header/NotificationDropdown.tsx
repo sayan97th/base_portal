@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { useNotifications } from "@/context/NotificationsContext";
+import { resolveNotificationLink } from "@/lib/notification-link";
 import type { Notification } from "@/services/client/notifications.service";
 
 const DROPDOWN_ITEMS_LIMIT = 5;
@@ -13,14 +15,17 @@ function NotificationRow({
   onMarkAsRead,
   onSnooze,
   onArchive,
+  onNavigate,
 }: {
   notification: Notification;
   onMarkAsRead: (id: number) => void;
   onSnooze: (id: number) => void;
   onArchive: (id: number) => void;
+  onNavigate: (notification: Notification) => void;
 }) {
   const [is_menu_open, setIsMenuOpen] = useState(false);
   const menu_ref = useRef<HTMLDivElement>(null);
+  const target_href = resolveNotificationLink(notification.link);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -34,9 +39,18 @@ function NotificationRow({
 
   return (
     <div
+      role={target_href ? "button" : undefined}
+      tabIndex={target_href ? 0 : undefined}
+      onClick={() => target_href && onNavigate(notification)}
+      onKeyDown={(event) => {
+        if (target_href && (event.key === "Enter" || event.key === " ")) {
+          event.preventDefault();
+          onNavigate(notification);
+        }
+      }}
       className={`flex items-start gap-3 px-5 py-3.5 transition-colors hover:bg-gray-50 dark:hover:bg-white/5 ${
-        !notification.is_read ? "bg-white dark:bg-white/2" : ""
-      }`}
+        target_href ? "cursor-pointer" : ""
+      } ${!notification.is_read ? "bg-white dark:bg-white/2" : ""}`}
     >
       {/* Bell Icon */}
       <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-50 dark:bg-brand-500/10">
@@ -170,6 +184,7 @@ function NotificationRow({
 
 export default function NotificationDropdown() {
   const [is_open, setIsOpen] = useState(false);
+  const router = useRouter();
 
   const {
     notifications,
@@ -201,6 +216,17 @@ export default function NotificationDropdown() {
 
   async function handleArchive(id: number) {
     await archiveNotification(id);
+  }
+
+  async function handleNavigate(notification: Notification) {
+    const target_href = resolveNotificationLink(notification.link);
+    if (!target_href) return;
+
+    closeDropdown();
+    if (!notification.is_read) {
+      await markAsRead(notification.id);
+    }
+    router.push(target_href);
   }
 
   return (
@@ -283,6 +309,7 @@ export default function NotificationDropdown() {
                 onMarkAsRead={handleMarkAsRead}
                 onSnooze={handleSnooze}
                 onArchive={handleArchive}
+                onNavigate={handleNavigate}
               />
             </li>
           ))}

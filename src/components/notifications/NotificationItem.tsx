@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { resolveNotificationLink } from "@/lib/notification-link";
 import type { Notification } from "./notificationData";
 
 interface NotificationItemProps {
@@ -10,6 +11,7 @@ interface NotificationItemProps {
   onArchive: (id: number) => void;
   onUnarchive: (id: number) => void;
   onSnooze: (id: number) => void;
+  onNavigate: (notification: Notification) => void;
 }
 
 const NotificationItem: React.FC<NotificationItemProps> = ({
@@ -19,9 +21,11 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
   onArchive,
   onUnarchive,
   onSnooze,
+  onNavigate,
 }) => {
   const [is_menu_open, setIsMenuOpen] = useState(false);
   const menu_ref = useRef<HTMLDivElement>(null);
+  const target_href = resolveNotificationLink(notification.link);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -68,7 +72,18 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
 
   return (
     <div
+      role={target_href ? "button" : undefined}
+      tabIndex={target_href ? 0 : undefined}
+      onClick={() => target_href && onNavigate(notification)}
+      onKeyDown={(event) => {
+        if (target_href && (event.key === "Enter" || event.key === " ")) {
+          event.preventDefault();
+          onNavigate(notification);
+        }
+      }}
       className={`group flex items-start gap-3.5 px-5 py-4 transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.03] ${
+        target_href ? "cursor-pointer" : ""
+      } ${
         !notification.is_read
           ? "bg-white dark:bg-white/[0.02]"
           : "bg-gray-50/30 dark:bg-transparent"

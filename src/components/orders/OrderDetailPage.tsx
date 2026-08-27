@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Badge from "@/components/ui/badge/Badge";
 import {
   Table,
@@ -700,6 +700,9 @@ interface OrderDetailPageProps {
 
 const OrderDetailPage: React.FC<OrderDetailPageProps> = ({ order_id }) => {
   const router = useRouter();
+  const search_params = useSearchParams();
+  const comment_id_param = search_params.get("comment_id");
+  const target_comment_id = comment_id_param ? Number(comment_id_param) : null;
   const [detected, setDetected] = useState<DetectedOrderDetail | null>(null);
   const [is_loading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -896,7 +899,7 @@ const OrderDetailPage: React.FC<OrderDetailPageProps> = ({ order_id }) => {
           {/* Main Grid */}
           <div className="grid grid-cols-12 gap-6">
             {/* Left — Items + Notes + Timeline */}
-            <div className="col-span-12 space-y-4 lg:col-span-8">
+            <div id="live-links" className="col-span-12 space-y-4 lg:col-span-8">
               <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
                 Order Items (
                 {is_lb ? lb_data!.items.length : content_items.length})
@@ -1137,7 +1140,11 @@ const OrderDetailPage: React.FC<OrderDetailPageProps> = ({ order_id }) => {
           </div>
 
           {/* Order Discussion */}
-          <OrderComments purchase_type="single_order" order_id={order_id} />
+          <OrderComments
+            purchase_type="single_order"
+            order_id={order_id}
+            target_comment_id={target_comment_id}
+          />
         </>
       )}
     </div>

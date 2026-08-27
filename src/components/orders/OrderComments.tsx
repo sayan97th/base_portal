@@ -498,6 +498,7 @@ interface CommentItemProps {
   on_edit: (comment_id: number, content: string) => Promise<void>;
   on_delete: (comment_id: number) => Promise<void>;
   is_reply?: boolean;
+  highlighted_id?: number | null;
 }
 
 function CommentItem({
@@ -510,6 +511,7 @@ function CommentItem({
   on_edit,
   on_delete,
   is_reply = false,
+  highlighted_id = null,
 }: CommentItemProps) {
   const [mode, setMode] = useState<"view" | "edit" | "reply">("view");
   const [is_busy, setIsBusy] = useState(false);
@@ -517,6 +519,7 @@ function CommentItem({
   const is_own = comment.user_id === current_user_id;
   const can_edit = is_own;
   const can_delete = is_own || is_admin_user;
+  const is_highlighted = highlighted_id === comment.id;
 
   const handleEdit = async (content: string) => {
     setIsBusy(true);
@@ -548,7 +551,14 @@ function CommentItem({
   };
 
   return (
-    <div>
+    <div
+      id={`comment-${comment.id}`}
+      className={
+        is_highlighted
+          ? "rounded-xl ring-2 ring-brand-400 ring-offset-2 ring-offset-white dark:ring-offset-gray-900 transition-shadow duration-1000"
+          : ""
+      }
+    >
       <div
         className={`flex gap-3 ${
           comment.is_admin_comment
@@ -677,6 +687,7 @@ function CommentItem({
               on_edit={on_edit}
               on_delete={on_delete}
               is_reply={true}
+              highlighted_id={highlighted_id}
             />
           ))}
         </div>
@@ -691,12 +702,14 @@ interface OrderCommentsProps {
   purchase_type: "multi_purchase" | "single_order";
   session_id?: string;
   order_id?: string;
+  target_comment_id?: number | null;
 }
 
 const OrderComments: React.FC<OrderCommentsProps> = ({
   purchase_type,
   session_id,
   order_id,
+  target_comment_id,
 }) => {
   const { user, isAdmin } = useAuth();
   const [comments, setComments] = useState<OrderComment[]>([]);
@@ -705,6 +718,7 @@ const OrderComments: React.FC<OrderCommentsProps> = ({
   const [new_content, setNewContent] = useState("");
   const [is_submitting, setIsSubmitting] = useState(false);
   const [submit_error, setSubmitError] = useState<string | null>(null);
+  const [highlighted_id, setHighlightedId] = useState<number | null>(null);
   const textarea_ref = useRef<HTMLTextAreaElement>(null);
 
   const current_user_name = user
@@ -738,6 +752,20 @@ const OrderComments: React.FC<OrderCommentsProps> = ({
     };
     void load();
   }, [purchase_type, session_id, order_id]);
+
+  // Deep-linking support: a notification or email button can point straight at a specific
+  // comment via ?comment_id=. Once the thread has loaded, scroll to it and flash a highlight,
+  // mirroring how Slack lands you on a linked message.
+  useEffect(() => {
+    if (is_loading || !target_comment_id) return;
+    const element = document.getElementById(`comment-${target_comment_id}`);
+    if (!element) return;
+
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+    setHighlightedId(target_comment_id);
+    const timeout = setTimeout(() => setHighlightedId(null), 2500);
+    return () => clearTimeout(timeout);
+  }, [is_loading, target_comment_id, comments]);
 
   const handleSubmit = async () => {
     if (!new_content.trim() || is_submitting) return;
@@ -862,6 +890,7 @@ const OrderComments: React.FC<OrderCommentsProps> = ({
                   on_reply={handleReply}
                   on_edit={handleEdit}
                   on_delete={handleDelete}
+                  highlighted_id={highlighted_id}
                 />
               </div>
             ))}

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Badge from "@/components/ui/badge/Badge";
 import OrderComments from "@/components/orders/OrderComments";
 import { linkBuildingService } from "@/services/client/link-building.service";
@@ -486,6 +486,9 @@ interface OrderSessionPageProps {
 
 const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
   const router = useRouter();
+  const search_params = useSearchParams();
+  const comment_id_param = search_params.get("comment_id");
+  const target_comment_id = comment_id_param ? Number(comment_id_param) : null;
   const [session, setSession] = useState<PurchaseGroup | null>(null);
   const [sections, setSections] = useState<ResolvedOrderSection[]>([]);
   const [is_loading, setIsLoading] = useState(true);
@@ -1025,7 +1028,11 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
       </div>
 
       {/* ── Order Discussion ── */}
-      <OrderComments purchase_type="multi_purchase" session_id={session_id} />
+      <OrderComments
+        purchase_type="multi_purchase"
+        session_id={session_id}
+        target_comment_id={target_comment_id}
+      />
     </div>
   );
 };

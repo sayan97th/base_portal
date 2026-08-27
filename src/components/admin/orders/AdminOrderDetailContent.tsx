@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import Badge from "@/components/ui/badge/Badge";
 import { getAdminOrder } from "@/services/admin/order.service";
 import { listAdminOrders } from "@/services/admin/order.service";
@@ -596,6 +597,9 @@ interface SessionContext {
 }
 
 const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order_id, initial_session_id }) => {
+  const search_params = useSearchParams();
+  const comment_id_param = search_params.get("comment_id");
+  const target_comment_id = comment_id_param ? Number(comment_id_param) : null;
   const [order, setOrder] = useState<AdminOrder | null>(null);
   const [session_orders, setSessionOrders] = useState<AdminOrder[]>([]);
   const [session_context, setSessionContext] = useState<SessionContext | null>(null);
@@ -910,6 +914,7 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
                 purchase_type={is_session_view ? "multi_purchase" : "single_order"}
                 order_id={order.id}
                 session_id={order.session_id}
+                target_comment_id={target_comment_id}
               />
 
               {/* Order Tracking / Activity Panel */}

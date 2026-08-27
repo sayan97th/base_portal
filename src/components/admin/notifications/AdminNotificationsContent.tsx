@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import AdminNotificationItem from "./AdminNotificationItem";
 import { useAdminNotifications } from "@/context/AdminNotificationsContext";
-import type { AdminNotificationType } from "@/services/admin/notifications.service";
+import { resolveNotificationLink } from "@/lib/notification-link";
+import type { AdminNotification, AdminNotificationType } from "@/services/admin/notifications.service";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -17,11 +19,26 @@ const TYPE_FILTERS: { label: string; value: AdminNotificationType | "all" }[] = 
   { label: "System", value: "system" },
 ];
 
+/**
+ * "order_comment" notifications are a sub-kind of order activity, so the "Orders" filter tab
+ * should surface them too instead of only exact-matching the literal "order" type.
+ */
+const TYPE_FILTER_GROUPS: Partial<Record<AdminNotificationType, AdminNotificationType[]>> = {
+  order: ["order", "order_comment"],
+};
+
+function matchesTypeFilter(type: AdminNotificationType, filter: AdminNotificationType | "all"): boolean {
+  if (filter === "all") return true;
+  const group = TYPE_FILTER_GROUPS[filter] ?? [filter];
+  return group.includes(type);
+}
+
 const AdminNotificationsContent: React.FC = () => {
   const [active_tab, setActiveTab] = useState<ActiveTab>("active");
   const [current_page, setCurrentPage] = useState(1);
   const [active_filter, setActiveFilter] = useState<AdminNotificationType | "all">("all");
   const [show_unread_only, setShowUnreadOnly] = useState(false);
+  const router = useRouter();
 
   const {
     notifications,
@@ -46,7 +63,7 @@ const AdminNotificationsContent: React.FC = () => {
   const filtered_notifications = useMemo(() => {
     const base = active_tab === "active" ? active_notifications : archived_notifications;
     return base.filter((n) => {
-      if (active_filter !== "all" && n.type !== active_filter) return false;
+      if (!matchesTypeFilter(n.type, active_filter)) return false;
       if (show_unread_only && n.is_read) return false;
       return true;
     });
@@ -82,6 +99,16 @@ const AdminNotificationsContent: React.FC = () => {
 
   function goToNextPage() {
     setCurrentPage((prev) => Math.min(prev + 1, total_pages));
+  }
+
+  async function handleNavigate(notification: AdminNotification) {
+    const target_href = resolveNotificationLink(notification.link);
+    if (!target_href) return;
+
+    if (!notification.is_read) {
+      await markAsRead(notification.id);
+    }
+    router.push(target_href);
   }
 
   if (is_loading) {
@@ -212,6 +239,7 @@ const AdminNotificationsContent: React.FC = () => {
                 onMarkAsRead={markAsRead}
                 onArchive={archiveNotification}
                 onUnarchive={unarchiveNotification}
+                onNavigate={handleNavigate}
               />
             ))}
           </div>

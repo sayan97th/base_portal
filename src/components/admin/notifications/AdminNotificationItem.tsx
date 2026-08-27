@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { resolveNotificationLink } from "@/lib/notification-link";
 import type { AdminNotification, AdminNotificationType } from "@/services/admin/notifications.service";
 
 interface AdminNotificationItemProps {
@@ -9,6 +10,7 @@ interface AdminNotificationItemProps {
   onMarkAsRead: (id: number) => void;
   onArchive: (id: number) => void;
   onUnarchive: (id: number) => void;
+  onNavigate: (notification: AdminNotification) => void;
 }
 
 const TYPE_CONFIG: Record<
@@ -64,6 +66,41 @@ const TYPE_CONFIG: Record<
       </svg>
     ),
   },
+  order_comment: {
+    bg: "bg-success-50 dark:bg-success-500/10",
+    icon_color: "text-success-600 dark:text-success-400",
+    icon: (
+      <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+        <path
+          fillRule="evenodd"
+          clipRule="evenodd"
+          d="M2 5a2 2 0 012-2h12a2 2 0 012 2v7a2 2 0 01-2 2H8l-4 3v-3H4a2 2 0 01-2-2V5z"
+        />
+      </svg>
+    ),
+  },
+  invoice: {
+    bg: "bg-brand-50 dark:bg-brand-500/10",
+    icon_color: "text-brand-600 dark:text-brand-400",
+    icon: (
+      <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+        <path
+          fillRule="evenodd"
+          clipRule="evenodd"
+          d="M4 2a2 2 0 00-2 2v14l3-2 3 2 3-2 3 2 3-2V4a2 2 0 00-2-2H4zm2 5a1 1 0 000 2h8a1 1 0 100-2H6zm0 4a1 1 0 100 2h5a1 1 0 100-2H6z"
+        />
+      </svg>
+    ),
+  },
+  post: {
+    bg: "bg-warning-50 dark:bg-warning-500/10",
+    icon_color: "text-warning-600 dark:text-warning-400",
+    icon: (
+      <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+        <path d="M2 4a2 2 0 012-2h12a2 2 0 012 2v9a2 2 0 01-2 2H6l-4 3V4z" />
+      </svg>
+    ),
+  },
 };
 
 const TYPE_LABEL: Record<AdminNotificationType, string> = {
@@ -71,6 +108,9 @@ const TYPE_LABEL: Record<AdminNotificationType, string> = {
   payment: "Payment",
   system: "System",
   user_registration: "New User",
+  order_comment: "Order Comment",
+  invoice: "Invoice",
+  post: "Post",
 };
 
 const AdminNotificationItem: React.FC<AdminNotificationItemProps> = ({
@@ -79,11 +119,13 @@ const AdminNotificationItem: React.FC<AdminNotificationItemProps> = ({
   onMarkAsRead,
   onArchive,
   onUnarchive,
+  onNavigate,
 }) => {
   const [is_menu_open, setIsMenuOpen] = useState(false);
   const menu_ref = useRef<HTMLDivElement>(null);
 
   const type_config = TYPE_CONFIG[notification.type] ?? TYPE_CONFIG.system;
+  const target_href = resolveNotificationLink(notification.link);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -124,7 +166,18 @@ const AdminNotificationItem: React.FC<AdminNotificationItemProps> = ({
 
   return (
     <div
+      role={target_href ? "button" : undefined}
+      tabIndex={target_href ? 0 : undefined}
+      onClick={() => target_href && onNavigate(notification)}
+      onKeyDown={(event) => {
+        if (target_href && (event.key === "Enter" || event.key === " ")) {
+          event.preventDefault();
+          onNavigate(notification);
+        }
+      }}
       className={`group flex items-start gap-3.5 px-5 py-4 transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.03] ${
+        target_href ? "cursor-pointer" : ""
+      } ${
         !notification.is_read
           ? "bg-white dark:bg-white/[0.02]"
           : "bg-gray-50/30 dark:bg-transparent"

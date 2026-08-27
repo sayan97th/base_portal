@@ -2,8 +2,11 @@
 
 import React, { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import NotificationItem from "./NotificationItem";
 import { useNotifications } from "@/context/NotificationsContext";
+import { resolveNotificationLink } from "@/lib/notification-link";
+import type { Notification } from "@/services/client/notifications.service";
 
 const ITEMS_PER_PAGE = 7;
 
@@ -12,6 +15,7 @@ type ActiveTab = "active" | "archived";
 const NotificationsPage: React.FC = () => {
   const [active_tab, setActiveTab] = useState<ActiveTab>("active");
   const [current_page, setCurrentPage] = useState(1);
+  const router = useRouter();
 
   const {
     notifications,
@@ -55,6 +59,16 @@ const NotificationsPage: React.FC = () => {
 
   function goToNextPage() {
     setCurrentPage((prev) => Math.min(prev + 1, total_pages));
+  }
+
+  async function handleNavigate(notification: Notification) {
+    const target_href = resolveNotificationLink(notification.link);
+    if (!target_href) return;
+
+    if (!notification.is_read) {
+      await markAsRead(notification.id);
+    }
+    router.push(target_href);
   }
 
   if (is_loading) {
@@ -144,6 +158,7 @@ const NotificationsPage: React.FC = () => {
                 onArchive={archiveNotification}
                 onUnarchive={unarchiveNotification}
                 onSnooze={snoozeNotification}
+                onNavigate={handleNavigate}
               />
             ))}
           </div>

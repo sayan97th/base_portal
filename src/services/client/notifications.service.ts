@@ -1,6 +1,13 @@
 import { apiClient } from "@/lib/api-client";
 
-export type NotificationType = "payment" | "post" | "system" | "order";
+export type NotificationType =
+  | "payment"
+  | "post"
+  | "system"
+  | "order"
+  | "order_comment"
+  | "user_registration"
+  | "invoice";
 
 export interface Notification {
   id: number;
@@ -9,6 +16,9 @@ export interface Notification {
   message: string;
   preview_text: string | null;
   link: string | null;
+  resource_type?: string | null;
+  resource_id?: string | null;
+  metadata?: Record<string, unknown> | null;
   is_read: boolean;
   is_archived: boolean;
   is_snoozed: boolean;

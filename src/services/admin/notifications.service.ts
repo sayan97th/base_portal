@@ -1,6 +1,13 @@
 import { apiClient } from "@/lib/api-client";
 
-export type AdminNotificationType = "payment" | "order" | "system" | "user_registration";
+export type AdminNotificationType =
+  | "payment"
+  | "order"
+  | "system"
+  | "user_registration"
+  | "order_comment"
+  | "invoice"
+  | "post";
 
 export interface AdminNotificationUser {
   id: number;
@@ -16,6 +23,9 @@ export interface AdminNotification {
   message: string;
   preview_text: string | null;
   link: string | null;
+  resource_type?: string | null;
+  resource_id?: string | null;
+  metadata?: Record<string, unknown> | null;
   is_read: boolean;
   is_archived: boolean;
   date: string;
