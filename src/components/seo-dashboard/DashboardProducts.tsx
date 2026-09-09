@@ -383,6 +383,8 @@ const DashboardProducts: React.FC = () => {
   const [keyword_step_error, setKeywordStepError] = useState<string | null>(
     null
   );
+  // True when the client chose "Skip for now" — all orders are parked as pending.
+  const [details_deferred, setDetailsDeferred] = useState(false);
 
   const {
     getQuantitiesForProductType,
@@ -619,6 +621,8 @@ const DashboardProducts: React.FC = () => {
       return;
     }
     setKeywordStepError(null);
+    // Reaching checkout by filling the form clears any earlier "Skip" intent.
+    setDetailsDeferred(false);
     if (has_saved_address && saved_billing_address) {
       const is_billing_empty =
         !billing_address.address &&
@@ -634,6 +638,20 @@ const DashboardProducts: React.FC = () => {
     saved_billing_address,
     billing_address,
   ]);
+
+  const handleSkipKeywordIntake = useCallback(() => {
+    setKeywordStepError(null);
+    setDetailsDeferred(true);
+    if (has_saved_address && saved_billing_address) {
+      const is_billing_empty =
+        !billing_address.address &&
+        !billing_address.city &&
+        !billing_address.postal_code;
+      if (is_billing_empty) setBillingAddress(saved_billing_address);
+    }
+    setCurrentStep("checkout");
+    scrollToContainer();
+  }, [has_saved_address, saved_billing_address, billing_address]);
 
   const handleBack = () => {
     if (current_step === "checkout") {
@@ -656,10 +674,11 @@ const DashboardProducts: React.FC = () => {
         payment_intent_id,
         is_using_saved_method,
         billing_address,
-        credits_amount
+        credits_amount,
+        details_deferred
       );
     },
-    [executeCheckout, billing_address]
+    [executeCheckout, billing_address, details_deferred]
   );
 
   const handleTriggerCheckout = useCallback(() => {
@@ -949,6 +968,37 @@ const DashboardProducts: React.FC = () => {
                 Enter target keywords and landing pages for each placement.
               </p>
 
+              {/* Defer-details helper: place the order now, add details later */}
+              <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 dark:border-amber-500/25 dark:bg-amber-500/8 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <svg
+                    className="mt-0.5 h-4 w-4 shrink-0 text-amber-500 dark:text-amber-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2}
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                  </svg>
+                  <p className="text-sm text-amber-700 dark:text-amber-300">
+                    Not ready to fill these in? Complete your purchase now, and your order will be
+                    marked <span className="font-semibold">Pending Details</span> so you (or your
+                    team) can add the details later from My Orders. The turnaround clock starts
+                    once they&apos;re submitted.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSkipKeywordIntake}
+                  className="inline-flex shrink-0 items-center gap-2 self-start rounded-lg border border-amber-300 bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-amber-600 dark:border-amber-500/40 sm:self-auto"
+                >
+                  Skip for now
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                  </svg>
+                </button>
+              </div>
+
               {keyword_step_error && <IntakeValidationBanner message={keyword_step_error} />}
 
               <KeywordEntryStep
@@ -973,7 +1023,7 @@ const DashboardProducts: React.FC = () => {
                 onBillingChange={handleBillingChange}
                 onPrevious={handleBack}
                 onComplete={handlePaymentComplete}
-                onPayLater={handlePayLater}
+                onPayLater={() => handlePayLater(details_deferred)}
                 is_loading={is_submitting}
                 error_message={submit_error}
                 total_amount={is_applying_credits ? subtotal : total}
