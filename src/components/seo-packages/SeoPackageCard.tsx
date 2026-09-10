@@ -83,11 +83,10 @@ const SeoPackageCard: React.FC<SeoPackageCardProps> = ({
 
   return (
     <div
-      className={`relative flex flex-col rounded-2xl border bg-white p-4 transition-all duration-200 dark:bg-white/3 ${
-        is_highlighted
-          ? "border-2 border-coral-400 shadow-md shadow-coral-500/10 dark:border-coral-500"
-          : "border-gray-200 dark:border-gray-800"
-      } ${is_selected ? "ring-2 ring-brand-500/40" : ""}`}
+      className={`relative flex flex-col rounded-2xl border bg-white p-4 transition-all duration-200 dark:bg-white/3 ${is_highlighted
+        ? "border-2 border-coral-400 shadow-md shadow-coral-500/10 dark:border-coral-500"
+        : "border-gray-200 dark:border-gray-800"
+        } ${is_selected ? "ring-2 ring-brand-500/40" : ""}`}
     >
       {is_highlighted && (
         <span className="absolute -top-3 left-4 rounded-full bg-coral-500 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm">
@@ -103,15 +102,15 @@ const SeoPackageCard: React.FC<SeoPackageCardProps> = ({
       </span>
 
       {/* Headline */}
-      <h3 className="mt-1.5 min-h-[3.25rem] text-lg font-bold leading-snug text-gray-900 dark:text-white/90">
+      <h3 className="mt-1.5 text-lg font-bold leading-snug text-gray-900 dark:text-white/90">
         {pkg.headline || pkg.name}
       </h3>
-      <p className="mt-1.5 min-h-[3.75rem] text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+      <p className="mt-1.5 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
         {pkg.best_for}
       </p>
 
       {/* Price */}
-      <p className="mt-3 text-3xl font-bold text-gray-900 dark:text-white/90">
+      <p className="mt-1.5 text-3xl font-bold text-gray-900 dark:text-white/90">
         ${pkg.price_per_month.toLocaleString()}
         <span className="text-sm font-normal text-gray-400"> /month</span>
       </p>
@@ -120,13 +119,12 @@ const SeoPackageCard: React.FC<SeoPackageCardProps> = ({
       <button
         type="button"
         onClick={() => onSelect(pkg.id)}
-        className={`mt-4 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
-          is_selected
+        className={`mt-4 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${is_selected
+          ? "bg-coral-500 text-white hover:bg-coral-600"
+          : is_highlighted
             ? "bg-coral-500 text-white hover:bg-coral-600"
-            : is_highlighted
-              ? "bg-coral-500 text-white hover:bg-coral-600"
-              : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10"
-        }`}
+            : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10"
+          }`}
       >
         {is_selected ? (
           <>
@@ -170,16 +168,14 @@ const SeoPackageCard: React.FC<SeoPackageCardProps> = ({
       {/* Ideal for callout */}
       {pkg.ideal_for && (
         <div
-          className={`mt-4 flex items-start gap-2 rounded-xl p-2.5 ${
-            is_highlighted
-              ? "bg-coral-50 dark:bg-coral-500/10"
-              : "bg-gray-50 dark:bg-white/5"
-          }`}
+          className={`mt-4 flex items-start gap-2 rounded-xl p-2.5 ${is_highlighted
+            ? "bg-coral-50 dark:bg-coral-500/10"
+            : "bg-gray-50 dark:bg-white/5"
+            }`}
         >
           <span
-            className={`mt-0.5 shrink-0 ${
-              is_highlighted ? "text-coral-500" : "text-brand-600 dark:text-brand-400"
-            }`}
+            className={`mt-0.5 shrink-0 ${is_highlighted ? "text-coral-500" : "text-brand-600 dark:text-brand-400"
+              }`}
           >
             {ideal_for_icon}
           </span>
