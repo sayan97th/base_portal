@@ -45,60 +45,65 @@ const SeoComparisonTable: React.FC<SeoComparisonTableProps> = ({ packages, rows 
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[520px] border-separate border-spacing-0 text-left text-sm">
-            <thead>
-              <tr>
-                <th className="whitespace-nowrap border-l border-t border-b border-gray-200 px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:border-gray-800 dark:text-gray-500">
-                  Features
-                </th>
-                {packages.map((pkg, tier_index) => (
+      <div className="overflow-x-auto pt-3">
+        <table className="w-full min-w-[520px] border-separate border-spacing-0 text-left text-sm">
+          <thead>
+            <tr>
+              <th className="whitespace-nowrap rounded-tl-xl border-l border-r border-t border-b border-gray-200 px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:border-gray-800 dark:text-gray-500">
+                Features
+              </th>
+              {packages.map((pkg, tier_index) => {
+                const is_last_column = tier_index === packages.length - 1;
+                return (
                   <th
                     key={pkg.id}
-                    className={`border-b border-r border-t border-gray-200 px-3 py-2.5 text-center align-bottom dark:border-gray-800 ${getColumnHeaderStyle(
-                      pkg.is_most_popular,
-                      tier_index,
-                    )}`}
+                    className={`relative border-b border-r border-t border-gray-200 px-3 py-2.5 text-center align-middle dark:border-gray-800 ${
+                      is_last_column ? "rounded-tr-xl" : ""
+                    } ${getColumnHeaderStyle(pkg.is_most_popular, tier_index)}`}
                   >
                     {pkg.is_most_popular && (
-                      <span className="mb-2 mt-1 inline-block rounded-full bg-coral-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
+                      <span className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full bg-coral-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm">
                         Most Popular
                       </span>
                     )}
                     <p className="text-xs font-bold uppercase tracking-wide">{pkg.name}</p>
                   </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, row_index) => {
-                const is_last_row = row_index === rows.length - 1;
-                return (
-                  <tr key={row.id}>
-                    <td
-                      className={`whitespace-nowrap border-b border-l border-gray-200 px-3 py-2 text-sm text-gray-600 dark:border-gray-800 dark:text-gray-400 ${
-                        is_last_row ? "font-semibold text-gray-900 dark:text-white/90" : ""
-                      }`}
-                    >
-                      {row.label}
-                    </td>
-                    {packages.map((pkg) => (
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, row_index) => {
+              const is_last_row = row_index === rows.length - 1;
+              return (
+                <tr key={row.id}>
+                  <td
+                    className={`whitespace-nowrap border-b border-l border-r border-gray-200 px-3 py-2 text-sm text-gray-600 dark:border-gray-800 dark:text-gray-400 ${
+                      is_last_row ? "rounded-bl-xl font-semibold text-gray-900 dark:text-white/90" : ""
+                    }`}
+                  >
+                    {row.label}
+                  </td>
+                  {packages.map((pkg, tier_index) => {
+                    const is_last_column = tier_index === packages.length - 1;
+                    return (
                       <td
                         key={pkg.id}
                         className={`border-b border-r border-gray-200 px-3 py-2 text-center text-sm text-gray-600 dark:border-gray-800 dark:text-gray-400 ${
                           is_last_row ? "font-semibold text-gray-900 dark:text-white/90" : ""
-                        } ${pkg.is_most_popular ? "bg-coral-50/40 dark:bg-coral-500/5" : ""}`}
+                        } ${is_last_row && is_last_column ? "rounded-br-xl" : ""} ${
+                          pkg.is_most_popular ? "bg-coral-50/40 dark:bg-coral-500/5" : ""
+                        }`}
                       >
                         {row.values[pkg.id] ?? "N/A"}
                       </td>
-                    ))}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );
