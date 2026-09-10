@@ -22,7 +22,7 @@ export default function ActiveSubscriptionBanner({ subscription }: Props) {
 
   return (
     <div className="overflow-hidden rounded-2xl border border-success-200 bg-gradient-to-br from-success-50 to-white shadow-sm dark:border-success-500/20 dark:from-success-500/5 dark:to-gray-900">
-      <div className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
         {/* Left: icon + text */}
         <div className="flex items-start gap-4">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-success-100 dark:bg-success-500/10">
@@ -78,7 +78,7 @@ export default function ActiveSubscriptionBanner({ subscription }: Props) {
       </div>
 
       {/* Bottom note */}
-      <div className="border-t border-success-100 bg-success-50/50 px-6 py-3 dark:border-success-500/10 dark:bg-success-500/5">
+      <div className="border-t border-success-100 bg-success-50/50 px-5 py-3 dark:border-success-500/10 dark:bg-success-500/5 sm:px-6">
         <p className="text-xs text-success-700 dark:text-success-400">
           Your SEO package is active. Our team is working on your strategy, reach out to support if you have any questions.
         </p>

@@ -17,7 +17,7 @@ const SeoPackageOrderSummary: React.FC<SeoPackageOrderSummaryProps> = ({
   is_action_disabled = false,
 }) => {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/3 lg:sticky lg:top-24">
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3 sm:p-6 lg:sticky lg:top-24">
       <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-800 dark:text-white/90">
         <svg className="h-5 w-5 text-brand-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
           <path

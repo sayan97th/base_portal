@@ -106,7 +106,7 @@ const SeoPackageCard: React.FC<SeoPackageCardProps> = ({
 
   return (
     <div
-      className={`relative flex flex-col rounded-2xl border p-4 transition-all duration-200 ${is_highlighted || is_selected
+      className={`relative flex flex-col rounded-2xl border p-4 transition-all duration-200 sm:p-5 ${is_highlighted || is_selected
         ? "border-2 border-coral-400 shadow-md shadow-coral-500/10 dark:border-coral-500"
         : "border-gray-200 dark:border-gray-800"
         } ${is_selected ? "bg-coral-50/60 dark:bg-coral-500/10" : "bg-white dark:bg-white/3"

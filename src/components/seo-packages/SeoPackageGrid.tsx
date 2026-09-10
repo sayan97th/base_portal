@@ -22,8 +22,8 @@ const SeoPackageGrid: React.FC<SeoPackageGridProps> = ({
   onPackageSelect,
 }) => {
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    <div className="@container space-y-6">
+      <div className="grid grid-cols-1 gap-4 @lg:grid-cols-2 @4xl:grid-cols-3">
         {packages.map((pkg, index) => (
           <SeoPackageCard
             key={pkg.id}

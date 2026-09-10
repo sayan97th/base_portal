@@ -129,13 +129,15 @@ const SeoPackagesPage: React.FC = () => {
             <div className="min-w-0 flex-1 space-y-6 xl:max-w-6xl">
               <SeoPackagesHeader />
               {packages_loading ? (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-64 animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-800"
-                    />
-                  ))}
+                <div className="@container">
+                  <div className="grid grid-cols-1 gap-4 @lg:grid-cols-2 @4xl:grid-cols-3">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="h-64 animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-800"
+                      />
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <SeoPackageGrid
