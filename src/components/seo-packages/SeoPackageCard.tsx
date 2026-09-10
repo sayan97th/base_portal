@@ -61,6 +61,38 @@ const DEFAULT_IDEAL_FOR_ICON = (
   </svg>
 );
 
+interface TierAccentStyle {
+  badge: string;
+  check: string;
+  callout_bg: string;
+  callout_text: string;
+}
+
+function getTierAccentStyle(tier_index: number, is_highlighted: boolean): TierAccentStyle {
+  if (is_highlighted) {
+    return {
+      badge: "bg-coral-50 text-coral-600 dark:bg-coral-500/15 dark:text-coral-400",
+      check: "bg-coral-100 text-coral-600 dark:bg-coral-500/20 dark:text-coral-400",
+      callout_bg: "bg-coral-50 dark:bg-coral-500/10",
+      callout_text: "text-coral-600 dark:text-coral-400",
+    };
+  }
+  if (tier_index === 0) {
+    return {
+      badge: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300",
+      check: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400",
+      callout_bg: "bg-gray-50 dark:bg-white/5",
+      callout_text: "text-gray-500 dark:text-gray-400",
+    };
+  }
+  return {
+    badge: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-400",
+    check: "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-400",
+    callout_bg: "bg-violet-50 dark:bg-violet-500/10",
+    callout_text: "text-violet-700 dark:text-violet-400",
+  };
+}
+
 const SeoPackageCard: React.FC<SeoPackageCardProps> = ({
   package: pkg,
   is_selected,
@@ -70,23 +102,15 @@ const SeoPackageCard: React.FC<SeoPackageCardProps> = ({
 }) => {
   const is_highlighted = pkg.is_most_popular;
   const ideal_for_icon = IDEAL_FOR_ICONS[tier_index] ?? DEFAULT_IDEAL_FOR_ICON;
-
-  const eyebrow_badge_style = is_highlighted
-    ? "bg-coral-50 text-coral-600 dark:bg-coral-500/15 dark:text-coral-400"
-    : tier_index === 0
-      ? "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"
-      : "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-400";
-
-  const check_badge_style = is_highlighted
-    ? "bg-coral-100 text-coral-600 dark:bg-coral-500/20 dark:text-coral-400"
-    : "bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400";
+  const tier_accent = getTierAccentStyle(tier_index, is_highlighted);
 
   return (
     <div
-      className={`relative flex flex-col rounded-2xl border bg-white p-4 transition-all duration-200 dark:bg-white/3 ${is_highlighted
+      className={`relative flex flex-col rounded-2xl border p-4 transition-all duration-200 ${is_highlighted || is_selected
         ? "border-2 border-coral-400 shadow-md shadow-coral-500/10 dark:border-coral-500"
         : "border-gray-200 dark:border-gray-800"
-        } ${is_selected ? "ring-2 ring-brand-500/40" : ""}`}
+        } ${is_selected ? "bg-coral-50/60 dark:bg-coral-500/10" : "bg-white dark:bg-white/3"
+        }`}
     >
       {is_highlighted && (
         <span className="absolute -top-3 left-4 rounded-full bg-coral-500 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm">
@@ -96,7 +120,7 @@ const SeoPackageCard: React.FC<SeoPackageCardProps> = ({
 
       {/* Eyebrow tier label */}
       <span
-        className={`inline-block w-fit rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${eyebrow_badge_style}`}
+        className={`inline-block w-fit rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${tier_accent.badge}`}
       >
         {pkg.name}
       </span>
@@ -147,7 +171,7 @@ const SeoPackageCard: React.FC<SeoPackageCardProps> = ({
         {pkg.features.map((feature, feature_index) => (
           <li key={`${feature.title}-${feature_index}`} className="flex items-start gap-2.5">
             <span
-              className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${check_badge_style}`}
+              className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${tier_accent.check}`}
             >
               <CheckIcon className="h-3 w-3" />
             </span>
@@ -167,21 +191,10 @@ const SeoPackageCard: React.FC<SeoPackageCardProps> = ({
 
       {/* Ideal for callout */}
       {pkg.ideal_for && (
-        <div
-          className={`mt-4 flex items-start gap-2 rounded-xl p-2.5 ${is_highlighted
-            ? "bg-coral-50 dark:bg-coral-500/10"
-            : "bg-gray-50 dark:bg-white/5"
-            }`}
-        >
-          <span
-            className={`mt-0.5 shrink-0 ${is_highlighted ? "text-coral-500" : "text-brand-600 dark:text-brand-400"
-              }`}
-          >
-            {ideal_for_icon}
-          </span>
-          <p className="text-[11px] leading-snug text-gray-600 dark:text-gray-400">
-            <span className="font-semibold text-gray-800 dark:text-white/90">Ideal for:</span>{" "}
-            {pkg.ideal_for}
+        <div className={`mt-4 flex items-start gap-2 rounded-xl p-2.5 ${tier_accent.callout_bg}`}>
+          <span className={`mt-0.5 shrink-0 ${tier_accent.callout_text}`}>{ideal_for_icon}</span>
+          <p className={`text-[11px] leading-snug ${tier_accent.callout_text}`}>
+            <span className="font-semibold">Ideal for:</span> {pkg.ideal_for}
           </p>
         </div>
       )}
