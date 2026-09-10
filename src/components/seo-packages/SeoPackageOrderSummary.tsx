@@ -91,7 +91,7 @@ const SeoPackageOrderSummary: React.FC<SeoPackageOrderSummaryProps> = ({
         </>
       ) : (
         <div className="flex flex-col items-center py-10 text-center">
-          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gray-100 dark:bg-white/10">
+          <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-gray-100 dark:bg-white/10">
             <svg
               className="h-8 w-8 text-gray-400 dark:text-gray-500"
               viewBox="0 0 24 24"
@@ -104,6 +104,20 @@ const SeoPackageOrderSummary: React.FC<SeoPackageOrderSummaryProps> = ({
                 strokeLinejoin="round"
                 d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
               />
+            </svg>
+            <svg
+              className="absolute -right-1 -top-1 h-4 w-4 text-brand-400 dark:text-brand-300"
+              viewBox="0 0 16 16"
+              fill="currentColor"
+            >
+              <path d="M8 0l1.5 6.5L16 8l-6.5 1.5L8 16l-1.5-6.5L0 8l6.5-1.5z" />
+            </svg>
+            <svg
+              className="absolute -left-1 bottom-1 h-2.5 w-2.5 text-coral-400 dark:text-coral-300"
+              viewBox="0 0 16 16"
+              fill="currentColor"
+            >
+              <path d="M8 0l1.5 6.5L16 8l-6.5 1.5L8 16l-1.5-6.5L0 8l6.5-1.5z" />
             </svg>
           </div>
           <p className="mt-5 text-base font-semibold text-gray-800 dark:text-white/90">
