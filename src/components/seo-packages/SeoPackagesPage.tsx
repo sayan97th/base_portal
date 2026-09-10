@@ -10,7 +10,7 @@ import CalendlyWidget, {
 } from "@/components/shared/CalendlyWidget";
 import { seo_packages as fallback_packages } from "./seoPackageData";
 import { seoPackagesService } from "@/services/client/seo-packages.service";
-import type { SeoPackage, ActiveSeoSubscription } from "@/types/client/seo-packages";
+import type { SeoPackage, SeoComparisonRow, ActiveSeoSubscription } from "@/types/client/seo-packages";
 
 const CALENDLY_URL =
   process.env.NEXT_PUBLIC_CALENDLY_URL_SEO_PACKAGES ||
@@ -22,6 +22,7 @@ type Step = "selection" | "schedule";
 const SeoPackagesPage: React.FC = () => {
   const [packages, setPackages] = useState<SeoPackage[]>(fallback_packages);
   const [packages_loading, setPackagesLoading] = useState(true);
+  const [comparison_rows, setComparisonRows] = useState<SeoComparisonRow[]>([]);
   const [active_subscription, setActiveSubscription] = useState<ActiveSeoSubscription | null>(null);
 
   const [selected_package_id, setSelectedPackageId] = useState<string | null>(null);
@@ -48,10 +49,20 @@ const SeoPackagesPage: React.FC = () => {
     setActiveSubscription(sub);
   }, []);
 
+  const loadComparisonRows = useCallback(async () => {
+    try {
+      const rows = await seoPackagesService.fetchComparisonRows();
+      setComparisonRows(rows);
+    } catch {
+      // Quick comparison table is optional; the package cards remain usable without it.
+    }
+  }, []);
+
   useEffect(() => {
     loadPackages();
     loadActiveSubscription();
-  }, [loadPackages, loadActiveSubscription]);
+    loadComparisonRows();
+  }, [loadPackages, loadActiveSubscription, loadComparisonRows]);
 
   const selected_package = packages.find((p) => p.id === selected_package_id) ?? null;
 
@@ -129,6 +140,7 @@ const SeoPackagesPage: React.FC = () => {
               ) : (
                 <SeoPackageGrid
                   packages={packages}
+                  comparison_rows={comparison_rows}
                   selected_package_id={selected_package_id}
                   onPackageSelect={handlePackageSelect}
                 />
@@ -231,7 +243,7 @@ const SeoPackagesPage: React.FC = () => {
                   onClick={handleFinish}
                   className="w-full rounded-lg bg-coral-500 px-6 py-3.5 text-sm font-medium text-white shadow-theme-xs transition-colors hover:bg-coral-600"
                 >
-                  Done — Return to SEO Packages
+                  Done, return to SEO Packages
                 </button>
               ) : (
                 <button

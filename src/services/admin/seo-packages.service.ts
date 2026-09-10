@@ -3,7 +3,13 @@ import type {
   AdminSeoPackage,
   CreateSeoPackagePayload,
   UpdateSeoPackagePayload,
+  AdminSeoComparisonRow,
+  UpdateSeoComparisonPayload,
 } from "@/types/admin/seo-packages";
+
+interface AdminSeoComparisonResponse {
+  data: AdminSeoComparisonRow[];
+}
 
 export async function listAdminSeoPackages(): Promise<AdminSeoPackage[]> {
   return apiClient.get<AdminSeoPackage[]>("/api/admin/seo-packages");
@@ -37,4 +43,21 @@ export async function toggleAdminSeoPackageStatus(
 
 export async function deleteAdminSeoPackage(id: string): Promise<void> {
   return apiClient.delete<void>(`/api/admin/seo-packages/${id}`);
+}
+
+export async function getAdminSeoComparison(): Promise<AdminSeoComparisonRow[]> {
+  const response = await apiClient.get<AdminSeoComparisonResponse>(
+    "/api/admin/seo-packages/comparison"
+  );
+  return response.data;
+}
+
+export async function updateAdminSeoComparison(
+  payload: UpdateSeoComparisonPayload
+): Promise<AdminSeoComparisonRow[]> {
+  const response = await apiClient.put<AdminSeoComparisonResponse>(
+    "/api/admin/seo-packages/comparison",
+    payload
+  );
+  return response.data;
 }

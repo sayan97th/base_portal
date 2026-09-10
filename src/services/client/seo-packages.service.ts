@@ -1,6 +1,7 @@
 import { apiClient } from "@/lib/api-client";
 import type {
   SeoPackage,
+  SeoComparisonRow,
   CreateSeoSubscriptionPayload,
   CreateSeoSubscriptionResponse,
   CreateSeoAppointmentPayload,
@@ -10,6 +11,10 @@ import type {
 
 interface SeoPackagesResponse {
   data: SeoPackage[];
+}
+
+interface SeoComparisonResponse {
+  data: SeoComparisonRow[];
 }
 
 interface CreateSeoSubscriptionApiResponse {
@@ -27,6 +32,11 @@ interface ActiveSeoSubscriptionApiResponse {
 export const seoPackagesService = {
   async fetchSeoPackages(): Promise<SeoPackage[]> {
     const response = await apiClient.get<SeoPackagesResponse>("/api/seo-packages");
+    return response.data;
+  },
+
+  async fetchComparisonRows(): Promise<SeoComparisonRow[]> {
+    const response = await apiClient.get<SeoComparisonResponse>("/api/seo-packages/comparison");
     return response.data;
   },
 

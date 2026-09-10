@@ -18,7 +18,14 @@ const SeoPackageOrderSummary: React.FC<SeoPackageOrderSummaryProps> = ({
 }) => {
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/3 lg:sticky lg:top-24">
-      <h2 className="mb-5 text-base font-semibold text-gray-800 dark:text-white/90">
+      <h2 className="mb-5 flex items-center gap-2 text-base font-semibold text-gray-800 dark:text-white/90">
+        <svg className="h-4 w-4 text-brand-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"
+          />
+        </svg>
         Order Summary
       </h2>
 
@@ -33,7 +40,7 @@ const SeoPackageOrderSummary: React.FC<SeoPackageOrderSummaryProps> = ({
           </p>
           <ul className="mt-3 space-y-1.5">
             {selected_package.features.map((feature) => (
-              <li key={feature.category} className="flex items-center gap-1.5">
+              <li key={feature.title} className="flex items-center gap-1.5">
                 <svg
                   className="h-3 w-3 shrink-0 text-coral-500"
                   fill="none"
@@ -44,7 +51,7 @@ const SeoPackageOrderSummary: React.FC<SeoPackageOrderSummaryProps> = ({
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                 </svg>
                 <span className="text-xs text-gray-600 dark:text-gray-400">
-                  <span className="font-semibold">{feature.category}:</span>{" "}
+                  <span className="font-semibold">{feature.title}:</span>{" "}
                   {feature.description}
                 </span>
               </li>
@@ -52,9 +59,29 @@ const SeoPackageOrderSummary: React.FC<SeoPackageOrderSummaryProps> = ({
           </ul>
         </div>
       ) : (
-        <p className="mb-6 text-sm text-gray-400 dark:text-gray-500">
-          No plan selected yet.
-        </p>
+        <div className="mb-6 flex flex-col items-center rounded-xl bg-gray-50 px-4 py-8 text-center dark:bg-white/5">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm dark:bg-gray-800">
+            <svg
+              className="h-5 w-5 text-brand-400"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
+            </svg>
+          </div>
+          <p className="mt-3 text-sm font-semibold text-gray-800 dark:text-white/90">
+            No plan selected yet
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+            Choose a plan to view the full summary, including pricing and next steps.
+          </p>
+        </div>
       )}
 
       {/* Pricing */}
@@ -70,7 +97,7 @@ const SeoPackageOrderSummary: React.FC<SeoPackageOrderSummaryProps> = ({
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}`
-                : "—"}
+                : "N/A"}
             </p>
             {selected_package && (
               <p className="text-xs text-gray-400 dark:text-gray-500">per month</p>

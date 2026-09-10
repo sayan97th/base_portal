@@ -80,7 +80,7 @@ export default function ActiveSubscriptionBanner({ subscription }: Props) {
       {/* Bottom note */}
       <div className="border-t border-success-100 bg-success-50/50 px-6 py-3 dark:border-success-500/10 dark:bg-success-500/5">
         <p className="text-xs text-success-700 dark:text-success-400">
-          Your SEO package is active. Our team is working on your strategy — reach out to support if you have any questions.
+          Your SEO package is active. Our team is working on your strategy, reach out to support if you have any questions.
         </p>
       </div>
     </div>

@@ -16,8 +16,10 @@ import {
 } from "@/services/admin/seo-packages.service";
 import SeoPackageCard from "./SeoPackageCard";
 import SeoPackageFormModal from "./SeoPackageFormModal";
+import SeoComparisonTableEditor from "./SeoComparisonTableEditor";
 
 type StatusFilter = "all" | "active" | "disabled";
+type ContentTab = "packages" | "comparison";
 
 interface StripStatProps {
   label: string;
@@ -114,6 +116,7 @@ export default function AdminSeoPackagesContent() {
 
   const [search_query, setSearchQuery] = useState("");
   const [status_filter, setStatusFilter] = useState<StatusFilter>("active");
+  const [active_tab, setActiveTab] = useState<ContentTab>("packages");
 
   const [form_modal_open, setFormModalOpen] = useState(false);
   const [editing_package, setEditingPackage] = useState<AdminSeoPackage | null>(null);
@@ -154,7 +157,7 @@ export default function AdminSeoPackagesContent() {
         !search_query ||
         p.name.toLowerCase().includes(search_query.toLowerCase()) ||
         p.slug.toLowerCase().includes(search_query.toLowerCase()) ||
-        p.tagline.toLowerCase().includes(search_query.toLowerCase()) ||
+        p.headline.toLowerCase().includes(search_query.toLowerCase()) ||
         p.best_for.toLowerCase().includes(search_query.toLowerCase());
 
       const matches_status =
@@ -241,7 +244,7 @@ export default function AdminSeoPackagesContent() {
               Manage SEO packages, features, and pricing available to clients.
             </p>
           </div>
-          {isAdmin && (
+          {isAdmin && active_tab === "packages" && (
             <button
               onClick={openAdd}
               className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-brand-600"
@@ -260,7 +263,31 @@ export default function AdminSeoPackagesContent() {
           )}
         </div>
 
-        {error && (
+        {/* Tabs */}
+        <div className="flex rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-900 sm:w-fit">
+          {(
+            [
+              { key: "packages", label: "Packages" },
+              { key: "comparison", label: "Quick Comparison" },
+            ] as { key: ContentTab; label: string }[]
+          ).map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-colors sm:flex-none ${
+                active_tab === tab.key
+                  ? "bg-brand-500 text-white shadow-sm"
+                  : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {active_tab === "comparison" && <SeoComparisonTableEditor packages={packages} />}
+
+        {active_tab === "packages" && error && (
           <div className="flex items-center justify-between rounded-xl bg-error-50 px-4 py-3 text-sm text-error-600 dark:bg-error-500/10 dark:text-error-400">
             <span>{error}</span>
             <button
@@ -272,6 +299,8 @@ export default function AdminSeoPackagesContent() {
           </div>
         )}
 
+      {active_tab === "packages" && (
+        <>
         {/* Stats strip */}
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-gray-800/40">
           <StripStat label="Total" value={total_count} />
@@ -379,6 +408,8 @@ export default function AdminSeoPackagesContent() {
             ))}
           </div>
         )}
+        </>
+      )}
       </div>
 
       {/* Add / Edit modal */}

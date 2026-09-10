@@ -1,15 +1,16 @@
 export interface AdminSeoPackageFeature {
-  category: string;
+  title: string;
   description: string;
 }
 
 export interface AdminSeoPackage {
   id: string;
   name: string;
+  headline: string;
   slug: string;
   price_per_month: number;
   best_for: string;
-  tagline: string;
+  ideal_for: string;
   is_most_popular: boolean;
   is_active: boolean;
   sort_order: number;
@@ -22,10 +23,11 @@ export interface AdminSeoPackage {
 
 export interface CreateSeoPackagePayload {
   name: string;
+  headline: string;
   slug: string;
   price_per_month: number;
   best_for: string;
-  tagline: string;
+  ideal_for: string;
   is_most_popular: boolean;
   is_active: boolean;
   sort_order: number;
@@ -33,3 +35,14 @@ export interface CreateSeoPackagePayload {
 }
 
 export type UpdateSeoPackagePayload = Partial<CreateSeoPackagePayload>;
+
+export interface AdminSeoComparisonRow {
+  id: string | null;
+  label: string;
+  sort_order: number;
+  values: Record<string, string | null>;
+}
+
+export interface UpdateSeoComparisonPayload {
+  rows: AdminSeoComparisonRow[];
+}

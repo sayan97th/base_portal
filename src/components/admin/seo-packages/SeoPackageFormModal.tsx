@@ -16,10 +16,11 @@ interface SeoPackageFormModalProps {
 
 const EMPTY_FORM: CreateSeoPackagePayload = {
   name: "",
+  headline: "",
   slug: "",
   price_per_month: 0,
   best_for: "",
-  tagline: "",
+  ideal_for: "",
   is_most_popular: false,
   is_active: true,
   sort_order: 0,
@@ -85,10 +86,11 @@ export default function SeoPackageFormModal({
     if (package_data) {
       setFormData({
         name: package_data.name,
+        headline: package_data.headline ?? "",
         slug: package_data.slug,
         price_per_month: package_data.price_per_month,
         best_for: package_data.best_for,
-        tagline: package_data.tagline ?? "",
+        ideal_for: package_data.ideal_for ?? "",
         is_most_popular: package_data.is_most_popular,
         is_active: package_data.is_active,
         sort_order: package_data.sort_order,
@@ -142,7 +144,7 @@ export default function SeoPackageFormModal({
   const addFeature = () => {
     setFormData((prev) => ({
       ...prev,
-      features: [...prev.features, { category: "", description: "" }],
+      features: [...prev.features, { title: "", description: "" }],
     }));
   };
 
@@ -224,32 +226,55 @@ export default function SeoPackageFormModal({
             />
           </div>
 
-          {/* Tagline */}
+          {/* Headline */}
           <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Tagline
+              Headline
             </label>
             <input
               type="text"
-              value={form_data.tagline}
-              onChange={(e) => setField("tagline", e.target.value)}
-              placeholder="Short description shown on the package card"
+              value={form_data.headline}
+              onChange={(e) => setField("headline", e.target.value)}
+              placeholder="e.g. Build a Strong Foundation"
               className="h-11 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
             />
+            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+              The bold marketing title shown on the package card.
+            </p>
           </div>
 
           {/* Best for */}
           <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Best For
+              Description
             </label>
             <input
               type="text"
               value={form_data.best_for}
               onChange={(e) => setField("best_for", e.target.value)}
-              placeholder="e.g. Small businesses looking to grow organic traffic"
+              placeholder="e.g. Perfect for businesses looking to establish steady rankings"
               className="h-11 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
             />
+            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+              Short paragraph shown under the headline.
+            </p>
+          </div>
+
+          {/* Ideal for */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Ideal For
+            </label>
+            <textarea
+              value={form_data.ideal_for}
+              onChange={(e) => setField("ideal_for", e.target.value)}
+              placeholder="e.g. Businesses with existing content that need consistent optimization"
+              rows={2}
+              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
+            />
+            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+              Shown in the highlighted callout at the bottom of the card.
+            </p>
           </div>
 
           {/* Price & Sort order row */}
@@ -316,9 +341,9 @@ export default function SeoPackageFormModal({
                     <div className="grid flex-1 grid-cols-2 gap-2">
                       <input
                         type="text"
-                        value={feature.category}
-                        onChange={(e) => updateFeature(idx, "category", e.target.value)}
-                        placeholder="Category"
+                        value={feature.title}
+                        onChange={(e) => updateFeature(idx, "title", e.target.value)}
+                        placeholder="Title"
                         className="h-9 rounded-lg border border-gray-300 px-3 text-sm text-gray-900 placeholder-gray-400 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
                       />
                       <input

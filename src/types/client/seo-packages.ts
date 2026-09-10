@@ -1,17 +1,25 @@
 export interface SeoPackageFeature {
-  category: string;
+  title: string;
   description: string;
 }
 
 export interface SeoPackage {
   id: string;
   name: string;
+  headline: string;
   slug: string;
   price_per_month: number;
   best_for: string;
+  ideal_for: string;
   is_most_popular: boolean;
   is_active: boolean;
   features: SeoPackageFeature[];
+}
+
+export interface SeoComparisonRow {
+  id: string;
+  label: string;
+  values: Record<string, string | null>;
 }
 
 export interface SeoSubscriptionBilling {

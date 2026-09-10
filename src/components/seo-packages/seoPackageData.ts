@@ -3,83 +3,58 @@ import type { SeoPackage } from "@/types/client/seo-packages";
 export const seo_packages: SeoPackage[] = [
   {
     id: "growth-seo-plan",
-    name: "Growth SEO Plan",
-    slug: "growth",
-    price_per_month: 1499,
-    best_for: "Businesses looking to steadily build rankings over time.",
+    name: "Starter",
+    headline: "Build a Strong Foundation",
+    slug: "starter",
+    price_per_month: 999,
+    best_for:
+      "Perfect for businesses looking to establish steady rankings and drive consistent traffic.",
+    ideal_for:
+      "Businesses with existing content that need consistent optimization and authority building.",
     is_most_popular: false,
     is_active: true,
     features: [
-      {
-        category: "Strategy",
-        description: "Competitive research & strategy (Top 2 competitors every 6 months).",
-      },
-      {
-        category: "On-Page",
-        description: "2 optimized pages per month.",
-      },
-      {
-        category: "Off-Page",
-        description: "5 high-authority links per month.",
-      },
-      {
-        category: "Technical",
-        description: "Quick SEO health & technical checkup (every 6 months).",
-      },
+      { title: "On-page optimization", description: "Improve existing pages for rankings and conversions." },
+      { title: "Manual link building", description: "Quality, relevant outreach." },
+      { title: "Quarterly SEO roadmap", description: "Clear priorities and next steps." },
+      { title: "Monthly performance reporting", description: "Track rankings, traffic and progress." },
     ],
   },
   {
     id: "performance-seo-plan",
-    name: "Performance SEO Plan",
-    slug: "performance",
+    name: "Growth",
+    headline: "Accelerate Organic Growth",
+    slug: "growth",
     price_per_month: 2999,
-    best_for: "Companies looking for aggressive link-building and content expansion.",
+    best_for: "For companies ready to turn SEO into a meaningful acquisition channel.",
+    ideal_for: "Growth-stage companies that want SEO to become a real revenue driver.",
     is_most_popular: true,
     is_active: true,
     features: [
-      {
-        category: "Strategy",
-        description: "Competitive research & strategy (Top 3 competitors every 4 months).",
-      },
-      {
-        category: "On-Page",
-        description: "4 optimized pages per month.",
-      },
-      {
-        category: "Off-Page",
-        description: "10 high-authority links per month.",
-      },
-      {
-        category: "Technical",
-        description: "Full SEO tech audit & fixes (every 4 months).",
-      },
+      { title: "Competitive SEO strategy", description: "Target high-value keywords and opportunities." },
+      { title: "New SEO content", description: "Blog posts and landing pages (e.g. 3/month)." },
+      { title: "Technical SEO audits", description: "Improve site health, crawlability and speed." },
+      { title: "Expanded link building", description: "More authority-building outreach." },
+      { title: "Quarterly strategy review", description: "Analyze results and plan next quarter." },
     ],
   },
   {
     id: "full-scale-seo-plan",
-    name: "Full-Scale SEO Plan",
+    name: "Full-Scale",
+    headline: "Dominate Competitive Search",
     slug: "full-scale",
     price_per_month: 4999,
-    best_for: "Brands that want to outrank competitors fast with a fully managed SEO powerhouse.",
+    best_for: "For established brands ready to outpace competitors and scale aggressively.",
+    ideal_for: "Established brands where organic search is a major growth priority.",
     is_most_popular: false,
     is_active: true,
     features: [
-      {
-        category: "Strategy",
-        description: "Advanced competitive research & strategy (Top 5 competitors every 3 months).",
-      },
-      {
-        category: "On-Page",
-        description: "8 optimized pages per month.",
-      },
-      {
-        category: "Off-Page",
-        description: "15 high-authority links per month.",
-      },
-      {
-        category: "Technical",
-        description: "Full SEO tech audit & fixes (every 3 months).",
-      },
+      { title: "Advanced competitor research", description: "In-depth analysis and strategy." },
+      { title: "SEO/AIO optimization", description: "For search and AI visibility." },
+      { title: "High-volume content production", description: "More blogs, pages and resources." },
+      { title: "Full technical SEO management", description: "Ongoing site health and performance." },
+      { title: "Reputation and PR link building", description: "Build brand authority." },
+      { title: "Monthly live check-ins", description: "Progress and strategy in real time." },
     ],
   },
 ];

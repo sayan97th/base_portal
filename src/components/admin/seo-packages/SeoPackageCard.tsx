@@ -89,10 +89,10 @@ export default function SeoPackageCard({
           <PackageStatusBadge pkg={package_data} />
         </div>
 
-        {/* Tagline */}
-        {package_data.tagline && (
+        {/* Headline */}
+        {package_data.headline && (
           <p className="mt-3 text-xs italic text-gray-500 dark:text-gray-400">
-            &ldquo;{package_data.tagline}&rdquo;
+            &ldquo;{package_data.headline}&rdquo;
           </p>
         )}
 
@@ -123,11 +123,11 @@ export default function SeoPackageCard({
                 </svg>
                 <div className="min-w-0 wrap-break-word">
                   <span className="font-medium text-gray-700 dark:text-gray-300">
-                    {feature.category}
+                    {feature.title}
                   </span>
                   {feature.description && (
                     <span className="ml-1 text-gray-500 dark:text-gray-400">
-                      — {feature.description}
+                      : {feature.description}
                     </span>
                   )}
                 </div>
