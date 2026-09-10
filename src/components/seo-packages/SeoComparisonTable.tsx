@@ -32,7 +32,7 @@ const ChevronIcon = ({ is_expanded }: { is_expanded: boolean }) => (
 
 function getColumnHeaderStyle(is_most_popular: boolean, tier_index: number): string {
   if (is_most_popular) {
-    return "bg-coral-50 text-coral-600 dark:bg-coral-500/10 dark:text-coral-400";
+    return "bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400";
   }
   if (tier_index === 0) {
     return "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300";
@@ -77,7 +77,7 @@ const SeoComparisonTable: React.FC<SeoComparisonTableProps> = ({ packages, rows 
               key={pkg.id}
               className={`overflow-hidden rounded-xl border ${
                 pkg.is_most_popular
-                  ? "border-coral-300 dark:border-coral-500/40"
+                  ? "border-brand-300 dark:border-brand-500/40"
                   : "border-gray-200 dark:border-gray-800"
               }`}
             >
@@ -93,7 +93,7 @@ const SeoComparisonTable: React.FC<SeoComparisonTableProps> = ({ packages, rows 
                 <span className="flex items-center gap-2">
                   <span className="text-xs font-bold uppercase tracking-wide">{pkg.name}</span>
                   {pkg.is_most_popular && (
-                    <span className="whitespace-nowrap rounded-full bg-coral-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
+                    <span className="whitespace-nowrap rounded-full bg-brand-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
                       Most Popular
                     </span>
                   )}
@@ -143,7 +143,7 @@ const SeoComparisonTable: React.FC<SeoComparisonTableProps> = ({ packages, rows 
                     } ${getColumnHeaderStyle(pkg.is_most_popular, tier_index)}`}
                   >
                     {pkg.is_most_popular && (
-                      <span className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full bg-coral-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm">
+                      <span className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full bg-brand-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm">
                         Most Popular
                       </span>
                     )}
@@ -173,7 +173,7 @@ const SeoComparisonTable: React.FC<SeoComparisonTableProps> = ({ packages, rows 
                         className={`border-b border-r border-gray-200 px-3 py-2 text-center text-sm text-gray-600 dark:border-gray-800 dark:text-gray-400 ${
                           is_last_row ? "font-semibold text-gray-900 dark:text-white/90" : ""
                         } ${is_last_row && is_last_column ? "rounded-br-xl" : ""} ${
-                          pkg.is_most_popular ? "bg-coral-50/40 dark:bg-coral-500/5" : ""
+                          pkg.is_most_popular ? "bg-brand-50/40 dark:bg-brand-500/5" : ""
                         }`}
                       >
                         {row.values[pkg.id] ?? "N/A"}
