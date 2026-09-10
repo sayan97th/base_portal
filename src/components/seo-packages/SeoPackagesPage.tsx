@@ -126,7 +126,7 @@ const SeoPackagesPage: React.FC = () => {
         {/* Selection step */}
         {current_step === "selection" && (
           <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-            <div className="min-w-0 flex-1 space-y-6">
+            <div className="min-w-0 flex-1 space-y-6 xl:max-w-6xl">
               <SeoPackagesHeader />
               {packages_loading ? (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -147,7 +147,7 @@ const SeoPackagesPage: React.FC = () => {
               )}
             </div>
 
-            <div className="w-full lg:w-[300px] lg:shrink-0">
+            <div className="w-full lg:w-[380px] lg:shrink-0">
               <SeoPackageOrderSummary
                 selected_package={selected_package}
                 action_label="Schedule a Consultation"
@@ -161,7 +161,7 @@ const SeoPackagesPage: React.FC = () => {
         {/* Schedule step */}
         {current_step === "schedule" && (
           <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-            <div className="min-w-0 flex-1 space-y-6">
+            <div className="min-w-0 flex-1 space-y-6 xl:max-w-6xl">
               <div>
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                   Schedule Your SEO Consultation
@@ -255,7 +255,7 @@ const SeoPackagesPage: React.FC = () => {
               )}
             </div>
 
-            <div className="w-full lg:w-[300px] lg:shrink-0">
+            <div className="w-full lg:w-[380px] lg:shrink-0">
               <SeoPackageOrderSummary
                 selected_package={selected_package}
                 action_label="Schedule a Consultation"

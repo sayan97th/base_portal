@@ -71,6 +71,16 @@ const SeoPackageCard: React.FC<SeoPackageCardProps> = ({
   const is_highlighted = pkg.is_most_popular;
   const ideal_for_icon = IDEAL_FOR_ICONS[tier_index] ?? DEFAULT_IDEAL_FOR_ICON;
 
+  const eyebrow_badge_style = is_highlighted
+    ? "bg-coral-50 text-coral-600 dark:bg-coral-500/15 dark:text-coral-400"
+    : tier_index === 0
+      ? "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+      : "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-400";
+
+  const check_badge_style = is_highlighted
+    ? "bg-coral-100 text-coral-600 dark:bg-coral-500/20 dark:text-coral-400"
+    : "bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400";
+
   return (
     <div
       className={`relative flex flex-col rounded-2xl border bg-white p-4 transition-all duration-200 dark:bg-white/3 ${
@@ -86,13 +96,11 @@ const SeoPackageCard: React.FC<SeoPackageCardProps> = ({
       )}
 
       {/* Eyebrow tier label */}
-      <p
-        className={`text-xs font-bold uppercase tracking-wide ${
-          is_highlighted ? "text-coral-600 dark:text-coral-400" : "text-brand-600 dark:text-brand-400"
-        }`}
+      <span
+        className={`inline-block w-fit rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${eyebrow_badge_style}`}
       >
         {pkg.name}
-      </p>
+      </span>
 
       {/* Headline */}
       <h3 className="mt-1.5 min-h-[3.25rem] text-lg font-bold leading-snug text-gray-900 dark:text-white/90">
@@ -139,12 +147,12 @@ const SeoPackageCard: React.FC<SeoPackageCardProps> = ({
       </p>
       <ul className="space-y-2">
         {pkg.features.map((feature, feature_index) => (
-          <li key={`${feature.title}-${feature_index}`} className="flex items-start gap-2">
-            <CheckIcon
-              className={`mt-0.5 h-4 w-4 shrink-0 ${
-                is_highlighted ? "text-coral-500" : "text-brand-600 dark:text-brand-400"
-              }`}
-            />
+          <li key={`${feature.title}-${feature_index}`} className="flex items-start gap-2.5">
+            <span
+              className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${check_badge_style}`}
+            >
+              <CheckIcon className="h-3 w-3" />
+            </span>
             <div className="min-w-0">
               <p className="text-sm font-semibold leading-snug text-gray-800 dark:text-white/90">
                 {feature.title}

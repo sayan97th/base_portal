@@ -18,7 +18,7 @@ const SeoPackageOrderSummary: React.FC<SeoPackageOrderSummaryProps> = ({
 }) => {
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/3 lg:sticky lg:top-24">
-      <h2 className="flex items-center gap-2 text-base font-semibold text-gray-800 dark:text-white/90">
+      <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-800 dark:text-white/90">
         <svg className="h-5 w-5 text-brand-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
           <path
             strokeLinecap="round"
@@ -90,10 +90,10 @@ const SeoPackageOrderSummary: React.FC<SeoPackageOrderSummaryProps> = ({
           </p>
         </>
       ) : (
-        <div className="flex flex-col items-center py-8 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-white/10">
+        <div className="flex flex-col items-center py-10 text-center">
+          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gray-100 dark:bg-white/10">
             <svg
-              className="h-7 w-7 text-gray-400 dark:text-gray-500"
+              className="h-8 w-8 text-gray-400 dark:text-gray-500"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -106,10 +106,10 @@ const SeoPackageOrderSummary: React.FC<SeoPackageOrderSummaryProps> = ({
               />
             </svg>
           </div>
-          <p className="mt-4 text-base font-semibold text-gray-800 dark:text-white/90">
+          <p className="mt-5 text-base font-semibold text-gray-800 dark:text-white/90">
             No plan selected yet
           </p>
-          <p className="mt-1.5 max-w-[240px] text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+          <p className="mt-2 max-w-[260px] text-sm leading-relaxed text-gray-500 dark:text-gray-400">
             Choose a plan to view the full summary, including pricing and next steps.
           </p>
         </div>
@@ -119,7 +119,7 @@ const SeoPackageOrderSummary: React.FC<SeoPackageOrderSummaryProps> = ({
       <button
         onClick={onAction}
         disabled={is_action_disabled}
-        className="mt-5 flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-coral-500 px-4 py-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-coral-600 disabled:cursor-not-allowed disabled:bg-coral-300"
+        className="mt-6 flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-coral-500 px-4 py-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-coral-600 disabled:cursor-not-allowed disabled:bg-coral-300"
       >
         {action_label}
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="shrink-0">
