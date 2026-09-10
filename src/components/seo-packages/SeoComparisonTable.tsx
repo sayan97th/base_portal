@@ -46,7 +46,15 @@ const SeoComparisonTable: React.FC<SeoComparisonTableProps> = ({ packages, rows 
       </div>
 
       <div className="overflow-x-auto pt-3">
-        <table className="w-full min-w-[520px] border-separate border-spacing-0 text-left text-sm">
+        <table
+          className="w-full min-w-[520px] table-fixed border-separate border-spacing-0 text-left text-sm"
+        >
+          <colgroup>
+            <col style={{ width: "24%" }} />
+            {packages.map((pkg) => (
+              <col key={pkg.id} style={{ width: `${76 / packages.length}%` }} />
+            ))}
+          </colgroup>
           <thead>
             <tr>
               <th className="whitespace-nowrap rounded-tl-xl border-l border-r border-t border-b border-gray-200 px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:border-gray-800 dark:text-gray-500">
@@ -78,7 +86,7 @@ const SeoComparisonTable: React.FC<SeoComparisonTableProps> = ({ packages, rows 
               return (
                 <tr key={row.id}>
                   <td
-                    className={`whitespace-nowrap border-b border-l border-r border-gray-200 px-3 py-2 text-sm text-gray-600 dark:border-gray-800 dark:text-gray-400 ${
+                    className={`break-words border-b border-l border-r border-gray-200 px-3 py-2 text-sm text-gray-600 dark:border-gray-800 dark:text-gray-400 ${
                       is_last_row ? "rounded-bl-xl font-semibold text-gray-900 dark:text-white/90" : ""
                     }`}
                   >
