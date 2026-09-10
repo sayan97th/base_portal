@@ -16,13 +16,23 @@ const LayersIcon = () => (
   </svg>
 );
 
+function getColumnHeaderStyle(is_most_popular: boolean, tier_index: number): string {
+  if (is_most_popular) {
+    return "bg-coral-50 text-coral-600 dark:bg-coral-500/10 dark:text-coral-400";
+  }
+  if (tier_index === 0) {
+    return "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300";
+  }
+  return "bg-violet-100 text-violet-700 dark:bg-violet-500/10 dark:text-violet-400";
+}
+
 const SeoComparisonTable: React.FC<SeoComparisonTableProps> = ({ packages, rows }) => {
   if (packages.length === 0 || rows.length === 0) return null;
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3 sm:p-6">
       <div className="mb-5 flex items-start gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-500/10 dark:text-violet-400">
           <LayersIcon />
         </div>
         <div>
@@ -35,66 +45,60 @@ const SeoComparisonTable: React.FC<SeoComparisonTableProps> = ({ packages, rows 
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[520px] border-separate border-spacing-0 text-left text-sm">
-          <thead>
-            <tr>
-              <th className="whitespace-nowrap px-3 pb-3 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                Features
-              </th>
-              {packages.map((pkg) => (
-                <th key={pkg.id} className="px-3 pb-3 text-center align-bottom">
-                  {pkg.is_most_popular && (
-                    <span className="mb-1 inline-block rounded-full bg-coral-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
-                      Most Popular
-                    </span>
-                  )}
-                  <p
-                    className={`text-xs font-bold uppercase tracking-wide ${
-                      pkg.is_most_popular
-                        ? "text-coral-600 dark:text-coral-400"
-                        : "text-gray-700 dark:text-gray-300"
-                    }`}
-                  >
-                    {pkg.name}
-                  </p>
+      <div className="overflow-hidden rounded-xl">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[520px] border-separate border-spacing-0 text-left text-sm">
+            <thead>
+              <tr>
+                <th className="whitespace-nowrap border-l border-t border-b border-gray-200 px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:border-gray-800 dark:text-gray-500">
+                  Features
                 </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, row_index) => {
-              const is_last_row = row_index === rows.length - 1;
-              return (
-                <tr key={row.id}>
-                  <td
-                    className={`whitespace-nowrap px-3 py-3 text-sm text-gray-600 dark:text-gray-400 ${
-                      is_last_row
-                        ? "font-semibold text-gray-900 dark:text-white/90"
-                        : ""
-                    } ${row_index > 0 ? "border-t border-gray-100 dark:border-gray-800" : ""}`}
+                {packages.map((pkg, tier_index) => (
+                  <th
+                    key={pkg.id}
+                    className={`border-b border-r border-t border-gray-200 px-3 py-2.5 text-center align-bottom dark:border-gray-800 ${getColumnHeaderStyle(
+                      pkg.is_most_popular,
+                      tier_index,
+                    )}`}
                   >
-                    {row.label}
-                  </td>
-                  {packages.map((pkg) => (
+                    {pkg.is_most_popular && (
+                      <span className="mb-2 mt-1 inline-block rounded-full bg-coral-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
+                        Most Popular
+                      </span>
+                    )}
+                    <p className="text-xs font-bold uppercase tracking-wide">{pkg.name}</p>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, row_index) => {
+                const is_last_row = row_index === rows.length - 1;
+                return (
+                  <tr key={row.id}>
                     <td
-                      key={pkg.id}
-                      className={`px-3 py-3 text-center text-sm text-gray-600 dark:text-gray-400 ${
-                        is_last_row
-                          ? "font-semibold text-gray-900 dark:text-white/90"
-                          : ""
-                      } ${row_index > 0 ? "border-t border-gray-100 dark:border-gray-800" : ""} ${
-                        pkg.is_most_popular ? "bg-coral-50/40 dark:bg-coral-500/5" : ""
+                      className={`whitespace-nowrap border-b border-l border-gray-200 px-3 py-2 text-sm text-gray-600 dark:border-gray-800 dark:text-gray-400 ${
+                        is_last_row ? "font-semibold text-gray-900 dark:text-white/90" : ""
                       }`}
                     >
-                      {row.values[pkg.id] ?? "N/A"}
+                      {row.label}
                     </td>
-                  ))}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                    {packages.map((pkg) => (
+                      <td
+                        key={pkg.id}
+                        className={`border-b border-r border-gray-200 px-3 py-2 text-center text-sm text-gray-600 dark:border-gray-800 dark:text-gray-400 ${
+                          is_last_row ? "font-semibold text-gray-900 dark:text-white/90" : ""
+                        } ${pkg.is_most_popular ? "bg-coral-50/40 dark:bg-coral-500/5" : ""}`}
+                      >
+                        {row.values[pkg.id] ?? "N/A"}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
