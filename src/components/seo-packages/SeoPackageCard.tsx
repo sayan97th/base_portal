@@ -73,7 +73,7 @@ const SeoPackageCard: React.FC<SeoPackageCardProps> = ({
 
   return (
     <div
-      className={`relative flex flex-col rounded-2xl border bg-white p-5 transition-all duration-200 dark:bg-white/3 ${
+      className={`relative flex flex-col rounded-2xl border bg-white p-4 transition-all duration-200 dark:bg-white/3 ${
         is_highlighted
           ? "border-2 border-coral-400 shadow-md shadow-coral-500/10 dark:border-coral-500"
           : "border-gray-200 dark:border-gray-800"
@@ -95,15 +95,15 @@ const SeoPackageCard: React.FC<SeoPackageCardProps> = ({
       </p>
 
       {/* Headline */}
-      <h3 className="mt-1.5 text-lg font-bold text-gray-900 dark:text-white/90">
+      <h3 className="mt-1.5 min-h-[3.25rem] text-lg font-bold leading-snug text-gray-900 dark:text-white/90">
         {pkg.headline || pkg.name}
       </h3>
-      <p className="mt-1.5 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+      <p className="mt-1.5 min-h-[3.75rem] text-sm leading-relaxed text-gray-500 dark:text-gray-400">
         {pkg.best_for}
       </p>
 
       {/* Price */}
-      <p className="mt-4 text-3xl font-bold text-gray-900 dark:text-white/90">
+      <p className="mt-3 text-3xl font-bold text-gray-900 dark:text-white/90">
         ${pkg.price_per_month.toLocaleString()}
         <span className="text-sm font-normal text-gray-400"> /month</span>
       </p>
@@ -134,23 +134,23 @@ const SeoPackageCard: React.FC<SeoPackageCardProps> = ({
       </button>
 
       {/* Feature list */}
-      <p className="mb-3 mt-6 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+      <p className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
         {features_label}
       </p>
-      <ul className="space-y-3">
+      <ul className="space-y-2">
         {pkg.features.map((feature, feature_index) => (
-          <li key={`${feature.title}-${feature_index}`} className="flex items-start gap-2.5">
+          <li key={`${feature.title}-${feature_index}`} className="flex items-start gap-2">
             <CheckIcon
               className={`mt-0.5 h-4 w-4 shrink-0 ${
                 is_highlighted ? "text-coral-500" : "text-brand-600 dark:text-brand-400"
               }`}
             />
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-gray-800 dark:text-white/90">
+              <p className="text-sm font-semibold leading-snug text-gray-800 dark:text-white/90">
                 {feature.title}
               </p>
               {feature.description && (
-                <p className="mt-0.5 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+                <p className="mt-0.5 text-[11px] leading-snug text-gray-500 dark:text-gray-400">
                   {feature.description}
                 </p>
               )}
@@ -162,7 +162,7 @@ const SeoPackageCard: React.FC<SeoPackageCardProps> = ({
       {/* Ideal for callout */}
       {pkg.ideal_for && (
         <div
-          className={`mt-6 flex items-start gap-2.5 rounded-xl p-3 ${
+          className={`mt-4 flex items-start gap-2 rounded-xl p-2.5 ${
             is_highlighted
               ? "bg-coral-50 dark:bg-coral-500/10"
               : "bg-gray-50 dark:bg-white/5"
@@ -175,7 +175,7 @@ const SeoPackageCard: React.FC<SeoPackageCardProps> = ({
           >
             {ideal_for_icon}
           </span>
-          <p className="text-xs leading-relaxed text-gray-600 dark:text-gray-400">
+          <p className="text-[11px] leading-snug text-gray-600 dark:text-gray-400">
             <span className="font-semibold text-gray-800 dark:text-white/90">Ideal for:</span>{" "}
             {pkg.ideal_for}
           </p>
