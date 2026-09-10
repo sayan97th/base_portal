@@ -17,8 +17,8 @@ const SeoPackageOrderSummary: React.FC<SeoPackageOrderSummaryProps> = ({
   is_action_disabled = false,
 }) => {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/3 lg:sticky lg:top-24">
-      <h2 className="mb-5 flex items-center gap-2 text-base font-semibold text-gray-800 dark:text-white/90">
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3 lg:sticky lg:top-24">
+      <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-white/90">
         <svg className="h-4 w-4 text-brand-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
           <path
             strokeLinecap="round"
@@ -29,40 +29,71 @@ const SeoPackageOrderSummary: React.FC<SeoPackageOrderSummaryProps> = ({
         Order Summary
       </h2>
 
+      {!selected_package && (
+        <p className="mt-1.5 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+          Select a plan to see your details and schedule a consultation.
+        </p>
+      )}
+
       {/* Selected plan card */}
       {selected_package ? (
-        <div className="mb-6 rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50">
-          <p className="text-sm font-semibold text-gray-800 dark:text-white/90">
-            {selected_package.name}
+        <>
+          <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50">
+            <p className="text-sm font-semibold text-gray-800 dark:text-white/90">
+              {selected_package.name}
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400 line-clamp-2">
+              {selected_package.best_for}
+            </p>
+            <ul className="mt-3 space-y-1.5">
+              {selected_package.features.map((feature) => (
+                <li key={feature.title} className="flex items-center gap-1.5">
+                  <svg
+                    className="h-3 w-3 shrink-0 text-coral-500"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2.5}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                  </svg>
+                  <span className="text-xs text-gray-600 dark:text-gray-400">
+                    <span className="font-semibold">{feature.title}:</span>{" "}
+                    {feature.description}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Pricing */}
+          <div className="mt-4 border-t border-gray-100 pt-4 dark:border-gray-800">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                Monthly Total
+              </p>
+              <div className="text-right">
+                <p className="text-xl font-bold text-gray-800 dark:text-white/90">
+                  ${selected_package.price_per_month.toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </p>
+                <p className="text-xs text-gray-400 dark:text-gray-500">per month</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Contract note */}
+          <p className="mt-4 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
+            Month-to-month subscription. No long-term contracts. Upgrades or downgrades require 30 days&apos; notice.
           </p>
-          <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400 line-clamp-2">
-            {selected_package.best_for}
-          </p>
-          <ul className="mt-3 space-y-1.5">
-            {selected_package.features.map((feature) => (
-              <li key={feature.title} className="flex items-center gap-1.5">
-                <svg
-                  className="h-3 w-3 shrink-0 text-coral-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2.5}
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                </svg>
-                <span className="text-xs text-gray-600 dark:text-gray-400">
-                  <span className="font-semibold">{feature.title}:</span>{" "}
-                  {feature.description}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
+        </>
       ) : (
-        <div className="mb-6 flex flex-col items-center rounded-xl bg-gray-50 px-4 py-8 text-center dark:bg-white/5">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm dark:bg-gray-800">
+        <div className="flex flex-col items-center py-6 text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gray-100 dark:bg-white/10">
             <svg
-              className="h-5 w-5 text-brand-400"
+              className="h-6 w-6 text-gray-400 dark:text-gray-500"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -78,47 +109,20 @@ const SeoPackageOrderSummary: React.FC<SeoPackageOrderSummaryProps> = ({
           <p className="mt-3 text-sm font-semibold text-gray-800 dark:text-white/90">
             No plan selected yet
           </p>
-          <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+          <p className="mt-1 max-w-[220px] text-xs leading-relaxed text-gray-500 dark:text-gray-400">
             Choose a plan to view the full summary, including pricing and next steps.
           </p>
         </div>
       )}
 
-      {/* Pricing */}
-      <div className="mb-5 border-t border-gray-100 pt-4 dark:border-gray-800">
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
-            Monthly Total
-          </p>
-          <div className="text-right">
-            <p className="text-xl font-bold text-gray-800 dark:text-white/90">
-              {selected_package
-                ? `$${selected_package.price_per_month.toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}`
-                : "N/A"}
-            </p>
-            {selected_package && (
-              <p className="text-xs text-gray-400 dark:text-gray-500">per month</p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Contract note */}
-      <p className="mb-5 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
-        Month-to-month subscription. No long-term contracts. Upgrades or downgrades require 30 days&apos; notice.
-      </p>
-
       {/* Action button */}
       <button
         onClick={onAction}
         disabled={is_action_disabled}
-        className="flex w-full items-center justify-center gap-2 rounded-xl bg-coral-500 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-coral-600 disabled:cursor-not-allowed disabled:bg-coral-300"
+        className="mt-4 flex w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-coral-500 px-3 py-3 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-coral-600 disabled:cursor-not-allowed disabled:bg-coral-300"
       >
         {action_label}
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="shrink-0">
           <path
             d="M3 8H13M9 4L13 8L9 12"
             stroke="currentColor"
