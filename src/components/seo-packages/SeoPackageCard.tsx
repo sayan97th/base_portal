@@ -71,10 +71,10 @@ interface TierAccentStyle {
 function getTierAccentStyle(tier_index: number, is_highlighted: boolean): TierAccentStyle {
   if (is_highlighted) {
     return {
-      badge: "bg-coral-50 text-coral-600 dark:bg-coral-500/15 dark:text-coral-400",
-      check: "bg-coral-100 text-coral-600 dark:bg-coral-500/20 dark:text-coral-400",
-      callout_bg: "bg-coral-50 dark:bg-coral-500/10",
-      callout_text: "text-coral-600 dark:text-coral-400",
+      badge: "bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400",
+      check: "bg-brand-100 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400",
+      callout_bg: "bg-brand-50 dark:bg-brand-500/10",
+      callout_text: "text-brand-600 dark:text-brand-400",
     };
   }
   if (tier_index === 0) {
@@ -104,16 +104,22 @@ const SeoPackageCard: React.FC<SeoPackageCardProps> = ({
   const ideal_for_icon = IDEAL_FOR_ICONS[tier_index] ?? DEFAULT_IDEAL_FOR_ICON;
   const tier_accent = getTierAccentStyle(tier_index, is_highlighted);
 
+  const border_classes = is_selected
+    ? "border-2 border-brand-400 shadow-md shadow-brand-500/10 dark:border-brand-500"
+    : is_highlighted
+      ? "border-2 border-coral-400 shadow-md shadow-coral-500/10 dark:border-coral-500"
+      : "border-gray-200 dark:border-gray-800";
+
+  const background_classes = is_selected
+    ? "bg-brand-50/60 dark:bg-brand-500/10"
+    : "bg-white dark:bg-white/3";
+
   return (
     <div
-      className={`relative flex flex-col rounded-2xl border p-4 transition-all duration-200 sm:p-5 ${is_highlighted || is_selected
-        ? "border-2 border-coral-400 shadow-md shadow-coral-500/10 dark:border-coral-500"
-        : "border-gray-200 dark:border-gray-800"
-        } ${is_selected ? "bg-coral-50/60 dark:bg-coral-500/10" : "bg-white dark:bg-white/3"
-        }`}
+      className={`relative flex flex-col rounded-2xl border p-4 transition-all duration-200 sm:p-5 ${border_classes} ${background_classes}`}
     >
       {is_highlighted && (
-        <span className="absolute -top-3 left-4 rounded-full bg-coral-500 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm">
+        <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-coral-500 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm">
           Most Popular
         </span>
       )}
@@ -144,7 +150,7 @@ const SeoPackageCard: React.FC<SeoPackageCardProps> = ({
         type="button"
         onClick={() => onSelect(pkg.id)}
         className={`mt-4 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${is_selected
-          ? "bg-coral-500 text-white hover:bg-coral-600"
+          ? "bg-brand-500 text-white hover:bg-brand-600"
           : is_highlighted
             ? "bg-coral-500 text-white hover:bg-coral-600"
             : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10"
