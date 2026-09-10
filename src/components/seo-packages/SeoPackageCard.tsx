@@ -107,7 +107,7 @@ const SeoPackageCard: React.FC<SeoPackageCardProps> = ({
   const border_classes = is_selected
     ? "border-2 border-brand-400 shadow-md shadow-brand-500/10 dark:border-brand-500"
     : is_highlighted
-      ? "border-2 border-coral-400 shadow-md shadow-coral-500/10 dark:border-coral-500"
+      ? "border-2 border-brand-400 shadow-md shadow-brand-500/10 dark:border-brand-500"
       : "border-gray-200 dark:border-gray-800";
 
   const background_classes = is_selected
