@@ -86,10 +86,10 @@ function getTierAccentStyle(tier_index: number, is_highlighted: boolean): TierAc
     };
   }
   return {
-    badge: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-400",
-    check: "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-400",
-    callout_bg: "bg-violet-50 dark:bg-violet-500/10",
-    callout_text: "text-violet-700 dark:text-violet-400",
+    badge: "bg-lilac-50 text-lilac-600 dark:bg-lilac-600/15 dark:text-lilac-300",
+    check: "bg-lilac-50 text-lilac-600 dark:bg-lilac-600/20 dark:text-lilac-300",
+    callout_bg: "bg-lilac-50 dark:bg-lilac-600/10",
+    callout_text: "text-lilac-600 dark:text-lilac-300",
   };
 }
 

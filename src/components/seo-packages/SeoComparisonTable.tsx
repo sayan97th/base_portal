@@ -37,7 +37,7 @@ function getColumnHeaderStyle(is_most_popular: boolean, tier_index: number): str
   if (tier_index === 0) {
     return "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300";
   }
-  return "bg-violet-100 text-violet-700 dark:bg-violet-500/10 dark:text-violet-400";
+  return "bg-lilac-50 text-lilac-600 dark:bg-lilac-600/10 dark:text-lilac-300";
 }
 
 const SeoComparisonTable: React.FC<SeoComparisonTableProps> = ({ packages, rows }) => {

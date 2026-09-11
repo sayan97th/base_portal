@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useEffect } from "react";
 import SeoPackagesHeader from "./SeoPackagesHeader";
+import SeoTrackingHighlights from "./SeoTrackingHighlights";
 import SeoPackageGrid from "./SeoPackageGrid";
 import SeoPackageOrderSummary from "./SeoPackageOrderSummary";
 import ActiveSubscriptionBanner from "./ActiveSubscriptionBanner";
@@ -128,6 +129,7 @@ const SeoPackagesPage: React.FC = () => {
           <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
             <div className="min-w-0 flex-1 space-y-6 xl:max-w-6xl">
               <SeoPackagesHeader />
+              <SeoTrackingHighlights />
               {packages_loading ? (
                 <div className="@container">
                   <div className="grid grid-cols-1 gap-4 @lg:grid-cols-2 @4xl:grid-cols-3">
