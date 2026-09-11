@@ -37,7 +37,7 @@ function getColumnHeaderStyle(is_most_popular: boolean, tier_index: number): str
   if (tier_index === 0) {
     return "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300";
   }
-  return "bg-lilac-50 text-lilac-600 dark:bg-lilac-600/10 dark:text-lilac-300";
+  return "bg-teal-50/30 text-teal-600 dark:bg-teal-600/10 dark:text-teal-300";
 }
 
 const SeoComparisonTable: React.FC<SeoComparisonTableProps> = ({ packages, rows }) => {
@@ -75,11 +75,10 @@ const SeoComparisonTable: React.FC<SeoComparisonTableProps> = ({ packages, rows 
           return (
             <div
               key={pkg.id}
-              className={`overflow-hidden rounded-xl border ${
-                pkg.is_most_popular
-                  ? "border-brand-300 dark:border-brand-500/40"
-                  : "border-gray-200 dark:border-gray-800"
-              }`}
+              className={`overflow-hidden rounded-xl border ${pkg.is_most_popular
+                ? "border-brand-300 dark:border-brand-500/40"
+                : "border-gray-200 dark:border-gray-800"
+                }`}
             >
               <button
                 type="button"
@@ -138,9 +137,8 @@ const SeoComparisonTable: React.FC<SeoComparisonTableProps> = ({ packages, rows 
                 return (
                   <th
                     key={pkg.id}
-                    className={`relative border-b border-r border-t border-gray-200 px-3 py-2.5 text-center align-middle dark:border-gray-800 ${
-                      is_last_column ? "rounded-tr-xl" : ""
-                    } ${getColumnHeaderStyle(pkg.is_most_popular, tier_index)}`}
+                    className={`relative border-b border-r border-t border-gray-200 px-3 py-2.5 text-center align-middle dark:border-gray-800 ${is_last_column ? "rounded-tr-xl" : ""
+                      } ${getColumnHeaderStyle(pkg.is_most_popular, tier_index)}`}
                   >
                     {pkg.is_most_popular && (
                       <span className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full bg-brand-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm">
@@ -159,9 +157,8 @@ const SeoComparisonTable: React.FC<SeoComparisonTableProps> = ({ packages, rows 
               return (
                 <tr key={row.id}>
                   <td
-                    className={`break-words border-b border-l border-r border-gray-200 px-3 py-2 text-sm text-gray-600 dark:border-gray-800 dark:text-gray-400 ${
-                      is_last_row ? "rounded-bl-xl font-semibold text-gray-900 dark:text-white/90" : ""
-                    }`}
+                    className={`break-words border-b border-l border-r border-gray-200 px-3 py-2 text-sm text-gray-600 dark:border-gray-800 dark:text-gray-400 ${is_last_row ? "rounded-bl-xl font-semibold text-gray-900 dark:text-white/90" : ""
+                      }`}
                   >
                     {row.label}
                   </td>
@@ -170,11 +167,9 @@ const SeoComparisonTable: React.FC<SeoComparisonTableProps> = ({ packages, rows 
                     return (
                       <td
                         key={pkg.id}
-                        className={`border-b border-r border-gray-200 px-3 py-2 text-center text-sm text-gray-600 dark:border-gray-800 dark:text-gray-400 ${
-                          is_last_row ? "font-semibold text-gray-900 dark:text-white/90" : ""
-                        } ${is_last_row && is_last_column ? "rounded-br-xl" : ""} ${
-                          pkg.is_most_popular ? "bg-brand-50/40 dark:bg-brand-500/5" : ""
-                        }`}
+                        className={`border-b border-r border-gray-200 px-3 py-2 text-center text-sm text-gray-600 dark:border-gray-800 dark:text-gray-400 ${is_last_row ? "font-semibold text-gray-900 dark:text-white/90" : ""
+                          } ${is_last_row && is_last_column ? "rounded-br-xl" : ""} ${pkg.is_most_popular ? "bg-brand-50/40 dark:bg-brand-500/5" : ""
+                          }`}
                       >
                         {row.values[pkg.id] ?? "N/A"}
                       </td>
