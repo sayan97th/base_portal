@@ -55,7 +55,7 @@ const SeoComparisonTable: React.FC<SeoComparisonTableProps> = ({ packages, rows 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/3 sm:p-6">
       <div className="mb-5 flex items-start gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-500/10 dark:text-violet-400">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#f0effd] text-[#3d35a6]">
           <LayersIcon />
         </div>
         <div>
