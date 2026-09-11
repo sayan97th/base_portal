@@ -65,14 +65,14 @@ const TRACKING_ITEMS: TrackingItem[] = [
 
 const SeoTrackingHighlights: React.FC = () => {
   return (
-    <div className="rounded-2xl border border-brand-100 bg-brand-25 p-4 dark:border-brand-500/15 dark:bg-brand-500/5 sm:p-5">
-      <p className="text-xs font-bold uppercase tracking-wide text-brand-600 dark:text-brand-400">
+    <div className="rounded-2xl border border-teal-600/20 bg-teal-50/20 p-4 dark:border-teal-600/25 dark:bg-teal-600/10 sm:p-5">
+      <p className="text-xs font-bold uppercase tracking-wide text-teal-600 dark:text-teal-300">
         What We Track &amp; Report On
       </p>
       <div className="mt-3 grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
         {TRACKING_ITEMS.map((item) => (
           <div key={item.label} className="flex items-center gap-2.5">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-brand-600 shadow-theme-xs dark:bg-white/10 dark:text-brand-400">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-teal-600 shadow-theme-xs dark:bg-white/10 dark:text-teal-300">
               {item.icon}
             </span>
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
