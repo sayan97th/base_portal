@@ -126,7 +126,7 @@ const SeoPackagesPage: React.FC = () => {
 
         {/* Selection step */}
         {current_step === "selection" && (
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+          <div className="flex flex-col gap-6 lg:flex-row">
             <div className="min-w-0 flex-1 space-y-6 xl:max-w-6xl">
               <SeoPackagesHeader />
               <SeoTrackingHighlights />
@@ -164,7 +164,7 @@ const SeoPackagesPage: React.FC = () => {
 
         {/* Schedule step */}
         {current_step === "schedule" && (
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+          <div className="flex flex-col gap-6 lg:flex-row">
             <div className="min-w-0 flex-1 space-y-6 xl:max-w-6xl">
               <div>
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
