@@ -26,12 +26,8 @@ function GoogleCallbackHandler() {
       return;
     }
 
-    setToken(token);
-
-    if (expires_in) {
-      const expires_at = Date.now() + parseInt(expires_in, 10) * 1000;
-      localStorage.setItem("token_expires_at", expires_at.toString());
-    }
+    const expires_at = Date.now() + (expires_in ? parseInt(expires_in, 10) : 60 * 60) * 1000;
+    setToken(token, expires_at);
 
     authService.getMe().then((data) => {
       const primary_role = getPrimaryRole(data.user.roles);

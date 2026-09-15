@@ -50,9 +50,8 @@ export const invitationService = {
       "/api/invitations/accept",
       data
     );
-    setToken(response.access_token);
     const expires_at = Date.now() + response.expires_in * 1000;
-    localStorage.setItem("token_expires_at", expires_at.toString());
+    setToken(response.access_token, expires_at);
     setPrimaryRoleCookie(getPrimaryRole(response.user.roles));
     return response;
   },

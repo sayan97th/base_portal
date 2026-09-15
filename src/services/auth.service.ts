@@ -14,9 +14,8 @@ import type {
 } from "@/types/auth";
 
 function persistSession(data: AuthResponse): void {
-  setToken(data.access_token);
-  const expiresAt = Date.now() + data.expires_in * 1000;
-  localStorage.setItem("token_expires_at", expiresAt.toString());
+  const expires_at = Date.now() + data.expires_in * 1000;
+  setToken(data.access_token, expires_at);
   const primary_role = getPrimaryRole(data.user.roles);
   setPrimaryRoleCookie(primary_role);
 }

@@ -10,9 +10,19 @@ function getToken(): string | null {
   return localStorage.getItem("access_token");
 }
 
-function setToken(token: string): void {
+/**
+ * Persists the access token and keeps the `access_token` cookie (read by the
+ * Next.js middleware for route gating) in sync with the token's real
+ * expiry. `expires_at` is an absolute epoch-ms timestamp, not a duration, so
+ * this also works when restoring a previously issued token (e.g. resuming
+ * the admin token after impersonation ends) whose remaining lifetime is
+ * shorter than its original one.
+ */
+function setToken(token: string, expires_at: number): void {
   localStorage.setItem("access_token", token);
-  document.cookie = `access_token=${token}; path=/; max-age=${60 * 60}; SameSite=Lax`;
+  localStorage.setItem("token_expires_at", expires_at.toString());
+  const max_age_seconds = Math.max(Math.floor((expires_at - Date.now()) / 1000), 0);
+  document.cookie = `access_token=${token}; path=/; max-age=${max_age_seconds}; SameSite=Lax`;
 }
 
 function removeToken(): void {
@@ -46,9 +56,8 @@ async function tryRefreshToken(): Promise<string | null> {
       if (!response.ok) return null;
 
       const data = await response.json();
-      setToken(data.access_token);
-      const expiresAt = Date.now() + data.expires_in * 1000;
-      localStorage.setItem("token_expires_at", expiresAt.toString());
+      const expires_at = Date.now() + data.expires_in * 1000;
+      setToken(data.access_token, expires_at);
       return data.access_token as string;
     } catch {
       return null;

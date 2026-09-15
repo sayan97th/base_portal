@@ -45,9 +45,8 @@ export const impersonationService = {
     };
     localStorage.setItem(IMPERSONATION_META_KEY, JSON.stringify(meta));
 
-    setToken(data.impersonation_token);
     const expires_at = Date.now() + data.expires_in * 1000;
-    localStorage.setItem("token_expires_at", expires_at.toString());
+    setToken(data.impersonation_token, expires_at);
     setPrimaryRoleCookie(target_role);
 
     return data;
@@ -71,16 +70,10 @@ export const impersonationService = {
     const admin_token = localStorage.getItem(ADMIN_TOKEN_KEY);
     const admin_expires_at = localStorage.getItem(ADMIN_EXPIRES_KEY);
 
-    if (admin_token) {
-      setToken(admin_token);
+    if (admin_token && admin_expires_at) {
+      setToken(admin_token, parseInt(admin_expires_at, 10));
     } else {
       removeToken();
-    }
-
-    if (admin_expires_at) {
-      localStorage.setItem("token_expires_at", admin_expires_at);
-    } else {
-      localStorage.removeItem("token_expires_at");
     }
 
     localStorage.removeItem(ADMIN_TOKEN_KEY);
