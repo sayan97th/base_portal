@@ -6,6 +6,7 @@ import Badge from "../ui/badge/Badge";
 import { invoicesService } from "@/services/client/invoices.service";
 import { useDebounce } from "@/hooks/useDebounce";
 import { INVOICE_PRODUCT_CONFIG } from "./invoiceData";
+import AutopayPanel from "./pay/AutopayPanel";
 import type { InvoiceSummary, ProductType } from "./invoiceData";
 
 const PER_PAGE = 10;
@@ -202,179 +203,183 @@ const InvoicesPage: React.FC = () => {
   const pending_invoices = invoices.filter((inv) => PENDING_PAYMENT_STATUSES.has(inv.status));
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white px-4 pb-4 pt-4 dark:border-gray-800 dark:bg-white/3 sm:px-6 sm:pt-6">
-      {/* Header */}
-      <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold text-gray-800 dark:text-white/90">Invoices</h1>
-          {!loading && (
-            <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-              {total}
+    <div className="space-y-5">
+      <AutopayPanel appearance="portal" />
+
+      <div className="rounded-2xl border border-gray-200 bg-white px-4 pb-4 pt-4 dark:border-gray-800 dark:bg-white/3 sm:px-6 sm:pt-6">
+        {/* Header */}
+        <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg font-semibold text-gray-800 dark:text-white/90">Invoices</h1>
+            {!loading && (
+              <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                {total}
+              </span>
+            )}
+          </div>
+
+          {/* Search */}
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M7.25 1.5C4.075 1.5 1.5 4.075 1.5 7.25C1.5 10.425 4.075 13 7.25 13C10.425 13 13 10.425 13 7.25C13 4.075 10.425 1.5 7.25 1.5Z"
+                  stroke="currentColor"
+                  strokeWidth="1.3"
+                />
+                <path d="M11.5 11.5L14.5 14.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+              </svg>
             </span>
+            <input
+              type="text"
+              placeholder="Invoice, date, status, service…"
+              value={search}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="h-10 rounded-lg border border-gray-200 bg-transparent py-2 pl-9 pr-3 text-sm text-gray-700 placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:placeholder:text-gray-500"
+            />
+          </div>
+        </div>
+
+        {/* Pending payment banner */}
+        {!loading && pending_invoices.length > 0 && (
+          <div className="mb-5 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/25 dark:bg-amber-500/10">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-500/20">
+              <svg className="h-4 w-4 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+              </svg>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                You have {pending_invoices.length} invoice{pending_invoices.length > 1 ? "s" : ""} awaiting payment
+              </p>
+              <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">
+                Orders with pending payment will not be processed until the invoice is paid. Click <span className="font-semibold">Pay</span> next to an invoice below to complete your payment.
+              </p>
+              <div className="mt-2.5 flex flex-wrap gap-2">
+                {pending_invoices.map((inv) => (
+                  <Link
+                    key={inv.unique_id}
+                    href={`/invoices/${inv.unique_id}/pay`}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-500 hover:text-white dark:border-amber-500/40 dark:bg-transparent dark:text-amber-400 dark:hover:bg-amber-500 dark:hover:text-white"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+                    </svg>
+                    Pay {inv.unique_id} · {inv.total}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Error */}
+        {error && (
+          <div className="mb-4 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/20 dark:bg-error-500/10">
+            <p className="text-sm font-medium text-error-600 dark:text-error-400">{error}</p>
+            <button
+              onClick={loadInvoices}
+              className="mt-1 text-sm font-medium text-error-600 underline hover:text-error-700 dark:text-error-400"
+            >
+              Try again
+            </button>
+          </div>
+        )}
+
+        {/* List */}
+        <div className="overflow-hidden rounded-xl border border-gray-100 dark:border-gray-800">
+          {/* Column labels */}
+          <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50/80 px-4 py-2 dark:border-gray-800 dark:bg-gray-800/40">
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Invoice · Services</span>
+            <span className="hidden text-xs font-medium text-gray-500 sm:block dark:text-gray-400">Status · Actions</span>
+          </div>
+
+          {loading ? (
+            <div className="divide-y divide-gray-100 dark:divide-gray-800">
+              {Array.from({ length: PER_PAGE }).map((_, i) => (
+                <InvoiceRowSkeleton key={i} />
+              ))}
+            </div>
+          ) : invoices.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-14">
+              <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
+                <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                </svg>
+              </div>
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                {total === 0 && !search ? "No invoices found." : "No invoices match your search."}
+              </p>
+            </div>
+          ) : (
+            <div>
+              {invoices.map((invoice) => (
+                <InvoiceRow key={invoice.unique_id} invoice={invoice} />
+              ))}
+            </div>
           )}
         </div>
 
-        {/* Search */}
-        <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path
-                d="M7.25 1.5C4.075 1.5 1.5 4.075 1.5 7.25C1.5 10.425 4.075 13 7.25 13C10.425 13 13 10.425 13 7.25C13 4.075 10.425 1.5 7.25 1.5Z"
-                stroke="currentColor"
-                strokeWidth="1.3"
-              />
-              <path d="M11.5 11.5L14.5 14.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-            </svg>
-          </span>
-          <input
-            type="text"
-            placeholder="Invoice, date, status, service…"
-            value={search}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            className="h-10 rounded-lg border border-gray-200 bg-transparent py-2 pl-9 pr-3 text-sm text-gray-700 placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:placeholder:text-gray-500"
-          />
-        </div>
-      </div>
+        {/* Pagination */}
+        {!loading && !error && total > 0 && (
+          <div className="mt-4 flex flex-col gap-3 border-t border-gray-200 px-1 pt-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Showing{" "}
+              <span className="font-medium text-gray-700 dark:text-gray-300">{range_start}–{range_end}</span>{" "}
+              of{" "}
+              <span className="font-medium text-gray-700 dark:text-gray-300">{total}</span>{" "}
+              results &nbsp;·&nbsp; Page{" "}
+              <span className="font-medium text-gray-700 dark:text-gray-300">{page}</span>{" "}
+              of{" "}
+              <span className="font-medium text-gray-700 dark:text-gray-300">{last_page}</span>
+            </p>
 
-      {/* Pending payment banner */}
-      {!loading && pending_invoices.length > 0 && (
-        <div className="mb-5 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/25 dark:bg-amber-500/10">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-500/20">
-            <svg className="h-4 w-4 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-            </svg>
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-              You have {pending_invoices.length} invoice{pending_invoices.length > 1 ? "s" : ""} awaiting payment
-            </p>
-            <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">
-              Orders with pending payment will not be processed until the invoice is paid. Click <span className="font-semibold">Pay</span> next to an invoice below to complete your payment.
-            </p>
-            <div className="mt-2.5 flex flex-wrap gap-2">
-              {pending_invoices.map((inv) => (
-                <Link
-                  key={inv.unique_id}
-                  href={`/invoices/${inv.unique_id}/pay`}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-500 hover:text-white dark:border-amber-500/40 dark:bg-transparent dark:text-amber-400 dark:hover:bg-amber-500 dark:hover:text-white"
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
-                  </svg>
-                  Pay {inv.unique_id} · {inv.total}
-                </Link>
-              ))}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage((p) => p - 1)}
+                disabled={page === 1}
+                className="flex h-8 items-center gap-1 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path d="M7.5 2.5L4.5 6L7.5 9.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Prev
+              </button>
+
+              {page_buttons.map((btn, i) =>
+                btn === "..." ? (
+                  <span key={`ellipsis-${i}`} className="flex h-8 w-8 items-center justify-center text-xs text-gray-400">
+                    …
+                  </span>
+                ) : (
+                  <button
+                    key={btn}
+                    onClick={() => setPage(btn as number)}
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg border text-xs font-medium transition-colors ${
+                      btn === page
+                        ? "border-coral-500 bg-coral-500 text-white"
+                        : "border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+                    }`}
+                  >
+                    {btn}
+                  </button>
+                )
+              )}
+
+              <button
+                onClick={() => setPage((p) => p + 1)}
+                disabled={page === last_page}
+                className="flex h-8 items-center gap-1 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+              >
+                Next
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path d="M4.5 2.5L7.5 6L4.5 9.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Error */}
-      {error && (
-        <div className="mb-4 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/20 dark:bg-error-500/10">
-          <p className="text-sm font-medium text-error-600 dark:text-error-400">{error}</p>
-          <button
-            onClick={loadInvoices}
-            className="mt-1 text-sm font-medium text-error-600 underline hover:text-error-700 dark:text-error-400"
-          >
-            Try again
-          </button>
-        </div>
-      )}
-
-      {/* List */}
-      <div className="overflow-hidden rounded-xl border border-gray-100 dark:border-gray-800">
-        {/* Column labels */}
-        <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50/80 px-4 py-2 dark:border-gray-800 dark:bg-gray-800/40">
-          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Invoice · Services</span>
-          <span className="hidden text-xs font-medium text-gray-500 sm:block dark:text-gray-400">Status · Actions</span>
-        </div>
-
-        {loading ? (
-          <div className="divide-y divide-gray-100 dark:divide-gray-800">
-            {Array.from({ length: PER_PAGE }).map((_, i) => (
-              <InvoiceRowSkeleton key={i} />
-            ))}
-          </div>
-        ) : invoices.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-14">
-            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
-              <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-              </svg>
-            </div>
-            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-              {total === 0 && !search ? "No invoices found." : "No invoices match your search."}
-            </p>
-          </div>
-        ) : (
-          <div>
-            {invoices.map((invoice) => (
-              <InvoiceRow key={invoice.unique_id} invoice={invoice} />
-            ))}
           </div>
         )}
       </div>
-
-      {/* Pagination */}
-      {!loading && !error && total > 0 && (
-        <div className="mt-4 flex flex-col gap-3 border-t border-gray-200 px-1 pt-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            Showing{" "}
-            <span className="font-medium text-gray-700 dark:text-gray-300">{range_start}–{range_end}</span>{" "}
-            of{" "}
-            <span className="font-medium text-gray-700 dark:text-gray-300">{total}</span>{" "}
-            results &nbsp;·&nbsp; Page{" "}
-            <span className="font-medium text-gray-700 dark:text-gray-300">{page}</span>{" "}
-            of{" "}
-            <span className="font-medium text-gray-700 dark:text-gray-300">{last_page}</span>
-          </p>
-
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setPage((p) => p - 1)}
-              disabled={page === 1}
-              className="flex h-8 items-center gap-1 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
-            >
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path d="M7.5 2.5L4.5 6L7.5 9.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              Prev
-            </button>
-
-            {page_buttons.map((btn, i) =>
-              btn === "..." ? (
-                <span key={`ellipsis-${i}`} className="flex h-8 w-8 items-center justify-center text-xs text-gray-400">
-                  …
-                </span>
-              ) : (
-                <button
-                  key={btn}
-                  onClick={() => setPage(btn as number)}
-                  className={`flex h-8 w-8 items-center justify-center rounded-lg border text-xs font-medium transition-colors ${
-                    btn === page
-                      ? "border-coral-500 bg-coral-500 text-white"
-                      : "border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
-                  }`}
-                >
-                  {btn}
-                </button>
-              )
-            )}
-
-            <button
-              onClick={() => setPage((p) => p + 1)}
-              disabled={page === last_page}
-              className="flex h-8 items-center gap-1 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
-            >
-              Next
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path d="M4.5 2.5L7.5 6L4.5 9.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

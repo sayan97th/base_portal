@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminInvoice } from "@/types/admin";
 import {
@@ -16,8 +16,11 @@ import {
   deleteAdminInvoice,
   voidAdminInvoice,
   setInvoicePaymentIntent,
+  getAdminInvoiceSavedCards,
+  chargeAdminInvoiceSavedCard,
   type UpdateInvoiceBillingPayload,
 } from "@/services/admin/invoice.service";
+import type { InvoiceSavedCardsResponse } from "@/types/admin/autopay";
 import type { CreateInvoiceLineItemPayload } from "@/types/admin";
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
@@ -2301,6 +2304,286 @@ export function SetPaymentIntentDialog({ invoice, onClose, onSuccess }: SetPayme
               {is_update ? "Update" : "Save Payment ID"}
             </button>
           </>
+        )}
+      </DialogFooter>
+    </DialogShell>
+  );
+}
+
+// ── Charge Card on File Dialog ────────────────────────────────────────────────
+
+const CHARGE_ATTEMPT_STATUS_STYLES: Record<string, string> = {
+  succeeded:       "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400",
+  failed:          "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400",
+  processing:      "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400",
+  skipped:         "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400",
+  requires_review: "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400",
+};
+
+function isSavedCardExpired(expiry_month: string, expiry_year: string): boolean {
+  const month = parseInt(expiry_month, 10);
+  let year = parseInt(expiry_year, 10);
+  if (!month || !year) return false;
+  if (year < 100) year += 2000;
+  const now = new Date();
+  return year < now.getFullYear() || (year === now.getFullYear() && month < now.getMonth() + 1);
+}
+
+interface ChargeSavedCardDialogProps {
+  invoice: AdminInvoice;
+  onClose: () => void;
+  onSuccess: (updated: AdminInvoice) => void;
+}
+
+export function ChargeSavedCardDialog({ invoice, onClose, onSuccess }: ChargeSavedCardDialogProps) {
+  const [saved_cards_data, setSavedCardsData] = useState<InvoiceSavedCardsResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [selected_profile_id, setSelectedProfileId] = useState("");
+  const [is_confirmed, setIsConfirmed] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const customer_name = `${invoice.user.first_name} ${invoice.user.last_name}`;
+  const amount_label = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(invoice.total_amount);
+  const is_payable = invoice.status === "unpaid" || invoice.status === "overdue";
+  const is_usd = invoice.currency_type === "usd";
+
+  useEffect(() => {
+    const loadSavedCards = async () => {
+      setLoading(true);
+      try {
+        const response = await getAdminInvoiceSavedCards(invoice.id);
+        setSavedCardsData(response);
+        const usable_cards = response.payment_profiles.filter(
+          (saved_card) => !isSavedCardExpired(saved_card.expiry_month, saved_card.expiry_year)
+        );
+        const preferred_card =
+          usable_cards.find((saved_card) => saved_card.is_autopay_card) ??
+          usable_cards.find((saved_card) => saved_card.is_default) ??
+          usable_cards[0];
+        setSelectedProfileId(preferred_card?.id ?? "");
+      } catch {
+        setError("Failed to load the client's saved cards.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadSavedCards();
+  }, [invoice.id]);
+
+  const handleCharge = async () => {
+    setError(null);
+    setNotice(null);
+    setSubmitting(true);
+    try {
+      const response = await chargeAdminInvoiceSavedCard(invoice.id, selected_profile_id);
+      if (response.status === "succeeded") {
+        onSuccess(response.invoice);
+        return;
+      }
+      // 202 — the charge is still being confirmed by Stripe.
+      setNotice(response.message);
+    } catch (err: unknown) {
+      const api_error = err as { message?: string; invoice?: AdminInvoice };
+      setError(api_error?.message ?? "The card could not be charged. Please try again.");
+      setIsConfirmed(false);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const saved_cards = saved_cards_data?.payment_profiles ?? [];
+  const charge_attempts = saved_cards_data?.charge_attempts ?? [];
+  const autopay_info = saved_cards_data?.autopay;
+  const can_charge = is_payable && is_usd && !!selected_profile_id && is_confirmed && !submitting && !notice;
+
+  return (
+    <DialogShell onClose={onClose} max_width="max-w-xl">
+      <DialogHeader
+        title="Charge Card on File"
+        onClose={onClose}
+        icon={
+          <svg className="h-4 w-4 text-brand-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+          </svg>
+        }
+      />
+
+      <div className="space-y-5 overflow-y-auto p-6">
+        <div className="space-y-2 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500 dark:text-gray-400">Customer</span>
+            <span className="font-medium text-gray-900 dark:text-white">{customer_name}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500 dark:text-gray-400">Invoice</span>
+            <span className="font-mono font-medium text-gray-900 dark:text-white">{invoice.invoice_number}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500 dark:text-gray-400">Amount to charge</span>
+            <span className="text-base font-semibold text-gray-900 dark:text-white">{amount_label}</span>
+          </div>
+        </div>
+
+        {!is_payable && (
+          <div className="rounded-lg border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-400">
+            Only unpaid or overdue invoices can be charged. This invoice is <strong>{invoice.status}</strong>.
+          </div>
+        )}
+        {is_payable && !is_usd && (
+          <div className="rounded-lg border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-400">
+            This is a credits invoice and cannot be charged to a card.
+          </div>
+        )}
+
+        {autopay_info?.is_enabled && (
+          <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300">
+            This client has <strong>Autopay on</strong> ({autopay_info.card_label}
+            {autopay_info.max_amount ? `, up to $${autopay_info.max_amount.toFixed(2)} per invoice` : ""}).
+            {autopay_info.schedule?.charge_date
+              ? ` This invoice is scheduled to be charged automatically on ${new Date(autopay_info.schedule.charge_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}.`
+              : " This invoice is not covered by autopay (it was issued before autopay was enabled)."}
+          </div>
+        )}
+
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Saved cards</p>
+          {loading ? (
+            <div className="space-y-2">
+              <div className="h-14 animate-pulse rounded-xl bg-gray-100 dark:bg-gray-800" />
+              <div className="h-14 animate-pulse rounded-xl bg-gray-100 dark:bg-gray-800" />
+            </div>
+          ) : saved_cards.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-gray-200 px-4 py-5 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+              This client has no saved cards. Share the invoice pay link so they can pay and save a card.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {saved_cards.map((saved_card) => {
+                const is_expired = isSavedCardExpired(saved_card.expiry_month, saved_card.expiry_year);
+                const is_selected = selected_profile_id === saved_card.id;
+                return (
+                  <label
+                    key={saved_card.id}
+                    className={`flex items-center gap-3 rounded-xl border px-4 py-3 transition-colors ${
+                      is_selected
+                        ? "border-brand-300 bg-brand-50/50 dark:border-brand-500/50 dark:bg-brand-500/10"
+                        : "border-gray-200 dark:border-gray-700"
+                    } ${is_expired ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.03]"}`}
+                  >
+                    <input
+                      type="radio"
+                      name="admin_saved_card"
+                      checked={is_selected}
+                      disabled={is_expired || submitting}
+                      onChange={() => {
+                        setSelectedProfileId(saved_card.id);
+                        setIsConfirmed(false);
+                      }}
+                      className="h-4 w-4 accent-brand-500"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-sm font-semibold capitalize text-gray-900 dark:text-white">
+                          {saved_card.card_brand} •••• {saved_card.last_four}
+                        </span>
+                        {saved_card.is_default && (
+                          <span className="rounded-full bg-success-50 px-2 py-0.5 text-[10px] font-bold uppercase text-success-700 dark:bg-success-500/10 dark:text-success-400">Default</span>
+                        )}
+                        {saved_card.is_autopay_card && (
+                          <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-bold uppercase text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">Autopay</span>
+                        )}
+                        {is_expired && (
+                          <span className="rounded-full bg-error-50 px-2 py-0.5 text-[10px] font-bold uppercase text-error-600 dark:bg-error-500/10 dark:text-error-400">Expired</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Expires {parseInt(saved_card.expiry_month, 10)}/{saved_card.expiry_year}
+                        {saved_card.cardholder_name ? ` · ${saved_card.cardholder_name}` : ""}
+                      </p>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {charge_attempts.length > 0 && (
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Previous charge attempts</p>
+            <ul className="divide-y divide-gray-100 rounded-xl border border-gray-200 dark:divide-gray-800 dark:border-gray-700">
+              {charge_attempts.slice(0, 5).map((charge_attempt) => (
+                <li key={charge_attempt.id} className="flex flex-col gap-0.5 px-4 py-2.5 text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-2">
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${CHARGE_ATTEMPT_STATUS_STYLES[charge_attempt.status] ?? ""}`}>
+                        {charge_attempt.status.replace("_", " ")}
+                      </span>
+                      <span className="text-gray-700 dark:text-gray-300">
+                        {charge_attempt.source === "autopay" ? "Autopay" : charge_attempt.initiated_by_name ?? "Admin"} · {charge_attempt.card_label}
+                      </span>
+                    </span>
+                    <span className="text-gray-400">
+                      {charge_attempt.created_at ? new Date(charge_attempt.created_at).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : ""}
+                    </span>
+                  </div>
+                  {charge_attempt.failure_message && (
+                    <span className="text-error-600 dark:text-error-400">{charge_attempt.failure_message}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {is_payable && is_usd && saved_cards.length > 0 && !notice && (
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-warning-200 bg-warning-50 p-4 dark:border-warning-500/30 dark:bg-warning-500/10">
+            <input
+              type="checkbox"
+              checked={is_confirmed}
+              onChange={(e) => setIsConfirmed(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-brand-500"
+            />
+            <span className="text-xs leading-relaxed text-warning-800 dark:text-warning-300">
+              I confirm the client authorized BASE Search Marketing to charge this card, and I want to charge{" "}
+              <strong>{amount_label}</strong> now. The client is not present, so cards that require 3D Secure authentication
+              will be declined.
+            </span>
+          </label>
+        )}
+
+        {notice && (
+          <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300">
+            {notice}
+          </div>
+        )}
+        {error && <ErrorBanner message={error} />}
+      </div>
+
+      <DialogFooter>
+        <button
+          onClick={onClose}
+          disabled={submitting}
+          className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+        >
+          {notice ? "Close" : "Cancel"}
+        </button>
+        {!notice && (
+          <button
+            onClick={handleCharge}
+            disabled={!can_charge}
+            className="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
+          >
+            {submitting && (
+              <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            )}
+            Charge {amount_label}
+          </button>
         )}
       </DialogFooter>
     </DialogShell>

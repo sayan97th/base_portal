@@ -1,12 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
-import {
-  Elements,
-  PaymentElement,
-  useStripe,
-  useElements,
-} from "@stripe/react-stripe-js";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { Elements } from "@stripe/react-stripe-js";
+import type { StripeElementsOptions } from "@stripe/stripe-js";
 import { getStripe } from "@/lib/stripe";
 import { getPublicInvoice } from "@/services/public/invoice.service";
 import {
@@ -14,7 +10,24 @@ import {
   confirmInvoicePayment,
 } from "@/services/public/invoice-payment.service";
 import { invoicesService } from "@/services/client/invoices.service";
+import { paymentProfileService } from "@/services/client/payment-profile.service";
+import type { PaymentProfile } from "@/types/client/payment-profile";
+import type { AutopaySettings } from "@/types/client/autopay";
 import type { InvoiceDetail } from "./invoiceData";
+import { InvoiceSummary, MobileSummaryStrip } from "./pay/InvoicePaySummary";
+import PayStatusPage from "./pay/PayStatusPage";
+import SavedCardList, { NEW_CARD_OPTION } from "./pay/SavedCardList";
+import NewCardPaymentForm, { type ConfirmedCardPayment } from "./pay/NewCardPaymentForm";
+import AutopayPanel from "./pay/AutopayPanel";
+import { PayButton, PaymentErrorBanner, SecurePaymentNote } from "./pay/PayButton";
+import {
+  STRIPE_APPEARANCE,
+  formatCardLabel,
+  formatCurrency,
+  getApiErrorMessage,
+  isCardExpired,
+  parseTotalCents,
+} from "./pay/payUtils";
 
 interface PublicInvoicePayViewProps {
   invoice_id: string;
@@ -33,375 +46,14 @@ type PageState =
   | "success"
   | "success_pending";
 
-function parseTotalCents(total: string): number | null {
-  if (/credits/i.test(total)) return null;
-  const cleaned = total.replace(/[^0-9.]/g, "");
-  if (!cleaned) return null;
-  const amount = parseFloat(cleaned);
-  if (isNaN(amount)) return null;
-  return Math.round(amount * 100);
-}
+const AUTHORIZED_INTENT_STATUSES = new Set(["requires_capture", "succeeded"]);
 
-const formatCurrency = (amount: number): string =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount);
-
-// ── Stripe checkout form ──────────────────────────────────────────────────────
-
-interface CheckoutFormProps {
-  invoice_id: string;
-  token: string;
-  total_cents: number;
-  onSuccess: () => void;
-  onSuccessPending: () => void;
-  on_confirm_payment: (payment_intent_id: string) => Promise<void>;
-}
-
-function CheckoutForm({ invoice_id, token, total_cents, onSuccess, onSuccessPending, on_confirm_payment }: CheckoutFormProps) {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [is_submitting, setIsSubmitting] = useState(false);
-  const [payment_error_message, setPaymentErrorMessage] = useState<string | null>(null);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!stripe || !elements) return;
-
-    setIsSubmitting(true);
-    setPaymentErrorMessage(null);
-
-    const { error, paymentIntent } = await stripe.confirmPayment({
-      elements,
-      confirmParams: {
-        return_url: `${window.location.origin}/invoices/${invoice_id}/pay?token=${token}&status=success`,
-      },
-      redirect: "if_required",
-    });
-
-    if (error) {
-      setPaymentErrorMessage(error.message ?? "Payment failed. Please try again.");
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (paymentIntent?.status === "succeeded") {
-      try {
-        await on_confirm_payment(paymentIntent.id);
-        onSuccess();
-      } catch {
-        // Stripe charge succeeded but backend confirmation failed.
-        // Show a pending state so the client knows to follow up if needed.
-        onSuccessPending();
-      }
-      return;
-    }
-
-    setIsSubmitting(false);
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-6 sm:space-y-8">
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
-        <PaymentElement
-          options={{
-            layout: "tabs",
-            fields: { billingDetails: { name: "auto" } },
-          }}
-        />
-      </div>
-
-      {payment_error_message && (
-        <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 sm:p-5">
-          <svg
-            className="mt-0.5 h-5 w-5 shrink-0 text-red-500"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={2}
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
-            />
-          </svg>
-          <p className="text-sm text-red-700 font-medium">{payment_error_message}</p>
-        </div>
-      )}
-
-      <button
-        type="submit"
-        disabled={is_submitting || !stripe || !elements}
-        className="w-full rounded-xl bg-brand-500 py-3.5 sm:py-4 px-4 sm:px-6 text-sm sm:text-base font-semibold text-white shadow-md transition-all hover:bg-brand-600 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:shadow-md"
-      >
-        {is_submitting ? (
-          <span className="flex items-center justify-center gap-2">
-            <svg
-              className="h-5 w-5 animate-spin"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-              />
-            </svg>
-            <span>Processing payment...</span>
-          </span>
-        ) : (
-          <span>Complete Purchase · {formatCurrency(total_cents / 100)}</span>
-        )}
-      </button>
-
-      <div className="flex items-center justify-center gap-2">
-        <svg
-          className="h-4 w-4 text-gray-400 shrink-0"
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={2}
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
-          />
-        </svg>
-        <p className="text-xs text-gray-500">
-          Payments are encrypted and secured by{" "}
-          <span className="font-semibold text-gray-600">Stripe</span>
-        </p>
-      </div>
-    </form>
+function pickDefaultPaymentOption(payment_profiles: PaymentProfile[]): string {
+  const usable_profiles = payment_profiles.filter(
+    (payment_profile) => !isCardExpired(payment_profile.expiry_month, payment_profile.expiry_year)
   );
-}
-
-// ── Invoice summary sidebar ───────────────────────────────────────────────────
-
-interface InvoiceSummaryProps {
-  invoice: InvoiceDetail;
-  total_cents: number;
-}
-
-function InvoiceSummary({ invoice, total_cents }: InvoiceSummaryProps) {
-  return (
-    <div className="flex h-full flex-col">
-      <p className="mb-6 sm:mb-8 text-xs font-semibold uppercase tracking-widest text-gray-400">
-        Payment Summary
-      </p>
-
-      <div className="flex-1 space-y-4 sm:space-y-5">
-        {invoice.line_items.map((line_item, index_item) => (
-          <div key={index_item} className="flex items-start justify-between gap-4">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm sm:text-base font-medium text-white">{line_item.item_name}</p>
-              <p className="mt-1 text-xs text-gray-400">Qty {line_item.quantity}</p>
-            </div>
-            <span className="shrink-0 text-sm sm:text-base font-medium text-white">
-              {line_item.item_total}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-8 sm:mt-10 space-y-3 sm:space-y-4 border-t border-white/10 pt-6 sm:pt-8">
-        <div className="flex justify-between text-sm sm:text-base">
-          <span className="text-gray-400">Subtotal</span>
-          <span className="text-gray-300 font-medium">{invoice.subtotal}</span>
-        </div>
-
-        {invoice.discount && (
-          <div className="flex justify-between text-sm sm:text-base">
-            <span className="text-gray-400">Discount</span>
-            <span className="font-semibold text-emerald-400">
-              -{invoice.discount}
-            </span>
-          </div>
-        )}
-
-        {invoice.coupon_discounts && invoice.coupon_discounts.length > 0 && (
-          <>
-            {invoice.coupon_discounts.map((coupon_item) => (
-              <div key={coupon_item.code} className="flex items-center justify-between gap-2">
-                <span className="inline-flex items-center rounded border border-emerald-500/30 bg-emerald-500/10 px-2 sm:px-2.5 py-1 font-mono text-xs font-semibold tracking-wider text-emerald-400">
-                  {coupon_item.code}
-                </span>
-                <span className="text-sm sm:text-base font-semibold text-emerald-400">
-                  -{coupon_item.discount_amount}
-                </span>
-              </div>
-            ))}
-          </>
-        )}
-
-        <div className="flex items-end justify-between border-t border-white/10 pt-4 sm:pt-6">
-          <div>
-            <p className="text-sm sm:text-base font-semibold text-white">Total</p>
-            <p className="text-xs text-gray-500">USD</p>
-          </div>
-          <p className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-            {formatCurrency(total_cents / 100)}
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-8 sm:mt-10 rounded-xl border border-white/5 bg-white/5 p-4 sm:p-5">
-        <p className="mb-1.5 text-xs sm:text-sm font-medium text-gray-300">
-          Invoice #{invoice.invoice_number}
-        </p>
-        <p className="text-xs text-gray-500">
-          Issued {invoice.date_issued} &bull; Due {invoice.date_due}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// ── Status / feedback pages ───────────────────────────────────────────────────
-
-type StatusIcon = "check" | "lock" | "warning" | "document" | "info";
-
-interface StatusPageProps {
-  icon: StatusIcon;
-  title: string;
-  description: string;
-  success?: boolean;
-  action_link?: { label: string; href: string };
-}
-
-function StatusPage({ icon, title, description, success = false, action_link }: StatusPageProps) {
-  const icon_background = success
-    ? "bg-emerald-100 dark:bg-emerald-500/15"
-    : "bg-gray-100 dark:bg-gray-800";
-  const icon_color_class = success ? "text-emerald-600 dark:text-emerald-400" : "text-gray-400";
-
-  const icon_map: Record<StatusIcon, React.ReactNode> = {
-    check: (
-      <svg className={`h-8 w-8 ${icon_color_class}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
-    lock: (
-      <svg className={`h-8 w-8 ${icon_color_class}`} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-      </svg>
-    ),
-    warning: (
-      <svg className={`h-8 w-8 ${icon_color_class}`} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-      </svg>
-    ),
-    document: (
-      <svg className={`h-8 w-8 ${icon_color_class}`} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-      </svg>
-    ),
-    info: (
-      <svg className={`h-8 w-8 ${icon_color_class}`} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-      </svg>
-    ),
-  };
-
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-linear-to-br from-gray-50 to-gray-100 p-4 sm:p-6">
-      <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-8 sm:p-10 md:p-12 text-center shadow-lg">
-        <div className={`mx-auto mb-6 sm:mb-8 flex h-16 w-16 sm:h-20 sm:w-20 items-center justify-center rounded-full ${icon_background}`}>
-          {icon_map[icon]}
-        </div>
-        <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">{title}</h1>
-        <p className="mt-2 sm:mt-3 text-sm sm:text-base leading-relaxed text-gray-600">{description}</p>
-        {success && (
-          <div className="mt-6 sm:mt-8 rounded-xl bg-emerald-50 px-4 sm:px-5 py-3 sm:py-4">
-            <p className="text-xs sm:text-sm text-emerald-700 font-medium">
-              A confirmation email will be sent to you shortly.
-            </p>
-          </div>
-        )}
-        {action_link && (
-          <a
-            href={action_link.href}
-            className="mt-5 inline-flex items-center justify-center gap-2 rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
-          >
-            {action_link.label}
-          </a>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Mobile summary strip ──────────────────────────────────────────────────────
-
-function MobileSummaryStrip({ invoice, total_cents }: InvoiceSummaryProps) {
-  const [is_expanded, setIsExpanded] = useState(false);
-  return (
-    <div className="border-b border-gray-200 bg-gray-900 lg:hidden">
-      <button
-        onClick={() => setIsExpanded((expanded_value) => !expanded_value)}
-        className="flex w-full items-center justify-between px-4 sm:px-6 py-3 sm:py-4 hover:bg-gray-800 transition-colors"
-      >
-        <div className="flex items-center gap-2 text-sm sm:text-base font-medium text-white">
-          <svg
-            className="h-5 w-5 text-gray-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={1.5}
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z"
-            />
-          </svg>
-          Order summary
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm sm:text-base font-bold text-white">
-            {formatCurrency(total_cents / 100)}
-          </span>
-          <svg
-            className={`h-5 w-5 text-gray-400 transition-transform duration-200 ${is_expanded ? "rotate-180" : ""}`}
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={2}
-            stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-          </svg>
-        </div>
-      </button>
-
-      {is_expanded && (
-        <div className="space-y-3 sm:space-y-4 px-4 sm:px-6 pb-4 sm:pb-5 bg-gray-800/50 border-t border-gray-700">
-          {invoice.line_items.map((line_item, index_item) => (
-            <div key={index_item} className="flex items-start justify-between gap-4">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-white">{line_item.item_name}</p>
-                <p className="mt-1 text-xs text-gray-400">Qty {line_item.quantity}</p>
-              </div>
-              <span className="shrink-0 text-sm text-white font-medium">{line_item.item_total}</span>
-            </div>
-          ))}
-          <div className="flex items-center justify-between border-t border-gray-600 pt-3 sm:pt-4">
-            <span className="text-sm font-semibold text-white">Total</span>
-            <span className="text-sm sm:text-base font-bold text-white">
-              {formatCurrency(total_cents / 100)}
-            </span>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  const default_profile = usable_profiles.find((payment_profile) => payment_profile.is_default) ?? usable_profiles[0];
+  return default_profile?.id ?? NEW_CARD_OPTION;
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -410,12 +62,19 @@ export default function PublicInvoicePayView({
   invoice_id,
   token,
 }: PublicInvoicePayViewProps) {
+  // Saved cards and autopay are only available to the signed-in invoice owner.
+  // A public share link (token) never exposes or charges stored cards.
   const is_authenticated_flow = !token;
 
   const [page_state, setPageState] = useState<PageState>("loading");
   const [invoice_data, setInvoiceData] = useState<InvoiceDetail | null>(null);
-  const [client_secret_value, setClientSecretValue] = useState<string | null>(null);
   const [total_cents_value, setTotalCentsValue] = useState(0);
+  const [payment_profiles, setPaymentProfiles] = useState<PaymentProfile[]>([]);
+  const [selected_option, setSelectedOption] = useState<string>(NEW_CARD_OPTION);
+  const [autopay_profile_id, setAutopayProfileId] = useState<string | null>(null);
+  const [is_paying_with_saved_card, setIsPayingWithSavedCard] = useState(false);
+  const [saved_card_error, setSavedCardError] = useState<string | null>(null);
+  const [success_notice, setSuccessNotice] = useState<string | null>(null);
 
   const initializePaymentView = useCallback(async () => {
     try {
@@ -429,7 +88,7 @@ export default function PublicInvoicePayView({
         return;
       }
 
-      if (invoice_response.status === "void" || invoice_response.status === "refund") {
+      if (invoice_response.status !== "unpaid" && invoice_response.status !== "overdue") {
         setPageState("invalid_status");
         return;
       }
@@ -447,15 +106,11 @@ export default function PublicInvoicePayView({
 
       setTotalCentsValue(total_cents_amount);
 
-      const session_key = `pi_secret_${invoice_response.unique_id}_${total_cents_amount}_${token}`;
-      const cached_secret = sessionStorage.getItem(session_key);
-
-      if (cached_secret) {
-        setClientSecretValue(cached_secret);
-      } else {
-        const payment_intent_result = await createInvoicePaymentIntent(total_cents_amount, invoice_response.unique_id, token);
-        sessionStorage.setItem(session_key, payment_intent_result.client_secret);
-        setClientSecretValue(payment_intent_result.client_secret);
+      if (is_authenticated_flow) {
+        // A failure here must not block payment — fall back to the new card form.
+        const saved_profiles = await paymentProfileService.fetchPaymentProfiles().catch(() => []);
+        setPaymentProfiles(saved_profiles);
+        setSelectedOption(pickDefaultPaymentOption(saved_profiles));
       }
 
       setPageState("ready");
@@ -478,6 +133,134 @@ export default function PublicInvoicePayView({
     initializePaymentView();
   }, [initializePaymentView]);
 
+  const elements_options = useMemo<StripeElementsOptions>(
+    () => ({
+      mode: "payment",
+      amount: total_cents_value || 50,
+      currency: "usd",
+      paymentMethodTypes: ["card"],
+      captureMethod: "manual",
+      ...(is_authenticated_flow ? { setupFutureUsage: "off_session" as const } : {}),
+      appearance: STRIPE_APPEARANCE,
+    }),
+    [total_cents_value, is_authenticated_flow]
+  );
+
+  const return_url = useMemo(() => {
+    if (typeof window === "undefined") return "";
+    const query_string = token
+      ? `?token=${encodeURIComponent(token)}&status=success`
+      : "?status=success";
+    return `${window.location.origin}/invoices/${invoice_id}/pay${query_string}`;
+  }, [invoice_id, token]);
+
+  const handleAutopaySettingsChange = useCallback((autopay_settings: AutopaySettings) => {
+    setAutopayProfileId(autopay_settings.is_enabled ? autopay_settings.payment_profile_id : null);
+  }, []);
+
+  /**
+   * Records the authorized PaymentIntent against the invoice. The API verifies
+   * it, marks the invoice paid and only then captures the funds.
+   *
+   * Throws with a readable message when the API rejects the payment (the
+   * authorization is released, so the client is not charged). When the
+   * outcome is unknown (network failure) the pending state asks the client
+   * to check before paying again.
+   */
+  const handlePaymentAuthorized = useCallback(
+    async ({ payment_intent_id, payment_method_id, save_card }: ConfirmedCardPayment) => {
+      try {
+        if (is_authenticated_flow) {
+          await invoicesService.payClientInvoice(invoice_id, {
+            payment_method: "credit_card",
+            payment_intent_id,
+          });
+        } else {
+          await confirmInvoicePayment(invoice_id, token, payment_intent_id);
+        }
+      } catch (error_response: unknown) {
+        const api_error = error_response as { status_code?: number };
+        if (!api_error?.status_code) {
+          setPageState("success_pending");
+          return;
+        }
+        throw {
+          message: getApiErrorMessage(
+            error_response,
+            "Your payment could not be completed. Your card has not been charged."
+          ),
+        };
+      }
+
+      if (save_card && payment_method_id) {
+        try {
+          await paymentProfileService.createPaymentProfile({
+            stripe_payment_method_id: payment_method_id,
+            cardholder_name: null,
+            is_default: payment_profiles.length === 0,
+          });
+          setSuccessNotice("Your card was saved for future payments. You can use it to turn on Autopay from your Invoices page.");
+        } catch {
+          // Non-critical: the payment already succeeded.
+        }
+      }
+
+      setPageState("success");
+    },
+    [invoice_id, token, is_authenticated_flow, payment_profiles.length]
+  );
+
+  const handleCreateNewCardIntent = useCallback(
+    async (save_card: boolean) => {
+      if (is_authenticated_flow) {
+        return invoicesService.createInvoicePaymentIntent(invoice_id, { save_card });
+      }
+      return createInvoicePaymentIntent(invoice_id, token);
+    },
+    [invoice_id, token, is_authenticated_flow]
+  );
+
+  const handleSavedCardPayment = async () => {
+    setIsPayingWithSavedCard(true);
+    setSavedCardError(null);
+
+    try {
+      const payment_intent = await invoicesService.createInvoicePaymentIntent(invoice_id, {
+        payment_profile_id: selected_option,
+      });
+
+      const stripe_instance = await getStripe();
+      if (!stripe_instance) {
+        throw { message: "The payment system could not be loaded. Please refresh the page and try again." };
+      }
+
+      // The saved card is already attached to the intent; this only completes
+      // 3D Secure when the client's bank asks for it.
+      const { error, paymentIntent } = await stripe_instance.confirmCardPayment(payment_intent.client_secret);
+
+      if (error) {
+        setSavedCardError(error.message ?? "Your card was declined. Please try another card.");
+        setIsPayingWithSavedCard(false);
+        return;
+      }
+
+      if (!paymentIntent || !AUTHORIZED_INTENT_STATUSES.has(paymentIntent.status)) {
+        setSavedCardError("The payment could not be completed. Please try again.");
+        setIsPayingWithSavedCard(false);
+        return;
+      }
+
+      await handlePaymentAuthorized({
+        payment_intent_id: paymentIntent.id,
+        payment_method_id: null,
+        save_card: false,
+      });
+    } catch (error_response: unknown) {
+      setSavedCardError(getApiErrorMessage(error_response, "We couldn't process the payment. Please try again."));
+      setIsPayingWithSavedCard(false);
+    }
+  };
+
   if (page_state === "loading") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-linear-to-br from-gray-50 to-gray-100">
@@ -491,7 +274,7 @@ export default function PublicInvoicePayView({
 
   if (page_state === "not_found") {
     return (
-      <StatusPage
+      <PayStatusPage
         icon="document"
         title="Invoice not found"
         description="This invoice does not exist or the link has expired."
@@ -501,7 +284,7 @@ export default function PublicInvoicePayView({
 
   if (page_state === "unauthorized") {
     return (
-      <StatusPage
+      <PayStatusPage
         icon="lock"
         title="Access denied"
         description="This payment link is invalid or has been disabled by the sender."
@@ -511,7 +294,7 @@ export default function PublicInvoicePayView({
 
   if (page_state === "already_paid") {
     return (
-      <StatusPage
+      <PayStatusPage
         icon="check"
         title="Invoice already paid"
         description="This invoice has already been paid. No further action is required."
@@ -522,7 +305,7 @@ export default function PublicInvoicePayView({
 
   if (page_state === "credits_invoice") {
     return (
-      <StatusPage
+      <PayStatusPage
         icon="info"
         title="Credits invoice"
         description="This invoice is denominated in account credits and cannot be paid with a credit card."
@@ -532,7 +315,7 @@ export default function PublicInvoicePayView({
 
   if (page_state === "invalid_status") {
     return (
-      <StatusPage
+      <PayStatusPage
         icon="warning"
         title="Payment not available"
         description="This invoice is no longer available for payment. Please contact support if you have any questions."
@@ -542,10 +325,12 @@ export default function PublicInvoicePayView({
 
   if (page_state === "success") {
     return (
-      <StatusPage
+      <PayStatusPage
         icon="check"
         title="Payment successful!"
-        description={`Your payment of ${formatCurrency(total_cents_value / 100)} has been processed successfully. Thank you!`}
+        description={`Your payment of ${formatCurrency(total_cents_value / 100)} has been processed successfully. Thank you!${
+          success_notice ? ` ${success_notice}` : ""
+        }`}
         success
         action_link={is_authenticated_flow ? { label: "Return to Invoices", href: "/invoices" } : undefined}
       />
@@ -554,25 +339,27 @@ export default function PublicInvoicePayView({
 
   if (page_state === "success_pending") {
     return (
-      <StatusPage
-        icon="check"
-        title="Payment processed"
-        description={`Your payment of ${formatCurrency(total_cents_value / 100)} was successfully charged. There may be a brief delay before your invoice reflects this update. If the invoice still shows as unpaid after a few minutes, please contact us at basesearchmarketing.com.`}
-        success
+      <PayStatusPage
+        icon="info"
+        title="Payment submitted"
+        description={`Your payment of ${formatCurrency(total_cents_value / 100)} was submitted, but we couldn't confirm it yet. Please refresh this page in a few minutes before trying again — if the invoice still shows as unpaid, contact us at basesearchmarketing.com.`}
         action_link={is_authenticated_flow ? { label: "Return to Invoices", href: "/invoices" } : undefined}
       />
     );
   }
 
-  if (page_state === "error" || !invoice_data || !client_secret_value) {
+  if (page_state === "error" || !invoice_data) {
     return (
-      <StatusPage
+      <PayStatusPage
         icon="warning"
         title="Something went wrong"
         description="We couldn't load this payment page. Please try again or contact support."
       />
     );
   }
+
+  const selected_profile = payment_profiles.find((payment_profile) => payment_profile.id === selected_option) ?? null;
+  const is_new_card_selected = selected_profile === null;
 
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100">
@@ -611,76 +398,53 @@ export default function PublicInvoicePayView({
                   </p>
                 </div>
 
-                {/* Stripe Elements */}
-                <div className="flex-1 mb-8">
-                  <Elements
-                    stripe={getStripe()}
-                    options={{
-                      clientSecret: client_secret_value,
-                      appearance: {
-                        theme: "stripe",
-                        variables: {
-                          colorPrimary: "#e91e8c",
-                          colorBackground: "#ffffff",
-                          colorText: "#111827",
-                          colorDanger: "#ef4444",
-                          fontFamily:
-                            "ui-sans-serif, system-ui, -apple-system, sans-serif",
-                          borderRadius: "12px",
-                          spacingUnit: "4px",
-                        },
-                        rules: {
-                          ".Input": {
-                            border: "1px solid #e5e7eb",
-                            boxShadow: "none",
-                            padding: "12px 14px",
-                          },
-                          ".Input:focus": {
-                            border: "1px solid #e91e8c",
-                            boxShadow: "0 0 0 3px rgba(233,30,140,0.1)",
-                          },
-                          ".Label": {
-                            color: "#374151",
-                            fontSize: "14px",
-                            fontWeight: "500",
-                          },
-                          ".Tab": {
-                            border: "1px solid #e5e7eb",
-                            borderRadius: "12px",
-                          },
-                          ".Tab--selected": {
-                            border: "1px solid #e91e8c",
-                            boxShadow: "0 0 0 2px rgba(233,30,140,0.15)",
-                          },
-                        },
-                      },
-                    }}
-                  >
-                    <CheckoutForm
-                      invoice_id={invoice_id}
-                      token={token}
-                      total_cents={total_cents_value}
-                      onSuccess={() => {
-                        sessionStorage.removeItem(`pi_secret_${invoice_data.unique_id}_${total_cents_value}_${token}`);
-                        setPageState("success");
+                <div className="flex-1 mb-8 space-y-6 sm:space-y-8">
+                  {payment_profiles.length > 0 && (
+                    <SavedCardList
+                      payment_profiles={payment_profiles}
+                      selected_option={selected_option}
+                      autopay_profile_id={autopay_profile_id}
+                      disabled={is_paying_with_saved_card}
+                      onSelect={(next_option) => {
+                        setSavedCardError(null);
+                        setSelectedOption(next_option);
                       }}
-                      onSuccessPending={() => {
-                        sessionStorage.removeItem(`pi_secret_${invoice_data.unique_id}_${total_cents_value}_${token}`);
-                        setPageState("success_pending");
-                      }}
-                      on_confirm_payment={
-                        is_authenticated_flow
-                          ? async (payment_intent_id) => {
-                              await invoicesService.payClientInvoice(invoice_id, {
-                                payment_method: "credit_card",
-                                payment_intent_id,
-                              });
-                            }
-                          : (payment_intent_id) =>
-                              confirmInvoicePayment(invoice_id, token, payment_intent_id)
-                      }
                     />
-                  </Elements>
+                  )}
+
+                  {is_new_card_selected ? (
+                    <Elements stripe={getStripe()} options={elements_options}>
+                      <NewCardPaymentForm
+                        total_cents={total_cents_value}
+                        return_url={return_url}
+                        allow_save_card={is_authenticated_flow}
+                        onCreatePaymentIntent={handleCreateNewCardIntent}
+                        onPaymentAuthorized={handlePaymentAuthorized}
+                      />
+                    </Elements>
+                  ) : (
+                    <div className="space-y-6 sm:space-y-8">
+                      {saved_card_error && <PaymentErrorBanner message={saved_card_error} />}
+                      <PayButton
+                        type="button"
+                        onClick={handleSavedCardPayment}
+                        is_submitting={is_paying_with_saved_card}
+                        label={`Pay ${formatCurrency(total_cents_value / 100)} with ${formatCardLabel(
+                          selected_profile.card_brand,
+                          selected_profile.last_four
+                        )}`}
+                      />
+                      <SecurePaymentNote />
+                    </div>
+                  )}
+
+                  {is_authenticated_flow && (
+                    <AutopayPanel
+                      appearance="light"
+                      payment_profiles={payment_profiles}
+                      onSettingsChange={handleAutopaySettingsChange}
+                    />
+                  )}
                 </div>
 
                 <div className="border-t border-gray-200 pt-6">

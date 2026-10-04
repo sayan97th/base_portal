@@ -42,6 +42,19 @@ interface PayInvoiceResponse {
   message?: string;
 }
 
+export interface CreateInvoicePaymentIntentPayload {
+  /** Pay with one of the client's saved cards. */
+  payment_profile_id?: string;
+  /** Save the new card entered on the pay page for future payments. */
+  save_card?: boolean;
+}
+
+export interface InvoicePaymentIntentResponse {
+  client_secret: string;
+  payment_intent_id: string;
+  amount_cents: number;
+}
+
 export const invoicesService = {
   async getInvoiceList(filters: InvoiceListFilters = {}): Promise<PaginatedInvoiceListResponse> {
     const { page = 1, per_page = 10, search, status } = filters;
@@ -74,6 +87,20 @@ export const invoicesService = {
       payload
     );
     return response.data;
+  },
+
+  /**
+   * Creates a card-only PaymentIntent for the invoice. The amount is taken
+   * from the invoice server-side.
+   */
+  async createInvoicePaymentIntent(
+    unique_id: string,
+    payload: CreateInvoicePaymentIntentPayload = {}
+  ): Promise<InvoicePaymentIntentResponse> {
+    return apiClient.post<InvoicePaymentIntentResponse>(
+      `/api/invoices/${unique_id}/payment-intent`,
+      payload
+    );
   },
 
   async sendInvoicePaymentNotification(unique_id: string): Promise<void> {

@@ -1,30 +1,38 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
-interface PaymentIntentResponse {
+export interface PublicPaymentIntentResponse {
   client_secret: string;
   payment_intent_id: string;
+  amount_cents: number;
 }
 
+/**
+ * Creates a card-only PaymentIntent for a public (share-link) invoice payment.
+ * The amount is resolved from the invoice by the API — it is never sent from
+ * the browser — and access is authorized by the share token.
+ */
 export async function createInvoicePaymentIntent(
-  amount_cents: number,
-  invoice_unique_id: string,
+  invoice_id: string,
   token: string
-): Promise<PaymentIntentResponse> {
-  const response = await fetch("/api/stripe/create-payment-intent", {
+): Promise<PublicPaymentIntentResponse> {
+  const url = `${API_BASE_URL}/api/invoices/${encodeURIComponent(invoice_id)}/payment-intent`;
+  const response = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      amount_cents,
-      metadata: { invoice_unique_id, token },
-      idempotency_key: `invoice-${invoice_unique_id}-${amount_cents}-${token}`,
-    }),
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({ token }),
   });
 
-  const data = await response.json();
+  const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data.error ?? "Failed to initialize payment.");
+    throw {
+      message: data.message ?? "Failed to initialize payment.",
+      status_code: response.status,
+    };
   }
-  return data as PaymentIntentResponse;
+  return data as PublicPaymentIntentResponse;
 }
 
 export async function confirmInvoicePayment(

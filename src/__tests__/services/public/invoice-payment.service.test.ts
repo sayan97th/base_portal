@@ -23,73 +23,69 @@ describe("createInvoicePaymentIntent", () => {
     jest.clearAllMocks();
   });
 
-  it("calls the internal Next.js API route /api/stripe/create-payment-intent", async () => {
-    mockFetchResponse(200, { client_secret: "pi_secret_abc", payment_intent_id: "pi_abc" });
+  it("calls the Laravel payment-intent endpoint for the invoice", async () => {
+    mockFetchResponse(200, { client_secret: "pi_secret_abc", payment_intent_id: "pi_abc", amount_cents: 50000 });
 
-    await createInvoicePaymentIntent(50000, "UNIQUE123", "tok-abc");
+    await createInvoicePaymentIntent("UNIQUE123", "tok-abc");
 
-    expect(mockFetch).toHaveBeenCalledWith(
-      "/api/stripe/create-payment-intent",
-      expect.any(Object)
-    );
+    const [url] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toMatch(/\/api\/invoices\/UNIQUE123\/payment-intent$/);
   });
 
-  it("sends correct JSON body with amount_cents, metadata, and idempotency_key", async () => {
-    mockFetchResponse(200, { client_secret: "pi_secret_abc", payment_intent_id: "pi_abc" });
+  it("sends only the share token — never an amount", async () => {
+    mockFetchResponse(200, { client_secret: "pi_secret_abc", payment_intent_id: "pi_abc", amount_cents: 75000 });
 
-    await createInvoicePaymentIntent(75000, "INV-XYZ", "token-123");
+    await createInvoicePaymentIntent("INV-XYZ", "token-123");
 
     const [, options] = mockFetch.mock.calls[0] as [string, RequestInit];
     const body = JSON.parse(options.body as string);
 
-    expect(body.amount_cents).toBe(75000);
-    expect(body.metadata.invoice_unique_id).toBe("INV-XYZ");
-    expect(body.metadata.token).toBe("token-123");
-    expect(body.idempotency_key).toContain("INV-XYZ");
+    expect(body).toEqual({ token: "token-123" });
   });
 
   it("uses POST method", async () => {
-    mockFetchResponse(200, { client_secret: "pi_secret", payment_intent_id: "pi_id" });
+    mockFetchResponse(200, { client_secret: "pi_secret", payment_intent_id: "pi_id", amount_cents: 100 });
 
-    await createInvoicePaymentIntent(10000, "INV-1", "tok");
+    await createInvoicePaymentIntent("INV-1", "tok");
 
     const [, options] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(options.method).toBe("POST");
   });
 
-  it("returns client_secret and payment_intent_id on success", async () => {
-    const expected = { client_secret: "pi_secret_xyz", payment_intent_id: "pi_xyz" };
+  it("URL-encodes the invoice id", async () => {
+    mockFetchResponse(200, { client_secret: "pi_secret", payment_intent_id: "pi_id", amount_cents: 100 });
+
+    await createInvoicePaymentIntent("ABC 123", "tok");
+
+    const [url] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("ABC%20123");
+  });
+
+  it("returns client_secret, payment_intent_id and amount_cents on success", async () => {
+    const expected = { client_secret: "pi_secret_xyz", payment_intent_id: "pi_xyz", amount_cents: 10000 };
     mockFetchResponse(200, expected);
 
-    const result = await createInvoicePaymentIntent(10000, "INV-1", "tok");
+    const result = await createInvoicePaymentIntent("INV-1", "tok");
 
-    expect(result.client_secret).toBe("pi_secret_xyz");
-    expect(result.payment_intent_id).toBe("pi_xyz");
+    expect(result).toEqual(expected);
   });
 
-  it("throws Error with message when response is not ok", async () => {
-    mockFetchResponse(400, { error: "Invalid amount." });
+  it("rejects with the API message and status code when the response is not ok", async () => {
+    mockFetchResponse(403, { message: "Access denied." });
 
-    await expect(createInvoicePaymentIntent(0, "INV-1", "tok")).rejects.toThrow("Invalid amount.");
+    await expect(createInvoicePaymentIntent("INV-1", "tok")).rejects.toMatchObject({
+      message: "Access denied.",
+      status_code: 403,
+    });
   });
 
-  it("throws with fallback message when error has no message field", async () => {
+  it("rejects with a fallback message when the error has no message", async () => {
     mockFetchResponse(500, {});
 
-    await expect(createInvoicePaymentIntent(1000, "INV-1", "tok")).rejects.toThrow(
-      "Failed to initialize payment."
-    );
-  });
-
-  it("builds a deterministic idempotency_key from invoice_unique_id, amount, and token", async () => {
-    mockFetchResponse(200, { client_secret: "pi_s", payment_intent_id: "pi_id" });
-
-    await createInvoicePaymentIntent(25000, "INVID", "MYTOKEN");
-
-    const [, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    const body = JSON.parse(options.body as string);
-
-    expect(body.idempotency_key).toBe("invoice-INVID-25000-MYTOKEN");
+    await expect(createInvoicePaymentIntent("INV-1", "tok")).rejects.toMatchObject({
+      message: "Failed to initialize payment.",
+      status_code: 500,
+    });
   });
 });
 

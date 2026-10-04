@@ -7,6 +7,7 @@ import type {
   CreateInvoiceLineItemPayload,
   InvoiceHistoryEntry,
 } from "@/types/admin";
+import type { ChargeAttempt, ChargeAttemptStatus, InvoiceSavedCardsResponse } from "@/types/admin/autopay";
 
 export interface UpdateInvoicePayload {
   user_id?: number;
@@ -73,6 +74,32 @@ export async function updateAdminInvoiceBilling(
 
 export async function markAdminInvoiceAsPaid(invoice_id: string): Promise<AdminInvoice> {
   return apiClient.post<AdminInvoice>(`/api/admin/invoices/${invoice_id}/mark-paid`, {});
+}
+
+export async function getAdminInvoiceSavedCards(invoice_id: string): Promise<InvoiceSavedCardsResponse> {
+  return apiClient.get<InvoiceSavedCardsResponse>(`/api/admin/invoices/${invoice_id}/saved-cards`);
+}
+
+export interface ChargeSavedCardResponse {
+  message: string;
+  status: ChargeAttemptStatus | "not_chargeable";
+  invoice: AdminInvoice;
+  attempt: ChargeAttempt | null;
+}
+
+/**
+ * Charges the full invoice total to one of the client's saved cards.
+ * Resolves for a successful or still-processing (202) charge; rejects with the
+ * API message when the card is declined or the invoice cannot be charged.
+ */
+export async function chargeAdminInvoiceSavedCard(
+  invoice_id: string,
+  payment_profile_id: string
+): Promise<ChargeSavedCardResponse> {
+  return apiClient.post<ChargeSavedCardResponse>(`/api/admin/invoices/${invoice_id}/charge-saved-card`, {
+    payment_profile_id,
+    confirmation: true,
+  });
 }
 
 export async function duplicateAdminInvoice(invoice_id: string): Promise<AdminInvoice> {
