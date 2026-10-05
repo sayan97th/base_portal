@@ -38,11 +38,24 @@ jest.mock("@/lib/stripe", () => ({
   getStripe: jest.fn().mockReturnValue(null),
 }));
 
+/** Card fields expose a button so tests can mark them complete. */
+function mockStripeField(test_id: string) {
+  return function MockStripeField({ onChange }: { onChange?: (change_event: Record<string, unknown>) => void }) {
+    return (
+      <div data-testid={test_id}>
+        <button type="button" onClick={() => onChange?.({ complete: true, brand: "visa" })}>
+          complete {test_id}
+        </button>
+      </div>
+    );
+  };
+}
+
 jest.mock("@stripe/react-stripe-js", () => ({
   Elements: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  CardNumberElement: () => <div data-testid="card-number-element" />,
-  CardExpiryElement: () => <div data-testid="card-expiry-element" />,
-  CardCvcElement: () => <div data-testid="card-cvc-element" />,
+  CardNumberElement: mockStripeField("card-number-element"),
+  CardExpiryElement: mockStripeField("card-expiry-element"),
+  CardCvcElement: mockStripeField("card-cvc-element"),
   useStripe: jest.fn(),
   useElements: jest.fn(),
 }));
@@ -257,6 +270,144 @@ describe("InvoicePaymentView", () => {
       render(<InvoicePaymentView invoice_id="B72E1872" token="share-token" />);
 
       await waitFor(() => expect(screen.getByText(expected_title)).toBeInTheDocument());
+    });
+  });
+
+  describe("public payment end to end", () => {
+    function fillNewCard() {
+      fireEvent.change(screen.getByLabelText("Name on card"), { target: { value: "Jane Client" } });
+      fireEvent.click(screen.getByText("complete card-number-element"));
+      fireEvent.click(screen.getByText("complete card-expiry-element"));
+      fireEvent.click(screen.getByText("complete card-cvc-element"));
+    }
+
+    it("records the payment with the share token and links back to the shared invoice", async () => {
+      mockGetPublicInvoice.mockResolvedValue(makeInvoice());
+
+      render(<InvoicePaymentView invoice_id="B72E1872" token="share-token" />);
+
+      await screen.findByTestId("card-number-element");
+      fillNewCard();
+      fireEvent.click(screen.getByRole("button", { name: /Pay \$500\.00/i }));
+
+      expect(await screen.findByText("Payment successful")).toBeInTheDocument();
+      expect(mockCardPaymentService.createPublicPaymentIntent).toHaveBeenCalledWith("B72E1872", "share-token");
+      expect(mockCardPaymentService.confirmPublicPayment).toHaveBeenCalledWith("B72E1872", "share-token", "pi_123");
+      expect(mockCardPaymentService.confirmAuthenticatedPayment).not.toHaveBeenCalled();
+      expect(screen.getByRole("link", { name: "View invoice" })).toHaveAttribute(
+        "href",
+        "/invoices/B72E1872/view?token=share-token"
+      );
+      expect(screen.queryByRole("link", { name: "Back to invoices" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("recovery after errors", () => {
+    it("shows success when recording fails but the invoice was actually paid", async () => {
+      mockGetInvoiceDetail
+        .mockResolvedValueOnce(makeInvoice())
+        .mockResolvedValueOnce(makeInvoice({ status: "paid" }));
+      mockFetchPaymentProfiles.mockResolvedValue([makeProfile()]);
+      mockCardPaymentService.confirmAuthenticatedPayment.mockRejectedValue({ status_code: 504 });
+
+      render(<InvoicePaymentView invoice_id="B72E1872" token="" />);
+
+      fireEvent.click(await screen.findByRole("button", { name: /Pay \$500\.00/i }));
+
+      expect(await screen.findByText("Payment successful")).toBeInTheDocument();
+    });
+
+    it("stays on the retry screen while the payment still cannot be recorded", async () => {
+      mockGetInvoiceDetail.mockResolvedValue(makeInvoice());
+      mockFetchPaymentProfiles.mockResolvedValue([makeProfile()]);
+      mockCardPaymentService.confirmAuthenticatedPayment.mockRejectedValue({ status_code: 500 });
+
+      render(<InvoicePaymentView invoice_id="B72E1872" token="" />);
+
+      fireEvent.click(await screen.findByRole("button", { name: /Pay \$500\.00/i }));
+      expect(await screen.findByText("We couldn't finalize your payment")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: /Try again/i }));
+
+      await waitFor(() => expect(mockCardPaymentService.confirmAuthenticatedPayment).toHaveBeenCalledTimes(2));
+      expect(mockCardPaymentService.confirmAuthenticatedPayment).toHaveBeenLastCalledWith("B72E1872", "pi_123");
+      expect(await screen.findByText("We couldn't finalize your payment")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "support@basesearchmarketing.com" })).toBeInTheDocument();
+    });
+
+    it("reloads the invoice after a load error", async () => {
+      mockGetInvoiceDetail.mockRejectedValueOnce({ status_code: 500 }).mockResolvedValueOnce(makeInvoice());
+      mockFetchPaymentProfiles.mockResolvedValue([]);
+
+      render(<InvoicePaymentView invoice_id="B72E1872" token="" />);
+
+      fireEvent.click(await screen.findByRole("button", { name: /Try again/i }));
+
+      expect(await screen.findByRole("button", { name: /Pay \$500\.00/i })).toBeInTheDocument();
+      expect(mockGetInvoiceDetail).toHaveBeenCalledTimes(2);
+    });
+
+    it("falls back to a new card when saved cards cannot be loaded", async () => {
+      mockGetInvoiceDetail.mockResolvedValue(makeInvoice());
+      mockFetchPaymentProfiles.mockRejectedValue({ status_code: 500 });
+
+      render(<InvoicePaymentView invoice_id="B72E1872" token="" />);
+
+      expect(await screen.findByTestId("card-number-element")).toBeInTheDocument();
+    });
+  });
+
+  describe("load states", () => {
+    it("shows not found with a link back to the invoices list", async () => {
+      mockGetInvoiceDetail.mockRejectedValue({ status_code: 404 });
+
+      render(<InvoicePaymentView invoice_id="NOPE" token="" />);
+
+      expect(await screen.findByText("Invoice not found")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Back to invoices" })).toHaveAttribute("href", "/invoices");
+    });
+
+    it("asks to sign in again when the session is rejected", async () => {
+      mockGetInvoiceDetail.mockRejectedValue({ status_code: 401 });
+
+      render(<InvoicePaymentView invoice_id="B72E1872" token="" />);
+
+      expect(await screen.findByText("Sign in to pay this invoice")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute(
+        "href",
+        `/signin?callbackUrl=${encodeURIComponent("/invoices/B72E1872/pay")}`
+      );
+    });
+
+    it("rejects invoices below the minimum card charge", async () => {
+      mockGetPublicInvoice.mockResolvedValue(makeInvoice({ total: "$0.30" }));
+
+      render(<InvoicePaymentView invoice_id="B72E1872" token="share-token" />);
+
+      expect(await screen.findByText("Payment not available")).toBeInTheDocument();
+      expect(mockCardPaymentService.createPublicPaymentIntent).not.toHaveBeenCalled();
+    });
+
+    it("allows paying overdue invoices and shows the summary", async () => {
+      mockGetPublicInvoice.mockResolvedValue(
+        makeInvoice({
+          status: "overdue",
+          subtotal: "$600.00",
+          discount: "$50.00",
+          total: "$500.00",
+          coupon_discounts: [
+            { code: "SAVE50", name: "Save 50", discount_type: "fixed_amount", discount_value: 50, discount_amount: "$50.00" },
+          ],
+        })
+      );
+
+      render(<InvoicePaymentView invoice_id="B72E1872" token="share-token" />);
+
+      expect(await screen.findByRole("button", { name: /Pay \$500\.00/i })).toBeInTheDocument();
+      expect(screen.getByText("Overdue")).toBeInTheDocument();
+      expect(screen.getAllByText("Link Building Package").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("SAVE50").length).toBeGreaterThan(0);
+      expect(screen.getByText(/Invoice #BSM-1234 · Due Oct 31, 2026/)).toBeInTheDocument();
     });
   });
 });

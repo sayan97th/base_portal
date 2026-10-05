@@ -56,7 +56,11 @@ export default function InvoicePaymentForm({
   const stripe = useStripe();
   const elements = useElements();
 
-  const preferred_payment_profile = useMemo(() => pickPreferredPaymentProfile(payment_profiles), [payment_profiles]);
+  // Saved cards are only ever usable by the authenticated invoice owner.
+  const preferred_payment_profile = useMemo(
+    () => (is_authenticated ? pickPreferredPaymentProfile(payment_profiles) : null),
+    [is_authenticated, payment_profiles]
+  );
 
   const [selected_option, setSelectedOption] = useState<string>(preferred_payment_profile?.id ?? NEW_CARD_OPTION);
   const [new_card_value, setNewCardValue] = useState<NewCardFieldsValue>({

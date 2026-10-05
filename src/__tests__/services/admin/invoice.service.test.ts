@@ -23,6 +23,8 @@ import {
   refundAdminInvoice,
   partialRefundAdminInvoice,
   setInvoicePaymentIntent,
+  getAdminInvoicePaymentProfiles,
+  chargeAdminInvoiceCardOnFile,
   type UpdateInvoicePayload,
   type RefundOptions,
 } from "@/services/admin/invoice.service";
@@ -238,5 +240,40 @@ describe("setInvoicePaymentIntent", () => {
       "/api/admin/invoices/inv-3/payment-intent",
       { payment_intent_id: "pi_new_abc" }
     );
+  });
+});
+
+describe("getAdminInvoicePaymentProfiles", () => {
+  it("requests the invoice client's saved cards and unwraps data", async () => {
+    const profiles = [{ id: "profile-1", card_brand: "visa", last_four: "4242" }];
+    mocked.get.mockResolvedValueOnce({ data: profiles } as never);
+
+    const result = await getAdminInvoicePaymentProfiles("inv-1");
+
+    expect(mocked.get).toHaveBeenCalledWith("/api/admin/invoices/inv-1/payment-profiles");
+    expect(result).toEqual(profiles);
+  });
+});
+
+describe("chargeAdminInvoiceCardOnFile", () => {
+  it("posts the selected card with an explicit confirmation", async () => {
+    mocked.post.mockResolvedValueOnce({ id: "inv-1", status: "paid" } as never);
+
+    const result = await chargeAdminInvoiceCardOnFile("inv-1", "profile-1");
+
+    expect(mocked.post).toHaveBeenCalledWith("/api/admin/invoices/inv-1/charge-card", {
+      payment_profile_id: "profile-1",
+      confirmation: true,
+    });
+    expect(result).toEqual({ id: "inv-1", status: "paid" });
+  });
+
+  it("propagates API errors such as declines", async () => {
+    mocked.post.mockRejectedValueOnce({ message: "Your card was declined.", status_code: 402 });
+
+    await expect(chargeAdminInvoiceCardOnFile("inv-1", "profile-1")).rejects.toEqual({
+      message: "Your card was declined.",
+      status_code: 402,
+    });
   });
 });
