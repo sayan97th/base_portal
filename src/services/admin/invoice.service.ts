@@ -75,6 +75,34 @@ export async function markAdminInvoiceAsPaid(invoice_id: string): Promise<AdminI
   return apiClient.post<AdminInvoice>(`/api/admin/invoices/${invoice_id}/mark-paid`, {});
 }
 
+export interface AdminInvoicePaymentProfile {
+  id: string;
+  card_brand: string;
+  last_four: string;
+  expiry_month: string;
+  expiry_year: string;
+  cardholder_name: string | null;
+  is_default: boolean;
+  is_expired: boolean;
+}
+
+export async function getAdminInvoicePaymentProfiles(invoice_id: string): Promise<AdminInvoicePaymentProfile[]> {
+  const response = await apiClient.get<{ data: AdminInvoicePaymentProfile[] }>(
+    `/api/admin/invoices/${invoice_id}/payment-profiles`
+  );
+  return response.data;
+}
+
+export async function chargeAdminInvoiceCardOnFile(
+  invoice_id: string,
+  payment_profile_id: string
+): Promise<AdminInvoice> {
+  return apiClient.post<AdminInvoice>(`/api/admin/invoices/${invoice_id}/charge-card`, {
+    payment_profile_id,
+    confirmation: true,
+  });
+}
+
 export async function duplicateAdminInvoice(invoice_id: string): Promise<AdminInvoice> {
   return apiClient.post<AdminInvoice>(`/api/admin/invoices/${invoice_id}/duplicate`, {});
 }

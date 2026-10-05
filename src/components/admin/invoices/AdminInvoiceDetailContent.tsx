@@ -15,6 +15,7 @@ import {
   EmailInvoiceDialog,
   EditBillingDetailsDialog,
   MarkAsPaidDialog,
+  ChargeCardOnFileDialog,
   MarkAsUnpaidDialog,
   MarkAsOverdueDialog,
   RefundInvoiceDialog,
@@ -795,14 +796,16 @@ function groupHistoryByDate(entries: InvoiceHistoryEntry[]): Array<{ date_label:
 
 // ── Actions dropdown ──────────────────────────────────────────────────────────
 
-type ActiveDialog = "email" | "edit" | "edit_billing" | "mark_paid" | "mark_unpaid" | "mark_overdue" | "refund" | "partial_refund" | "duplicate" | "delete" | "void" | "set_payment_intent" | null;
+type ActiveDialog = "email" | "edit" | "edit_billing" | "charge_card" | "mark_paid" | "mark_unpaid" | "mark_overdue" | "refund" | "partial_refund" | "duplicate" | "delete" | "void" | "set_payment_intent" | null;
 // "edit" is intercepted in handleDialogSelect and navigates to the full edit page
 
 interface ActionsDropdownProps {
   onSelect: (dialog: ActiveDialog) => void;
+  /** Shows "Charge Card on File" for unpaid / overdue USD invoices. */
+  can_charge_card?: boolean;
 }
 
-function ActionsDropdown({ onSelect }: ActionsDropdownProps) {
+function ActionsDropdown({ onSelect, can_charge_card = false }: ActionsDropdownProps) {
   const [open, setOpen] = useState(false);
   const container_ref = useRef<HTMLDivElement>(null);
 
@@ -825,6 +828,9 @@ function ActionsDropdown({ onSelect }: ActionsDropdownProps) {
     { label: "Email invoice",        dialog: "email" },
     { label: "Edit",                 dialog: "edit" },
     { label: "Edit Billing Details", dialog: "edit_billing" },
+    ...(can_charge_card
+      ? [{ label: "Charge Card on File", dialog: "charge_card" as ActiveDialog, separator_before: true }]
+      : []),
     { label: "Set Stripe Payment ID", dialog: "set_payment_intent", separator_before: true },
     { label: "Mark as Paid",         dialog: "mark_paid",    separator_before: true },
     { label: "Mark as Unpaid",       dialog: "mark_unpaid" },
@@ -1017,7 +1023,12 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
             </svg>
             Download PDF
           </button>
-          <ActionsDropdown onSelect={handleDialogSelect} />
+          <ActionsDropdown
+            onSelect={handleDialogSelect}
+            can_charge_card={
+              (invoice.status === "unpaid" || invoice.status === "overdue") && invoice.currency_type === "usd"
+            }
+          />
         </div>
       </div>
 
@@ -1765,6 +1776,13 @@ export default function AdminInvoiceDetailContent({ invoice_id }: AdminInvoiceDe
       )}
       {active_dialog === "edit_billing" && (
         <EditBillingDetailsDialog
+          invoice={invoice}
+          onClose={() => setActiveDialog(null)}
+          onSuccess={(updated) => { setInvoice(updated); setActiveDialog(null); }}
+        />
+      )}
+      {active_dialog === "charge_card" && (
+        <ChargeCardOnFileDialog
           invoice={invoice}
           onClose={() => setActiveDialog(null)}
           onSuccess={(updated) => { setInvoice(updated); setActiveDialog(null); }}

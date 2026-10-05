@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminInvoice } from "@/types/admin";
 import {
@@ -8,6 +8,9 @@ import {
   updateAdminInvoice,
   updateAdminInvoiceBilling,
   markAdminInvoiceAsPaid,
+  getAdminInvoicePaymentProfiles,
+  chargeAdminInvoiceCardOnFile,
+  type AdminInvoicePaymentProfile,
   markAdminInvoiceAsUnpaid,
   markAdminInvoiceAsOverdue,
   refundAdminInvoice,
@@ -808,6 +811,215 @@ export function MarkAsPaidDialog({ invoice, onClose, onSuccess }: MarkAsPaidDial
             </svg>
           )}
           Mark as Paid
+        </button>
+      </DialogFooter>
+    </DialogShell>
+  );
+}
+
+// ── Charge Card on File Dialog ────────────────────────────────────────────────
+
+const CARD_BRAND_LABELS: Record<string, string> = {
+  visa: "Visa",
+  mastercard: "Mastercard",
+  amex: "American Express",
+  discover: "Discover",
+  diners: "Diners Club",
+  jcb: "JCB",
+  unionpay: "UnionPay",
+};
+
+function formatCardBrand(card_brand: string): string {
+  return CARD_BRAND_LABELS[card_brand.toLowerCase()] ?? card_brand.charAt(0).toUpperCase() + card_brand.slice(1);
+}
+
+interface ChargeCardOnFileDialogProps {
+  invoice: AdminInvoice;
+  onClose: () => void;
+  onSuccess: (updated: AdminInvoice) => void;
+}
+
+export function ChargeCardOnFileDialog({ invoice, onClose, onSuccess }: ChargeCardOnFileDialogProps) {
+  const [payment_profiles, setPaymentProfiles] = useState<AdminInvoicePaymentProfile[]>([]);
+  const [loading_profiles, setLoadingProfiles] = useState(true);
+  const [selected_profile_id, setSelectedProfileId] = useState<string | null>(null);
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const customer_name = `${invoice.user.first_name} ${invoice.user.last_name}`;
+  const formatted_amount = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(invoice.total_amount);
+  const is_payable = (invoice.status === "unpaid" || invoice.status === "overdue") && invoice.currency_type === "usd";
+  const selected_profile = payment_profiles.find((profile) => profile.id === selected_profile_id) ?? null;
+
+  useEffect(() => {
+    let is_active = true;
+
+    getAdminInvoicePaymentProfiles(invoice.id)
+      .then((profiles) => {
+        if (!is_active) return;
+        setPaymentProfiles(profiles);
+        const preferred_profile =
+          profiles.find((profile) => profile.is_default && !profile.is_expired) ??
+          profiles.find((profile) => !profile.is_expired) ??
+          null;
+        setSelectedProfileId(preferred_profile?.id ?? null);
+      })
+      .catch(() => {
+        if (is_active) setError("Failed to load the client's saved cards.");
+      })
+      .finally(() => {
+        if (is_active) setLoadingProfiles(false);
+      });
+
+    return () => {
+      is_active = false;
+    };
+  }, [invoice.id]);
+
+  const handleConfirm = async () => {
+    if (!selected_profile_id) return;
+
+    setError(null);
+    setSubmitting(true);
+    try {
+      const updated = await chargeAdminInvoiceCardOnFile(invoice.id, selected_profile_id);
+      onSuccess(updated);
+    } catch (err: unknown) {
+      const api_error = err as { message?: string };
+      setError(api_error?.message ?? "The card could not be charged. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <DialogShell onClose={submitting ? () => {} : onClose}>
+      <DialogHeader
+        title="Charge Card on File"
+        onClose={onClose}
+        icon={
+          <svg className="h-4 w-4 text-brand-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+          </svg>
+        }
+      />
+
+      <div className="space-y-5 overflow-y-auto p-6">
+        <div className="space-y-2 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500 dark:text-gray-400">Customer</span>
+            <span className="font-medium text-gray-900 dark:text-white">{customer_name}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500 dark:text-gray-400">Invoice</span>
+            <span className="font-mono font-medium text-gray-900 dark:text-white">{invoice.invoice_number}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500 dark:text-gray-400">Amount to charge</span>
+            <span className="font-semibold text-gray-900 dark:text-white">{formatted_amount}</span>
+          </div>
+        </div>
+
+        {!is_payable ? (
+          <div className="rounded-lg border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-400">
+            Only unpaid or overdue USD invoices can be charged to a card on file.
+          </div>
+        ) : loading_profiles ? (
+          <div className="flex items-center justify-center gap-2 py-6 text-sm text-gray-500 dark:text-gray-400">
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-brand-500" />
+            Loading saved cards…
+          </div>
+        ) : payment_profiles.length === 0 ? (
+          <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+            {customer_name} has no saved cards. Share the invoice payment link so the client can pay with a new card.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Select a card</p>
+            {payment_profiles.map((profile) => (
+              <label
+                key={profile.id}
+                className={`flex items-center gap-3 rounded-xl border px-4 py-3 transition-colors ${
+                  profile.is_expired
+                    ? "cursor-not-allowed border-gray-200 opacity-50 dark:border-gray-700"
+                    : selected_profile_id === profile.id
+                    ? "cursor-pointer border-brand-500 bg-brand-50/50 dark:bg-brand-500/10"
+                    : "cursor-pointer border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="charge_card_profile"
+                  checked={selected_profile_id === profile.id}
+                  disabled={profile.is_expired || submitting}
+                  onChange={() => setSelectedProfileId(profile.id)}
+                  className="h-4 w-4 accent-brand-500"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {formatCardBrand(profile.card_brand)} ending in {profile.last_four}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {profile.cardholder_name ? `${profile.cardholder_name} · ` : ""}
+                    {profile.is_expired ? "Expired" : "Expires"} {profile.expiry_month.padStart(2, "0")}/{profile.expiry_year.slice(-2)}
+                  </p>
+                </div>
+                {profile.is_default && !profile.is_expired && (
+                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                    Default
+                  </span>
+                )}
+                {profile.is_expired && (
+                  <span className="rounded-full bg-error-50 px-2 py-0.5 text-xs font-medium text-error-600 dark:bg-error-500/15 dark:text-error-400">
+                    Expired
+                  </span>
+                )}
+              </label>
+            ))}
+          </div>
+        )}
+
+        {is_payable && selected_profile && (
+          <label className="flex cursor-pointer items-start gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-800/60">
+            <input
+              type="checkbox"
+              checked={acknowledged}
+              disabled={submitting}
+              onChange={(e) => setAcknowledged(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-brand-500"
+            />
+            <span className="text-sm text-gray-700 dark:text-gray-300">
+              I confirm I want to charge <span className="font-semibold">{formatted_amount}</span> to{" "}
+              {customer_name}&apos;s {formatCardBrand(selected_profile.card_brand)} ending in {selected_profile.last_four}. The
+              invoice will be marked as paid and the client will receive a receipt.
+            </span>
+          </label>
+        )}
+
+        {error && <ErrorBanner message={error} />}
+      </div>
+
+      <DialogFooter>
+        <button
+          onClick={onClose}
+          disabled={submitting}
+          className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleConfirm}
+          disabled={submitting || !is_payable || !selected_profile || !acknowledged}
+          className="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
+        >
+          {submitting && (
+            <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          )}
+          Charge {formatted_amount}
         </button>
       </DialogFooter>
     </DialogShell>

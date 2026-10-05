@@ -1,6 +1,6 @@
 "use client";
 
-import PublicInvoicePayView from "@/components/invoices/PublicInvoicePayView";
+import InvoicePaymentView from "@/components/invoices/payment/InvoicePaymentView";
 
 interface PublicInvoicePayClientProps {
   invoice_id: string;
@@ -11,5 +11,5 @@ export default function PublicInvoicePayClient({
   invoice_id,
   token,
 }: PublicInvoicePayClientProps) {
-  return <PublicInvoicePayView invoice_id={invoice_id} token={token} />;
+  return <InvoicePaymentView invoice_id={invoice_id} token={token} />;
 }
