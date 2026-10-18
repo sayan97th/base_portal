@@ -37,6 +37,19 @@ describe("EmailNotificationSettingsTabs", () => {
     expect(screen.queryByTestId("email-interceptor-panel")).not.toBeInTheDocument();
   });
 
+  it("renders the tabs in the expected order", () => {
+    render(<EmailNotificationSettingsTabs />);
+
+    const tab_labels = screen.getAllByRole("tab").map((tab) => tab.textContent?.trim());
+
+    expect(tab_labels).toEqual([
+      "System Notifications",
+      "User Preferences",
+      "Email Types",
+      "Email Interceptor",
+    ]);
+  });
+
   it("switches to the Email Interceptor panel when its tab is clicked", async () => {
     const user = userEvent.setup();
     render(<EmailNotificationSettingsTabs />);
@@ -62,8 +75,8 @@ describe("EmailNotificationSettingsTabs", () => {
   });
 
   it.each([
-    ["Email Types", "email-types-panel"],
     ["User Preferences", "user-preferences-panel"],
+    ["Email Types", "email-types-panel"],
   ])("switches to the %s panel when its tab is clicked", async (tab_name, panel_test_id) => {
     const user = userEvent.setup();
     render(<EmailNotificationSettingsTabs />);
