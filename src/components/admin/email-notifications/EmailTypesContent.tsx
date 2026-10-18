@@ -281,7 +281,7 @@ const EmailTypesContent: React.FC = () => {
         <div>
           <h2 className="text-base font-semibold text-gray-900 dark:text-white">Email Types</h2>
           <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
-            Turn each type of email on or off for every recipient on the platform
+            Turn each type of admin side email on or off for every recipient
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-3 rounded-xl border border-gray-200 bg-white px-5 py-3 dark:border-gray-800 dark:bg-gray-900">
@@ -319,9 +319,10 @@ const EmailTypesContent: React.FC = () => {
           <p className="text-sm font-medium text-blue-800 dark:text-blue-300">How it works</p>
           <p className="mt-1 text-sm leading-relaxed text-blue-700/90 dark:text-blue-400/90">
             Every email sent by BASE Portal is checked against these settings before it leaves the
-            platform. Turning an email type off stops it for everyone. To stop emails for a single
-            person only, use the User Preferences tab. Account and security emails, such as password
-            resets and invitations, are always delivered.
+            platform. Turning an email type off stops it for every admin side recipient. To stop
+            emails for a single person only, use the User Preferences tab. Client side users always
+            receive their emails, so client emails, together with account and security emails such
+            as password resets and invitations, are always delivered.
           </p>
         </div>
       </div>
@@ -402,7 +403,7 @@ const EmailTypesContent: React.FC = () => {
                       </p>
                     </div>
                     {email_type.is_mandatory ? (
-                      <AlwaysSentBadge />
+                      <AlwaysSentBadge audience={email_type.audience} />
                     ) : (
                       <ToggleSwitch
                         enabled={Boolean(enabled_by_key[email_type.key])}

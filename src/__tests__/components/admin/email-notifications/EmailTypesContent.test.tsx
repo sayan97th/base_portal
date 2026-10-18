@@ -55,6 +55,7 @@ function makeResponse(): EmailTypeSettingsResponse {
         label: "Order report delivered",
         audience: "client",
         category: "orders",
+        is_mandatory: true,
       }),
       makeEmailType({
         key: "password_reset",
@@ -96,8 +97,17 @@ describe("EmailTypesContent", () => {
 
     expect(screen.getByText("Purchases and payments")).toBeInTheDocument();
     expect(screen.getByText("Order report delivered")).toBeInTheDocument();
-    expect(screen.getByText("Always sent")).toBeInTheDocument();
+    expect(screen.getAllByText("Always sent")).toHaveLength(2);
     expect(screen.queryByRole("switch", { name: "Send Password reset" })).not.toBeInTheDocument();
+  });
+
+  it("locks client side emails so clients always receive them", async () => {
+    await renderAndWaitForLoad();
+
+    expect(
+      screen.queryByRole("switch", { name: "Send Order report delivered" })
+    ).not.toBeInTheDocument();
+    expect(screen.getByTitle("Client side users always receive their emails")).toBeInTheDocument();
   });
 
   it("only sends the email types that changed when saving", async () => {

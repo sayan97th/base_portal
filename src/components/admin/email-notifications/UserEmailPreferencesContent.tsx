@@ -469,7 +469,7 @@ const UserEmailPreferencesContent: React.FC = () => {
                               </p>
                             </div>
                             {email_type.is_mandatory ? (
-                              <AlwaysSentBadge />
+                              <AlwaysSentBadge audience={email_type.audience} />
                             ) : (
                               <ToggleSwitch
                                 enabled={isReceiving(email_type)}

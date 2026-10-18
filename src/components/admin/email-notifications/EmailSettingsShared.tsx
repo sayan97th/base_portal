@@ -158,10 +158,14 @@ export function EmailTypeAudienceBadge({ audience }: { audience: EmailTypeAudien
   );
 }
 
-export function AlwaysSentBadge() {
+export function AlwaysSentBadge({ audience }: { audience: EmailTypeAudience }) {
   return (
     <span
-      title="Account and security emails are always delivered"
+      title={
+        audience === "client"
+          ? "Client side users always receive their emails"
+          : "Account and security emails are always delivered"
+      }
       className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-400"
     >
       <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
