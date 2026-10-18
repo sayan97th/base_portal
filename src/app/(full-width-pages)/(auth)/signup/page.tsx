@@ -1,4 +1,5 @@
 import SignUpForm from "@/components/auth/SignUpForm";
+import AuthFormSkeleton from "@/components/auth/AuthFormSkeleton";
 import { Metadata } from "next";
 import { Suspense } from "react";
 
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function SignUp() {
   return (
-    <Suspense>
+    <Suspense fallback={<AuthFormSkeleton field_count={4} show_social_button />}>
       <SignUpForm />
     </Suspense>
   );

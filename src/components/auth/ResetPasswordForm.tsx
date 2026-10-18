@@ -53,7 +53,7 @@ export default function ResetPasswordForm({ token }: Props) {
 
   if (is_success) {
     return (
-      <div className="flex flex-col flex-1 lg:w-1/2 w-full">
+      <div className="auth-enter flex flex-col flex-1 w-full">
         <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto">
           <div className="flex flex-col items-center text-center gap-4 py-10">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-success-50 dark:bg-success-500/10">
@@ -91,7 +91,7 @@ export default function ResetPasswordForm({ token }: Props) {
   }
 
   return (
-    <div className="flex flex-col flex-1 lg:w-1/2 w-full">
+    <div className="auth-enter flex flex-col flex-1 w-full">
       <div className="w-full max-w-md sm:pt-10 mx-auto mb-5">
         <Link
           href="/signin"

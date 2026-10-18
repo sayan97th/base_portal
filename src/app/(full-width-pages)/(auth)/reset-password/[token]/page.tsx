@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import ResetPasswordForm from "@/components/auth/ResetPasswordForm";
+import AuthFormSkeleton from "@/components/auth/AuthFormSkeleton";
 
 export const metadata: Metadata = {
   title: "Reset Password | BASE Search Marketing",
@@ -15,7 +16,7 @@ export default async function ResetPasswordTokenPage({ params }: Props) {
   const { token } = await params;
 
   return (
-    <Suspense>
+    <Suspense fallback={<AuthFormSkeleton field_count={3} />}>
       <ResetPasswordForm token={token} />
     </Suspense>
   );

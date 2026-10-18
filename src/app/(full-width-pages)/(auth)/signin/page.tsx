@@ -1,4 +1,5 @@
 import SignInForm from "@/components/auth/SignInForm";
+import AuthFormSkeleton from "@/components/auth/AuthFormSkeleton";
 import { Metadata } from "next";
 import { Suspense } from "react";
 
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function SignIn() {
   return (
-    <Suspense>
+    <Suspense fallback={<AuthFormSkeleton show_social_button />}>
       <SignInForm />
     </Suspense>
   );

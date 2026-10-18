@@ -13,6 +13,10 @@ const outfit = Outfit({
   subsets: ['latin'],
 });
 
+// Applies the saved theme before first paint so dark mode users do not see a
+// light flash while ThemeProvider hydrates.
+const theme_init_script = `try{if(localStorage.getItem('theme')==='dark'){document.documentElement.classList.add('dark')}}catch(e){}`;
+
 const site_url = 'https://portal.basesearchmarketing.com';
 const og_image_url = '/images/seo/base-og.png';
 
@@ -72,8 +76,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: theme_init_script }} />
         <link
           rel="preload"
           href="/images/seo/grid-mountain-pink.png"
