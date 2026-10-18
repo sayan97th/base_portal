@@ -183,4 +183,84 @@ describe("EmailTypesContent", () => {
 
     expect(await screen.findByText("Server error")).toBeInTheDocument();
   });
+
+  it("turns a whole category off and back on with its group toggle", async () => {
+    const user = userEvent.setup();
+    await renderAndWaitForLoad();
+
+    const group_toggle = screen.getByRole("switch", {
+      name: "Toggle every email in Purchases and payments",
+    });
+    const invoice_paid = screen.getByRole("switch", { name: "Send Invoice paid" });
+
+    await user.click(group_toggle);
+    expect(invoice_paid).toHaveAttribute("aria-checked", "false");
+
+    await user.click(group_toggle);
+    expect(invoice_paid).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("keeps Save disabled until something changes", async () => {
+    await renderAndWaitForLoad();
+
+    expect(screen.getByRole("button", { name: "Save Changes" })).toBeDisabled();
+    expect(screen.getByText("All changes saved")).toBeInTheDocument();
+  });
+
+  it("shows the API error and keeps the change when saving fails", async () => {
+    const user = userEvent.setup();
+    mocked_service.updateEmailTypes.mockRejectedValue({ message: "Forbidden" });
+    await renderAndWaitForLoad();
+
+    await user.click(screen.getByRole("switch", { name: "Send Invoice paid" }));
+    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    expect(await screen.findByText("Forbidden")).toBeInTheDocument();
+    expect(screen.getByText("1 unsaved change")).toBeInTheDocument();
+  });
+
+  it("treats a saved state as the new baseline", async () => {
+    const user = userEvent.setup();
+    await renderAndWaitForLoad();
+
+    await user.click(screen.getByRole("switch", { name: "Send Invoice paid" }));
+    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    expect(await screen.findByText("All changes saved")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Discard Changes" })).toBeDisabled();
+  });
+
+  it("reloads the blocked emails list when refreshing", async () => {
+    const user = userEvent.setup();
+    await renderAndWaitForLoad();
+    await waitFor(() => expect(mocked_service.getSuppressionLogs).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByRole("button", { name: /Refresh/ }));
+
+    await waitFor(() => expect(mocked_service.getSuppressionLogs).toHaveBeenCalledTimes(2));
+  });
+
+  it("falls back to a generic label for blocked emails of an unknown type", async () => {
+    mocked_service.getSuppressionLogs.mockResolvedValue([
+      {
+        mailable_class: "App\\Mail\\Removed",
+        email_type: null,
+        recipient_email: "someone@example.com",
+        subject: null,
+        reason: "email_type_disabled",
+        suppressed_at: "2026-10-18T10:00:00Z",
+      },
+    ]);
+
+    await renderAndWaitForLoad();
+
+    expect(await screen.findByText("Unknown email")).toBeInTheDocument();
+    expect(screen.getByText("Email type turned off")).toBeInTheDocument();
+  });
+
+  it("shows an empty state when nothing has been blocked", async () => {
+    await renderAndWaitForLoad();
+
+    expect(await screen.findByText("No emails have been blocked yet")).toBeInTheDocument();
+  });
 });

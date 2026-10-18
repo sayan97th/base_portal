@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import UserEmailPreferencesContent from "@/components/admin/email-notifications/UserEmailPreferencesContent";
 import { useAuth } from "@/context/AuthContext";
@@ -209,5 +209,110 @@ describe("UserEmailPreferencesContent", () => {
 
     expect(screen.getByRole("radio", { name: /No emails/ })).toBeDisabled();
     expect(screen.queryByRole("button", { name: "Save Preferences" })).not.toBeInTheDocument();
+  });
+
+  it("loads a muted user in the No emails mode", async () => {
+    mocked_service.getUserPreferences.mockResolvedValue(
+      makeResponse([{ ...abby, mute_all_emails: true }, kennedy])
+    );
+
+    await renderAndWaitForLoad();
+
+    expect(screen.getByRole("radio", { name: /No emails/ })).toHaveAttribute("aria-checked", "true");
+    expect(
+      within(screen.getByRole("button", { name: /Abby Admin/ })).getByText("Muted")
+    ).toBeInTheDocument();
+  });
+
+  it("filters the user list by name or email", async () => {
+    const user = userEvent.setup();
+    await renderAndWaitForLoad();
+
+    await user.type(screen.getByRole("searchbox", { name: "Search users" }), "kennedy@");
+
+    expect(screen.getByRole("button", { name: /Kennedy Staff/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Abby Admin/ })).not.toBeInTheDocument();
+
+    await user.clear(screen.getByRole("searchbox", { name: "Search users" }));
+    await user.type(screen.getByRole("searchbox", { name: "Search users" }), "nobody");
+    expect(screen.getByText("No users found")).toBeInTheDocument();
+  });
+
+  it("asks before discarding unsaved changes when switching users", async () => {
+    const user = userEvent.setup();
+    const confirm_spy = jest.spyOn(window, "confirm").mockReturnValue(false);
+    await renderAndWaitForLoad();
+
+    await user.click(screen.getByRole("radio", { name: /No emails/ }));
+    await user.click(screen.getByRole("button", { name: /Kennedy Staff/ }));
+
+    expect(confirm_spy).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("heading", { name: /Abby Admin/ })).toBeInTheDocument();
+
+    confirm_spy.mockReturnValue(true);
+    await user.click(screen.getByRole("button", { name: /Kennedy Staff/ }));
+
+    expect(screen.getByRole("heading", { name: /Kennedy Staff/ })).toBeInTheDocument();
+    confirm_spy.mockRestore();
+  });
+
+  it("switches users without asking when nothing changed", async () => {
+    const user = userEvent.setup();
+    const confirm_spy = jest.spyOn(window, "confirm");
+    await renderAndWaitForLoad();
+
+    await user.click(screen.getByRole("button", { name: /Kennedy Staff/ }));
+
+    expect(confirm_spy).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading", { name: /Kennedy Staff/ })).toBeInTheDocument();
+    confirm_spy.mockRestore();
+  });
+
+  it("keeps the custom selection while muted so un-muting restores it", async () => {
+    const user = userEvent.setup();
+    await renderAndWaitForLoad();
+
+    await user.click(screen.getByRole("radio", { name: /Only selected emails/ }));
+    await user.click(screen.getByRole("switch", { name: "Receive Client credit purchase" }));
+    await user.click(screen.getByRole("radio", { name: /No emails/ }));
+    await user.click(screen.getByRole("button", { name: "Save Preferences" }));
+
+    await waitFor(() => {
+      expect(mocked_service.updateUserPreference).toHaveBeenCalledWith(abby.id, {
+        mute_all_emails: true,
+        disabled_email_types: ["admin_credit_purchase"],
+      });
+    });
+  });
+
+  it("discards unsaved changes", async () => {
+    const user = userEvent.setup();
+    await renderAndWaitForLoad();
+
+    await user.click(screen.getByRole("radio", { name: /No emails/ }));
+    await user.click(screen.getByRole("button", { name: "Discard Changes" }));
+
+    expect(screen.getByRole("radio", { name: /All emails/ })).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("shows the API error when saving fails", async () => {
+    const user = userEvent.setup();
+    mocked_service.updateUserPreference.mockRejectedValue({ message: "Forbidden" });
+    await renderAndWaitForLoad();
+
+    await user.click(screen.getByRole("radio", { name: /No emails/ }));
+    await user.click(screen.getByRole("button", { name: "Save Preferences" }));
+
+    expect(await screen.findByText("Forbidden")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save Preferences" })).toBeEnabled();
+  });
+
+  it("shows an error when preferences fail to load", async () => {
+    mocked_service.getUserPreferences.mockRejectedValue({ message: "Server error" });
+
+    render(<UserEmailPreferencesContent />);
+
+    expect(await screen.findByText("Server error")).toBeInTheDocument();
+    expect(screen.getByText("Select a user to manage their email preferences")).toBeInTheDocument();
   });
 });

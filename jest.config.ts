@@ -15,10 +15,13 @@ const config: Config = {
   },
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
-    "\\.(css|less|scss|sass)$": "<rootDir>/src/__tests__/__mocks__/styleMock.ts",
-    "\\.(png|jpg|jpeg|gif|svg|ico|webp)$": "<rootDir>/src/__tests__/__mocks__/fileMock.ts",
+    "\\.(css|less|scss|sass)$": "<rootDir>/test/__mocks__/styleMock.ts",
+    "\\.(png|jpg|jpeg|gif|svg|ico|webp)$": "<rootDir>/test/__mocks__/fileMock.ts",
   },
-  testMatch: ["**/__tests__/**/*.(test|spec).(ts|tsx)"],
+  // Every test lives in test/, mirroring the location of the file it covers
+  // (test/components/admin/... tests src/components/admin/...).
+  roots: ["<rootDir>/test"],
+  testMatch: ["<rootDir>/test/**/*.(test|spec).(ts|tsx)"],
   collectCoverageFrom: [
     "src/components/**/*.{ts,tsx}",
     "src/utils/**/*.{ts,tsx}",

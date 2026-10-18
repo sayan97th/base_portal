@@ -7,7 +7,7 @@ import path from "path";
 // provider itself. This suite fails if a mail library or provider API ends up
 // in the frontend, which would let emails skip those settings.
 
-const PROJECT_ROOT = path.resolve(__dirname, "../../..");
+const PROJECT_ROOT = path.resolve(__dirname, "../..");
 const SOURCE_ROOT = path.join(PROJECT_ROOT, "src");
 
 const FORBIDDEN_PACKAGES = [
@@ -40,7 +40,7 @@ const FORBIDDEN_SOURCE_PATTERNS: { pattern: RegExp; description: string }[] = [
 function listSourceFiles(directory: string): string[] {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const full_path = path.join(directory, entry.name);
-    if (entry.isDirectory()) return entry.name === "__tests__" ? [] : listSourceFiles(full_path);
+    if (entry.isDirectory()) return listSourceFiles(full_path);
     return /\.(ts|tsx|js|jsx|mjs)$/.test(entry.name) ? [full_path] : [];
   });
 }
