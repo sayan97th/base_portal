@@ -28,7 +28,7 @@ export default function EmailNotificationSettingsPage() {
             Email Notification Settings
           </h1>
           <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
-            Manage who gets notified by email, and audit exactly what goes out
+            Control which emails are sent, who receives them, and audit exactly what goes out
           </p>
         </div>
       </div>

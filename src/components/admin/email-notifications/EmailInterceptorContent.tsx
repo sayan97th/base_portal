@@ -10,35 +10,9 @@ import {
   AUTOMATED_EMAIL_CATALOG,
   type EmailAudience,
 } from "./automatedEmailCatalog";
+import { ToggleSwitch } from "./EmailSettingsShared";
 
-// ── Toggle Switch (mirrors the one used on the Comment Notifications tab) ──
-
-interface ToggleSwitchProps {
-  enabled: boolean;
-  onChange: () => void;
-  disabled?: boolean;
-}
-
-function ToggleSwitch({ enabled, onChange, disabled = false }: ToggleSwitchProps) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={enabled}
-      disabled={disabled}
-      onClick={onChange}
-      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${
-        enabled ? "bg-brand-500" : "bg-gray-200 dark:bg-gray-700"
-      } ${disabled ? "cursor-not-allowed opacity-40" : "cursor-pointer"}`}
-    >
-      <span
-        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform duration-200 ${
-          enabled ? "translate-x-6" : "translate-x-1"
-        }`}
-      />
-    </button>
-  );
-}
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function AudienceBadge({ audience }: { audience: EmailAudience }) {
   return (
