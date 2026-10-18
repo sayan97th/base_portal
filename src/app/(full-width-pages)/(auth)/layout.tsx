@@ -4,12 +4,6 @@ import Image from "next/image";
 import Link from "next/link";
 import React from "react";
 
-const brand_highlights = [
-  "Link building campaigns built for SEOs",
-  "New content, optimization and content briefs",
-  "Full SEO packages for teams that want extra support",
-];
-
 export default function AuthLayout({
   children,
 }: {
@@ -43,65 +37,33 @@ export default function AuthLayout({
         </main>
 
         <aside className="relative isolate hidden overflow-hidden bg-gray-950 lg:flex lg:items-center lg:justify-center">
-          {/* ===== Decorative background ===== */}
           <div
             aria-hidden="true"
-            className="absolute -top-32 -right-32 -z-1 h-96 w-96 rounded-full bg-brand-500/25 blur-3xl"
-          />
-          <div
-            aria-hidden="true"
-            className="absolute -bottom-40 -left-24 -z-1 h-96 w-96 rounded-full bg-brand-700/20 blur-3xl"
+            className="absolute left-1/2 top-1/2 -z-1 h-80 w-80 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand-500/10 blur-3xl"
           />
           <GridShape />
 
-          <div className="flex max-w-sm flex-col items-center px-6 text-center">
+          <div className="flex max-w-xs flex-col items-center px-6 text-center">
             <Link
               href="/"
-              className="mb-10 block rounded-2xl bg-white px-8 py-6 shadow-theme-xl ring-1 ring-white/10 transition-transform duration-300 hover:-translate-y-0.5"
+              className="mb-8 block rounded-2xl bg-white px-7 py-5 shadow-theme-xl"
             >
+              {/* Copy below comes from the public BASE Search Marketing website */}
               <Image
                 width={231}
                 height={94}
                 src="/images/logo/base-logo.png"
                 alt="BASE Search Marketing"
                 priority
-                className="h-auto w-[200px]"
+                className="h-auto w-[180px]"
               />
             </Link>
-
-            <h2 className="text-2xl font-semibold text-white">
-              A Link Building and Content Agency
+            <h2 className="text-xl font-medium leading-snug text-white">
+              Custom SEO services for search and AI visibility.
             </h2>
-            <p className="mt-3 text-sm leading-relaxed text-gray-400">
-              Links and content services for SEOs who know what they need, and
-              full SEO packages for marketers who want extra support.
+            <p className="mt-2 text-sm text-gray-400">
+              Built for brands and agencies.
             </p>
-
-            <ul className="mt-8 w-full space-y-3 text-left">
-              {brand_highlights.map((highlight) => (
-                <li
-                  key={highlight}
-                  className="flex items-center gap-3 rounded-xl border border-white/5 bg-white/[0.03] px-4 py-3 text-sm text-gray-300 backdrop-blur-sm"
-                >
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-500/15 text-brand-400">
-                    <svg
-                      className="h-3.5 w-3.5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      strokeWidth={3}
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                  </span>
-                  {highlight}
-                </li>
-              ))}
-            </ul>
           </div>
         </aside>
       </div>
