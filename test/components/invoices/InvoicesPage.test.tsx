@@ -42,11 +42,14 @@ function makeSummary(overrides: Partial<InvoiceSummary> = {}): InvoiceSummary {
   };
 }
 
-function makeResponse(items: InvoiceSummary[] = []) {
+type InvoiceListResponse = Awaited<ReturnType<typeof invoicesService.getInvoiceList>>;
+
+function makeResponse(items: InvoiceSummary[] = []): InvoiceListResponse {
   return {
     data: items,
     current_page: 1,
     last_page: 1,
+    per_page: 10,
     total: items.length,
   };
 }

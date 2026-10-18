@@ -37,6 +37,7 @@ const base_row: OrderPlacementRow = {
   completed_date: "07/13/2026",
   dr_lbs: "61",
   request_date: "07/01/2026",
+  source: "purchased",
 };
 
 describe("dashboardService.fetchPaginatedTableRows", () => {

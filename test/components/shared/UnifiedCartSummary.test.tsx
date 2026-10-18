@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import UnifiedCartSummary from "@/components/shared/UnifiedCartSummary";
 import { validateCoupon } from "@/services/client/coupons.service";
 import type { CartItem, CartAppliedCoupon } from "@/types/client/unified-cart";
+import type { BulkDiscountDetail, Discount } from "@/types/admin/discounts";
 
 // ─── Module mocks ────────────────────────────────────────────────────────────
 
@@ -30,6 +31,36 @@ function makeCartItem(overrides: Partial<CartItem> = {}): CartItem {
     tier_name:     "DR 30+",
     quantity:      2,
     unit_price:    100.0,
+    ...overrides,
+  };
+}
+
+function makeDiscount(overrides: Partial<Discount> = {}): Discount {
+  return {
+    id:            "bd1",
+    name:          "Link Building Bulk Discount",
+    description:   null,
+    discount_type: "bulk",
+    discount_rate: 10,
+    min_quantity:  10,
+    applies_to:    "link_building",
+    is_active:     true,
+    dr_tier_ids:   [],
+    dr_tiers:      [],
+    created_at:    "2026-01-01T00:00:00.000Z",
+    updated_at:    "2026-01-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function makeBulkDiscountDetail(overrides: Partial<BulkDiscountDetail> = {}): BulkDiscountDetail {
+  return {
+    config:           makeDiscount(),
+    is_applied:       false,
+    discount_amount:  0,
+    current_quantity: 0,
+    quantity_needed:  0,
+    product_subtotal: 0,
     ...overrides,
   };
 }
@@ -227,17 +258,13 @@ describe("UnifiedCartSummary", () => {
           active_discount_type:      "bulk",
           total:                     900,
           bulk_discount_details: [
-            {
-              config: {
-                id:            "bd1",
-                applies_to:    "link_building",
-                discount_rate: 10,
-                min_quantity:  10,
-              },
+            makeBulkDiscountDetail({
               is_applied:       true,
+              current_quantity: 10,
               quantity_needed:  0,
               discount_amount:  100,
-            },
+              product_subtotal: 1000,
+            }),
           ],
         })
       );
@@ -253,17 +280,13 @@ describe("UnifiedCartSummary", () => {
         buildCartContext({
           items: [makeCartItem({ quantity: 5 })],
           bulk_discount_details: [
-            {
-              config: {
-                id:            "bd1",
-                applies_to:    "link_building",
-                discount_rate: 10,
-                min_quantity:  10,
-              },
-              is_applied:      false,
-              quantity_needed: 5,
-              discount_amount: 0,
-            },
+            makeBulkDiscountDetail({
+              is_applied:       false,
+              current_quantity: 5,
+              quantity_needed:  5,
+              discount_amount:  0,
+              product_subtotal: 500,
+            }),
           ],
         })
       );
@@ -725,17 +748,13 @@ describe("UnifiedCartSummary", () => {
           active_discount_type:  "coupon",
           total:                 880,
           bulk_discount_details: [
-            {
-              config: {
-                id:            "bd1",
-                applies_to:    "link_building",
-                discount_rate: 10,
-                min_quantity:  10,
-              },
-              is_applied:      true,
-              quantity_needed: 0,
-              discount_amount: 100,
-            },
+            makeBulkDiscountDetail({
+              is_applied:       true,
+              current_quantity: 10,
+              quantity_needed:  0,
+              discount_amount:  100,
+              product_subtotal: 1000,
+            }),
           ],
         })
       );
