@@ -11,7 +11,7 @@
  */
 
 import React from "react";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
 import LinkBuildingOrdersTable from "@/components/admin/dashboard/LinkBuildingOrdersTable";
 import {
   listLinkBuildingOrders,
@@ -188,16 +188,16 @@ async function renderTableWithRow(row: LinkBuildingOrderRow): Promise<void> {
 }
 
 /**
- * Opens a cell for editing. The table's Excel-style drag-to-select gesture starts
- * editing from a mousedown/mouseup pair with no movement in between (see
- * handleCellMouseDown/handleCellMouseUp in the component), not from a click handler,
- * so a plain fireEvent.click never opens the cell.
+ * Opens a cell for editing. Like a spreadsheet, a plain click (a mousedown/mouseup
+ * pair with no movement in between, see handleCellMouseDown/handleCellMouseUp in the
+ * component) only selects the cell, and the double click that follows opens it.
  */
 function openCellForEditing(display_text: string): void {
   const cell = screen.getByText(display_text).closest("td");
   if (!cell) throw new Error(`No <td> ancestor found for text "${display_text}"`);
   fireEvent.mouseDown(cell);
   fireEvent.mouseUp(cell);
+  fireEvent.doubleClick(cell);
 }
 
 /**
@@ -346,7 +346,7 @@ describe("LinkBuildingOrdersTable — undo / redo", () => {
     fireEvent.blur(screen.getByDisplayValue("local seo"));
 
     await waitFor(() => expect(mockUpdateLinkBuildingOrder).toHaveBeenCalledTimes(1));
-    await screen.findByText("local seo");
+    await within(screen.getByRole("grid")).findByText("local seo");
 
     // Undo: value should revert to "seo tools" and re-sync through batch-update-cells.
     mockBatchUpdateLinkBuildingOrderCells.mockResolvedValueOnce({
@@ -361,7 +361,7 @@ describe("LinkBuildingOrdersTable — undo / redo", () => {
     expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenNthCalledWith(1, [
       { id: "uuid-1", fields: { keyword: "seo tools" } },
     ]);
-    await screen.findByText("seo tools");
+    await within(screen.getByRole("grid")).findByText("seo tools");
 
     // Redo: value should move forward again to "local seo".
     mockBatchUpdateLinkBuildingOrderCells.mockResolvedValueOnce({
@@ -376,7 +376,7 @@ describe("LinkBuildingOrdersTable — undo / redo", () => {
     expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenNthCalledWith(2, [
       { id: "uuid-1", fields: { keyword: "local seo" } },
     ]);
-    await screen.findByText("local seo");
+    await within(screen.getByRole("grid")).findByText("local seo");
   });
 
   it("enables the Undo toolbar button after an edit, and clicking it works the same as Ctrl+Z", async () => {
@@ -553,7 +553,7 @@ describe("LinkBuildingOrdersTable — multi-cell range copy & paste", () => {
         { id: "uuid-2", fields: { client: "New Client B", keyword: "New Kw B" } },
       ])
     );
-    await screen.findByText("New Client A");
+    await within(screen.getByRole("grid")).findByText("New Client A");
     await screen.findByText("New Kw B");
   });
 
@@ -579,7 +579,7 @@ describe("LinkBuildingOrdersTable — multi-cell range copy & paste", () => {
     render(<LinkBuildingOrdersTable />);
     await screen.findByText("BL-1");
 
-    // A plain click on "Acme Corp" opens it for editing (no range yet).
+    // A double click on "Acme Corp" opens it for editing (no range yet).
     openCellForEditing("Acme Corp");
     expect(screen.getByDisplayValue("Acme Corp")).toBeInTheDocument();
 
@@ -675,7 +675,7 @@ describe("LinkBuildingOrdersTable — multi-cell range copy & paste", () => {
         { id: "uuid-2", fields: { status: "Done" } },
       ])
     );
-    await screen.findByText("Needs Client Approval");
+    await within(screen.getByRole("grid")).findByText("Needs Client Approval");
     await screen.findByText("Done");
   });
 
@@ -836,6 +836,7 @@ describe("LinkBuildingOrdersTable — editable select-cell combobox", () => {
     const status_cell = getTableCellByText("New Request");
     fireEvent.mouseDown(status_cell);
     fireEvent.mouseUp(status_cell);
+    fireEvent.doubleClick(status_cell);
 
     const input = screen.getByDisplayValue("New Request");
     fireEvent.change(input, { target: { value: "Needs Client Approval" } });
@@ -854,6 +855,7 @@ describe("LinkBuildingOrdersTable — editable select-cell combobox", () => {
     const status_cell = getTableCellByText("New Request");
     fireEvent.mouseDown(status_cell);
     fireEvent.mouseUp(status_cell);
+    fireEvent.doubleClick(status_cell);
 
     // "New Request" matches the cell's current value, so every other preset option
     // (not yet typed over) should still be listed below it.
@@ -872,6 +874,7 @@ describe("LinkBuildingOrdersTable — editable select-cell combobox", () => {
     const status_cell = getTableCellByText("New Request");
     fireEvent.mouseDown(status_cell);
     fireEvent.mouseUp(status_cell);
+    fireEvent.doubleClick(status_cell);
 
     fireEvent.click(getDropdownOptionButton("Reviewing"));
 
@@ -891,6 +894,7 @@ describe("LinkBuildingOrdersTable — editable select-cell combobox", () => {
     const status_cell = getTableCellByText("New Request");
     fireEvent.mouseDown(status_cell);
     fireEvent.mouseUp(status_cell);
+    fireEvent.doubleClick(status_cell);
 
     const input = screen.getByDisplayValue("New Request");
     fireEvent.change(input, { target: { value: "Needs Client Approval" } });
@@ -910,6 +914,7 @@ describe("LinkBuildingOrdersTable — editable select-cell combobox", () => {
     const status_cell = getTableCellByText("New Request");
     fireEvent.mouseDown(status_cell);
     fireEvent.mouseUp(status_cell);
+    fireEvent.doubleClick(status_cell);
 
     const input = screen.getByDisplayValue("New Request");
     fireEvent.change(input, { target: { value: "Reviewing" } });
@@ -928,6 +933,7 @@ describe("LinkBuildingOrdersTable — editable select-cell combobox", () => {
     const status_cell = getTableCellByText("New Request");
     fireEvent.mouseDown(status_cell);
     fireEvent.mouseUp(status_cell);
+    fireEvent.doubleClick(status_cell);
 
     const input = screen.getByDisplayValue("New Request");
     // Clear the cell first so every preset option is listed from the top —
@@ -954,6 +960,7 @@ describe("LinkBuildingOrdersTable — editable select-cell combobox", () => {
     const link_type_cell = getTableCellByText("DR 30+ External");
     fireEvent.mouseDown(link_type_cell);
     fireEvent.mouseUp(link_type_cell);
+    fireEvent.doubleClick(link_type_cell);
 
     const input = screen.getByDisplayValue("DR 30+ External");
     fireEvent.change(input, { target: { value: "Guest Post External" } });
@@ -987,6 +994,7 @@ describe("LinkBuildingOrdersTable — Status cell save notification banner", () 
     const status_cell = getTableCellByText("New Request");
     fireEvent.mouseDown(status_cell);
     fireEvent.mouseUp(status_cell);
+    fireEvent.doubleClick(status_cell);
 
     const input = screen.getByDisplayValue("New Request");
     fireEvent.blur(input);
@@ -1006,6 +1014,7 @@ describe("LinkBuildingOrdersTable — Status cell save notification banner", () 
     const status_cell = getTableCellByText("New Request");
     fireEvent.mouseDown(status_cell);
     fireEvent.mouseUp(status_cell);
+    fireEvent.doubleClick(status_cell);
 
     const input = screen.getByDisplayValue("New Request");
     fireEvent.change(input, { target: { value: "Reviewing" } });
@@ -1280,5 +1289,135 @@ describe("LinkBuildingOrdersTable, saved filters", () => {
       })
     );
     expect(await screen.findByText('Saved the current filters as "Pending orders".')).toBeInTheDocument();
+  });
+});
+
+// ─── Spreadsheet keyboard navigation ─────────────────────────────────────────
+
+describe("LinkBuildingOrdersTable — spreadsheet keyboard navigation", () => {
+  // Column letters follow the visible column order: A Order ID, B Status,
+  // C Team Specific Link ID, D Link Type, E Company, F Keyword.
+  const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", client: "Acme Corp", keyword: "seo tools" });
+  const row2 = makeRow({ id: "uuid-2", order_id: "BL-2", client: "Globex Inc", keyword: "ppc ads" });
+
+  async function renderTwoRows(): Promise<HTMLElement> {
+    mockListLinkBuildingOrders.mockResolvedValue(mockSearchResponse([row1, row2]));
+    render(<LinkBuildingOrdersTable />);
+    await screen.findByText("BL-1");
+    return screen.getByRole("grid");
+  }
+
+  /** A plain click (mouse down and up on the same cell) only selects the cell. */
+  function clickCell(display_text: string): void {
+    const cell = within(screen.getByRole("grid")).getByText(display_text).closest("td");
+    if (!cell) throw new Error(`No <td> ancestor found for text "${display_text}"`);
+    fireEvent.mouseDown(cell);
+    fireEvent.mouseUp(cell);
+  }
+
+  function nameBoxText(): string {
+    return screen.getByTitle("Active cell").textContent ?? "";
+  }
+
+  it("a single click selects the cell without opening it for editing", async () => {
+    await renderTwoRows();
+
+    clickCell("Acme Corp");
+
+    expect(nameBoxText()).toBe("E1");
+    expect(screen.queryByDisplayValue("Acme Corp")).not.toBeInTheDocument();
+  });
+
+  it("arrow keys move the active cell and the formula bar shows its full value", async () => {
+    const grid = await renderTwoRows();
+    clickCell("Acme Corp");
+
+    fireEvent.keyDown(grid, { key: "ArrowRight" });
+    expect(nameBoxText()).toBe("F1");
+    // Once in the grid cell and once in the formula bar.
+    expect(screen.getAllByText("seo tools")).toHaveLength(2);
+
+    fireEvent.keyDown(grid, { key: "ArrowDown" });
+    expect(nameBoxText()).toBe("F2");
+
+    fireEvent.keyDown(grid, { key: "ArrowLeft" });
+    fireEvent.keyDown(grid, { key: "ArrowUp" });
+    expect(nameBoxText()).toBe("E1");
+
+    // Ctrl+ArrowLeft jumps straight to the first column.
+    fireEvent.keyDown(grid, { key: "ArrowLeft", ctrlKey: true });
+    expect(nameBoxText()).toBe("A1");
+  });
+
+  it("Tab moves right and Enter opens the active cell for editing", async () => {
+    const grid = await renderTwoRows();
+    clickCell("Acme Corp");
+
+    fireEvent.keyDown(grid, { key: "Tab" });
+    expect(nameBoxText()).toBe("F1");
+
+    fireEvent.keyDown(grid, { key: "Enter" });
+    expect(screen.getByDisplayValue("seo tools")).toBeInTheDocument();
+  });
+
+  it("typing starts editing with the typed character, and an arrow key commits and moves", async () => {
+    const grid = await renderTwoRows();
+    mockUpdateLinkBuildingOrder.mockResolvedValue({
+      message: "Updated",
+      data: { ...row1, keyword: "xyz" },
+    });
+    clickCell("seo tools");
+
+    fireEvent.keyDown(grid, { key: "x" });
+    const input = screen.getByDisplayValue("x");
+    fireEvent.change(input, { target: { value: "xyz" } });
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+
+    await waitFor(() => expect(mockUpdateLinkBuildingOrder).toHaveBeenCalledTimes(1));
+    expect(mockUpdateLinkBuildingOrder.mock.calls[0][1]).toMatchObject({ keyword: "xyz" });
+    expect(nameBoxText()).toBe("F2");
+  });
+
+  it("Escape discards the edit and restores the original value without saving", async () => {
+    const grid = await renderTwoRows();
+    clickCell("seo tools");
+
+    fireEvent.keyDown(grid, { key: "F2" });
+    const input = screen.getByDisplayValue("seo tools");
+    fireEvent.change(input, { target: { value: "changed" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+
+    expect(screen.queryByDisplayValue("changed")).not.toBeInTheDocument();
+    expect(within(grid).getByText("seo tools")).toBeInTheDocument();
+    expect(mockUpdateLinkBuildingOrder).not.toHaveBeenCalled();
+    expect(nameBoxText()).toBe("F1");
+  });
+
+  it("Shift+Arrow extends a range from the active cell", async () => {
+    const grid = await renderTwoRows();
+    clickCell("seo tools");
+
+    fireEvent.keyDown(grid, { key: "ArrowDown", shiftKey: true });
+
+    expect(nameBoxText()).toBe("F1:F2");
+  });
+
+  it("Delete clears the active cell through the batch cell update", async () => {
+    const grid = await renderTwoRows();
+    mockBatchUpdateLinkBuildingOrderCells.mockResolvedValue({
+      message: "1 row(s) updated successfully.",
+      updated_count: 1,
+      data: [{ ...row1, keyword: "" }],
+    });
+    clickCell("seo tools");
+
+    fireEvent.keyDown(grid, { key: "Delete" });
+
+    await waitFor(() =>
+      expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledWith([
+        { id: "uuid-1", fields: { keyword: "" } },
+      ])
+    );
+    expect(await screen.findByText(/Cleared 1 cell across 1 row/i)).toBeInTheDocument();
   });
 });

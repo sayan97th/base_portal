@@ -1,0 +1,308 @@
+// Spreadsheet look (Google Sheets / Excel) for the admin Link Building Orders table.
+//
+// These rules sit outside Tailwind's layers, so they take precedence over the
+// utility classes on the same elements. That is intentional: the grid lines,
+// selection colors and row height are owned here, while Tailwind keeps handling
+// content styling (status pills, links, avatars) inside each cell.
+
+// ── Tokens ─────────────────────────────────────────────────────────────────────
+
+$grid_line: #e1e3e1;
+$grid_line_dark: #374151;
+$header_bg: #f8f9fa;
+$header_bg_dark: #1f2937;
+$header_text: #444746;
+$header_text_dark: #9ca3af;
+$header_active_bg: #d3e3fd;
+$header_active_bg_dark: rgba(26, 115, 232, 0.35);
+$header_active_text: #041e49;
+$header_active_text_dark: #e8f0fe;
+$selection_color: #1a73e8;
+$selection_color_dark: #8ab4f8;
+$range_fill: rgba(26, 115, 232, 0.12);
+$range_fill_dark: rgba(138, 180, 248, 0.18);
+$cell_bg_dark: #111827;
+$row_height: 32px;
+$letter_row_height: 22px;
+$cell_font_size: 12px;
+
+@mixin dark {
+  :global(.dark) & {
+    @content;
+  }
+}
+
+// ── Formula bar ────────────────────────────────────────────────────────────────
+
+.formula_bar {
+  display: flex;
+  align-items: stretch;
+  min-height: 30px;
+  border-bottom: 1px solid $grid_line;
+  background: #fff;
+  font-size: $cell_font_size;
+
+  @include dark {
+    border-bottom-color: $grid_line_dark;
+    background: $cell_bg_dark;
+  }
+}
+
+.name_box {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  width: 110px;
+  padding: 0 10px;
+  border-right: 1px solid $grid_line;
+  color: $header_text;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  @include dark {
+    border-right-color: $grid_line_dark;
+    color: $header_text_dark;
+  }
+}
+
+.formula_icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  padding: 0 10px;
+  border-right: 1px solid $grid_line;
+  color: #9aa0a6;
+  font-style: italic;
+  font-weight: 600;
+  font-family: Georgia, "Times New Roman", serif;
+
+  @include dark {
+    border-right-color: $grid_line_dark;
+  }
+}
+
+.formula_value {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  padding: 0 10px;
+  color: #1f1f1f;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  @include dark {
+    color: #e5e7eb;
+  }
+}
+
+.formula_placeholder {
+  color: #9aa0a6;
+  font-style: italic;
+}
+
+.range_stats {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 14px;
+  padding: 0 12px;
+  border-left: 1px solid $grid_line;
+  color: $header_text;
+  white-space: nowrap;
+
+  strong {
+    font-weight: 600;
+    color: #1f1f1f;
+  }
+
+  @include dark {
+    border-left-color: $grid_line_dark;
+    color: $header_text_dark;
+
+    strong {
+      color: #e5e7eb;
+    }
+  }
+}
+
+// ── Scroll container ───────────────────────────────────────────────────────────
+
+.grid_container {
+  outline: none;
+  background: #fff;
+
+  @include dark {
+    background: $cell_bg_dark;
+  }
+
+  // Keyboard users see a thin ring when the grid itself has focus.
+  &:focus-visible {
+    box-shadow: inset 0 0 0 2px rgba(26, 115, 232, 0.35);
+  }
+}
+
+// ── Table and grid lines ───────────────────────────────────────────────────────
+
+.grid_table {
+  // "separate" keeps every cell's borders attached to it, so the grid lines
+  // stay visible on frozen (sticky) columns and the sticky header while scrolling.
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: $cell_font_size;
+
+  th,
+  td {
+    border-style: solid;
+    border-width: 0 1px 1px 0;
+  }
+
+  th {
+    border-color: rgba(0, 0, 0, 0.14);
+  }
+
+  tbody td {
+    height: $row_height;
+    border-color: $grid_line;
+    vertical-align: middle;
+
+    @include dark {
+      border-color: $grid_line_dark;
+    }
+  }
+}
+
+// ── Column letters (A, B, C) and row numbers ───────────────────────────────────
+
+.letter_row th {
+  height: $letter_row_height;
+  padding: 0 4px;
+  background: $header_bg;
+  color: $header_text;
+  font-size: 11px;
+  font-weight: 500;
+  text-align: center;
+  border-color: $grid_line;
+  cursor: pointer;
+  user-select: none;
+
+  &:hover {
+    background: #eef0f2;
+  }
+
+  @include dark {
+    background: $header_bg_dark;
+    color: $header_text_dark;
+    border-color: $grid_line_dark;
+
+    &:hover {
+      background: #273244;
+    }
+  }
+}
+
+.corner_header {
+  cursor: default !important;
+}
+
+.header_highlighted {
+  background: $header_active_bg !important;
+  color: $header_active_text !important;
+  font-weight: 700 !important;
+
+  @include dark {
+    background: $header_active_bg_dark !important;
+    color: $header_active_text_dark !important;
+  }
+}
+
+.row_header {
+  padding: 0 4px;
+  background: $header_bg;
+  color: $header_text;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+
+  &:hover {
+    background: #eef0f2;
+  }
+
+  @include dark {
+    background: $header_bg_dark;
+    color: $header_text_dark;
+
+    &:hover {
+      background: #273244;
+    }
+  }
+}
+
+// ── Cells ──────────────────────────────────────────────────────────────────────
+
+.cell {
+  padding: 0 8px;
+  cursor: cell;
+}
+
+.cell_numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+// Light blue fill for every cell inside a drag / Shift selected range.
+.cell_in_range {
+  background-color: $range_fill !important;
+
+  @include dark {
+    background-color: $range_fill_dark !important;
+  }
+}
+
+// The active cell: the one the arrow keys move and Enter edits. Drawn with an
+// inset shadow so it does not change the cell size or shift its neighbors.
+.cell_active {
+  box-shadow: inset 0 0 0 2px $selection_color;
+
+  @include dark {
+    box-shadow: inset 0 0 0 2px $selection_color_dark;
+  }
+
+  // Like Sheets, the active cell inside a range keeps a plain background so
+  // it stays easy to spot.
+  &.cell_in_range {
+    background-color: #fff !important;
+
+    @include dark {
+      background-color: $cell_bg_dark !important;
+    }
+  }
+}
+
+.cell_editing {
+  padding: 0;
+}
+
+.cell_input {
+  display: block;
+  width: 100%;
+  height: $row_height - 1px;
+  padding: 0 7px;
+  border: 2px solid $selection_color;
+  background: #fff;
+  font-size: $cell_font_size;
+  outline: none;
+  box-shadow: 0 2px 6px rgba(26, 115, 232, 0.25);
+
+  @include dark {
+    border-color: $selection_color_dark;
+    background: #1f2937;
+    color: #fff;
+  }
+}

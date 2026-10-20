@@ -160,7 +160,7 @@ describe("unassigned state", () => {
 // ─── Interaction ──────────────────────────────────────────────────────────────
 
 describe("cell interaction", () => {
-  it("calls onStartEdit when the cell is clicked in display mode", () => {
+  it("calls onStartEdit when the cell is double clicked in display mode", () => {
     const on_start_edit = jest.fn();
 
     renderCell({
@@ -169,9 +169,28 @@ describe("cell interaction", () => {
       client_users: [makeClient()],
     });
 
-    fireEvent.click(screen.getByTitle("Click to assign a client account"));
+    fireEvent.doubleClick(screen.getByTitle("Double click or press Enter to assign a client account"));
 
     expect(on_start_edit).toHaveBeenCalledTimes(1);
+  });
+
+  it("selects the cell on mouse down without opening the picker", () => {
+    const on_start_edit = jest.fn();
+    const on_select_cell = jest.fn();
+
+    renderCell({
+      is_editing:   false,
+      onStartEdit:  on_start_edit,
+      onSelectCell: on_select_cell,
+      client_users: [makeClient()],
+    });
+
+    const cell = screen.getByTitle("Double click or press Enter to assign a client account");
+    fireEvent.mouseDown(cell);
+    fireEvent.click(cell);
+
+    expect(on_select_cell).toHaveBeenCalledTimes(1);
+    expect(on_start_edit).not.toHaveBeenCalled();
   });
 
   it("does not call onStartEdit when already in editing mode", () => {
@@ -184,7 +203,7 @@ describe("cell interaction", () => {
       onStartEdit:  on_start_edit,
     });
 
-    fireEvent.click(screen.getByTitle("Click to assign a client account"));
+    fireEvent.doubleClick(screen.getByTitle("Double click or press Enter to assign a client account"));
 
     expect(on_start_edit).not.toHaveBeenCalled();
   });

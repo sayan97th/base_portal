@@ -1,6 +1,7 @@
 import React, { useRef } from "react";
 import type { ClientUserOption } from "@/services/admin/link-building-dashboard.service";
 import ClientSearchableSelect from "./ClientSearchableSelect";
+import styles from "./LinkBuildingOrdersTable.module.scss";
 
 export interface ClientAssignCellProps {
   user_id: number | null | undefined;
@@ -9,6 +10,12 @@ export interface ClientAssignCellProps {
   onStartEdit: () => void;
   onAssignClient: (value: string) => void;
   onCancelEdit: () => void;
+  /** True when this is the spreadsheet's active (keyboard selected) cell. */
+  is_active?: boolean;
+  /** Mouse down on the cell, makes it the active cell without opening the picker. */
+  onSelectCell?: () => void;
+  /** Lookup key the table uses to scroll this cell into view during keyboard navigation. */
+  cell_key?: string;
 }
 
 export default function ClientAssignCell({
@@ -18,6 +25,9 @@ export default function ClientAssignCell({
   onStartEdit,
   onAssignClient,
   onCancelEdit,
+  is_active = false,
+  onSelectCell,
+  cell_key,
 }: ClientAssignCellProps) {
   const cell_ref = useRef<HTMLTableCellElement>(null);
   const selected_client = client_users.find(
@@ -28,14 +38,18 @@ export default function ClientAssignCell({
     <>
       <td
         ref={cell_ref}
-        className={`cursor-pointer whitespace-nowrap px-2 py-1.5 text-xs transition-colors ${
+        data-cell-key={cell_key}
+        className={`${styles.cell} whitespace-nowrap text-xs transition-colors ${
           is_editing
             ? "bg-teal-50 ring-2 ring-inset ring-teal-400 dark:bg-teal-900/20 dark:ring-teal-600"
-            : "hover:bg-teal-50 dark:hover:bg-teal-900/20"
+            : is_active
+              ? styles.cell_active
+              : ""
         }`}
         style={{ minWidth: 200 }}
-        onClick={!is_editing ? onStartEdit : undefined}
-        title="Click to assign a client account"
+        onMouseDown={!is_editing ? onSelectCell : undefined}
+        onDoubleClick={!is_editing ? onStartEdit : undefined}
+        title="Double click or press Enter to assign a client account"
       >
         {selected_client ? (
           <span className="inline-flex items-center gap-1.5">

@@ -54,6 +54,18 @@ import RowPresenceIndicator, {
   RowPresenceFloater,
 } from "./RowPresenceIndicator";
 import type { CollaboratorPresence } from "@/types/admin/presence";
+import {
+  computeRangeStats,
+  getTabPosition,
+  isPrintableKey,
+  moveGridPosition,
+  scrollCellIntoView,
+  toCellAddress,
+  toColumnLetter,
+  type GridDirection,
+  type GridPosition,
+} from "@/lib/spreadsheet-navigation";
+import styles from "./LinkBuildingOrdersTable.module.scss";
 
 // ── Column types ───────────────────────────────────────────────────────────────
 
@@ -85,6 +97,38 @@ interface ColumnDef {
 
 /** Identifies a single cell by row + column key, used by the Excel-style range selection. */
 type CellRef = { row_id: string; col_key: string };
+
+/** Where keyboard focus goes after a cell edit is committed: Tab/Shift+Tab wrap
+ * across rows, Enter/Shift+Enter and the arrow keys move one cell without wrapping. */
+type CellNavDirection = "next" | "prev" | GridDirection;
+
+/** How a cell entered edit mode. "type" started from a printable key press, so the
+ * arrow keys commit and move like Excel's Enter mode. "edit" came from a double
+ * click, Enter or F2, so the arrow keys move the caret inside the text instead. */
+type CellEditEntry = "edit" | "type";
+
+/** Cell keys after the data columns that are still part of keyboard navigation. */
+const ASSIGNMENT_COLUMN_KEYS = ["user_id", "assigned_admin_user_id"] as const;
+
+const ASSIGNMENT_COLUMN_LABELS: Record<string, string> = {
+  user_id: "Client Account",
+  assigned_admin_user_id: "Assigned To",
+};
+
+const ARROW_KEY_DIRECTIONS: Record<string, GridDirection> = {
+  ArrowUp: "up",
+  ArrowDown: "down",
+  ArrowLeft: "left",
+  ArrowRight: "right",
+};
+
+/** Rows moved by PageUp / PageDown. */
+const PAGE_NAVIGATION_STEP = 10;
+
+/** Stable lookup key written to each cell's data-cell-key, used to scroll it into view. */
+function toCellKey(row_id: string, col_key: string): string {
+  return `${row_id}:${col_key}`;
+}
 
 /** A single field's before/after value, recorded for the undo/redo history stack. */
 type CellHistoryValue = string | number | null;
@@ -171,7 +215,9 @@ const COLUMN_LABELS: Record<string, string> = Object.fromEntries(
   COLUMNS.map((col) => [col.key, col.label])
 );
 
-// Fixed pixel width of the checkbox column, used to compute sticky left offsets.
+// Fixed pixel widths of the row number gutter and the checkbox column, used to
+// compute sticky left offsets.
+const ROW_HEADER_WIDTH = 46;
 const CHECKBOX_COL_WIDTH = 40;
 
 // ── Group header styles ────────────────────────────────────────────────────────
@@ -315,6 +361,9 @@ interface UserAssignCellProps {
   onStartEdit: () => void;
   onAssignUser: (value: string) => void;
   onCancelEdit: () => void;
+  is_active?: boolean;
+  onSelectCell?: () => void;
+  cell_key?: string;
 }
 
 function UserAssignCell({
@@ -324,6 +373,9 @@ function UserAssignCell({
   onStartEdit,
   onAssignUser,
   onCancelEdit,
+  is_active = false,
+  onSelectCell,
+  cell_key,
 }: UserAssignCellProps) {
   const cell_ref = useRef<HTMLTableCellElement>(null);
   const selected_user = admin_users.find(
@@ -334,14 +386,18 @@ function UserAssignCell({
     <>
       <td
         ref={cell_ref}
-        className={`cursor-pointer whitespace-nowrap px-2 py-1.5 text-xs transition-colors ${
+        data-cell-key={cell_key}
+        className={`${styles.cell} whitespace-nowrap text-xs transition-colors ${
           is_editing
             ? "bg-indigo-50 ring-2 ring-inset ring-indigo-400 dark:bg-indigo-900/20 dark:ring-indigo-600"
-            : "hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+            : is_active
+              ? styles.cell_active
+              : ""
         }`}
         style={{ minWidth: 180 }}
-        onClick={!is_editing ? onStartEdit : undefined}
-        title="Click to assign a team member"
+        onMouseDown={!is_editing ? onSelectCell : undefined}
+        onDoubleClick={!is_editing ? onStartEdit : undefined}
+        title="Double click or press Enter to assign a team member"
       >
         {selected_user ? (
           <span className="inline-flex items-center gap-1.5">
@@ -404,7 +460,17 @@ interface EditableCellProps {
   cell_editors?: CollaboratorPresence[];
   onUpdate: (value: string) => void;
   onStopEdit: () => void;
-  onKeyNav: (direction: "next" | "prev" | "down") => void;
+  /** Escape: discards the in-progress edit and restores the value the cell had before. */
+  onCancelEdit: () => void;
+  onKeyNav: (direction: CellNavDirection) => void;
+  /** How editing started, see CellEditEntry. Only meaningful while is_editing. */
+  edit_entry?: CellEditEntry;
+  /** True when this is the spreadsheet's active (keyboard selected) cell. */
+  is_active?: boolean;
+  /** Double click on the display cell, opens it for editing. */
+  onCellDoubleClick?: () => void;
+  /** Lookup key the table uses to scroll this cell into view during keyboard navigation. */
+  cell_key?: string;
   /** When provided, shows a copy-to-clipboard icon on cell hover. */
   onCopy?: (value: string) => void;
   /** Fires when a multi-cell (tab/newline delimited) block is pasted into this cell's input. */
@@ -433,7 +499,12 @@ function EditableCell({
   cell_editors = [],
   onUpdate,
   onStopEdit,
+  onCancelEdit,
   onKeyNav,
+  edit_entry = "edit",
+  is_active = false,
+  onCellDoubleClick,
+  cell_key,
   onCopy,
   onBulkPaste,
   onCellMouseDown,
@@ -492,23 +563,50 @@ function EditableCell({
     setWasEditing(is_editing);
     if (is_editing) {
       if (highlighted_idx !== -1) setHighlightedIdx(-1);
-      if (has_typed) setHasTyped(false);
+      // Editing started by typing a character already holds typed text, so a
+      // select-type cell filters its options by it right away.
+      const starts_typed = edit_entry === "type";
+      if (has_typed !== starts_typed) setHasTyped(starts_typed);
     }
   }
 
   useEffect(() => {
-    if (is_editing) {
-      input_ref.current?.focus();
-      input_ref.current?.select();
+    if (!is_editing) return;
+    const input_el = input_ref.current;
+    if (!input_el) return;
+    input_el.focus();
+    if (edit_entry === "type") {
+      // Keep the caret after the character that started the edit, so the next
+      // keystroke appends to it instead of replacing it.
+      const end = input_el.value.length;
+      input_el.setSelectionRange(end, end);
+    } else {
+      input_el.select();
     }
+    // edit_entry is fixed for the lifetime of one edit, it only matters on entry.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [is_editing]);
 
+  /** Arrow keys commit and move only when the edit started from typing (Excel's Enter mode). */
+  const handleArrowCommit = (e: React.KeyboardEvent, allowed: ReadonlyArray<GridDirection>): boolean => {
+    if (edit_entry !== "type") return false;
+    const direction = ARROW_KEY_DIRECTIONS[e.key];
+    if (!direction || !allowed.includes(direction)) return false;
+    e.preventDefault();
+    onStopEdit();
+    onKeyNav(direction);
+    return true;
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (handleArrowCommit(e, ["up", "down", "left", "right"])) return;
     if (e.key === "Escape") {
-      onStopEdit();
+      e.preventDefault();
+      onCancelEdit();
     } else if (e.key === "Enter") {
+      e.preventDefault();
       onStopEdit();
-      onKeyNav("down");
+      onKeyNav(e.shiftKey ? "up" : "down");
     } else if (e.key === "Tab") {
       e.preventDefault();
       onStopEdit();
@@ -544,6 +642,8 @@ function EditableCell({
       };
 
       const handleComboboxKeyDown = (e: React.KeyboardEvent) => {
+        // Up/Down always drive the options list, Left/Right can still commit and move.
+        if (handleArrowCommit(e, ["left", "right"])) return;
         if (e.key === "ArrowDown") {
           e.preventDefault();
           setHighlightedIdx((prev) => Math.min(prev + 1, dropdown_items.length - 1));
@@ -555,7 +655,8 @@ function EditableCell({
           return;
         }
         if (e.key === "Escape") {
-          onStopEdit();
+          e.preventDefault();
+          onCancelEdit();
           return;
         }
         if (e.key === "Enter") {
@@ -565,7 +666,7 @@ function EditableCell({
           } else {
             onStopEdit();
           }
-          onKeyNav("down");
+          onKeyNav(e.shiftKey ? "up" : "down");
           return;
         }
         if (e.key === "Tab") {
@@ -582,8 +683,9 @@ function EditableCell({
       return (
         <td
           ref={setComboboxAnchorEl}
-          className={`p-0${is_sticky ? ` ${sticky_bg_class}` : ""}`}
-          style={is_sticky ? { position: "sticky", left: sticky_left, zIndex: 1 } : undefined}
+          data-cell-key={cell_key}
+          className={`${styles.cell_editing}${is_sticky ? ` ${sticky_bg_class}` : ""}`}
+          style={is_sticky ? { position: "sticky", left: sticky_left, zIndex: 3 } : undefined}
         >
           <input
             ref={input_ref}
@@ -597,7 +699,7 @@ function EditableCell({
             onBlur={onStopEdit}
             onKeyDown={handleComboboxKeyDown}
             onPaste={handleInputPaste}
-            className="h-full w-full border-2 border-brand-500 bg-white px-2 py-1.5 text-xs outline-none dark:bg-gray-800 dark:text-white"
+            className={styles.cell_input}
             style={{ minWidth: col.min_width }}
           />
           <CellOptionsDropdown
@@ -615,8 +717,9 @@ function EditableCell({
 
     return (
       <td
-        className={`p-0${is_sticky ? ` ${sticky_bg_class}` : ""}`}
-        style={is_sticky ? { position: "sticky", left: sticky_left, zIndex: 1 } : undefined}
+        data-cell-key={cell_key}
+        className={`${styles.cell_editing}${is_sticky ? ` ${sticky_bg_class}` : ""}`}
+        style={is_sticky ? { position: "sticky", left: sticky_left, zIndex: 3 } : undefined}
       >
         <input
           ref={input_ref}
@@ -626,7 +729,7 @@ function EditableCell({
           onBlur={onStopEdit}
           onKeyDown={handleKeyDown}
           onPaste={handleInputPaste}
-          className="h-full w-full border-2 border-brand-500 bg-white px-2 py-1.5 text-xs outline-none dark:bg-gray-800 dark:text-white"
+          className={styles.cell_input}
           style={{ minWidth: col.min_width }}
         />
       </td>
@@ -707,13 +810,16 @@ function EditableCell({
 
   return (
     <td
-      className={`group/cell relative cursor-pointer select-none whitespace-nowrap px-2 py-1.5 text-xs text-gray-700 transition-colors dark:text-gray-300 ${
+      data-cell-key={cell_key}
+      className={`group/cell relative select-none whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 ${styles.cell}${
+        col.type === "number" ? ` ${styles.cell_numeric}` : ""
+      }${is_range_selected ? ` ${styles.cell_in_range}` : ""}${is_active ? ` ${styles.cell_active}` : ""} ${
         is_required_error
-          ? "bg-red-50/80 ring-1 ring-inset ring-red-300 hover:bg-red-100/60 dark:bg-red-900/20 dark:ring-red-700"
-          : is_range_selected
-            ? "bg-indigo-100 ring-1 ring-inset ring-indigo-300 dark:bg-indigo-900/40 dark:ring-indigo-600"
-            : `hover:bg-blue-50 dark:hover:bg-blue-900/20${is_sticky ? ` ${sticky_bg_class}` : ""}`
-      }${is_sticky && show_shadow ? " shadow-[4px_0_6px_-3px_rgba(0,0,0,0.35)]" : ""}`}
+          ? "bg-red-50/80 ring-1 ring-inset ring-red-300 dark:bg-red-900/20 dark:ring-red-700"
+          : is_sticky
+            ? sticky_bg_class
+            : ""
+      }${is_sticky && show_shadow && !is_active ? " shadow-[4px_0_6px_-3px_rgba(0,0,0,0.35)]" : ""}`}
       style={{
         ...(has_cell_editors
           ? { outline: `2px solid ${cell_editors[0].color}`, outlineOffset: "-2px" }
@@ -729,7 +835,8 @@ function EditableCell({
       }}
       onMouseEnter={onCellMouseEnter}
       onMouseUp={onCellMouseUp}
-      title={is_required_error ? `Required: ${col.label} must be filled to save this row` : "Click to edit · Click+drag to select multiple cells · Ctrl+C to copy · Ctrl+V to paste"}
+      onDoubleClick={onCellDoubleClick}
+      title={is_required_error ? `Required: ${col.label} must be filled to save this row` : "Double click, Enter or start typing to edit · Arrow keys to move · Shift+Arrow or drag to select · Ctrl+C / Ctrl+V to copy and paste"}
     >
       {show_row_floater && <RowPresenceFloater editors={row_editors} />}
       {has_cell_editors && <CellPresenceOverlay editors={cell_editors} />}
@@ -867,6 +974,11 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   /** In-memory copy of the last range copied from this table, used as a fallback for Ctrl+V when the OS clipboard can't be read. */
   const [range_clipboard, setRangeClipboard] = useState<PastedGrid | null>(null);
 
+  // ── Spreadsheet keyboard navigation ─────────────────────────────────────────
+  /** The selected cell the arrow keys move and Enter / F2 / typing opens for editing. */
+  const [active_cell, setActiveCell] = useState<CellRef | null>(null);
+  const [edit_entry, setEditEntry] = useState<CellEditEntry>("edit");
+
   // ── Undo / redo history ──────────────────────────────────────────────────────
   const [undo_stack, setUndoStack] = useState<HistoryEntry[]>([]);
   const [redo_stack, setRedoStack] = useState<HistoryEntry[]>([]);
@@ -910,6 +1022,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
   const range_clipboard_kbd_ref = useRef(range_clipboard);
   range_clipboard_kbd_ref.current = range_clipboard;
+
+  const active_cell_kbd_ref = useRef(active_cell);
+  active_cell_kbd_ref.current = active_cell;
 
   const undo_stack_kbd_ref = useRef(undo_stack);
   undo_stack_kbd_ref.current = undo_stack;
@@ -1125,22 +1240,33 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
   // ── Derived state ───────────────────────────────────────────────────────────
 
-  const visible_columns = COLUMNS.filter((col) => !hidden_columns.has(col.key));
+  const visible_columns = useMemo(
+    () => COLUMNS.filter((col) => !hidden_columns.has(col.key)),
+    [hidden_columns]
+  );
   const filtered_rows = rows;
 
   // Cumulative left offsets for sticky columns (accounts for hidden sticky columns).
-  // Starts after the fixed-width checkbox column.
-  const sticky_left_offsets = useMemo<Record<string, number>>(() => {
+  // Starts after the fixed-width row number gutter and checkbox column. The final
+  // cumulative value is the total frozen width, which keyboard navigation keeps
+  // scrolled cells clear of.
+  const { sticky_left_offsets, frozen_columns_width } = useMemo(() => {
     const offsets: Record<string, number> = {};
-    let cumulative = CHECKBOX_COL_WIDTH;
+    let cumulative = ROW_HEADER_WIDTH + CHECKBOX_COL_WIDTH;
     for (const col of visible_columns) {
       if (col.sticky) {
         offsets[col.key] = cumulative;
         cumulative += col.min_width;
       }
     }
-    return offsets;
+    return { sticky_left_offsets: offsets, frozen_columns_width: cumulative };
   }, [visible_columns]);
+
+  /** Every column the active cell can move through, in on-screen order. */
+  const grid_column_keys = useMemo<string[]>(
+    () => [...visible_columns.map((col) => col.key as string), ...ASSIGNMENT_COLUMN_KEYS],
+    [visible_columns]
+  );
 
   // Key of the rightmost visible sticky column — receives the separator shadow.
   const last_sticky_col_key = useMemo(
@@ -1346,39 +1472,82 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
   // ── Editing ─────────────────────────────────────────────────────────────────
 
-  const startEditing = useCallback((row_id: string, col_key: string) => {
+  const startEditing = useCallback((row_id: string, col_key: string, entry: CellEditEntry = "edit") => {
     const row = rows_ref.current.find((r) => r.id === row_id);
     edit_start_value_ref.current = row
       ? { row_id, col_key, old_value: String(row[col_key as keyof LinkBuildingOrderRow] ?? "") }
       : null;
+    // Set eagerly so a second key press landing before the next render is not
+    // treated as another "start editing" from the grid.
+    editing_cell_ref.current = { row_id, col_key };
+    setEditEntry(entry);
+    setActiveCell({ row_id, col_key });
     setEditingCell({ row_id, col_key });
   }, []);
 
-  // ── Excel-style drag-to-select ───────────────────────────────────────────────
-  // A plain click (mouse down + up on the same cell, no movement in between) opens
-  // the cell for editing, exactly as before. Moving the pointer to a different cell
-  // while the button is held turns the gesture into a rectangular range selection
-  // instead, so the click-to-edit behavior every admin already relies on is unchanged.
+  /** Returns keyboard focus to the grid so the arrow keys keep working after an edit. */
+  const focusGrid = useCallback(() => {
+    table_scroll_ref.current?.focus({ preventScroll: true });
+  }, []);
+
+  /** Scrolls a cell into view, clear of the sticky header and the frozen columns. */
+  const scrollToCell = useCallback(
+    (cell: CellRef) => {
+      const container = table_scroll_ref.current;
+      if (!container) return;
+      const cell_el = container.querySelector<HTMLElement>(
+        `[data-cell-key="${CSS.escape(toCellKey(cell.row_id, cell.col_key))}"]`
+      );
+      if (!cell_el) return;
+      const header_height = container.querySelector("thead")?.getBoundingClientRect().height ?? 0;
+      const is_frozen_column = COLUMNS.some((col) => col.key === cell.col_key && col.sticky);
+      scrollCellIntoView(
+        container,
+        cell_el,
+        { top: header_height, left: frozen_columns_width },
+        is_frozen_column
+      );
+    },
+    [frozen_columns_width]
+  );
+
+  /** Makes a cell the active cell, dropping any range selection, like a plain click in Sheets. */
+  const selectCell = useCallback(
+    (cell: CellRef, options: { scroll?: boolean } = {}) => {
+      setActiveCell(cell);
+      setCellRange(null);
+      if (!new_row_ids_ref.current.has(cell.row_id)) setSelectedRowId(cell.row_id);
+      if (options.scroll) scrollToCell(cell);
+    },
+    [scrollToCell]
+  );
+
+  // ── Excel-style click and drag-to-select ─────────────────────────────────────
+  // Like a spreadsheet, a plain click selects the cell (it becomes the active cell
+  // the arrow keys move from) and a double click, Enter, F2 or typing opens it for
+  // editing. Moving the pointer to a different cell while the button is held turns
+  // the gesture into a rectangular range selection anchored at the clicked cell.
 
   const handleCellMouseDown = useCallback((row_id: string, col_key: string, shift_key: boolean) => {
-    // Shift+Click extends the range from an existing anchor — either an already
-    // active range, or (the common case) the single cell that was just clicked
-    // into edit mode — falling back to a fresh one-cell range only when neither
-    // exists yet. A discrete action, not the start of a drag.
+    // Shift+Click extends the range from an existing anchor (an already active
+    // range, the cell being edited, or the active cell), falling back to a fresh
+    // one-cell range only when none exists yet. A discrete action, not a drag.
     if (shift_key) {
       const existing_range_anchor = cell_range_kbd_ref.current?.anchor;
       const editing_anchor = editing_cell_ref.current
         ? { row_id: editing_cell_ref.current.row_id, col_key: editing_cell_ref.current.col_key }
         : null;
-      const anchor = existing_range_anchor ?? editing_anchor ?? { row_id, col_key };
+      const anchor = existing_range_anchor ?? editing_anchor ?? active_cell_kbd_ref.current ?? { row_id, col_key };
 
       setEditingCell(null);
+      setActiveCell(anchor);
       setCellRange({ anchor, focus: { row_id, col_key } });
       return;
     }
+    selectCell({ row_id, col_key });
     range_mouse_down_ref.current = { row_id, col_key };
     range_dragged_ref.current = false;
-  }, []);
+  }, [selectCell]);
 
   const handleCellMouseEnter = useCallback((row_id: string, col_key: string) => {
     const start = range_mouse_down_ref.current;
@@ -1397,18 +1566,17 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     const start = range_mouse_down_ref.current;
     range_mouse_down_ref.current = null;
     if (!start) return;
-    if (!range_dragged_ref.current) {
-      // No movement occurred — treat it as a normal click-to-edit and drop any
-      // previously selected range, matching spreadsheet click behavior.
-      setCellRange(null);
-      startEditing(start.row_id, start.col_key);
-    }
+    // A click without movement already selected the cell on mouse down, so only
+    // the drag bookkeeping needs resetting here.
     range_dragged_ref.current = false;
-  }, [startEditing]);
+  }, []);
 
   const stopEditing = useCallback(() => {
     const cell = editing_cell_ref.current;
     if (!cell) return;
+    // Cleared eagerly so the input's blur, which can fire while the grid takes
+    // focus back in this same tick, does not persist the row a second time.
+    editing_cell_ref.current = null;
     setEditingCell(null);
 
     const row = rows_ref.current.find((r) => r.id === cell.row_id);
@@ -1459,31 +1627,54 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     []
   );
 
-  const navigateCell = useCallback(
-    (row_id: string, col_key: string, direction: "next" | "prev" | "down") => {
-      const col_idx = visible_columns.findIndex((c) => c.key === col_key);
-      const row_idx = filtered_rows.findIndex((r) => r.id === row_id);
+  /** Escape while editing: puts the original value back and leaves the cell selected, nothing is saved. */
+  const cancelEditing = useCallback(() => {
+    const cell = editing_cell_ref.current;
+    if (!cell) return;
+    const edit_start = edit_start_value_ref.current;
+    editing_cell_ref.current = null;
+    edit_start_value_ref.current = null;
+    setEditingCell(null);
 
-      if (direction === "next") {
-        const next_col = visible_columns[col_idx + 1];
-        if (next_col) {
-          setEditingCell({ row_id, col_key: next_col.key });
-        } else if (filtered_rows[row_idx + 1]) {
-          setEditingCell({
-            row_id: filtered_rows[row_idx + 1].id,
-            col_key: visible_columns[0].key,
-          });
-        }
-      } else if (direction === "prev") {
-        const prev_col = visible_columns[col_idx - 1];
-        if (prev_col) setEditingCell({ row_id, col_key: prev_col.key });
-      } else if (direction === "down") {
-        if (filtered_rows[row_idx + 1]) {
-          setEditingCell({ row_id: filtered_rows[row_idx + 1].id, col_key });
-        }
-      }
+    if (edit_start && edit_start.row_id === cell.row_id && edit_start.col_key === cell.col_key) {
+      updateCell(cell.row_id, cell.col_key as keyof LinkBuildingOrderRow, edit_start.old_value);
+    }
+    focusGrid();
+  }, [updateCell, focusGrid]);
+
+  /** Converts a cell reference to its grid position, or null when it is not on screen. */
+  const toGridPosition = useCallback(
+    (cell: CellRef): GridPosition | null => {
+      const row_idx = filtered_rows.findIndex((r) => r.id === cell.row_id);
+      const col_idx = grid_column_keys.indexOf(cell.col_key);
+      return row_idx === -1 || col_idx === -1 ? null : { row_idx, col_idx };
     },
-    [visible_columns, filtered_rows]
+    [filtered_rows, grid_column_keys]
+  );
+
+  const toCellRef = useCallback(
+    (position: GridPosition): CellRef => ({
+      row_id: filtered_rows[position.row_idx].id,
+      col_key: grid_column_keys[position.col_idx],
+    }),
+    [filtered_rows, grid_column_keys]
+  );
+
+  /** Moves the active cell after an edit is committed with Enter, Tab or an arrow key. */
+  const navigateCell = useCallback(
+    (row_id: string, col_key: string, direction: CellNavDirection) => {
+      const position = toGridPosition({ row_id, col_key });
+      if (!position) return;
+      const size = { row_count: filtered_rows.length, col_count: grid_column_keys.length };
+      const next_position =
+        direction === "next" || direction === "prev"
+          ? getTabPosition(position, direction === "prev", size)
+          : moveGridPosition(position, direction, size);
+
+      selectCell(toCellRef(next_position), { scroll: true });
+      focusGrid();
+    },
+    [filtered_rows.length, grid_column_keys.length, toGridPosition, toCellRef, selectCell, focusGrid]
   );
 
   // ── Add / Delete ────────────────────────────────────────────────────────────
@@ -1501,9 +1692,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     setShowAddMenu(false);
     setTimeout(() => {
       table_scroll_ref.current?.scrollTo({ top: 0, behavior: "smooth" });
-      if (new_rows[0]) setEditingCell({ row_id: new_rows[0].id, col_key: "client" });
+      if (new_rows[0]) startEditing(new_rows[0].id, "client");
     }, 50);
-  }, []);
+  }, [startEditing]);
 
   const addRow = useCallback(() => {
     addMultipleRows(1);
@@ -1549,6 +1740,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
     setRows((prev) => prev.map((r) => (r.id === row_id ? updated_row : r)));
     setEditingCell(null);
+    focusGrid();
 
     if (new_row_ids_ref.current.has(row_id)) {
       persistNewRow(updated_row);
@@ -1561,7 +1753,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       }
       persistRowUpdate(updated_row, "assigned_admin_user_id");
     }
-  }, [persistNewRow, persistRowUpdate, pushHistoryEntry]);
+  }, [persistNewRow, persistRowUpdate, pushHistoryEntry, focusGrid]);
 
   const cancelAssignEdit = useCallback(() => {
     setEditingCell(null);
@@ -1579,6 +1771,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
     setRows((prev) => prev.map((r) => (r.id === row_id ? updated_row : r)));
     setEditingCell(null);
+    focusGrid();
 
     if (new_row_ids_ref.current.has(row_id)) {
       persistNewRow(updated_row);
@@ -1591,7 +1784,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       }
       persistRowUpdate(updated_row, "user_id");
     }
-  }, [persistNewRow, persistRowUpdate, pushHistoryEntry]);
+  }, [persistNewRow, persistRowUpdate, pushHistoryEntry, focusGrid]);
 
   // ── Column visibility ───────────────────────────────────────────────────────
 
@@ -1796,7 +1989,15 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
   // ── Bulk grid paste: fills a rectangular block of cells from clipboard data ──
 
-  const handleBulkPaste = useCallback(async (start_row_id: string, start_col_key: string, grid: PastedGrid) => {
+  // Delete / Backspace on a selection reuses this same path with a grid of empty
+  // strings (operation "clear"), so clearing cells gets the same locked column
+  // rules, batch save and undo history as a paste.
+  const handleBulkPaste = useCallback(async (
+    start_row_id: string,
+    start_col_key: string,
+    grid: PastedGrid,
+    operation: "paste" | "clear" = "paste"
+  ) => {
     const start_row_index = filtered_rows.findIndex((r) => r.id === start_row_id);
     const start_col_index = visible_columns.findIndex((c) => c.key === start_col_key);
     if (start_row_index === -1 || start_col_index === -1) return;
@@ -1898,16 +2099,26 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         setRows((prev) => prev.map((r) => updated_by_id.get(r.id) ?? r));
         on_order_mutated_ref.current?.();
         refreshNeedsApprovalCount();
-        pushHistoryEntry(history_changes, "bulk paste");
+        pushHistoryEntry(history_changes, operation === "clear" ? "clear cells" : "bulk paste");
       } catch (err) {
         const api_message = parseApiErrorMessage(err, COLUMN_LABELS);
-        setSaveError(`Bulk paste failed to save: ${api_message}`);
+        setSaveError(
+          operation === "clear"
+            ? `Clearing cells failed to save: ${api_message}`
+            : `Bulk paste failed to save: ${api_message}`
+        );
       } finally {
         setIsBatchSaving(false);
       }
     }
 
     const row_count = changed_row_ids.length;
+    if (operation === "clear") {
+      setNotificationBanner(
+        `Cleared ${changed_cell_count} cell${changed_cell_count !== 1 ? "s" : ""} across ${row_count} row${row_count !== 1 ? "s" : ""}.`
+      );
+      return;
+    }
     setNotificationBanner(
       `Pasted ${changed_cell_count} cell${changed_cell_count !== 1 ? "s" : ""} across ${row_count} row${row_count !== 1 ? "s" : ""}.` +
       (overflow_row_count > 0 ? ` ${overflow_row_count} row(s) beyond the visible table were skipped.` : "")
@@ -1976,6 +2187,73 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
     handleBulkPaste(start_row.id, start_col.key, grid);
   }, [filtered_rows, visible_columns, handleBulkPaste]);
+
+  /** Ctrl+V on the active cell with no range: pastes the OS clipboard starting at that cell. */
+  const pasteIntoActiveCell = useCallback(async () => {
+    const cell = active_cell_kbd_ref.current;
+    if (!cell || !visible_columns.some((col) => col.key === cell.col_key)) return;
+
+    let grid: PastedGrid | null = null;
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) grid = parsePastedGrid(text);
+    } catch {
+      // Blocked by the browser's clipboard-read permission, fall back below.
+    }
+    if (!grid) grid = range_clipboard_kbd_ref.current;
+    if (!grid) return;
+
+    handleBulkPaste(cell.row_id, cell.col_key, grid);
+  }, [visible_columns, handleBulkPaste]);
+
+  /** Delete / Backspace: empties every cell of the selected range, or just the active cell. */
+  const clearSelectedCells = useCallback(() => {
+    const bounds = range_bounds_kbd_ref.current;
+    if (bounds) {
+      const start_row = filtered_rows[bounds.min_row];
+      const start_col = visible_columns[bounds.min_col];
+      if (!start_row || !start_col) return;
+      const empty_grid = Array.from({ length: bounds.max_row - bounds.min_row + 1 }, () =>
+        Array.from({ length: bounds.max_col - bounds.min_col + 1 }, () => "")
+      );
+      handleBulkPaste(start_row.id, start_col.key, empty_grid, "clear");
+      return;
+    }
+
+    const cell = active_cell_kbd_ref.current;
+    if (!cell || !visible_columns.some((col) => col.key === cell.col_key)) return;
+    handleBulkPaste(cell.row_id, cell.col_key, [[""]], "clear");
+  }, [filtered_rows, visible_columns, handleBulkPaste]);
+
+  /** Row number click: selects every data cell of that row, like clicking a row header in Sheets. */
+  const selectEntireRow = useCallback((row_id: string) => {
+    const first_col = visible_columns[0];
+    const last_col = visible_columns[visible_columns.length - 1];
+    if (!first_col || !last_col) return;
+    const anchor = { row_id, col_key: first_col.key as string };
+    setEditingCell(null);
+    setActiveCell(anchor);
+    setCellRange({ anchor, focus: { row_id, col_key: last_col.key } });
+    if (!new_row_ids_ref.current.has(row_id)) setSelectedRowId(row_id);
+    focusGrid();
+  }, [visible_columns, focusGrid]);
+
+  /** Column letter click: selects that column for every row on the current page. */
+  const selectEntireColumn = useCallback((col_key: string) => {
+    const first_row = filtered_rows[0];
+    const last_row = filtered_rows[filtered_rows.length - 1];
+    if (!first_row || !last_row) return;
+    const anchor = { row_id: first_row.id, col_key };
+    setEditingCell(null);
+    setActiveCell(anchor);
+    // The assignment columns are not part of range selection, so they only get the active cell.
+    setCellRange(
+      visible_columns.some((col) => col.key === col_key)
+        ? { anchor, focus: { row_id: last_row.id, col_key } }
+        : null
+    );
+    focusGrid();
+  }, [filtered_rows, visible_columns, focusGrid]);
 
   const handleBatchApply = useCallback(async () => {
     if (!batch_field || !batch_value || selected_row_ids.size === 0) return;
@@ -2118,6 +2396,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   // ── Global keyboard shortcuts: Ctrl+C = copy, Ctrl+V = paste, Ctrl+Z = undo, Ctrl+Y / Ctrl+Shift+Z = redo ──
 
   useEffect(() => {
+    const isGridFocused = () =>
+      !!table_scroll_ref.current && table_scroll_ref.current.contains(document.activeElement);
+
     const handleKeyDown = (e: KeyboardEvent) => {
       // Escape drops the active multi-cell range selection (mirrors editing's own
       // Escape handling, which is local to the cell's input and never reaches here).
@@ -2140,7 +2421,10 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
           return;
         }
 
-        if (!cell) return;
+        // Without an open editor, the active cell is copied, but only while the grid
+        // has focus so copying text elsewhere on the page is never hijacked.
+        const copy_cell = cell ?? (isGridFocused() ? active_cell_kbd_ref.current : null);
+        if (!copy_cell) return;
 
         // If the user has text selected inside an input, let the browser handle it
         const active_el = document.activeElement;
@@ -2149,12 +2433,13 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
           if (sel_len > 0) return;
         }
 
-        const row = rows_ref.current.find((r) => r.id === cell.row_id);
+        const row = rows_ref.current.find((r) => r.id === copy_cell.row_id);
         if (!row) return;
-        const value = String(row[cell.col_key as keyof LinkBuildingOrderRow] ?? "");
-        const col_label = COLUMNS.find((c) => c.key === cell.col_key)?.label ?? cell.col_key;
+        const value = String(row[copy_cell.col_key as keyof LinkBuildingOrderRow] ?? "");
+        const col_label = COLUMNS.find((c) => c.key === copy_cell.col_key)?.label ?? copy_cell.col_key;
 
-        setClipboardCell({ value, col_key: cell.col_key });
+        e.preventDefault();
+        setClipboardCell({ value, col_key: copy_cell.col_key });
         navigator.clipboard.writeText(value).catch(() => {});
 
         const short = value.length > 28 ? value.slice(0, 28) + "…" : value;
@@ -2183,10 +2468,6 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
           return;
         }
 
-        const clip = clipboard_cell_kbd_ref.current;
-        const selected = selected_row_ids_kbd_ref.current;
-        if (!clip || selected.size === 0) return;
-
         // Do not override paste when the user is typing inside an input
         const active_el = document.activeElement;
         if (
@@ -2195,8 +2476,18 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
           active_el instanceof HTMLTextAreaElement
         ) return;
 
-        e.preventDefault();
-        handlePasteClipboard();
+        const clip = clipboard_cell_kbd_ref.current;
+        const selected = selected_row_ids_kbd_ref.current;
+        if (clip && selected.size > 0) {
+          e.preventDefault();
+          handlePasteClipboard();
+          return;
+        }
+
+        if (isGridFocused() && active_cell_kbd_ref.current && !editing_cell_ref.current) {
+          e.preventDefault();
+          pasteIntoActiveCell();
+        }
         return;
       }
 
@@ -2224,7 +2515,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [handlePasteClipboard, copyRangeToClipboard, pasteIntoRange, undo, redo]);
+  }, [handlePasteClipboard, copyRangeToClipboard, pasteIntoRange, pasteIntoActiveCell, undo, redo]);
 
   // Opening a cell for editing through any path (Client Account / Assigned To cells,
   // Tab/Enter navigation, etc. — not only the drag handlers above) always drops a
@@ -2337,6 +2628,170 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     }
   }, [selected_row_ids]);
 
+  // ── Spreadsheet keyboard navigation ─────────────────────────────────────────
+  // Handled on the scroll container (not the document), so the arrow keys only
+  // drive the grid while it has focus and never hijack the toolbar inputs. Keys
+  // pressed inside a cell editor or a dropdown are ignored here, those elements
+  // handle their own keys and hand focus back to the grid when they commit.
+
+  const handleGridKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget || editing_cell_ref.current) return;
+    if (filtered_rows.length === 0 || grid_column_keys.length === 0) return;
+
+    const size = { row_count: filtered_rows.length, col_count: grid_column_keys.length };
+    const position = active_cell ? toGridPosition(active_cell) : null;
+    const is_ctrl = e.ctrlKey || e.metaKey;
+    const arrow_direction = ARROW_KEY_DIRECTIONS[e.key];
+
+    // Nothing selected yet (or the active row left the page): the first
+    // navigation key just lands on the top left cell.
+    if (!active_cell || !position) {
+      if (arrow_direction || e.key === "Tab" || e.key === "Enter" || e.key === "Home") {
+        e.preventDefault();
+        selectCell(toCellRef({ row_idx: 0, col_idx: 0 }), { scroll: true });
+      }
+      return;
+    }
+
+    const moveTo = (next_position: GridPosition) => {
+      e.preventDefault();
+      selectCell(toCellRef(next_position), { scroll: true });
+    };
+
+    if (arrow_direction) {
+      if (e.shiftKey) {
+        // Shift+Arrow grows the range from the active cell. Ranges cover the data
+        // columns only, so the assignment columns cannot be range selected.
+        e.preventDefault();
+        if (position.col_idx >= visible_columns.length) return;
+        const range_focus = cell_range ? toGridPosition(cell_range.focus) ?? position : position;
+        const next_focus = moveGridPosition(
+          range_focus,
+          arrow_direction,
+          { row_count: filtered_rows.length, col_count: visible_columns.length },
+          { jump_to_edge: is_ctrl }
+        );
+        const focus_cell = toCellRef(next_focus);
+        setCellRange({ anchor: active_cell, focus: focus_cell });
+        scrollToCell(focus_cell);
+        return;
+      }
+      moveTo(moveGridPosition(position, arrow_direction, size, { jump_to_edge: is_ctrl }));
+      return;
+    }
+
+    switch (e.key) {
+      case "Tab":
+        moveTo(getTabPosition(position, e.shiftKey, size));
+        return;
+      case "Home":
+        moveTo(is_ctrl ? { row_idx: 0, col_idx: 0 } : { row_idx: position.row_idx, col_idx: 0 });
+        return;
+      case "End":
+        moveTo(
+          is_ctrl
+            ? { row_idx: size.row_count - 1, col_idx: size.col_count - 1 }
+            : { row_idx: position.row_idx, col_idx: size.col_count - 1 }
+        );
+        return;
+      case "PageUp":
+        moveTo(moveGridPosition(position, "up", size, { step: PAGE_NAVIGATION_STEP }));
+        return;
+      case "PageDown":
+        moveTo(moveGridPosition(position, "down", size, { step: PAGE_NAVIGATION_STEP }));
+        return;
+      case "Enter":
+      case "F2":
+        e.preventDefault();
+        startEditing(active_cell.row_id, active_cell.col_key);
+        return;
+      case "Delete":
+      case "Backspace":
+        e.preventDefault();
+        clearSelectedCells();
+        return;
+    }
+
+    // Typing a character starts editing and replaces the cell's content with it,
+    // exactly like Excel and Sheets. The assignment cells open their picker instead.
+    if (isPrintableKey(e)) {
+      e.preventDefault();
+      const is_assignment_col = (ASSIGNMENT_COLUMN_KEYS as readonly string[]).includes(active_cell.col_key);
+      if (is_assignment_col) {
+        startEditing(active_cell.row_id, active_cell.col_key);
+        return;
+      }
+      startEditing(active_cell.row_id, active_cell.col_key, "type");
+      updateCell(active_cell.row_id, active_cell.col_key as keyof LinkBuildingOrderRow, e.key);
+    }
+  };
+
+  /** Spreadsheet address of a cell, e.g. "C14". Row numbers follow the server's row offset. */
+  const row_number_offset = from_row ?? 1;
+  const getCellAddress = (cell: CellRef): string | null => {
+    const position = toGridPosition(cell);
+    return position ? toCellAddress(position.col_idx, row_number_offset + position.row_idx) : null;
+  };
+
+  const active_cell_address = active_cell ? getCellAddress(active_cell) : null;
+  const range_focus_address = cell_range ? getCellAddress(cell_range.focus) : null;
+  const name_box_label =
+    active_cell_address && range_focus_address && range_focus_address !== active_cell_address
+      ? `${active_cell_address}:${range_focus_address}`
+      : active_cell_address;
+
+  /** Full value of the active cell for the formula bar (long values are truncated in the grid). */
+  const active_cell_value = useMemo(() => {
+    if (!active_cell) return "";
+    const row = filtered_rows.find((r) => r.id === active_cell.row_id);
+    if (!row) return "";
+    if (active_cell.col_key === "user_id") {
+      const client = client_users.find((u) => row.user_id != null && u.id === Number(row.user_id));
+      return client ? client.company || client.name : "";
+    }
+    if (active_cell.col_key === "assigned_admin_user_id") {
+      const admin = admin_users.find(
+        (u) => row.assigned_admin_user_id != null && u.id === Number(row.assigned_admin_user_id)
+      );
+      return admin ? admin.name : "";
+    }
+    return String(row[active_cell.col_key as keyof LinkBuildingOrderRow] ?? "");
+  }, [active_cell, filtered_rows, client_users, admin_users]);
+
+  const active_column_label = active_cell
+    ? (COLUMN_LABELS[active_cell.col_key] ?? ASSIGNMENT_COLUMN_LABELS[active_cell.col_key] ?? "")
+    : "";
+
+  /** Count / Sum / Average for a multi-cell selection, like the Sheets status bar. */
+  const range_stats = useMemo(() => {
+    if (!range_bounds) return null;
+    const is_single_cell =
+      range_bounds.min_row === range_bounds.max_row && range_bounds.min_col === range_bounds.max_col;
+    if (is_single_cell) return null;
+    const values: string[] = [];
+    for (let r = range_bounds.min_row; r <= range_bounds.max_row; r++) {
+      const row = filtered_rows[r];
+      if (!row) continue;
+      for (let c = range_bounds.min_col; c <= range_bounds.max_col; c++) {
+        const col = visible_columns[c];
+        if (col) values.push(String(row[col.key] ?? ""));
+      }
+    }
+    return computeRangeStats(values);
+  }, [range_bounds, filtered_rows, visible_columns]);
+
+  const active_position = active_cell ? toGridPosition(active_cell) : null;
+
+  /** True when a column letter or row number should be highlighted for the current selection. */
+  const isColumnHighlighted = (col_idx: number) =>
+    range_bounds
+      ? col_idx >= range_bounds.min_col && col_idx <= range_bounds.max_col
+      : active_position?.col_idx === col_idx;
+  const isRowHighlighted = (row_idx: number) =>
+    range_bounds
+      ? row_idx >= range_bounds.min_row && row_idx <= range_bounds.max_row
+      : active_position?.row_idx === row_idx;
+
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
@@ -2350,7 +2805,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
           <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
             {is_loading
               ? "Loading…"
-              : `${filtered_rows.length} of ${total} rows · ${visible_columns.length} columns · Click any cell to edit`}
+              : `${filtered_rows.length} of ${total} rows · ${visible_columns.length} columns · Arrow keys to move, Enter or type to edit`}
           </p>
           <div className="mt-1.5">
             <CollaborationBar collaborators={collaborators} ready_state={ready_state} />
@@ -3219,18 +3674,96 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         </div>
       )}
 
+      {/* Formula bar: address of the active cell (or range), its full value, and range totals */}
+      {!is_loading && (
+        <div className={styles.formula_bar} aria-live="polite">
+          <div className={styles.name_box} title="Active cell">
+            {name_box_label ?? ""}
+          </div>
+          <div className={styles.formula_icon} aria-hidden="true">fx</div>
+          <div className={styles.formula_value} title={active_cell_value || undefined}>
+            {active_cell ? (
+              active_cell_value ? (
+                active_cell_value
+              ) : (
+                <span className={styles.formula_placeholder}>{active_column_label} is empty</span>
+              )
+            ) : (
+              <span className={styles.formula_placeholder}>
+                Select a cell to see its full value. Use the arrow keys to move, Enter or F2 to edit.
+              </span>
+            )}
+          </div>
+          {range_stats && (
+            <div className={styles.range_stats}>
+              <span>Count: <strong>{range_stats.count}</strong></span>
+              {range_stats.numeric_count > 0 && (
+                <>
+                  <span>Sum: <strong>{range_stats.sum.toLocaleString(undefined, { maximumFractionDigits: 2 })}</strong></span>
+                  <span>Average: <strong>{(range_stats.average ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</strong></span>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Table body */}
       {is_loading ? (
         <TableSkeleton />
       ) : (
-        <div ref={table_scroll_ref} className="w-full min-w-0 overflow-auto max-h-[calc(100vh-200px)]">
-          <table className="min-w-full border-collapse text-xs">
+        <div
+          ref={table_scroll_ref}
+          tabIndex={0}
+          role="grid"
+          aria-label="Link building orders spreadsheet"
+          aria-rowcount={filtered_rows.length}
+          onKeyDown={handleGridKeyDown}
+          className={`w-full min-w-0 overflow-auto max-h-[calc(100vh-200px)] ${styles.grid_container}`}
+        >
+          <table className={`min-w-full text-xs ${styles.grid_table}`}>
             <thead className="sticky top-0 z-20">
-              <tr>
-                {/* Select-all checkbox column — sticky so it stays visible while scrolling */}
+              {/* Column letters, like the A, B, C header of a spreadsheet. Click one to select the column. */}
+              <tr className={styles.letter_row}>
                 <th
-                  className="border border-gray-700/30 bg-gray-800 px-2 py-1.5 text-center sticky left-0 z-[31]"
-                  style={{ width: CHECKBOX_COL_WIDTH, minWidth: CHECKBOX_COL_WIDTH }}
+                  className={`sticky left-0 z-[32] ${styles.corner_header}`}
+                  style={{ width: ROW_HEADER_WIDTH, minWidth: ROW_HEADER_WIDTH }}
+                  aria-hidden="true"
+                />
+                <th
+                  className={`sticky z-[31] ${styles.corner_header}`}
+                  style={{ left: ROW_HEADER_WIDTH, width: CHECKBOX_COL_WIDTH, minWidth: CHECKBOX_COL_WIDTH }}
+                  aria-hidden="true"
+                />
+                {grid_column_keys.map((col_key, col_idx) => {
+                  const col_def = visible_columns[col_idx];
+                  const is_sticky_col = !!col_def?.sticky;
+                  return (
+                    <th
+                      key={col_key}
+                      onClick={() => selectEntireColumn(col_key)}
+                      title={`Select column ${toColumnLetter(col_idx)}`}
+                      className={`${is_sticky_col ? "sticky z-[30]" : ""}${isColumnHighlighted(col_idx) ? ` ${styles.header_highlighted}` : ""}`}
+                      style={is_sticky_col ? { left: sticky_left_offsets[col_key] } : undefined}
+                    >
+                      {toColumnLetter(col_idx)}
+                    </th>
+                  );
+                })}
+                <th className={styles.corner_header} aria-hidden="true" />
+              </tr>
+              <tr>
+                {/* Row number gutter header */}
+                <th
+                  className="border border-gray-700/30 bg-gray-800 px-1 py-1.5 text-center text-[10px] font-semibold text-gray-300 sticky left-0 z-[32]"
+                  style={{ width: ROW_HEADER_WIDTH, minWidth: ROW_HEADER_WIDTH }}
+                >
+                  #
+                </th>
+                {/* Select-all checkbox column, sticky so it stays visible while scrolling */}
+                <th
+                  className="border border-gray-700/30 bg-gray-800 px-2 py-1.5 text-center sticky z-[31]"
+                  style={{ left: ROW_HEADER_WIDTH, width: CHECKBOX_COL_WIDTH, minWidth: CHECKBOX_COL_WIDTH }}
                 >
                   <input
                     ref={select_all_ref}
@@ -3454,7 +3987,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
               {filtered_rows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={visible_columns.length + 4}
+                    colSpan={visible_columns.length + 5}
                     className="px-6 py-14 text-center text-sm text-gray-400 dark:text-gray-500"
                   >
                     {search || status_filter || link_type_filter || client_filter
@@ -3479,9 +4012,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                     ? "bg-indigo-50/80 dark:bg-indigo-950/20"
                     : is_locally_selected
                     ? "bg-brand-50/80 dark:bg-brand-900/10"
-                    : row_idx % 2 === 0
-                    ? "bg-white dark:bg-gray-900"
-                    : "bg-gray-50 dark:bg-gray-800/30";
+                    : "bg-white dark:bg-gray-900";
 
                   return (
                     <tr
@@ -3497,10 +4028,8 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                             ? "border-l-2 border-l-indigo-400 bg-indigo-50/50 dark:border-l-indigo-500 dark:bg-indigo-950/20"
                             : is_locally_selected
                               ? "border-l-2 border-l-brand-400 bg-brand-50/30 dark:border-l-brand-500 dark:bg-brand-900/10"
-                              : row_idx % 2 === 0
-                                ? "bg-white dark:bg-gray-900"
-                                : "bg-gray-50/60 dark:bg-gray-800/30"
-                        } ${is_saving ? "opacity-60" : ""} hover:bg-blue-50/40 dark:hover:bg-blue-900/10`}
+                              : "bg-white dark:bg-gray-900"
+                        } ${is_saving ? "opacity-60" : ""}`}
                       style={
                         primary_editor
                           ? {
@@ -3510,10 +4039,22 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                           : undefined
                       }
                     >
-                      {/* Row checkbox — sticky so it stays aligned with the frozen column block */}
+                      {/* Row number, click it to select the whole row */}
                       <td
-                        className={`border-r border-gray-100 px-2 py-1.5 dark:border-gray-800 sticky left-0 z-[2] ${sticky_row_bg_class}`}
-                        style={{ width: CHECKBOX_COL_WIDTH, minWidth: CHECKBOX_COL_WIDTH }}
+                        className={`sticky left-0 z-[2] ${styles.row_header}${isRowHighlighted(row_idx) ? ` ${styles.header_highlighted}` : ""}`}
+                        style={{ width: ROW_HEADER_WIDTH, minWidth: ROW_HEADER_WIDTH }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          selectEntireRow(row.id);
+                        }}
+                        title={`Select row ${row_number_offset + row_idx}`}
+                      >
+                        {is_new ? "new" : row_number_offset + row_idx}
+                      </td>
+                      {/* Row checkbox, sticky so it stays aligned with the frozen column block */}
+                      <td
+                        className={`px-2 sticky z-[2] ${sticky_row_bg_class}`}
+                        style={{ left: ROW_HEADER_WIDTH, width: CHECKBOX_COL_WIDTH, minWidth: CHECKBOX_COL_WIDTH }}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <input
@@ -3532,12 +4073,19 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                           !!range_bounds &&
                           row_idx >= range_bounds.min_row && row_idx <= range_bounds.max_row &&
                           col_idx >= range_bounds.min_col && col_idx <= range_bounds.max_col;
+                        const is_active =
+                          active_cell?.row_id === row.id && active_cell?.col_key === col.key;
                         return (
                           <EditableCell
                             key={col.key}
                             col={col}
                             value={(row[col.key] as string) ?? ""}
                             is_editing={is_editing}
+                            edit_entry={is_editing ? edit_entry : "edit"}
+                            is_active={is_active}
+                            cell_key={toCellKey(row.id, col.key)}
+                            onCellDoubleClick={() => startEditing(row.id, col.key)}
+                            onCancelEdit={cancelEditing}
                             is_draft={is_new}
                             is_first_col={is_first_col}
                             row_editors={is_first_col ? row_collaborators : []}
@@ -3568,6 +4116,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                         onStartEdit={() => startEditing(row.id, "user_id")}
                         onAssignClient={(val) => handleAssignClientChange(row.id, val)}
                         onCancelEdit={cancelAssignEdit}
+                        is_active={active_cell?.row_id === row.id && active_cell?.col_key === "user_id"}
+                        onSelectCell={() => selectCell({ row_id: row.id, col_key: "user_id" })}
+                        cell_key={toCellKey(row.id, "user_id")}
                       />
                       {/* Assign admin user cell */}
                       <UserAssignCell
@@ -3577,10 +4128,13 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                         onStartEdit={() => startEditing(row.id, "assigned_admin_user_id")}
                         onAssignUser={(val) => handleAssignUserChange(row.id, val)}
                         onCancelEdit={cancelAssignEdit}
+                        is_active={active_cell?.row_id === row.id && active_cell?.col_key === "assigned_admin_user_id"}
+                        onSelectCell={() => selectCell({ row_id: row.id, col_key: "assigned_admin_user_id" })}
+                        cell_key={toCellKey(row.id, "assigned_admin_user_id")}
                       />
 
                       {/* Actions cell */}
-                      <td className="w-px whitespace-nowrap border-l border-gray-100 px-2 py-1.5 dark:border-gray-800">
+                      <td className="w-px whitespace-nowrap px-2">
                         {is_saving ? (
                           <div className="flex items-center justify-center">
                             <svg
