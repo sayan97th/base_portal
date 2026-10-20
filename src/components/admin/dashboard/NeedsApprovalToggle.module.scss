@@ -1,10 +1,9 @@
-// "Needs LB TL Approval" switch, used on the Link Building Orders toolbar (chip)
-// and at the top of the Filter menu (row). Colors follow the portal's warning
+// "Needs LB TL Approval" switch, shown as a chip on the Link Building Orders
+// toolbar. Colors follow the portal's warning
 // palette so the view reads as "orders waiting on someone".
 
 // ── Tokens ─────────────────────────────────────────────────────────────────────
 
-$warning_25: var(--color-warning-25);
 $warning_50: var(--color-warning-50);
 $warning_100: var(--color-warning-100);
 $warning_200: var(--color-warning-200);
@@ -171,94 +170,5 @@ $knob_size: 12px;
   70%,
   100% {
     box-shadow: 0 0 0 6px rgba(247, 144, 9, 0);
-  }
-}
-
-// ── Filter menu row ────────────────────────────────────────────────────────────
-
-.row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: calc(100% - 40px);
-  margin: 10px 20px 2px;
-  padding: 10px 12px;
-  border: 1px solid $warning_100;
-  border-radius: 12px;
-  background: $warning_25;
-  color: $warning_700;
-  text-align: left;
-  cursor: pointer;
-  transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease;
-  @include focus_ring;
-
-  &:hover {
-    border-color: $warning_200;
-    background: $warning_50;
-  }
-
-  @include dark {
-    border-color: $warning_dark_border;
-    background: $warning_dark_bg;
-    color: $warning_dark_text;
-
-    &:hover {
-      background: $warning_dark_bg_hover;
-    }
-  }
-
-  &.is_active {
-    border-color: $warning_300;
-    background: $warning_50;
-
-    .switch {
-      background: $warning_500;
-    }
-
-    @include dark {
-      background: $warning_dark_bg_hover;
-    }
-  }
-}
-
-.row_icon {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: $warning_100;
-
-  @include dark {
-    background: $warning_dark_bg_hover;
-  }
-}
-
-.row_text {
-  display: flex;
-  flex: 1;
-  min-width: 0;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.row_title {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.row_description {
-  overflow: hidden;
-  color: var(--color-gray-500);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-
-  @include dark {
-    color: var(--color-gray-400);
   }
 }

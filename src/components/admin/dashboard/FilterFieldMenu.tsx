@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { getAnchoredMenuStyle } from "@/lib/anchored-menu-position";
 
 export interface FilterFieldMenuProps<T> {
   options: T[];
@@ -30,8 +31,8 @@ const MENU_GAP = 4;
 /**
  * Compact select used by the Advanced filters rules (column, condition and the
  * And / Or joins). The menu uses fixed positioning, so it floats above the
- * panel's scroll area instead of being clipped by it, and it flips above the
- * field when there is no room below. Arrow keys, Enter and Escape work like a
+ * panel's scroll area instead of being clipped by it, flips above the field
+ * when there is more room there, and shrinks to the space left on screen. Arrow keys, Enter and Escape work like a
  * native select, and Escape only closes the menu, not the panel around it.
  */
 export default function FilterFieldMenu<T>({
@@ -79,14 +80,12 @@ export default function FilterFieldMenu<T>({
   const updatePosition = useCallback(() => {
     const rect = trigger_ref.current?.getBoundingClientRect();
     if (!rect) return;
-    const width = Math.max(rect.width, menu_min_width);
-    const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
-    const space_below = window.innerHeight - rect.bottom;
-    const opens_above = space_below < MENU_MAX_HEIGHT && rect.top > space_below;
     setMenuStyle(
-      opens_above
-        ? { position: "fixed", left, width, bottom: window.innerHeight - rect.top + MENU_GAP }
-        : { position: "fixed", left, width, top: rect.bottom + MENU_GAP }
+      getAnchoredMenuStyle(rect, {
+        width: Math.max(rect.width, menu_min_width),
+        preferred_height: MENU_MAX_HEIGHT,
+        gap: MENU_GAP,
+      })
     );
   }, [menu_min_width]);
 
@@ -186,7 +185,7 @@ export default function FilterFieldMenu<T>({
           className="z-[60] flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg shadow-gray-200/60 dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/30"
         >
           {getSearchText && (
-            <div className="border-b border-gray-100 p-1.5 dark:border-gray-700">
+            <div className="shrink-0 border-b border-gray-100 p-1.5 dark:border-gray-700">
               <input
                 type="text"
                 autoFocus
@@ -202,11 +201,11 @@ export default function FilterFieldMenu<T>({
             </div>
           )}
           {menu_heading && (
-            <p className="px-3 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+            <p className="shrink-0 px-3 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
               {menu_heading}
             </p>
           )}
-          <ul ref={list_ref} role="listbox" aria-label={label} className="overflow-y-auto py-1" style={{ maxHeight: MENU_MAX_HEIGHT }}>
+          <ul ref={list_ref} role="listbox" aria-label={label} className="min-h-0 flex-1 overflow-y-auto py-1">
             {visible_options.length === 0 ? (
               <li className="px-3 py-2 text-xs text-gray-400 dark:text-gray-500">No matches</li>
             ) : (

@@ -205,7 +205,8 @@ $font_family: var(--font-outfit), ui-sans-serif, system-ui, -apple-system, "Sego
   flex-direction: column;
   width: $panel_width;
   max-width: calc(100vw - 2rem);
-  max-height: min(36rem, calc(100vh - 10rem));
+  max-height: min(36rem, calc(100dvh - 1.5rem));
+  scroll-margin-block: 12px;
   overflow: hidden;
   border: 1px solid $gray_200;
   border-radius: $panel_radius;

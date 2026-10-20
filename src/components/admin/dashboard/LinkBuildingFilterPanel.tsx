@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef } from "react";
+import { useKeepInViewport } from "@/hooks/useKeepInViewport";
 
 interface LinkBuildingFilterPanelProps {
   is_open: boolean;
@@ -21,8 +22,6 @@ interface LinkBuildingFilterPanelProps {
   /** Classes of the split button frame (no padding, each half pads itself), idle and active. */
   button_class: string;
   active_button_class: string;
-  /** Saved views shown above both modes, e.g. the "Needs LB TL Approval" switch. */
-  quick_views?: React.ReactNode;
   /** The Quick filters or Advanced filters content. */
   children: React.ReactNode;
 }
@@ -54,10 +53,10 @@ export default function LinkBuildingFilterPanel({
   footer_note,
   button_class,
   active_button_class,
-  quick_views,
   children,
 }: LinkBuildingFilterPanelProps) {
   const container_ref = useRef<HTMLDivElement>(null);
+  const dialog_ref = useRef<HTMLDivElement>(null);
   const title = is_advanced_mode ? "Advanced filters" : "Quick filters";
 
   const closePanel = useCallback(() => onOpenChange(false), [onOpenChange]);
@@ -87,6 +86,9 @@ export default function LinkBuildingFilterPanel({
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [is_open, closePanel]);
+
+  // Keeps the whole panel on screen, on small screens and when the table under it is short.
+  useKeepInViewport(dialog_ref, is_open);
 
   return (
     <div ref={container_ref} className="relative">
@@ -137,11 +139,12 @@ export default function LinkBuildingFilterPanel({
 
       {is_open && (
         <div
+          ref={dialog_ref}
           role="dialog"
           aria-label={title}
-          className="absolute right-0 top-full z-50 mt-1.5 flex w-[52rem] max-w-[calc(100vw-2rem)] flex-col rounded-xl border border-gray-200 bg-white shadow-xl shadow-gray-200/60 dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/30"
+          className="absolute right-0 top-full z-50 mt-1.5 flex max-h-[calc(100dvh-1.5rem)] w-[52rem] max-w-[calc(100vw-2rem)] scroll-my-3 flex-col rounded-xl border border-gray-200 bg-white shadow-xl shadow-gray-200/60 dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/30"
         >
-          <div className="flex flex-wrap items-center justify-between gap-2 px-5 pb-1 pt-4">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-5 pb-1 pt-4">
             <div className="flex min-w-0 items-center gap-2">
               <h2 className="text-[15px] font-semibold text-gray-800 dark:text-gray-100">{title}</h2>
               <span className={`text-[13px] text-gray-500 dark:text-gray-400 ${is_loading ? "animate-pulse" : ""}`} aria-live="polite">
@@ -178,11 +181,10 @@ export default function LinkBuildingFilterPanel({
             </div>
           </div>
 
-          {quick_views}
+          {/* Header and footer stay put, the filters scroll when the screen is short */}
+          <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin]">{children}</div>
 
-          {children}
-
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-200 px-5 py-3 dark:border-gray-700">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-gray-200 px-5 py-3 dark:border-gray-700">
             <p className="text-xs text-gray-400 dark:text-gray-500">{footer_note}</p>
             <button
               type="button"

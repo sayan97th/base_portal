@@ -13,6 +13,7 @@ import {
 } from "@/services/admin/link-building-saved-filters.service";
 import { parseApiErrorMessage } from "@/services/admin/link-building-dashboard.service";
 import { areFilterStatesEqual, countActiveFilters } from "@/lib/link-building-saved-filters";
+import { useKeepInViewport } from "@/hooks/useKeepInViewport";
 import styles from "./SavedFiltersMenu.module.scss";
 
 interface SavedFiltersMenuProps {
@@ -58,7 +59,11 @@ export default function SavedFiltersMenu({
   const [busy_filter_id, setBusyFilterId] = useState<string | null>(null);
 
   const container_ref = useRef<HTMLDivElement>(null);
+  const panel_ref = useRef<HTMLDivElement>(null);
   const new_name_input_id = useId();
+
+  // Keeps the whole panel on screen, on small screens and when the table under it is short.
+  useKeepInViewport(panel_ref, is_open);
 
   // ── Loading ───────────────────────────────────────────────────────────────
 
@@ -471,7 +476,7 @@ export default function SavedFiltersMenu({
       </button>
 
       {is_open && (
-        <div role="dialog" aria-label="Saved filters" className={styles.panel}>
+        <div ref={panel_ref} role="dialog" aria-label="Saved filters" className={styles.panel}>
           <div className={styles.header}>
             <span className={styles.header_icon} aria-hidden="true">
               <Icon path={ICON_PATHS.bookmark} />

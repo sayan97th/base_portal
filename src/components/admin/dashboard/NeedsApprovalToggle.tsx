@@ -7,21 +7,17 @@ interface NeedsApprovalToggleProps {
   /** Live orders still missing an LB TL Approval value, null while loading. */
   pending_count: number | null;
   onToggle: () => void;
-  /** "chip" for the toolbar, "row" for the top of the Filter menu. */
-  variant?: "chip" | "row";
 }
 
 /**
  * On / off switch for the "Needs LB TL Approval" view: Live orders that still need a
  * team lead review. The client asked for this view to stay one click away, so it
- * lives on the toolbar and is repeated at the top of the Filter menu, both bound to
- * the same state.
+ * lives on the toolbar as a compact chip.
  */
 export default function NeedsApprovalToggle({
   is_active,
   pending_count,
   onToggle,
-  variant = "chip",
 }: NeedsApprovalToggleProps) {
   const has_pending = pending_count !== null && pending_count > 0;
   const state_class = `${is_active ? ` ${styles.is_active}` : ""}${has_pending ? ` ${styles.has_pending}` : ""}`;
@@ -32,26 +28,6 @@ export default function NeedsApprovalToggle({
     </svg>
   );
   const count_badge = has_pending && <span className={styles.count}>{pending_count.toLocaleString()}</span>;
-
-  if (variant === "row") {
-    return (
-      <button
-        type="button"
-        role="switch"
-        aria-checked={is_active}
-        onClick={onToggle}
-        className={`${styles.row}${state_class}`}
-      >
-        <span className={styles.row_icon}>{warning_icon}</span>
-        <span className={styles.row_text}>
-          <span className={styles.row_title}>Needs LB TL Approval</span>
-          <span className={styles.row_description}>Live orders still waiting for a team lead review</span>
-        </span>
-        {count_badge}
-        <span className={styles.switch} aria-hidden="true" />
-      </button>
-    );
-  }
 
   return (
     <button

@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useDebounce } from "@/hooks/useDebounce";
+import { getAnchoredMenuStyle } from "@/lib/anchored-menu-position";
 import type { AdvancedFilterColumn } from "@/lib/link-building-advanced-filters";
 
 interface AdvancedFilterValuesPickerProps {
@@ -50,15 +51,7 @@ export default function AdvancedFilterValuesPicker({ column, values, onChange, l
   const updatePosition = useCallback(() => {
     const rect = field_ref.current?.getBoundingClientRect();
     if (!rect) return;
-    const width = Math.max(rect.width, MENU_WIDTH);
-    const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
-    const space_below = window.innerHeight - rect.bottom;
-    const opens_above = space_below < MENU_MAX_HEIGHT && rect.top > space_below;
-    setMenuStyle(
-      opens_above
-        ? { position: "fixed", left, width, bottom: window.innerHeight - rect.top + 4 }
-        : { position: "fixed", left, width, top: rect.bottom + 4 }
-    );
+    setMenuStyle(getAnchoredMenuStyle(rect, { width: Math.max(rect.width, MENU_WIDTH), preferred_height: MENU_MAX_HEIGHT }));
   }, []);
 
   useLayoutEffect(() => {
@@ -184,7 +177,7 @@ export default function AdvancedFilterValuesPicker({ column, values, onChange, l
           style={menu_style}
           className="z-[60] flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg shadow-gray-200/60 dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/30"
         >
-          <div className="border-b border-gray-100 p-1.5 dark:border-gray-700">
+          <div className="shrink-0 border-b border-gray-100 p-1.5 dark:border-gray-700">
             <input
               type="text"
               autoFocus
@@ -196,7 +189,7 @@ export default function AdvancedFilterValuesPicker({ column, values, onChange, l
             />
           </div>
 
-          <ul role="listbox" aria-multiselectable="true" aria-label={`${column.label} values`} className="overflow-y-auto py-1" style={{ maxHeight: MENU_MAX_HEIGHT - 80 }}>
+          <ul role="listbox" aria-multiselectable="true" aria-label={`${column.label} values`} className="min-h-0 flex-1 overflow-y-auto py-1">
             {is_loading && listed_values.length === 0 ? (
               [0, 1, 2].map((i) => (
                 <li key={i} className="mx-2 my-1 h-6 animate-pulse rounded bg-gray-100 dark:bg-gray-700" aria-hidden="true" />
@@ -226,7 +219,7 @@ export default function AdvancedFilterValuesPicker({ column, values, onChange, l
           </ul>
 
           {values.length > 0 && (
-            <div className="flex items-center justify-between border-t border-gray-100 px-3 py-1.5 dark:border-gray-700">
+            <div className="flex shrink-0 items-center justify-between border-t border-gray-100 px-3 py-1.5 dark:border-gray-700">
               <span className="text-[11px] text-gray-500 dark:text-gray-400">{values.length} selected</span>
               <button
                 type="button"

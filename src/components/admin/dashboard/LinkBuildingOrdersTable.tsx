@@ -3549,7 +3549,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       className={`${styles.table_root} ${
         is_fullscreen
           ? "fixed inset-0 z-[100000] flex flex-col bg-white dark:bg-gray-900"
-          : "overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-xs dark:border-gray-800 dark:bg-gray-900"
+          : // No overflow-hidden here: it would clip the toolbar popovers (Filter, Saved Filters, Import...)
+            // when the table only has a few rows. The grid scrolls inside its own frame instead.
+            "rounded-2xl border border-gray-200 bg-white shadow-theme-xs dark:border-gray-800 dark:bg-gray-900"
       }`}
     >
       {/* Header: title, live collaborators and the table's main actions */}
@@ -3976,7 +3978,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         </div>
 
         <div className={styles.toolbar_actions}>
-          {/* The client's most used view, kept one click away and mirrored inside the Filter menu */}
+          {/* The client's most used view, kept one click away on the toolbar */}
           <NeedsApprovalToggle
             is_active={needs_approval_filter}
             pending_count={needs_approval_count}
@@ -3998,14 +4000,6 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
             footer_note={filter_panel_footer_note}
             button_class={toolbar_split_button_class}
             active_button_class={toolbar_split_button_active_class}
-            quick_views={
-              <NeedsApprovalToggle
-                variant="row"
-                is_active={needs_approval_filter}
-                pending_count={needs_approval_count}
-                onToggle={toggleNeedsApprovalFilter}
-              />
-            }
           >
             {is_advanced_filter_mode ? (
               <AdvancedFilterPanel
