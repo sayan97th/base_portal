@@ -1,6 +1,8 @@
 import React, { useRef } from "react";
 import type { ClientUserOption } from "@/services/admin/link-building-dashboard.service";
 import ClientSearchableSelect from "./ClientSearchableSelect";
+import FindHighlightedText from "./FindHighlightedText";
+import type { TableFindMatchState } from "@/hooks/useTableFind";
 import styles from "./LinkBuildingOrdersTable.module.scss";
 
 export interface ClientAssignCellProps {
@@ -16,6 +18,10 @@ export interface ClientAssignCellProps {
   onSelectCell?: () => void;
   /** Lookup key the table uses to scroll this cell into view during keyboard navigation. */
   cell_key?: string;
+  /** Find (Ctrl/Cmd+F) highlight for this cell, null when it does not match. */
+  find_match_state?: TableFindMatchState;
+  /** Normalized find query, only passed while this cell matches. */
+  find_query?: string;
 }
 
 export default function ClientAssignCell({
@@ -28,6 +34,8 @@ export default function ClientAssignCell({
   is_active = false,
   onSelectCell,
   cell_key,
+  find_match_state = null,
+  find_query = "",
 }: ClientAssignCellProps) {
   const cell_ref = useRef<HTMLTableCellElement>(null);
   const selected_client = client_users.find(
@@ -44,6 +52,12 @@ export default function ClientAssignCell({
             ? "bg-teal-50 ring-2 ring-inset ring-teal-400 dark:bg-teal-900/20 dark:ring-teal-600"
             : is_active
               ? styles.cell_active
+              : ""
+        }${
+          find_match_state === "current"
+            ? ` ${styles.cell_find_current}`
+            : find_match_state === "match"
+              ? ` ${styles.cell_find_match}`
               : ""
         }`}
         onMouseDown={!is_editing ? onSelectCell : undefined}
@@ -67,11 +81,14 @@ export default function ClientAssignCell({
               </span>
             )}
             <span className="min-w-0 truncate font-medium text-gray-700 dark:text-gray-200">
-              {selected_client.company || selected_client.name}
+              <FindHighlightedText
+                text={selected_client.company || selected_client.name}
+                normalized_query={find_query}
+              />
             </span>
             {selected_client.company && (
               <span className="min-w-0 truncate text-[10px] text-gray-400 dark:text-gray-500">
-                {selected_client.name}
+                <FindHighlightedText text={selected_client.name} normalized_query={find_query} />
               </span>
             )}
           </span>

@@ -66,6 +66,9 @@ import {
   type GridPosition,
 } from "@/lib/spreadsheet-navigation";
 import { useResizableColumnWidths } from "@/hooks/useResizableColumnWidths";
+import { useTableFind, type TableFindMatch, type TableFindMatchState } from "@/hooks/useTableFind";
+import TableFindBar from "./TableFindBar";
+import FindHighlightedText from "./FindHighlightedText";
 import styles from "./LinkBuildingOrdersTable.module.scss";
 
 // ── Column types ───────────────────────────────────────────────────────────────
@@ -387,6 +390,10 @@ interface UserAssignCellProps {
   is_active?: boolean;
   onSelectCell?: () => void;
   cell_key?: string;
+  /** Find (Ctrl/Cmd+F) highlight for this cell, null when it does not match. */
+  find_match_state?: TableFindMatchState;
+  /** Normalized find query, only passed while this cell matches. */
+  find_query?: string;
 }
 
 function UserAssignCell({
@@ -399,6 +406,8 @@ function UserAssignCell({
   is_active = false,
   onSelectCell,
   cell_key,
+  find_match_state = null,
+  find_query = "",
 }: UserAssignCellProps) {
   const cell_ref = useRef<HTMLTableCellElement>(null);
   const selected_user = admin_users.find(
@@ -416,7 +425,7 @@ function UserAssignCell({
             : is_active
               ? styles.cell_active
               : ""
-        }`}
+        }${getFindCellClass(find_match_state)}`}
         onMouseDown={!is_editing ? onSelectCell : undefined}
         onDoubleClick={!is_editing ? onStartEdit : undefined}
         title="Double click or press Enter to assign a team member"
@@ -435,10 +444,10 @@ function UserAssignCell({
               </span>
             )}
             <span className="shrink-0 font-medium text-gray-700 dark:text-gray-200">
-              {selected_user.name}
+              <FindHighlightedText text={selected_user.name} normalized_query={find_query} />
             </span>
             <span className="min-w-0 truncate text-[10px] text-gray-400 dark:text-gray-500">
-              {selected_user.email}
+              <FindHighlightedText text={selected_user.email} normalized_query={find_query} />
             </span>
           </span>
         ) : (
@@ -468,6 +477,13 @@ function isDateOverdue(date_str: string): boolean {
     `${parts[2]}-${parts[0].padStart(2, "0")}-${parts[1].padStart(2, "0")}`
   );
   return !isNaN(date.getTime()) && date < new Date();
+}
+
+/** Extra cell classes for a find (Ctrl/Cmd+F) match, prefixed with a space when present. */
+function getFindCellClass(find_match_state: TableFindMatchState): string {
+  if (find_match_state === "current") return ` ${styles.cell_find_current}`;
+  if (find_match_state === "match") return ` ${styles.cell_find_match}`;
+  return "";
 }
 
 // ── Editable cell ──────────────────────────────────────────────────────────────
@@ -508,6 +524,10 @@ interface EditableCellProps {
   is_sticky?: boolean;
   sticky_left?: number;
   sticky_bg_class?: string;
+  /** Find (Ctrl/Cmd+F) highlight for this cell, null when it does not match. */
+  find_match_state?: TableFindMatchState;
+  /** Normalized find query, only passed while this cell matches, so its text can be marked. */
+  find_query?: string;
 }
 
 function EditableCell({
@@ -535,6 +555,8 @@ function EditableCell({
   is_sticky = false,
   sticky_left = 0,
   sticky_bg_class = "bg-white dark:bg-gray-900",
+  find_match_state = null,
+  find_query = "",
 }: EditableCellProps) {
   const input_ref = useRef<HTMLInputElement>(null);
   const [just_copied, setJustCopied] = useState(false);
@@ -772,15 +794,23 @@ function EditableCell({
           onMouseDown={(e) => e.stopPropagation()}
           title={value}
         >
-          {label}
+          <FindHighlightedText text={label} normalized_query={find_query} />
           {value.replace(/^https?:\/\//, "").length > 28 ? "…" : ""}
         </a>
       );
     } else {
-      display = <span title={value}>{value}</span>;
+      display = (
+        <span title={value}>
+          <FindHighlightedText text={value} normalized_query={find_query} />
+        </span>
+      );
     }
   } else if (col.key === "estimated_delivery_date" && isDateOverdue(value)) {
-    display = <span className="font-semibold text-red-500">{value}</span>;
+    display = (
+      <span className="font-semibold text-red-500">
+        <FindHighlightedText text={value} normalized_query={find_query} />
+      </span>
+    );
   } else if (col.key === "status" && value) {
     const status_map: Record<string, string> = {
       "New Request": "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
@@ -803,7 +833,7 @@ function EditableCell({
           }`}
       >
         {value === "Live" && <span className="h-1.5 w-1.5 rounded-full bg-green-500" />}
-        {value}
+        <FindHighlightedText text={value} normalized_query={find_query} />
       </span>
     );
   } else if (col.key === "exact_match") {
@@ -816,7 +846,9 @@ function EditableCell({
     }
   } else {
     display = value ? (
-      <span title={value}>{value}</span>
+      <span title={value}>
+        <FindHighlightedText text={value} normalized_query={find_query} />
+      </span>
     ) : (
       <span className="text-gray-300 dark:text-gray-600">—</span>
     );
@@ -831,7 +863,7 @@ function EditableCell({
       data-cell-key={cell_key}
       className={`group/cell relative select-none whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 ${styles.cell}${
         col.type === "number" ? ` ${styles.cell_numeric}` : ""
-      }${is_range_selected ? ` ${styles.cell_in_range}` : ""}${is_active ? ` ${styles.cell_active}` : ""} ${
+      }${getFindCellClass(find_match_state)}${is_range_selected ? ` ${styles.cell_in_range}` : ""}${is_active ? ` ${styles.cell_active}` : ""} ${
         is_required_error
           ? "bg-red-50 ring-1 ring-inset ring-red-300 dark:bg-red-950 dark:ring-red-700"
           : is_sticky
@@ -1552,6 +1584,67 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     },
     [scrollToCell]
   );
+
+  // ── Find in table (Ctrl/Cmd+F) ───────────────────────────────────────────────
+  // Highlights every matching cell on the loaded page instead of filtering rows
+  // out like the server side search does, so matches can be compared in context.
+
+  /** Text a cell shows, assignment cells resolve their ids to the displayed names. */
+  const getFindCellText = useCallback(
+    (row: LinkBuildingOrderRow, col_key: string): string => {
+      if (col_key === "user_id") {
+        const client = client_users.find((u) => row.user_id != null && u.id === Number(row.user_id));
+        return client ? [client.company, client.name].filter(Boolean).join(" ") : "";
+      }
+      if (col_key === "assigned_admin_user_id") {
+        const admin = admin_users.find(
+          (u) => row.assigned_admin_user_id != null && u.id === Number(row.assigned_admin_user_id)
+        );
+        return admin ? `${admin.name} ${admin.email}` : "";
+      }
+      return String(row[col_key as keyof LinkBuildingOrderRow] ?? "");
+    },
+    [client_users, admin_users]
+  );
+
+  const getFindRowId = useCallback((row: LinkBuildingOrderRow) => row.id, []);
+
+  const navigateToFindMatch = useCallback(
+    (match: TableFindMatch) => {
+      // The match becomes the active cell (so the formula bar shows its full value
+      // and the arrow keys continue from it) without stealing focus from the find input.
+      setActiveCell(match);
+      scrollToCell(match);
+    },
+    [scrollToCell]
+  );
+
+  const {
+    is_find_open,
+    find_query,
+    normalized_query: find_normalized_query,
+    find_input_ref,
+    matches: find_matches,
+    matched_row_ids: find_matched_row_ids,
+    current_match_idx: find_current_match_idx,
+    setFindQuery,
+    openFind,
+    closeFind,
+    goToNextMatch,
+    goToPreviousMatch,
+    getCellMatchState,
+  } = useTableFind({
+    rows: filtered_rows,
+    column_keys: grid_column_keys,
+    getRowId: getFindRowId,
+    getCellText: getFindCellText,
+    onNavigateToMatch: navigateToFindMatch,
+  });
+
+  const handleCloseFind = useCallback(() => {
+    closeFind();
+    focusGrid();
+  }, [closeFind, focusGrid]);
 
   // ── Excel-style click and drag-to-select ─────────────────────────────────────
   // Like a spreadsheet, a plain click selects the cell (it becomes the active cell
@@ -2884,6 +2977,21 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
               )}
             </button>
           </div>
+          {/* Find in table, highlights matches without filtering (Ctrl/Cmd+F) */}
+          <button
+            onClick={is_find_open ? handleCloseFind : openFind}
+            title="Find in table (Ctrl+F / Cmd+F), highlights matches without hiding other rows"
+            className={`flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors ${
+              is_find_open
+                ? "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400"
+                : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+            }`}
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0zM8 10.5h5" />
+            </svg>
+            Find
+          </button>
           {/* Search */}
           <div className="relative">
             <svg
@@ -3750,6 +3858,20 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         </div>
       )}
 
+      {/* Find bar (Ctrl/Cmd+F) */}
+      {is_find_open && (
+        <TableFindBar
+          query={find_query}
+          match_count={find_matches.length}
+          current_match_idx={find_current_match_idx}
+          input_ref={find_input_ref}
+          onQueryChange={setFindQuery}
+          onNext={goToNextMatch}
+          onPrevious={goToPreviousMatch}
+          onClose={handleCloseFind}
+        />
+      )}
+
       {/* Table body */}
       {is_loading ? (
         <TableSkeleton />
@@ -4107,7 +4229,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                     >
                       {/* Row number, click it to select the whole row */}
                       <td
-                        className={`sticky left-0 z-[2] ${styles.row_header}${isRowHighlighted(row_idx) ? ` ${styles.header_highlighted}` : ""}`}
+                        className={`sticky left-0 z-[2] ${styles.row_header}${isRowHighlighted(row_idx) ? ` ${styles.header_highlighted}` : ""}${find_matched_row_ids.has(row.id) ? ` ${styles.row_header_find_match}` : ""}`}
                         style={{ width: ROW_HEADER_WIDTH, minWidth: ROW_HEADER_WIDTH }}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -4141,6 +4263,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                           col_idx >= range_bounds.min_col && col_idx <= range_bounds.max_col;
                         const is_active =
                           active_cell?.row_id === row.id && active_cell?.col_key === col.key;
+                        const find_match_state = getCellMatchState(row.id, col.key);
                         return (
                           <EditableCell
                             key={col.key}
@@ -4170,6 +4293,8 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                             is_sticky={col.sticky}
                             sticky_left={col.sticky ? sticky_left_offsets[col.key] : undefined}
                             sticky_bg_class={col.sticky ? sticky_row_bg_class : undefined}
+                            find_match_state={find_match_state}
+                            find_query={find_match_state ? find_normalized_query : ""}
                           />
                         );
                       })}
@@ -4184,6 +4309,8 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                         is_active={active_cell?.row_id === row.id && active_cell?.col_key === "user_id"}
                         onSelectCell={() => selectCell({ row_id: row.id, col_key: "user_id" })}
                         cell_key={toCellKey(row.id, "user_id")}
+                        find_match_state={getCellMatchState(row.id, "user_id")}
+                        find_query={getCellMatchState(row.id, "user_id") ? find_normalized_query : ""}
                       />
                       {/* Assign admin user cell */}
                       <UserAssignCell
@@ -4196,6 +4323,8 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                         is_active={active_cell?.row_id === row.id && active_cell?.col_key === "assigned_admin_user_id"}
                         onSelectCell={() => selectCell({ row_id: row.id, col_key: "assigned_admin_user_id" })}
                         cell_key={toCellKey(row.id, "assigned_admin_user_id")}
+                        find_match_state={getCellMatchState(row.id, "assigned_admin_user_id")}
+                        find_query={getCellMatchState(row.id, "assigned_admin_user_id") ? find_normalized_query : ""}
                       />
 
                       {/* Actions cell */}

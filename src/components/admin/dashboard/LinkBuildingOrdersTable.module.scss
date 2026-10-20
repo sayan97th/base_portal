@@ -22,6 +22,14 @@ $selection_color_dark: #8ab4f8;
 $range_fill: rgba(26, 115, 232, 0.12);
 $range_fill_dark: rgba(138, 180, 248, 0.18);
 $cell_bg_dark: #111827;
+$find_match_bg: #fff6cc;
+$find_match_bg_dark: #3d3412;
+$find_current_bg: #ffe08a;
+$find_current_bg_dark: #6b5114;
+$find_current_ring: #f59e0b;
+$find_current_ring_dark: #fbbf24;
+$find_mark_bg: #fde047;
+$find_mark_bg_dark: #a16207;
 $row_height: 32px;
 $letter_row_height: 22px;
 $header_row_height: 34px;
@@ -309,6 +317,57 @@ $cell_font_size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
+// ── Find (Ctrl/Cmd+F) highlights ───────────────────────────────────────────────
+// Declared before the range fill so an active selection still reads on top of a
+// find highlight. Fills are opaque so frozen (sticky) cells keep covering the
+// columns scrolling underneath them.
+
+.cell_find_match {
+  background-color: $find_match_bg !important;
+
+  @include dark {
+    background-color: $find_match_bg_dark !important;
+  }
+}
+
+.cell_find_current {
+  background-color: $find_current_bg !important;
+  box-shadow: inset 0 0 0 2px $find_current_ring;
+
+  @include dark {
+    background-color: $find_current_bg_dark !important;
+    box-shadow: inset 0 0 0 2px $find_current_ring_dark;
+  }
+}
+
+.find_mark {
+  border-radius: 2px;
+  background-color: $find_mark_bg;
+  color: inherit;
+
+  @include dark {
+    background-color: $find_mark_bg_dark;
+    color: #fff;
+  }
+
+  .cell_find_current & {
+    background-color: $find_current_ring;
+    color: #fff;
+  }
+}
+
+// Row number marker for rows holding at least one match, so they stay easy to
+// spot while the grid is scrolled sideways.
+.row_header_find_match {
+  box-shadow: inset 3px 0 0 $find_current_ring;
+  background: $find_match_bg !important;
+
+  @include dark {
+    box-shadow: inset 3px 0 0 $find_current_ring_dark;
+    background: $find_match_bg_dark !important;
+  }
+}
+
 // Light blue fill for every cell inside a drag / Shift selected range.
 .cell_in_range {
   background-color: $range_fill !important;
@@ -325,6 +384,16 @@ $cell_font_size: 12px;
 
   @include dark {
     box-shadow: inset 0 0 0 2px $selection_color_dark;
+  }
+
+  // The current find match keeps its amber ring even though it is also the
+  // active cell, so it never blends in with a plain selection.
+  &.cell_find_current {
+    box-shadow: inset 0 0 0 2px $find_current_ring;
+
+    @include dark {
+      box-shadow: inset 0 0 0 2px $find_current_ring_dark;
+    }
   }
 
   // Like Sheets, the active cell inside a range keeps a plain background so
