@@ -6,6 +6,7 @@ import type {
   LinkBuildingOrderMutationResponse,
   LinkBuildingOrderDeleteResponse,
   LinkBuildingOrderSearchBody,
+  LinkBuildingOrderFilterValuesResponse,
 } from "@/types/admin/link-building-order";
 
 // ── Validation ─────────────────────────────────────────────────────────────────
@@ -218,6 +219,31 @@ export async function getLinkBuildingOrderColumnValues(
     request_body
   );
   return res.data;
+}
+
+/**
+ * POST /api/admin/link-building-orders/filter-values
+ * Distinct values (with row counts) of one column for the "Filter by values"
+ * checklist. The backend applies every filter in `body` except the ones that
+ * target `column` itself, the same way a spreadsheet filter behaves.
+ */
+export async function getLinkBuildingOrderFilterValues(
+  column: keyof LinkBuildingOrderRow,
+  body: LinkBuildingOrderSearchBody = {},
+  value_search = "",
+  limit?: number
+): Promise<LinkBuildingOrderFilterValuesResponse> {
+  const { page: _page, per_page: _per_page, sort_rules: _sort_rules, ...filters } = body;
+
+  return apiClient.post<LinkBuildingOrderFilterValuesResponse>(
+    "/api/admin/link-building-orders/filter-values",
+    {
+      ...filters,
+      column,
+      value_search: value_search.trim() || undefined,
+      limit,
+    }
+  );
 }
 
 /**

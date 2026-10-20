@@ -4,8 +4,13 @@ import React, { useState, useCallback, useEffect, useRef, useMemo } from "react"
 import { flushSync } from "react-dom";
 import type { LinkBuildingOrderRow } from "@/types/admin/link-building-order";
 import { useTableSort } from "@/hooks/useTableSort";
-import { useColumnFilters, isFilterActive } from "@/hooks/useColumnFilters";
-import ColumnFilterDropdown from "./ColumnFilterDropdown";
+import {
+  useSheetColumnFilters,
+  isSheetFilterActive,
+  toColumnFilterPayloads,
+  describeSheetFilter,
+} from "@/hooks/useSheetColumnFilters";
+import SheetColumnFilterDropdown from "./SheetColumnFilterDropdown";
 import {
   listLinkBuildingOrders,
   createLinkBuildingOrder,
@@ -16,6 +21,7 @@ import {
   batchUpdateLinkBuildingOrders,
   batchUpdateLinkBuildingOrderCells,
   getLinkBuildingOrderColumnValues,
+  getLinkBuildingOrderFilterValues,
   listAdminUsersForSelect,
   listClientUsersForSelect,
   getNeedsLbTlApprovalCount,
@@ -31,7 +37,7 @@ import ClientAssignCell from "./ClientAssignCell";
 import ClientSearchableSelect from "./ClientSearchableSelect";
 import AdminSearchableSelect from "./AdminSearchableSelect";
 import CellOptionsDropdown from "./CellOptionsDropdown";
-import type { LinkBuildingOrderSearchBody, ColumnFilterPayload, SortRulePayload, LinkBuildingOrderPayload } from "@/types/admin/link-building-order";
+import type { LinkBuildingOrderSearchBody, SortRulePayload, LinkBuildingOrderPayload } from "@/types/admin/link-building-order";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useAuth } from "@/context/AuthContext";
 import { useLinkBuildingCollaboration } from "@/hooks/useLinkBuildingCollaboration";
@@ -856,13 +862,14 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   const [redo_stack, setRedoStack] = useState<HistoryEntry[]>([]);
   const [is_undo_redo_saving, setIsUndoRedoSaving] = useState(false);
 
-  const { sort_rules, toggleSort, clearSort } = useTableSort(DEFAULT_SORT_RULES);
+  const { sort_rules, toggleSort, setSort, clearSort } = useTableSort(DEFAULT_SORT_RULES);
   const {
-    column_filters,
-    setFilter,
-    clearAllFilters: clearColumnFilters,
-    active_filter_count,
-  } = useColumnFilters();
+    sheet_filters,
+    setSheetFilter,
+    clearSheetFilter,
+    clearAllSheetFilters,
+    active_sheet_filter_count,
+  } = useSheetColumnFilters();
 
   const [open_filter_col, setOpenFilterCol] = useState<keyof LinkBuildingOrderRow | null>(null);
   const [filter_anchor_el, setFilterAnchorEl] = useState<HTMLElement | null>(null);
@@ -1075,9 +1082,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   }, []);
 
   useEffect(() => {
-    const active_col_filters: ColumnFilterPayload[] = Object.entries(column_filters)
-      .filter(([, f]) => f && isFilterActive(f))
-      .map(([key, f]) => ({ key, ...f } as ColumnFilterPayload));
+    const active_col_filters = toColumnFilterPayloads(sheet_filters);
 
     const body: LinkBuildingOrderSearchBody = {
       search: debounced_search.trim() || undefined,
@@ -1103,7 +1108,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     assigned_user_id_filter,
     needs_approval_filter,
     sort_rules,
-    column_filters,
+    sheet_filters,
     per_page,
   ]);
 
@@ -1610,7 +1615,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     assigned_user_id_filter !== null ||
     needs_approval_filter ||
     hidden_columns.size > 0 ||
-    active_filter_count > 0 ||
+    active_sheet_filter_count > 0 ||
     sort_is_non_default;
 
   const clearAllFilters = useCallback(() => {
@@ -1622,9 +1627,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     setAssignedUserIdFilter(null);
     setNeedsApprovalFilter(false);
     setHiddenColumns(new Set());
-    clearColumnFilters();
+    clearAllSheetFilters();
     clearSort();
-  }, [clearColumnFilters, clearSort]);
+  }, [clearAllSheetFilters, clearSort]);
 
   const toggleNeedsApprovalFilter = useCallback(() => {
     setNeedsApprovalFilter((prev) => {
@@ -1692,6 +1697,42 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       setCopyingColumnKey(null);
     }
   }, [selected_row_ids]);
+
+  // ── Spreadsheet style column filter menu ───────────────────────────────────
+
+  const open_filter_column_def = open_filter_col
+    ? COLUMNS.find((c) => c.key === open_filter_col)
+    : undefined;
+
+  const toggleColumnFilter = useCallback(
+    (col_key: keyof LinkBuildingOrderRow, anchor_el: HTMLElement) => {
+      if (open_filter_col === col_key && filter_anchor_el === anchor_el) {
+        setOpenFilterCol(null);
+        setFilterAnchorEl(null);
+        return;
+      }
+      setOpenFilterCol(col_key);
+      setFilterAnchorEl(anchor_el);
+    },
+    [open_filter_col, filter_anchor_el]
+  );
+
+  const closeColumnFilter = useCallback(() => {
+    setOpenFilterCol(null);
+    setFilterAnchorEl(null);
+  }, []);
+
+  // Stable per open column so the menu only refetches when its search text changes.
+  // The backend ignores this column's own filter, so its values can be re-checked.
+  const loadFilterValues = useCallback(
+    (value_search: string) =>
+      getLinkBuildingOrderFilterValues(
+        open_filter_col ?? "order_id",
+        current_body_ref.current,
+        value_search
+      ),
+    [open_filter_col]
+  );
 
   // ── Bulk grid paste: fills a rectangular block of cells from clipboard data ──
 
@@ -2723,6 +2764,54 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         </div>
       </div>
 
+      {/* Active column filters: one chip per filtered column, so filters spread across
+          several columns (including hidden ones) stay visible and easy to edit or remove. */}
+      {active_sheet_filter_count > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-gray-100 bg-amber-50/40 px-4 py-2 dark:border-gray-800 dark:bg-amber-900/10">
+          <span className="mr-1 text-xs font-medium text-gray-500 dark:text-gray-400">
+            Filtered by:
+          </span>
+          {COLUMNS.filter((col) => isSheetFilterActive(sheet_filters[col.key])).map((col) => {
+            const description = describeSheetFilter(sheet_filters[col.key]!);
+            return (
+              <span
+                key={col.key}
+                className="inline-flex max-w-xs items-center overflow-hidden rounded-full border border-amber-200 bg-white text-xs text-gray-700 dark:border-amber-800/60 dark:bg-gray-800 dark:text-gray-200"
+              >
+                <button
+                  type="button"
+                  onClick={(e) => toggleColumnFilter(col.key, e.currentTarget)}
+                  className="min-w-0 truncate py-0.5 pl-2.5 pr-1 text-left hover:text-brand-600 dark:hover:text-brand-400"
+                  title={`${col.label}: ${description}. Click to edit.`}
+                >
+                  <span className="font-semibold">{col.label}:</span> {description}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => clearSheetFilter(col.key)}
+                  className="shrink-0 py-1 pl-1 pr-2 text-gray-400 hover:text-red-500"
+                  aria-label={`Remove the ${col.label} filter`}
+                  title="Remove filter"
+                >
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </span>
+            );
+          })}
+          {active_sheet_filter_count > 1 && (
+            <button
+              type="button"
+              onClick={clearAllSheetFilters}
+              className="ml-1 text-xs font-medium text-gray-500 hover:text-red-600 hover:underline dark:text-gray-400 dark:hover:text-red-400"
+            >
+              Clear column filters
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Error banner */}
       {save_error && (
         <div className="flex items-center justify-between border-b border-red-100 bg-red-50 px-4 py-2 dark:border-red-900/30 dark:bg-red-900/20">
@@ -3096,8 +3185,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                   const is_sortable = col.sortable !== false;
                   const sort_rule = sort_rules.find((r) => r.key === effective_sort_key);
                   const sort_priority = sort_rules.findIndex((r) => r.key === effective_sort_key);
-                  const col_filter = column_filters[col.key as Parameters<typeof setFilter>[0]];
-                  const filter_is_active = col_filter ? isFilterActive(col_filter) : false;
+                  const filter_is_active = isSheetFilterActive(sheet_filters[col.key]);
 
                   return (
                     <th
@@ -3177,15 +3265,10 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (open_filter_col === col.key) {
-                              setOpenFilterCol(null);
-                              setFilterAnchorEl(null);
-                            } else {
-                              setOpenFilterCol(col.key);
-                              setFilterAnchorEl(e.currentTarget);
-                            }
+                            toggleColumnFilter(col.key, e.currentTarget);
                           }}
-                          title="Filter this column"
+                          title={filter_is_active ? "Edit this column's filter" : "Sort or filter this column"}
+                          aria-label={`Filter ${col.label}`}
                           className={`shrink-0 rounded p-0.5 transition-opacity ${filter_is_active
                             ? "opacity-100 text-yellow-200"
                             : "opacity-30 hover:opacity-80"
@@ -3527,20 +3610,24 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         onImportComplete={handleImportComplete}
       />
 
-      {/* Per-column filter dropdown */}
-      {open_filter_col && (
-        <ColumnFilterDropdown
-          col_key={open_filter_col}
-          col_label={COLUMNS.find((c) => c.key === open_filter_col)?.label ?? open_filter_col}
-          col_type={COLUMNS.find((c) => c.key === open_filter_col)?.type ?? "text"}
-          col_options={COLUMNS.find((c) => c.key === open_filter_col)?.options}
-          current_filter={column_filters[open_filter_col as Parameters<typeof setFilter>[0]]}
+      {/* Per-column spreadsheet style sort and filter menu. Keyed by column so its
+          staged selections reset when another column's menu is opened. */}
+      {open_filter_col && open_filter_column_def && (
+        <SheetColumnFilterDropdown
+          key={open_filter_col}
+          col_label={open_filter_column_def.label}
+          is_sortable={open_filter_column_def.sortable !== false}
+          sort_direction={
+            sort_rules.length === 1 && sort_rules[0].key === (open_filter_column_def.sort_key ?? open_filter_col)
+              ? sort_rules[0].direction
+              : null
+          }
+          current_filter={sheet_filters[open_filter_col]}
           anchor_el={filter_anchor_el}
-          onSetFilter={(filter) => setFilter(open_filter_col as Parameters<typeof setFilter>[0], filter)}
-          onClose={() => {
-            setOpenFilterCol(null);
-            setFilterAnchorEl(null);
-          }}
+          loadValues={loadFilterValues}
+          onSort={(direction) => setSort(open_filter_column_def.sort_key ?? open_filter_col, direction)}
+          onApply={(filter) => setSheetFilter(open_filter_col, filter)}
+          onClose={closeColumnFilter}
         />
       )}
 

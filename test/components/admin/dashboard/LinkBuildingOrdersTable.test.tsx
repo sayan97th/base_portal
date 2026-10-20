@@ -5,7 +5,8 @@
  *    unless that specific cell was the one edited;
  *  - undo/redo (Ctrl+Z / Ctrl+Y and the toolbar buttons) for single-cell edits and
  *    bulk pastes;
- *  - Excel-style multi-cell range selection, copy (Ctrl+C) and paste (Ctrl+V).
+ *  - Excel-style multi-cell range selection, copy (Ctrl+C) and paste (Ctrl+V);
+ *  - spreadsheet style column filters (several values per column, several columns).
  */
 
 import React from "react";
@@ -18,6 +19,7 @@ import {
   listClientUsersForSelect,
   batchUpdateLinkBuildingOrderCells,
   getLinkBuildingOrderColumnValues,
+  getLinkBuildingOrderFilterValues,
 } from "@/services/admin/link-building-dashboard.service";
 import type { LinkBuildingOrderRow } from "@/types/admin/link-building-order";
 
@@ -35,33 +37,24 @@ jest.mock("@/services/admin/link-building-dashboard.service", () => {
     batchUpdateLinkBuildingOrders: jest.fn(),
     batchUpdateLinkBuildingOrderCells: jest.fn(),
     getLinkBuildingOrderColumnValues: jest.fn(),
+    getLinkBuildingOrderFilterValues: jest.fn(),
     listAdminUsersForSelect:    jest.fn(),
     listClientUsersForSelect:   jest.fn(),
   };
 });
 
-// NOTE: sort_rules/column_filters must be referentially stable across renders —
+// NOTE: sort_rules must be referentially stable across renders, since
 // the table's fetch effect depends on them, and a fresh array/object literal on
 // every call would re-trigger the fetch effect forever (infinite "Loading…" loop).
 jest.mock("@/hooks/useTableSort", () => {
   const stable_sort_rules: unknown[] = [];
   return {
-    useTableSort: () => ({ sort_rules: stable_sort_rules, toggleSort: jest.fn(), clearSort: jest.fn() }),
-  };
-});
-
-jest.mock("@/hooks/useColumnFilters", () => {
-  const stable_column_filters = {};
-  return {
-    useColumnFilters: () => ({
-      column_filters: stable_column_filters,
-      setFilter: jest.fn(),
-      clearFilter: jest.fn(),
-      clearAllFilters: jest.fn(),
-      active_filter_count: 0,
-      applyFilters: (rows: unknown[]) => rows,
+    useTableSort: () => ({
+      sort_rules: stable_sort_rules,
+      toggleSort: jest.fn(),
+      setSort: jest.fn(),
+      clearSort: jest.fn(),
     }),
-    isFilterActive: () => false,
   };
 });
 
@@ -89,7 +82,6 @@ jest.mock("@/hooks/useLinkBuildingCollaboration", () => ({
 
 // Presentational children unrelated to this feature — stub them out so the table
 // can mount without pulling in websocket/dropdown/searchable-select internals.
-jest.mock("@/components/admin/dashboard/ColumnFilterDropdown", () => ({ __esModule: true, default: () => null }));
 jest.mock("@/components/admin/dashboard/LinkBuildingOrderImportModal", () => ({ __esModule: true, default: () => null }));
 jest.mock("@/components/admin/dashboard/UserSelectFilterDropdown", () => ({ __esModule: true, default: () => null }));
 jest.mock("@/components/admin/dashboard/ClientAssignCell", () => ({ __esModule: true, default: () => null }));
@@ -109,6 +101,7 @@ const mockListAdminUsersForSelect = listAdminUsersForSelect as jest.MockedFuncti
 const mockListClientUsersForSelect = listClientUsersForSelect as jest.MockedFunction<typeof listClientUsersForSelect>;
 const mockBatchUpdateLinkBuildingOrderCells = batchUpdateLinkBuildingOrderCells as jest.MockedFunction<typeof batchUpdateLinkBuildingOrderCells>;
 const mockGetLinkBuildingOrderColumnValues = getLinkBuildingOrderColumnValues as jest.MockedFunction<typeof getLinkBuildingOrderColumnValues>;
+const mockGetLinkBuildingOrderFilterValues = getLinkBuildingOrderFilterValues as jest.MockedFunction<typeof getLinkBuildingOrderFilterValues>;
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -1074,5 +1067,125 @@ describe("LinkBuildingOrdersTable — copy entire column", () => {
     );
 
     await screen.findByText(/No values to copy from "Landing Page"/i);
+  });
+});
+
+describe("LinkBuildingOrdersTable, spreadsheet style column filters", () => {
+  /** Column filters sent with the most recent search request. */
+  function lastSearchColumnFilters() {
+    const calls = mockListLinkBuildingOrders.mock.calls;
+    return calls[calls.length - 1][0]?.column_filters;
+  }
+
+  function mockFilterValues(values: { value: string; count: number }[]) {
+    mockGetLinkBuildingOrderFilterValues.mockResolvedValue({
+      data: values,
+      total_distinct: values.length,
+      has_more: false,
+    });
+  }
+
+  it("keeps several checked values of the same column and sends them as one include filter", async () => {
+    await renderTableWithRow(makeRow());
+    mockFilterValues([
+      { value: "https://mather.com/a", count: 4 },
+      { value: "https://mather.com/b", count: 2 },
+      { value: "https://other.com", count: 9 },
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Filter Landing Page" }));
+    await screen.findByText("https://other.com");
+
+    // Everything starts checked, like Google Sheets. "Clear" then pick two.
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /https:\/\/mather\.com\/a/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /https:\/\/mather\.com\/b/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+    await waitFor(() =>
+      expect(lastSearchColumnFilters()).toEqual([
+        {
+          key: "landing_page",
+          type: "values",
+          mode: "include",
+          values: ["https://mather.com/a", "https://mather.com/b"],
+        },
+      ])
+    );
+    expect(screen.getByText("Filtered by:")).toBeInTheDocument();
+  });
+
+  it("applying while searching keeps only the checked matches", async () => {
+    await renderTableWithRow(makeRow());
+    mockFilterValues([{ value: "Acme Corp", count: 3 }]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Filter Company" }));
+    await screen.findByText("Acme Corp");
+
+    mockFilterValues([
+      { value: "Mather", count: 5 },
+      { value: "Mather Senior Living", count: 2 },
+    ]);
+    fireEvent.change(screen.getByRole("textbox", { name: "Search values" }), { target: { value: "mather" } });
+    await screen.findByText("Mather Senior Living");
+    expect(mockGetLinkBuildingOrderFilterValues).toHaveBeenLastCalledWith("client", expect.any(Object), "mather");
+
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+    await waitFor(() =>
+      expect(lastSearchColumnFilters()).toEqual([
+        { key: "client", type: "values", mode: "include", values: ["Mather", "Mather Senior Living"] },
+      ])
+    );
+  });
+
+  it("keeps filters on different columns at the same time and lets each one be removed", async () => {
+    await renderTableWithRow(makeRow());
+
+    // Column 1: exclude a single value by unchecking it.
+    mockFilterValues([
+      { value: "DR 30+ External", count: 4 },
+      { value: "DR 50+ External", count: 1 },
+    ]);
+    fireEvent.click(screen.getByRole("button", { name: "Filter Link Type" }));
+    fireEvent.click(await screen.findByRole("checkbox", { name: /DR 50\+ External/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+    // Column 2: a "Text contains" condition.
+    // Applying refetches the rows (the skeleton replaces the table meanwhile).
+    mockFilterValues([{ value: "seo tools", count: 1 }]);
+    fireEvent.click(await screen.findByRole("button", { name: "Filter Keyword" }));
+    await screen.findByText("seo tools");
+    fireEvent.click(screen.getByRole("button", { name: "Filter by condition" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Condition" }), { target: { value: "text_contains" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Condition value" }), { target: { value: "seo" } });
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+    await waitFor(() =>
+      expect(lastSearchColumnFilters()).toEqual([
+        { key: "link_type", type: "values", mode: "exclude", values: ["DR 50+ External"] },
+        { key: "keyword", type: "condition", operator: "text_contains", value: "seo", value_to: undefined },
+      ])
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove the Link Type filter" }));
+
+    await waitFor(() =>
+      expect(lastSearchColumnFilters()).toEqual([
+        { key: "keyword", type: "condition", operator: "text_contains", value: "seo", value_to: undefined },
+      ])
+    );
+  });
+
+  it("disables Apply when every value is unchecked", async () => {
+    await renderTableWithRow(makeRow());
+    mockFilterValues([{ value: "Acme Corp", count: 1 }]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Filter Company" }));
+    await screen.findByText("Acme Corp");
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+
+    expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled();
+    expect(screen.getByText("Select at least one value.")).toBeInTheDocument();
   });
 });

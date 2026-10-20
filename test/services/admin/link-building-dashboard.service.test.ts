@@ -26,6 +26,7 @@ import {
   batchUpdateLinkBuildingOrders,
   batchUpdateLinkBuildingOrderCells,
   getLinkBuildingOrderColumnValues,
+  getLinkBuildingOrderFilterValues,
   buildLboPayload,
   parseApiErrorMessage,
   getMissingLboFields,
@@ -277,6 +278,45 @@ describe("batchUpdateLinkBuildingOrderCells", () => {
 // ─── getLinkBuildingOrderColumnValues ─────────────────────────────────────────
 // Powers the "copy entire column" header button (e.g. copying every Landing Page
 // so an admin can paste the list of domains into a tool like Ahrefs).
+
+describe("getLinkBuildingOrderFilterValues", () => {
+  it("POSTs the column, the value search and the filters, without paging or sorting", async () => {
+    const response = { data: [{ value: "Mather", count: 3 }], total_distinct: 1, has_more: false };
+    mocked.post.mockResolvedValueOnce(response as never);
+
+    const result = await getLinkBuildingOrderFilterValues(
+      "client",
+      {
+        page: 2,
+        per_page: 50,
+        status: "Live",
+        sort_rules: [{ key: "order_id", direction: "desc" }],
+        column_filters: [{ key: "client", type: "values", mode: "include", values: ["Mather"] }],
+      },
+      "  mather  "
+    );
+
+    const [url, body] = mocked.post.mock.calls[0];
+    expect(url).toBe("/api/admin/link-building-orders/filter-values");
+    expect(body).toEqual({
+      column: "client",
+      status: "Live",
+      column_filters: [{ key: "client", type: "values", mode: "include", values: ["Mather"] }],
+      value_search: "mather",
+      limit: undefined,
+    });
+    expect(result).toEqual(response);
+  });
+
+  it("omits an empty value search", async () => {
+    mocked.post.mockResolvedValueOnce({ data: [], total_distinct: 0, has_more: false } as never);
+
+    await getLinkBuildingOrderFilterValues("keyword", {}, "   ");
+
+    const [, body] = mocked.post.mock.calls[0];
+    expect(body).toEqual({ column: "keyword", value_search: undefined, limit: undefined });
+  });
+});
 
 describe("getLinkBuildingOrderColumnValues", () => {
   it("POSTs the column plus the current filters when no row_ids are given", async () => {

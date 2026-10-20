@@ -123,11 +123,67 @@ export interface DateColumnFilterPayload {
   to: string;
 }
 
+/**
+ * Spreadsheet style "Filter by values". `include` keeps only the listed values,
+ * `exclude` hides them and keeps everything else. An empty string means "(Blanks)".
+ */
+export interface ValuesColumnFilterPayload {
+  key: string;
+  type: "values";
+  mode: "include" | "exclude";
+  values: string[];
+}
+
+export type FilterConditionOperator =
+  | "is_empty"
+  | "is_not_empty"
+  | "text_contains"
+  | "text_not_contains"
+  | "text_starts_with"
+  | "text_ends_with"
+  | "text_is_exactly"
+  | "date_is"
+  | "date_is_before"
+  | "date_is_after"
+  | "greater_than"
+  | "greater_than_or_equal"
+  | "less_than"
+  | "less_than_or_equal"
+  | "is_equal_to"
+  | "is_not_equal_to"
+  | "is_between"
+  | "is_not_between";
+
+/** Spreadsheet style "Filter by condition". Dates are sent as YYYY-MM-DD. */
+export interface ConditionColumnFilterPayload {
+  key: string;
+  type: "condition";
+  operator: FilterConditionOperator;
+  value?: string;
+  /** Upper bound, only used by the "is_between" and "is_not_between" operators. */
+  value_to?: string;
+}
+
 export type ColumnFilterPayload =
   | TextColumnFilterPayload
   | SelectColumnFilterPayload
   | NumberColumnFilterPayload
-  | DateColumnFilterPayload;
+  | DateColumnFilterPayload
+  | ValuesColumnFilterPayload
+  | ConditionColumnFilterPayload;
+
+/** One distinct value of a column, as listed by the "Filter by values" checklist. */
+export interface LinkBuildingOrderFilterValue {
+  value: string;
+  count: number;
+}
+
+export interface LinkBuildingOrderFilterValuesResponse {
+  data: LinkBuildingOrderFilterValue[];
+  /** Distinct values matching the request, which may exceed `data.length`. */
+  total_distinct: number;
+  has_more: boolean;
+}
 
 export interface LinkBuildingOrderSearchBody {
   page?: number;

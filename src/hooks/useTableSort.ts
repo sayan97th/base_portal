@@ -59,7 +59,12 @@ export function useTableSort(default_rules: SortRulePayload[] = []) {
     []
   );
 
+  /** Replaces every rule with a single explicit sort, e.g. a "Sort A to Z" menu action. */
+  const setSort = useCallback((key: string, direction: SortDirection) => {
+    setSortRules([{ key, direction, nulls_last: true }]);
+  }, []);
+
   const clearSort = useCallback(() => setSortRules(default_rules_ref.current), []);
 
-  return { sort_rules, toggleSort, clearSort };
+  return { sort_rules, toggleSort, setSort, clearSort };
 }
