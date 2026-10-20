@@ -249,6 +249,7 @@ export default function SheetColumnFilterDropdown({
   const debounced_value_search = useDebounce(value_search.trim(), 300);
   const [reload_count, setReloadCount] = useState(0);
   const [values_result, setValuesResult] = useState<ValuesResult | null>(null);
+  const [is_applying, setIsApplying] = useState(false);
 
   const request_key = `${reload_count}:${debounced_value_search}`;
 
@@ -284,12 +285,21 @@ export default function SheetColumnFilterDropdown({
 
   const is_loading_values = values_result?.request_key !== request_key;
   const items = useMemo(() => values_result?.data ?? [], [values_result]);
-  const is_searching = debounced_value_search !== "";
+  const typed_value_search = value_search.trim();
+  // Searching is driven by the typed text, not the debounced one, so clicking Apply
+  // right after typing still applies the search instead of silently ignoring it.
+  const is_searching = typed_value_search !== "";
   // While typing, the visible list still belongs to the previous search text.
-  const is_search_pending = value_search.trim() !== debounced_value_search || is_loading_values;
+  const is_search_pending = typed_value_search !== debounced_value_search || is_loading_values;
 
   const isChecked = (value: string) =>
     selection_mode === "include" ? selection_values.has(value) : !selection_values.has(value);
+
+  /** Like Google Sheets, applying while searching keeps only the checked matches. */
+  const checkedMatches = (matches: LinkBuildingOrderFilterValue[]): ValuesSelection => ({
+    mode: "include",
+    values: matches.filter((item) => isChecked(item.value)).map((item) => item.value),
+  });
 
   const toggleValue = (value: string) =>
     setSelectionValues((prev) => {
@@ -319,39 +329,53 @@ export default function SheetColumnFilterDropdown({
     });
   };
 
-  const values_selection = useMemo((): ValuesSelection | null => {
-    // Like Google Sheets, applying while searching keeps only the matching values
-    // that are checked. This is how "all variations of a client" is picked quickly.
-    if (is_searching) {
-      return {
-        mode: "include",
-        values: items
-          .filter((item) =>
-            selection_mode === "include"
-              ? selection_values.has(item.value)
-              : !selection_values.has(item.value)
-          )
-          .map((item) => item.value),
-      };
-    }
-    if (selection_mode === "exclude") {
-      return selection_values.size > 0 ? { mode: "exclude", values: [...selection_values] } : null;
-    }
-    return { mode: "include", values: [...selection_values] };
-  }, [is_searching, items, selection_mode, selection_values]);
+  // Searching for e.g. "mather" and applying is how every variation of a client is
+  // picked at once. Not meaningful while the matches for the typed text are loading.
+  const values_selection: ValuesSelection | null = is_searching
+    ? checkedMatches(items)
+    : selection_mode === "exclude"
+      ? selection_values.size > 0
+        ? { mode: "exclude", values: [...selection_values] }
+        : null
+      : { mode: "include", values: [...selection_values] };
 
-  const is_values_empty = values_selection?.mode === "include" && values_selection.values.length === 0;
+  const is_values_empty =
+    !(is_searching && is_search_pending) &&
+    values_selection?.mode === "include" &&
+    values_selection.values.length === 0;
   const checked_visible_count = items.filter((item) => isChecked(item.value)).length;
 
   // ── Apply / clear ────────────────────────────────────────────────────────────
 
-  const can_apply =
-    !is_condition_incomplete && !is_values_empty && !(is_searching && is_search_pending);
+  const can_apply = !is_condition_incomplete && !is_values_empty && !is_applying;
 
-  const handleApply = () => {
-    if (!can_apply) return;
-    onApply(condition || values_selection ? { condition, values: values_selection } : null);
+  const commitFilter = (selection: ValuesSelection | null) => {
+    onApply(condition || selection ? { condition, values: selection } : null);
     onClose();
+  };
+
+  const handleApply = async () => {
+    if (!can_apply) return;
+
+    if (!(is_searching && is_search_pending)) {
+      commitFilter(values_selection);
+      return;
+    }
+
+    // Apply was pressed before the matches for the typed text arrived, so fetch
+    // them now and apply the checked ones, rather than dropping the search.
+    setIsApplying(true);
+    try {
+      const res = await loadValues(typed_value_search);
+      const selection = checkedMatches(res.data);
+      if (selection.values.length > 0) {
+        commitFilter(selection);
+        return;
+      }
+    } catch {
+      // Falls through: the list below shows the load error or the empty search.
+    }
+    setIsApplying(false);
   };
 
   const handleClearFilter = () => {
@@ -511,7 +535,8 @@ export default function SheetColumnFilterDropdown({
                   <button
                     type="button"
                     onClick={() => setAllChecked(true)}
-                    className="font-medium text-brand-600 hover:underline dark:text-brand-400"
+                    disabled={is_searching && is_search_pending}
+                    className="font-medium text-brand-600 hover:underline dark:text-brand-400 disabled:cursor-wait disabled:opacity-40"
                   >
                     {is_searching
                       ? "Select all matches"
@@ -520,7 +545,8 @@ export default function SheetColumnFilterDropdown({
                   <button
                     type="button"
                     onClick={() => setAllChecked(false)}
-                    className="font-medium text-brand-600 hover:underline dark:text-brand-400"
+                    disabled={is_searching && is_search_pending}
+                    className="font-medium text-brand-600 hover:underline dark:text-brand-400 disabled:cursor-wait disabled:opacity-40"
                   >
                     Clear
                   </button>
@@ -649,7 +675,7 @@ export default function SheetColumnFilterDropdown({
             disabled={!can_apply}
             className="rounded bg-brand-500 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Apply
+            {is_applying ? "Applying" : "Apply"}
           </button>
         </div>
       </div>

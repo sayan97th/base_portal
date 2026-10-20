@@ -3269,9 +3269,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                           }}
                           title={filter_is_active ? "Edit this column's filter" : "Sort or filter this column"}
                           aria-label={`Filter ${col.label}`}
-                          className={`shrink-0 rounded p-0.5 transition-opacity ${filter_is_active
-                            ? "opacity-100 text-yellow-200"
-                            : "opacity-30 hover:opacity-80"
+                          className={`shrink-0 rounded p-0.5 transition ${filter_is_active
+                            ? "bg-white/20 opacity-100 text-yellow-200"
+                            : "opacity-70 hover:bg-white/15 hover:opacity-100"
                             }`}
                         >
                           <svg
