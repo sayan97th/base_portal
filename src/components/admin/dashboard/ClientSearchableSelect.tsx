@@ -132,7 +132,7 @@ export default function ClientSearchableSelect({
   const content = (
     <div
       ref={dropdown_ref}
-      className="fixed z-[9999] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl shadow-gray-400/20 dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/50"
+      className="fixed z-[100001] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl shadow-gray-400/20 dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/50"
       style={{ top: position.top, left: position.left, minWidth: position.min_width }}
     >
       {/* Header */}

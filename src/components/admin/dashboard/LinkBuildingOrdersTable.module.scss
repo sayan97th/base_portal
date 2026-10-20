@@ -30,14 +30,34 @@ $find_current_ring: #f59e0b;
 $find_current_ring_dark: #fbbf24;
 $find_mark_bg: #fde047;
 $find_mark_bg_dark: #a16207;
-$row_height: 32px;
+$row_height: 34px;
 $letter_row_height: 22px;
-$header_row_height: 34px;
-$cell_font_size: 12px;
+$header_row_height: 36px;
+$cell_font_size: 13px;
+// Outfit, the portal's typeface (loaded by next/font in the root layout and
+// exposed as --font-outfit), with system fallbacks while it loads.
+$font_family: var(--font-outfit), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 
 @mixin dark {
   :global(.dark) & {
     @content;
+  }
+}
+
+// ── Root ───────────────────────────────────────────────────────────────────────
+
+// Applies the portal typeface to the whole table card, including the native
+// form controls (inputs, selects, buttons) that do not inherit fonts on their own.
+.table_root {
+  font-family: $font_family;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  input,
+  select,
+  button,
+  textarea {
+    font-family: inherit;
   }
 }
 
@@ -46,7 +66,7 @@ $cell_font_size: 12px;
 .formula_bar {
   display: flex;
   align-items: stretch;
-  min-height: 30px;
+  min-height: 34px;
   border-bottom: 1px solid $grid_line;
   background: #fff;
   font-size: $cell_font_size;
@@ -65,8 +85,9 @@ $cell_font_size: 12px;
   padding: 0 10px;
   border-right: 1px solid $grid_line;
   color: $header_text;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
   font-weight: 600;
+  letter-spacing: 0.02em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -86,7 +107,6 @@ $cell_font_size: 12px;
   color: #9aa0a6;
   font-style: italic;
   font-weight: 600;
-  font-family: Georgia, "Times New Roman", serif;
 
   @include dark {
     border-right-color: $grid_line_dark;
@@ -139,6 +159,20 @@ $cell_font_size: 12px;
   }
 }
 
+// Contextual badges (range size, copied value) on the right of the formula bar.
+.formula_badges {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border-left: 1px solid $grid_line;
+
+  @include dark {
+    border-left-color: $grid_line_dark;
+  }
+}
+
 // ── Scroll container ───────────────────────────────────────────────────────────
 
 .grid_container {
@@ -158,6 +192,7 @@ $cell_font_size: 12px;
 // ── Table and grid lines ───────────────────────────────────────────────────────
 
 .grid_table {
+  font-family: $font_family;
   // "separate" keeps every cell's borders attached to it, so the grid lines
   // stay visible on frozen (sticky) columns and the sticky header while scrolling.
   border-collapse: separate;
@@ -261,6 +296,8 @@ $cell_font_size: 12px;
 .column_header {
   height: $header_row_height;
   padding: 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.01em;
   overflow: hidden;
   white-space: nowrap;
   vertical-align: middle;
@@ -309,6 +346,7 @@ $cell_font_size: 12px;
 
 .cell {
   padding: 0 8px;
+  font-size: $cell_font_size;
   cursor: cell;
 }
 
@@ -418,6 +456,7 @@ $cell_font_size: 12px;
   padding: 0 7px;
   border: 2px solid $selection_color;
   background: #fff;
+  font-family: inherit;
   font-size: $cell_font_size;
   outline: none;
   box-shadow: 0 2px 6px rgba(26, 115, 232, 0.25);

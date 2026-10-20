@@ -86,7 +86,7 @@ export default function CellOptionsDropdown({
   const content = (
     <div
       ref={panel_ref}
-      className="fixed z-[9999] max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-2xl shadow-gray-400/20 dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/50"
+      className="fixed z-[100001] max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-2xl shadow-gray-400/20 dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/50"
       style={{ top: position.top, left: position.left, minWidth: position.width }}
     >
       {show_custom_row && (

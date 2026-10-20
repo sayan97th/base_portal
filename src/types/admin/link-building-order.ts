@@ -185,6 +185,18 @@ export interface LinkBuildingOrderFilterValuesResponse {
   has_more: boolean;
 }
 
+export interface LinkBuildingOrderStatusCount {
+  /** Status value as stored on the row, "" for rows without a status. */
+  status: string;
+  count: number;
+}
+
+export interface LinkBuildingOrderStatusCountsResponse {
+  data: LinkBuildingOrderStatusCount[];
+  /** Rows matching every filter except the Status ones, i.e. the "All" count. */
+  total: number;
+}
+
 export interface LinkBuildingOrderSearchBody {
   page?: number;
   per_page?: number;

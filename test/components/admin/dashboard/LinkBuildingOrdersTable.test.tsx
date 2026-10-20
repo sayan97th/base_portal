@@ -7,7 +7,8 @@
  *    bulk pastes;
  *  - Excel-style multi-cell range selection, copy (Ctrl+C) and paste (Ctrl+V);
  *  - spreadsheet style column filters (several values per column, several columns);
- *  - saved filters (saving the current view and reapplying a saved one).
+ *  - saved filters (saving the current view and reapplying a saved one);
+ *  - the status filter bar (per status counts, picking a status, active filter chips).
  */
 
 import React from "react";
@@ -21,6 +22,7 @@ import {
   batchUpdateLinkBuildingOrderCells,
   getLinkBuildingOrderColumnValues,
   getLinkBuildingOrderFilterValues,
+  getLinkBuildingOrderStatusCounts,
 } from "@/services/admin/link-building-dashboard.service";
 import {
   listSavedFilters,
@@ -46,6 +48,9 @@ jest.mock("@/services/admin/link-building-dashboard.service", () => {
     getLinkBuildingOrderFilterValues: jest.fn(),
     listAdminUsersForSelect:    jest.fn(),
     listClientUsersForSelect:   jest.fn(),
+    listPenNamesForSelect:      jest.fn().mockResolvedValue([]),
+    getNeedsLbTlApprovalCount:  jest.fn().mockResolvedValue(0),
+    getLinkBuildingOrderStatusCounts: jest.fn().mockResolvedValue({ data: [], total: 0 }),
   };
 });
 
@@ -116,6 +121,7 @@ const mockListClientUsersForSelect = listClientUsersForSelect as jest.MockedFunc
 const mockBatchUpdateLinkBuildingOrderCells = batchUpdateLinkBuildingOrderCells as jest.MockedFunction<typeof batchUpdateLinkBuildingOrderCells>;
 const mockGetLinkBuildingOrderColumnValues = getLinkBuildingOrderColumnValues as jest.MockedFunction<typeof getLinkBuildingOrderColumnValues>;
 const mockGetLinkBuildingOrderFilterValues = getLinkBuildingOrderFilterValues as jest.MockedFunction<typeof getLinkBuildingOrderFilterValues>;
+const mockGetLinkBuildingOrderStatusCounts = getLinkBuildingOrderStatusCounts as jest.MockedFunction<typeof getLinkBuildingOrderStatusCounts>;
 const mockListSavedFilters = listSavedFilters as jest.MockedFunction<typeof listSavedFilters>;
 const mockCreateSavedFilter = createSavedFilter as jest.MockedFunction<typeof createSavedFilter>;
 
@@ -231,15 +237,18 @@ function getTableCellByText(label: string): HTMLElement {
 
 /**
  * Locates an option row inside the floating CellOptionsDropdown panel (rendered via
- * a portal into document.body) by its visible label — disambiguated from any other
- * element carrying the same text by requiring a <button> ancestor, since the panel's
- * rows are the only buttons in the tree that render a plain option label.
+ * a portal into document.body) by its visible label, disambiguated from any other
+ * element carrying the same text by requiring a <button> ancestor that is not one of
+ * the status filter bar's pills (which also render plain status labels).
  */
 function getDropdownOptionButton(label: string): HTMLElement {
   const button = screen
     .getAllByText(label)
     .map((el) => el.closest("button"))
-    .find((btn): btn is HTMLButtonElement => btn !== null);
+    .find(
+      (btn): btn is HTMLButtonElement =>
+        btn !== null && btn.closest("[data-status-filter-bar]") === null
+    );
   if (!button) throw new Error(`No dropdown option button found for "${label}"`);
   return button;
 }
@@ -1271,7 +1280,9 @@ describe("LinkBuildingOrdersTable, saved filters", () => {
     );
     await renderTableWithRow(makeRow());
 
-    fireEvent.change(screen.getByDisplayValue("All Statuses"), { target: { value: "Pending" } });
+    fireEvent.click(
+      within(screen.getByRole("radiogroup", { name: "Filter by status" })).getByRole("radio", { name: /^Pending/ })
+    );
     fireEvent.click(screen.getByRole("button", { name: /Saved Filters/ }));
     await screen.findByText(/No saved filters yet/);
 
@@ -1441,5 +1452,82 @@ describe("LinkBuildingOrdersTable — fixed column layout", () => {
     // The table is exactly as wide as its columns, so nothing stretches past them.
     const total_width = col_widths.reduce((sum, width) => sum + width, 0);
     expect(table!.style.width).toBe(`${total_width}px`);
+  });
+});
+
+// ─── Status filter bar ───────────────────────────────────────────────────────
+
+describe("LinkBuildingOrdersTable, status filter bar", () => {
+  function lastSearchBody() {
+    const calls = mockListLinkBuildingOrders.mock.calls;
+    return calls[calls.length - 1][0];
+  }
+
+  function statusBar() {
+    return within(screen.getByRole("radiogroup", { name: "Filter by status" }));
+  }
+
+  it("shows the row count of every status and of All orders", async () => {
+    mockGetLinkBuildingOrderStatusCounts.mockResolvedValue({
+      data: [
+        { status: "Live", count: 12 },
+        { status: "Pending", count: 3 },
+        { status: "Waiting On Writer", count: 2 },
+      ],
+      total: 17,
+    });
+    await renderTableWithRow(makeRow());
+
+    expect(await statusBar().findByRole("radio", { name: "All orders 17" })).toBeChecked();
+    expect(statusBar().getByRole("radio", { name: "Live 12" })).toBeInTheDocument();
+    expect(statusBar().getByRole("radio", { name: "Reviewing 0" })).toBeInTheDocument();
+    // A status typed by hand, outside the preset list, still gets its own pill.
+    expect(statusBar().getByRole("radio", { name: "Waiting On Writer 2" })).toBeInTheDocument();
+  });
+
+  it("filters by the picked status, lists it as a chip, and clicking it again shows every status", async () => {
+    await renderTableWithRow(makeRow());
+
+    fireEvent.click(statusBar().getByRole("radio", { name: /^Live/ }));
+
+    await waitFor(() => expect(lastSearchBody()).toEqual(expect.objectContaining({ status: "Live" })));
+    expect(statusBar().getByRole("radio", { name: /^Live/ })).toBeChecked();
+    expect(screen.getByRole("button", { name: "Remove the Status quick filter" })).toBeInTheDocument();
+
+    fireEvent.click(statusBar().getByRole("radio", { name: /^Live/ }));
+
+    await waitFor(() => expect(lastSearchBody().status).toBeUndefined());
+    expect(statusBar().getByRole("radio", { name: /^All orders/ })).toBeChecked();
+  });
+
+  it("picking a status turns the Needs LB TL Approval view off", async () => {
+    await renderTableWithRow(makeRow());
+
+    fireEvent.click(statusBar().getByRole("radio", { name: /^Needs LB TL Approval/ }));
+    await waitFor(() =>
+      expect(lastSearchBody()).toEqual(expect.objectContaining({ needs_lb_tl_approval: true }))
+    );
+
+    fireEvent.click(statusBar().getByRole("radio", { name: /^Pending/ }));
+
+    await waitFor(() =>
+      expect(lastSearchBody()).toEqual(
+        expect.objectContaining({ status: "Pending", needs_lb_tl_approval: undefined })
+      )
+    );
+  });
+
+  it("asks for the status counts with the current filters", async () => {
+    await renderTableWithRow(makeRow());
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Filter by link type" }), {
+      target: { value: "DR 50+ External" },
+    });
+
+    await waitFor(() =>
+      expect(mockGetLinkBuildingOrderStatusCounts).toHaveBeenLastCalledWith(
+        expect.objectContaining({ link_type: "DR 50+ External" })
+      )
+    );
   });
 });

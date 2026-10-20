@@ -407,7 +407,7 @@ export default function SheetColumnFilterDropdown({
       ref={dropdown_ref}
       role="dialog"
       aria-label={`Filter ${col_label}`}
-      className="fixed z-[9999] flex w-[19rem] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900"
+      className="fixed z-[100001] flex w-[19rem] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900"
       style={{
         top: position.top,
         bottom: position.bottom,

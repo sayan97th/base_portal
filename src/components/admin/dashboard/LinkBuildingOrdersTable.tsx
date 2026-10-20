@@ -28,6 +28,7 @@ import {
   listClientUsersForSelect,
   listPenNamesForSelect,
   getNeedsLbTlApprovalCount,
+  getLinkBuildingOrderStatusCounts,
   parseApiErrorMessage,
   type AdminUserOption,
   type ClientUserOption,
@@ -69,6 +70,15 @@ import {
 import { useResizableColumnWidths } from "@/hooks/useResizableColumnWidths";
 import { useTableFind, type TableFindMatch, type TableFindMatchState } from "@/hooks/useTableFind";
 import TableFindBar from "./TableFindBar";
+import StatusFilterBar from "./StatusFilterBar";
+import ActiveFiltersBar, { type ActiveFilterChip } from "./ActiveFiltersBar";
+import ColumnVisibilityPanel, { type ColumnVisibilityGroup } from "./ColumnVisibilityPanel";
+import TablePagination from "./TablePagination";
+import {
+  LINK_BUILDING_ORDER_STATUSES,
+  STATUS_BADGE_CLASSES,
+  DEFAULT_STATUS_BADGE_CLASS,
+} from "@/lib/link-building-order-statuses";
 import FindHighlightedText from "./FindHighlightedText";
 import styles from "./LinkBuildingOrdersTable.module.scss";
 
@@ -172,21 +182,7 @@ const LINK_TYPE_OPTIONS = [
   "DR 70+ Internal",
 ];
 
-const STATUS_OPTIONS = [
-  "New Request",
-  "Reviewing",
-  "Ordered",
-  "Pending",
-  "Live",
-  "Quality Control",
-  "Cancelled",
-  "Partnership Check",
-  "Approved",
-  "Not Approved",
-  "Ready",
-  "Rejected",
-  "Scheduled",
-];
+const STATUS_OPTIONS = LINK_BUILDING_ORDER_STATUSES;
 
 const COLUMNS: ColumnDef[] = [
   { key: "order_id", label: "Order ID", group: "order", min_width: 110, type: "text", sticky: true },
@@ -280,6 +276,37 @@ const GROUP_HEADER_STYLES: Record<ColumnGroup, string> = {
   metrics: "bg-emerald-700 text-white border-emerald-800",
   pricing: "bg-gray-200 text-gray-800 border-gray-300 dark:bg-gray-600 dark:text-gray-100 dark:border-gray-500",
 };
+
+/** Names and header colors of the column groups, in table order, for the column chooser. */
+const COLUMN_GROUP_META: Record<ColumnGroup, { label: string; swatch_class: string }> = {
+  order: { label: "Order", swatch_class: "bg-gray-950 dark:bg-gray-400" },
+  status_col: { label: "Status", swatch_class: "bg-purple-700" },
+  team_link: { label: "Team Link", swatch_class: "bg-pink-600" },
+  core: { label: "Order Details", swatch_class: "bg-gray-700 dark:bg-gray-500" },
+  internal: { label: "Internal", swatch_class: "bg-slate-600" },
+  dates: { label: "Dates", swatch_class: "bg-amber-700" },
+  writer: { label: "Writer and Content", swatch_class: "bg-gray-300 dark:bg-gray-600" },
+  live: { label: "Live Link", swatch_class: "bg-rose-400" },
+  metrics: { label: "Metrics", swatch_class: "bg-emerald-700" },
+  pricing: { label: "Pricing and Approval", swatch_class: "bg-gray-300 dark:bg-gray-600" },
+};
+
+const COLUMN_VISIBILITY_GROUPS: ColumnVisibilityGroup[] = COLUMNS.reduce<ColumnVisibilityGroup[]>((groups, col) => {
+  let group = groups.find((g) => g.key === col.group);
+  if (!group) {
+    group = { key: col.group, ...COLUMN_GROUP_META[col.group], columns: [] };
+    groups.push(group);
+  }
+  group.columns.push({ key: col.key as string, label: col.label });
+  return groups;
+}, []);
+
+// Shared toolbar control styles, so every button and input in the header lines up at the same height.
+const toolbar_button_base_class =
+  "flex h-9 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30";
+const toolbar_button_class = `${toolbar_button_base_class} border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700`;
+const toolbar_input_class =
+  "h-9 rounded-lg border border-gray-200 bg-white text-sm text-gray-800 placeholder-gray-400 outline-none transition focus:border-brand-400 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500";
 
 // ── Empty row factory ──────────────────────────────────────────────────────────
 
@@ -833,25 +860,9 @@ function EditableCell({
       </span>
     );
   } else if (col.key === "status" && value) {
-    const status_map: Record<string, string> = {
-      "New Request": "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-      Reviewing: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400",
-      Ordered: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
-      Pending: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-      Live: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-      "Quality Control": "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
-      Cancelled: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-      "Partnership Check": "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-      Approved: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-      "Not Approved": "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-      Ready: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400",
-      Rejected: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",
-      Scheduled: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
-    };
     display = (
       <span
-        className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs font-medium ${status_map[value] ?? "bg-gray-100 text-gray-600"
-          }`}
+        className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs font-medium ${STATUS_BADGE_CLASSES[value] ?? DEFAULT_STATUS_BADGE_CLASS}`}
       >
         {value === "Live" && <span className="h-1.5 w-1.5 rounded-full bg-green-500" />}
         <FindHighlightedText text={value} normalized_query={find_query} />
@@ -1013,6 +1024,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   const [assigned_user_id_filter, setAssignedUserIdFilter] = useState<number | null>(null);
   const [needs_approval_filter, setNeedsApprovalFilter] = useState(false);
   const [needs_approval_count, setNeedsApprovalCount] = useState<number | null>(null);
+  const [status_counts, setStatusCounts] = useState<Record<string, number> | null>(null);
+  const [status_total, setStatusTotal] = useState<number | null>(null);
+  const [is_fullscreen, setIsFullscreen] = useState(false);
   const [open_special_filter, setOpenSpecialFilter] = useState<"client_account" | "assigned_to" | null>(null);
   const [special_filter_anchor_el, setSpecialFilterAnchorEl] = useState<HTMLElement | null>(null);
   const [show_filter_panel, setShowFilterPanel] = useState(false);
@@ -1130,13 +1144,24 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   const on_order_mutated_ref = useRef(onOrderMutated);
   on_order_mutated_ref.current = onOrderMutated;
 
-  const refreshNeedsApprovalCount = useCallback(() => {
-    getNeedsLbTlApprovalCount().then(setNeedsApprovalCount).catch(() => {/* non-critical */ });
+  const refreshStatusCounts = useCallback(() => {
+    getLinkBuildingOrderStatusCounts(current_body_ref.current)
+      .then((res) => {
+        setStatusCounts(Object.fromEntries(res.data.map((item) => [item.status, item.count])));
+        setStatusTotal(res.total);
+      })
+      .catch(() => {/* non-critical */ });
   }, []);
 
+  /** Refreshes the badges on the status filter bar after rows change. */
+  const refreshFilterCounts = useCallback(() => {
+    getNeedsLbTlApprovalCount().then(setNeedsApprovalCount).catch(() => {/* non-critical */ });
+    refreshStatusCounts();
+  }, [refreshStatusCounts]);
+
   useEffect(() => {
-    refreshNeedsApprovalCount();
-  }, [refreshNeedsApprovalCount]);
+    getNeedsLbTlApprovalCount().then(setNeedsApprovalCount).catch(() => {/* non-critical */ });
+  }, []);
 
   // ── Real-time collaboration ─────────────────────────────────────────────────
 
@@ -1158,9 +1183,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         })
       );
       on_order_mutated_ref.current?.();
-      refreshNeedsApprovalCount();
+      refreshFilterCounts();
     },
-    [refreshNeedsApprovalCount]
+    [refreshFilterCounts]
   );
 
   const handleRemoteRowCreated = useCallback(
@@ -1173,9 +1198,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       });
       setTotal((prev) => prev + 1);
       on_order_mutated_ref.current?.();
-      refreshNeedsApprovalCount();
+      refreshFilterCounts();
     },
-    [refreshNeedsApprovalCount]
+    [refreshFilterCounts]
   );
 
   const handleRemoteRowDeleted = useCallback(
@@ -1187,9 +1212,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       setRows((prev) => prev.filter((r) => r.id !== row_id));
       setTotal((prev) => Math.max(0, prev - 1));
       on_order_mutated_ref.current?.();
-      refreshNeedsApprovalCount();
+      refreshFilterCounts();
     },
-    [refreshNeedsApprovalCount]
+    [refreshFilterCounts]
   );
 
   const { user } = useAuth();
@@ -1306,6 +1331,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
     current_body_ref.current = body;
     fetchRows(1, body);
+    refreshStatusCounts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     debounced_search,
@@ -1442,7 +1468,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       );
       saveDraftsToStorage(remaining);
       on_order_mutated_ref.current?.();
-      refreshNeedsApprovalCount();
+      refreshFilterCounts();
     } catch (err) {
       const all_drafts = rows_ref.current.filter((r) => new_row_ids_ref.current.has(r.id));
       saveDraftsToStorage(all_drafts);
@@ -1452,7 +1478,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     } finally {
       unmarkSaving(row.id);
     }
-  }, [refreshNeedsApprovalCount]);
+  }, [refreshFilterCounts]);
 
   const persistRowUpdate = useCallback(async (row: LinkBuildingOrderRow, changed_col_key?: string, value_changed = true) => {
     markSaving(row.id);
@@ -1488,14 +1514,14 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         }
       }
       on_order_mutated_ref.current?.();
-      refreshNeedsApprovalCount();
+      refreshFilterCounts();
     } catch (err) {
       const api_message = parseApiErrorMessage(err, COLUMN_LABELS);
       setSaveError(`Failed to save row "${row.order_id}": ${api_message}`);
     } finally {
       unmarkSaving(row.id);
     }
-  }, [refreshNeedsApprovalCount]);
+  }, [refreshFilterCounts]);
 
   // ── Undo / redo ─────────────────────────────────────────────────────────────
   // Every user action that changes one or more persisted cells (a single cell edit,
@@ -1549,14 +1575,14 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       const updated_by_id = new Map(res.data.map((r) => [r.id, r]));
       setRows((prev) => prev.map((r) => updated_by_id.get(r.id) ?? r));
       on_order_mutated_ref.current?.();
-      refreshNeedsApprovalCount();
+      refreshFilterCounts();
     } catch (err) {
       const api_message = parseApiErrorMessage(err, COLUMN_LABELS);
       setSaveError(`Failed to sync the change, please try again: ${api_message}`);
     } finally {
       setIsUndoRedoSaving(false);
     }
-  }, [refreshNeedsApprovalCount]);
+  }, [refreshFilterCounts]);
 
   const undo = useCallback(() => {
     const stack = undo_stack_kbd_ref.current;
@@ -1891,13 +1917,13 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       await deleteLinkBuildingOrder(row_id);
       setRows((prev) => prev.filter((r) => r.id !== row_id));
       on_order_mutated_ref.current?.();
-      refreshNeedsApprovalCount();
+      refreshFilterCounts();
     } catch {
       setSaveError("Failed to delete row. Please try again.");
     } finally {
       unmarkSaving(row_id);
     }
-  }, [refreshNeedsApprovalCount]);
+  }, [refreshFilterCounts]);
 
   // ── Assign user ─────────────────────────────────────────────────────────────
 
@@ -2055,6 +2081,32 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     [replaceSheetFilters, replaceSort]
   );
 
+  /** Picks a status from the status bar. A plain status replaces the "Needs LB TL Approval" view. */
+  const selectStatusFilter = useCallback((status: string) => {
+    setNeedsApprovalFilter(false);
+    setStatusFilter(status);
+  }, []);
+
+  const setColumnsHidden = useCallback((col_keys: string[], is_hidden: boolean) => {
+    setHiddenColumns((prev) => {
+      const next = new Set(prev);
+      col_keys.forEach((col_key) => (is_hidden ? next.add(col_key) : next.delete(col_key)));
+      return next;
+    });
+  }, []);
+
+  /** Clears every filter chip (toolbar and column filters) but keeps the sort and hidden columns. */
+  const clearFilterChips = useCallback(() => {
+    setSearch("");
+    setStatusFilter("");
+    setClientFilter("");
+    setLinkTypeFilter("");
+    setClientAccountFilter(null);
+    setAssignedUserIdFilter(null);
+    setNeedsApprovalFilter(false);
+    clearAllSheetFilters();
+  }, [clearAllSheetFilters]);
+
   const toggleNeedsApprovalFilter = useCallback(() => {
     setNeedsApprovalFilter((prev) => {
       const next = !prev;
@@ -2064,6 +2116,13 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       return next;
     });
   }, []);
+
+  const openSpecialFilter = useCallback((filter_key: "client_account" | "assigned_to", anchor_el: HTMLElement) => {
+    setOpenSpecialFilter(filter_key);
+    setSpecialFilterAnchorEl(anchor_el);
+  }, []);
+
+  const search_input_ref = useRef<HTMLInputElement>(null);
 
   const handlePerPageChange = useCallback((option: PerPageOption) => {
     setPerPage(option);
@@ -2157,6 +2216,114 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       ),
     [open_filter_col]
   );
+
+  // ── Active filter chips ─────────────────────────────────────────────────────
+
+  const active_filter_chips = useMemo<ActiveFilterChip[]>(() => {
+    const chips: ActiveFilterChip[] = [];
+    if (search.trim()) {
+      chips.push({
+        key: "search",
+        label: "Search",
+        description: `"${search.trim()}"`,
+        remove_label: "Remove the search",
+        kind: "quick",
+        onEdit: () => search_input_ref.current?.focus(),
+        onRemove: () => setSearch(""),
+      });
+    }
+    if (needs_approval_filter) {
+      chips.push({
+        key: "needs_approval",
+        label: "Status",
+        description: "Live, needs LB TL Approval",
+        remove_label: "Remove the Needs LB TL Approval filter",
+        kind: "quick",
+        onRemove: () => setNeedsApprovalFilter(false),
+      });
+    } else if (status_filter) {
+      chips.push({
+        key: "status",
+        label: "Status",
+        description: status_filter,
+        remove_label: "Remove the Status quick filter",
+        kind: "quick",
+        onRemove: () => setStatusFilter(""),
+      });
+    }
+    if (link_type_filter) {
+      chips.push({
+        key: "link_type",
+        label: "Link Type",
+        description: link_type_filter,
+        remove_label: "Remove the Link Type quick filter",
+        kind: "quick",
+        onRemove: () => setLinkTypeFilter(""),
+      });
+    }
+    if (client_filter.trim()) {
+      chips.push({
+        key: "company",
+        label: "Company",
+        description: `contains "${client_filter.trim()}"`,
+        remove_label: "Remove the Company quick filter",
+        kind: "quick",
+        onRemove: () => setClientFilter(""),
+      });
+    }
+    if (client_account_filter !== null) {
+      const client_user = client_users.find((u) => u.id === client_account_filter);
+      chips.push({
+        key: "client_account",
+        label: "Client Account",
+        description: client_user ? client_user.company || client_user.name : `#${client_account_filter}`,
+        remove_label: "Remove the Client Account filter",
+        kind: "quick",
+        onEdit: (anchor_el) => openSpecialFilter("client_account", anchor_el),
+        onRemove: () => setClientAccountFilter(null),
+      });
+    }
+    if (assigned_user_id_filter !== null) {
+      const admin_user = admin_users.find((u) => u.id === assigned_user_id_filter);
+      chips.push({
+        key: "assigned_to",
+        label: "Assigned To",
+        description: admin_user ? admin_user.name : `#${assigned_user_id_filter}`,
+        remove_label: "Remove the Assigned To filter",
+        kind: "quick",
+        onEdit: (anchor_el) => openSpecialFilter("assigned_to", anchor_el),
+        onRemove: () => setAssignedUserIdFilter(null),
+      });
+    }
+    // One chip per filtered column (hidden columns included), so filters spread
+    // across several columns stay visible and easy to edit or remove.
+    COLUMNS.filter((col) => isSheetFilterActive(sheet_filters[col.key])).forEach((col) => {
+      chips.push({
+        key: `column_${col.key}`,
+        label: col.label,
+        description: describeSheetFilter(sheet_filters[col.key]!),
+        remove_label: `Remove the ${col.label} filter`,
+        kind: "column",
+        onEdit: (anchor_el) => toggleColumnFilter(col.key, anchor_el),
+        onRemove: () => clearSheetFilter(col.key),
+      });
+    });
+    return chips;
+  }, [
+    search,
+    needs_approval_filter,
+    status_filter,
+    link_type_filter,
+    client_filter,
+    client_account_filter,
+    assigned_user_id_filter,
+    client_users,
+    admin_users,
+    sheet_filters,
+    openSpecialFilter,
+    toggleColumnFilter,
+    clearSheetFilter,
+  ]);
 
   // ── Bulk grid paste: fills a rectangular block of cells from clipboard data ──
 
@@ -2269,7 +2436,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         const updated_by_id = new Map(res.data.map((r) => [r.id, r]));
         setRows((prev) => prev.map((r) => updated_by_id.get(r.id) ?? r));
         on_order_mutated_ref.current?.();
-        refreshNeedsApprovalCount();
+        refreshFilterCounts();
         pushHistoryEntry(history_changes, operation === "clear" ? "clear cells" : "bulk paste");
       } catch (err) {
         const api_message = parseApiErrorMessage(err, COLUMN_LABELS);
@@ -2294,7 +2461,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       `Pasted ${changed_cell_count} cell${changed_cell_count !== 1 ? "s" : ""} across ${row_count} row${row_count !== 1 ? "s" : ""}.` +
       (overflow_row_count > 0 ? ` ${overflow_row_count} row(s) beyond the visible table were skipped.` : "")
     );
-  }, [filtered_rows, visible_columns, persistNewRow, refreshNeedsApprovalCount, pushHistoryEntry]);
+  }, [filtered_rows, visible_columns, persistNewRow, refreshFilterCounts, pushHistoryEntry]);
 
   // ── Range copy/paste: Ctrl+C / Ctrl+V on an active multi-cell selection ──────
 
@@ -2493,7 +2660,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         `"${col_label}" set to "${display_value}" for ${selected_row_ids.size} row${selected_row_ids.size !== 1 ? "s" : ""}.`
       );
       if (batch_field === "status" || batch_field === "lb_tl_approval") {
-        refreshNeedsApprovalCount();
+        refreshFilterCounts();
       }
       clearSelection();
       setBatchField("");
@@ -2504,7 +2671,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     } finally {
       setIsBatchSaving(false);
     }
-  }, [batch_field, batch_value, selected_row_ids, clearSelection, client_users, admin_users, refreshNeedsApprovalCount, pushHistoryEntry]);
+  }, [batch_field, batch_value, selected_row_ids, clearSelection, client_users, admin_users, refreshFilterCounts, pushHistoryEntry]);
 
   const handlePasteClipboard = useCallback(async () => {
     if (!clipboard_cell || selected_row_ids.size === 0) return;
@@ -2554,7 +2721,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         `Pasted "${short_val}" → "${col_label}" for ${selected_row_ids.size} row${selected_row_ids.size !== 1 ? "s" : ""}.`
       );
       if (clipboard_cell.col_key === "status" || clipboard_cell.col_key === "lb_tl_approval") {
-        refreshNeedsApprovalCount();
+        refreshFilterCounts();
       }
       clearSelection();
     } catch {
@@ -2562,7 +2729,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     } finally {
       setIsBatchSaving(false);
     }
-  }, [clipboard_cell, selected_row_ids, clearSelection, refreshNeedsApprovalCount, pushHistoryEntry]);
+  }, [clipboard_cell, selected_row_ids, clearSelection, refreshFilterCounts, pushHistoryEntry]);
 
   // ── Global keyboard shortcuts: Ctrl+C = copy, Ctrl+V = paste, Ctrl+Z = undo, Ctrl+Y / Ctrl+Shift+Z = redo ──
 
@@ -2754,8 +2921,8 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
   const handleImportComplete = useCallback(() => {
     fetchRows(1, current_body_ref.current);
-    refreshNeedsApprovalCount();
-  }, [fetchRows, refreshNeedsApprovalCount]);
+    refreshFilterCounts();
+  }, [fetchRows, refreshFilterCounts]);
 
   // ── Export ──────────────────────────────────────────────────────────────────
 
@@ -2934,6 +3101,14 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     : "";
 
   /** Count / Sum / Average for a multi-cell selection, like the Sheets status bar. */
+  /** Size of the active multi cell range, shown as a badge in the formula bar. */
+  const range_badge = useMemo(() => {
+    if (!cell_range || !range_bounds) return null;
+    const n_rows = range_bounds.max_row - range_bounds.min_row + 1;
+    const n_cols = range_bounds.max_col - range_bounds.min_col + 1;
+    return { n_rows, n_cols, n_cells: n_rows * n_cols };
+  }, [cell_range, range_bounds]);
+
   const range_stats = useMemo(() => {
     if (!range_bounds) return null;
     const is_single_cell =
@@ -2963,28 +3138,74 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       ? row_idx >= range_bounds.min_row && row_idx <= range_bounds.max_row
       : active_position?.row_idx === row_idx;
 
+  // ── Full screen ─────────────────────────────────────────────────────────────
+
+  const table_root_ref = useRef<HTMLDivElement>(null);
+
+  // Locks the page scroll behind the full screen table, and lets Escape leave full
+  // screen when nothing inside the grid (an edit, a range, a menu) is using the key.
+  useEffect(() => {
+    if (!is_fullscreen) return;
+    const previous_overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('[role="grid"], [role="dialog"], [role="search"], input, textarea, select')) return;
+      setIsFullscreen(false);
+    };
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previous_overflow;
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [is_fullscreen]);
+
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-      {/* Toolbar */}
-      <div className="flex flex-col gap-3 border-b border-gray-100 px-4 py-3 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-            Link Building Orders
-          </h2>
-          <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-            {is_loading
-              ? "Loading…"
-              : `${filtered_rows.length} of ${total} rows · ${visible_columns.length} columns · Arrow keys to move, Enter or type to edit`}
-          </p>
-          <div className="mt-1.5">
-            <CollaborationBar collaborators={collaborators} ready_state={ready_state} />
+    <div
+      ref={table_root_ref}
+      className={`${styles.table_root} ${
+        is_fullscreen
+          ? "fixed inset-0 z-[100000] flex flex-col bg-white dark:bg-gray-900"
+          : "overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-xs dark:border-gray-800 dark:bg-gray-900"
+      }`}
+    >
+      {/* Header: title, live collaborators and the table's main actions */}
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4 border-b border-gray-100 px-4 py-4 sm:px-5 dark:border-gray-800">
+        <div className="flex min-w-0 flex-1 basis-80 items-start gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+            </svg>
+          </span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <h2 className="text-lg font-semibold leading-tight text-gray-900 dark:text-white">
+                Link Building Orders
+              </h2>
+              <CollaborationBar collaborators={collaborators} ready_state={ready_state} />
+            </div>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {is_loading ? (
+                "Loading orders..."
+              ) : (
+                <>
+                  <span className="font-medium text-gray-700 tabular-nums dark:text-gray-200">{total.toLocaleString()}</span>{" "}
+                  {total === 1 ? "order" : "orders"} &middot; {visible_columns.length} of {COLUMNS.length} columns
+                  <span className="hidden md:inline"> &middot; Arrow keys to move, Enter or type to edit</span>
+                </>
+              )}
+            </p>
           </div>
         </div>
+
         <div className="flex flex-wrap items-center gap-2">
-          {/* Undo / redo — Ctrl+Z / Ctrl+Y, reverts or replays the last cell edit, bulk paste, or batch fill */}
-          <div className="flex h-8 items-center overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
+          {/* Undo / redo, Ctrl+Z / Ctrl+Y, reverts or replays the last cell edit, bulk paste, or batch fill */}
+          <div className="flex h-9 items-center overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
             <button
               onClick={undo}
               disabled={undo_stack.length === 0 || is_undo_redo_saving}
@@ -2993,13 +3214,13 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                   ? `Undo: ${undo_stack[undo_stack.length - 1].label} (Ctrl+Z)`
                   : "Nothing to undo"
               }
-              className="flex h-8 items-center gap-1 border-r border-gray-200 bg-white px-2.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+              className="flex h-9 items-center gap-1 border-r border-gray-200 px-2.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
             >
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
               </svg>
               {undo_stack.length > 0 && (
-                <span className="rounded-full bg-gray-100 px-1 text-[10px] font-bold text-gray-500 dark:bg-gray-700 dark:text-gray-300">
+                <span className="rounded-full bg-gray-100 px-1.5 text-[10px] font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-300">
                   {undo_stack.length}
                 </span>
               )}
@@ -3012,221 +3233,46 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                   ? `Redo: ${redo_stack[redo_stack.length - 1].label} (Ctrl+Y)`
                   : "Nothing to redo"
               }
-              className="flex h-8 items-center gap-1 bg-white px-2.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+              className="flex h-9 items-center gap-1 px-2.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-300 dark:hover:bg-gray-700"
             >
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 15l6-6m0 0l-6-6m6 6H9a6 6 0 000 12h3" />
               </svg>
               {redo_stack.length > 0 && (
-                <span className="rounded-full bg-gray-100 px-1 text-[10px] font-bold text-gray-500 dark:bg-gray-700 dark:text-gray-300">
+                <span className="rounded-full bg-gray-100 px-1.5 text-[10px] font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-300">
                   {redo_stack.length}
                 </span>
               )}
             </button>
           </div>
-          {/* Find in table, highlights matches without filtering (Ctrl/Cmd+F) */}
-          <button
-            onClick={is_find_open ? handleCloseFind : openFind}
-            title="Find in table (Ctrl+F / Cmd+F), highlights matches without hiding other rows"
-            className={`flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors ${
-              is_find_open
-                ? "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400"
-                : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
-            }`}
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0zM8 10.5h5" />
-            </svg>
-            Find
-          </button>
-          {/* Search */}
-          <div className="relative">
-            <svg
-              className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <input
-              type="text"
-              placeholder="Search..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-8 rounded-lg border border-gray-200 bg-gray-50 pl-8 pr-3 text-xs outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-            />
-          </div>
-          {/* Status filter */}
-          <select
-            value={needs_approval_filter ? "Live" : status_filter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            disabled={needs_approval_filter}
-            title={needs_approval_filter ? "Status is locked to Live while \"Needs LB TL Approval\" is active" : undefined}
-            className="h-8 rounded-lg border border-gray-200 bg-gray-50 px-2 text-xs outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-          >
-            <option value="">All Statuses</option>
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-          {/* Link Type filter */}
-          <select
-            value={link_type_filter}
-            onChange={(e) => setLinkTypeFilter(e.target.value)}
-            className="h-8 rounded-lg border border-gray-200 bg-gray-50 px-2 text-xs outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-          >
-            <option value="">All Link Types</option>
-            {LINK_TYPE_OPTIONS.map((t) => (
-              <option key={t} value={t}>{t}</option>
-            ))}
-          </select>
-          {/* Client filter */}
-          <input
-            type="text"
-            placeholder="Client..."
-            value={client_filter}
-            onChange={(e) => setClientFilter(e.target.value)}
-            className="h-8 rounded-lg border border-gray-200 bg-gray-50 px-3 text-xs outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-          />
-          {/* Needs LB TL Approval — quick filter for Live orders that haven't been reviewed yet */}
-          <button
-            onClick={toggleNeedsApprovalFilter}
-            title="Show Live orders that still need LB TL Approval"
-            className={`flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors ${needs_approval_filter
-              ? "border-amber-400 bg-amber-100 text-amber-800 dark:border-amber-600 dark:bg-amber-900/40 dark:text-amber-300"
-              : "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-900/10 dark:text-amber-400 dark:hover:bg-amber-900/30"
-              }`}
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-            </svg>
-            Needs LB TL Approval
-            {needs_approval_count !== null && needs_approval_count > 0 && (
-              <span className="inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-amber-600 px-1 text-[10px] font-bold text-white">
-                {needs_approval_count}
-              </span>
-            )}
-          </button>
-          {/* Saved filters, save the current view or reapply one in a single click */}
-          <SavedFiltersMenu
-            current_state={current_filter_state}
-            has_active_filters={has_active_filters}
-            onApply={applySavedFilter}
-            onNotify={setNotificationBanner}
-          />
-          {/* Clear all filters */}
-          {has_active_filters && (
-            <button
-              onClick={clearAllFilters}
-              className="flex h-8 items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40"
-            >
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-              Clear All
-            </button>
-          )}
-          {/* Column filter toggle */}
-          <button
-            onClick={() => setShowFilterPanel((v) => !v)}
-            className={`flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors ${show_filter_panel
-              ? "border-brand-400 bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
-              : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
-              }`}
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-            </svg>
-            Columns
-            {hidden_columns.size > 0 && (
-              <span className="ml-0.5 rounded-full bg-brand-500 px-1.5 py-0.5 text-xs text-white">
-                {hidden_columns.size}
-              </span>
-            )}
-          </button>
-          {/* Range selection badge — shows while a drag/shift-click multi-cell range is active */}
-          {cell_range && range_bounds && (() => {
-            const n_rows = range_bounds.max_row - range_bounds.min_row + 1;
-            const n_cols = range_bounds.max_col - range_bounds.min_col + 1;
-            const n_cells = n_rows * n_cols;
-            return (
-              <div
-                className="flex items-center gap-1.5 rounded-lg border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs text-teal-700 dark:border-teal-800 dark:bg-teal-900/20 dark:text-teal-300"
-                title="Click and drag across cells (or Shift+Click) to select a range, then Ctrl+C to copy or Ctrl+V to paste"
-              >
-                <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h12A2.25 2.25 0 0120.25 6v12A2.25 2.25 0 0118 20.25H6A2.25 2.25 0 013.75 18V6zM3.75 9h16.5M3.75 15h16.5M9 3.75v16.5M15 3.75v16.5" />
-                </svg>
-                <span className="font-semibold">
-                  {n_cells} cell{n_cells !== 1 ? "s" : ""} selected
-                </span>
-                <span className="opacity-70">({n_rows}×{n_cols})</span>
-                <kbd className="rounded bg-teal-100 px-1 py-0.5 font-mono text-[9px] text-teal-600 dark:bg-teal-800 dark:text-teal-300">Ctrl+C</kbd>
-                <kbd className="rounded bg-teal-100 px-1 py-0.5 font-mono text-[9px] text-teal-600 dark:bg-teal-800 dark:text-teal-300">Ctrl+V</kbd>
-                <button
-                  onClick={() => setCellRange(null)}
-                  className="ml-0.5 rounded p-0.5 opacity-50 transition-opacity hover:opacity-100"
-                  title="Clear selection"
-                >
-                  <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            );
-          })()}
-          {/* Clipboard badge — shows when a cell value has been copied */}
-          {clipboard_cell && (
-            <div
-              className="flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs text-indigo-700 dark:border-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-300"
-              title={`Clipboard: "${clipboard_cell.value}" (${COLUMNS.find((c) => c.key === clipboard_cell.col_key)?.label ?? clipboard_cell.col_key}) — select rows then press Ctrl+V to paste`}
-            >
-              <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              <span className="font-semibold">{COLUMNS.find((c) => c.key === clipboard_cell.col_key)?.label ?? clipboard_cell.col_key}:</span>
-              <span className="max-w-[90px] overflow-hidden text-ellipsis whitespace-nowrap opacity-80">
-                {clipboard_cell.value || "—"}
-              </span>
-              <kbd className="rounded bg-indigo-100 px-1 py-0.5 font-mono text-[9px] text-indigo-500 dark:bg-indigo-800 dark:text-indigo-300">
-                Ctrl+V
-              </kbd>
-              <button
-                onClick={() => setClipboardCell(null)}
-                className="ml-0.5 rounded p-0.5 opacity-50 transition-opacity hover:opacity-100"
-                title="Clear clipboard"
-              >
-                <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          )}
+
+          <span className="hidden h-6 w-px bg-gray-200 sm:block dark:bg-gray-700" aria-hidden="true" />
+
           {/* Import dropdown */}
           <div ref={import_btn_ref} className="relative">
             <button
               onClick={() => setShowImportMenu((v) => !v)}
-              className="flex h-8 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40"
+              aria-haspopup="menu"
+              aria-expanded={show_import_menu}
+              className={toolbar_button_class}
             >
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="h-4 w-4 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
               </svg>
-              Import CSV
+              Import
               <svg className="h-3 w-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
               </svg>
             </button>
 
             {show_import_menu && (
-              <div className="absolute left-0 top-full z-50 mt-1.5 w-72 min-w-[18rem] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl shadow-gray-200/60 dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/30">
+              <div className="absolute left-0 top-full z-50 mt-1.5 w-72 min-w-[18rem] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl shadow-gray-200/60 xl:left-auto xl:right-0 dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/30">
                 <div className="border-b border-gray-100 px-4 py-3 dark:border-gray-700">
-                  <p className="text-xs font-semibold text-gray-800 dark:text-gray-100">Import Data</p>
-                  <p className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">Upload a CSV file to create or update records</p>
+                  <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">Import data</p>
+                  <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">Upload a CSV file to create or update records</p>
                 </div>
 
-                {/* Option 1 — Full order import */}
+                {/* Option 1, full order import */}
                 <button
                   onClick={() => {
                     setShowImportMenu(false);
@@ -3242,15 +3288,14 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                   <div className="min-w-0">
                     <p className="text-xs font-semibold text-gray-800 dark:text-gray-100">Import Link Building Orders</p>
                     <p className="mt-0.5 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
-                      Full order CSV — creates and updates rows, matched by Order ID
+                      Full order CSV, creates and updates rows matched by Order ID
                     </p>
                   </div>
                 </button>
 
-                {/* Divider */}
                 <div className="mx-4 border-t border-gray-100 dark:border-gray-700" />
 
-                {/* Option 2 — Metrics-only update */}
+                {/* Option 2, metrics only update */}
                 <button
                   onClick={() => {
                     setShowImportMenu(false);
@@ -3266,7 +3311,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                   <div className="min-w-0">
                     <p className="text-xs font-semibold text-gray-800 dark:text-gray-100">Update Metrics</p>
                     <p className="mt-0.5 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
-                      Bulk-update Current Traffic, DR Formula, Current POC, Current Price and
+                      Bulk update Current Traffic, DR Formula, Current POC, Current Price and
                       other metric columns only, matched by Order ID
                     </p>
                   </div>
@@ -3274,24 +3319,23 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
               </div>
             )}
           </div>
+
           {/* Export dropdown */}
           <div ref={export_btn_ref} className="relative">
             <button
               onClick={() => setShowExportMenu((v) => !v)}
               disabled={is_exporting}
-              className={`flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-                selected_row_ids.size > 0
-                  ? "border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-900/20 dark:text-violet-400 dark:hover:bg-violet-900/40"
-                  : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
-              }`}
+              aria-haspopup="menu"
+              aria-expanded={show_export_menu}
+              className={`${toolbar_button_class} disabled:cursor-not-allowed disabled:opacity-60`}
             >
               {is_exporting ? (
-                <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                <svg className="h-4 w-4 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                 </svg>
               ) : (
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg className="h-4 w-4 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
               )}
@@ -3307,13 +3351,13 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
             </button>
 
             {show_export_menu && (
-              <div className="absolute right-0 top-full z-50 mt-1.5 w-68 min-w-[17rem] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl shadow-gray-200/60 dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/30">
+              <div className="absolute left-0 top-full z-50 mt-1.5 w-68 min-w-[17rem] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl shadow-gray-200/60 sm:left-auto sm:right-0 dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/30">
                 <div className="border-b border-gray-100 px-4 py-3 dark:border-gray-700">
-                  <p className="text-xs font-semibold text-gray-800 dark:text-gray-100">Export Data</p>
-                  <p className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">Download records as a CSV file</p>
+                  <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">Export data</p>
+                  <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">Download records as a CSV file</p>
                 </div>
 
-                {/* Option 1 — Export all filtered */}
+                {/* Option 1, export all filtered */}
                 <button
                   onClick={handleExportAll}
                   className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
@@ -3326,7 +3370,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                   <div className="min-w-0">
                     <p className="text-xs font-semibold text-gray-800 dark:text-gray-100">Export All Filtered</p>
                     <p className="mt-0.5 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
-                      {total.toLocaleString()} row{total !== 1 ? "s" : ""} · applies current search &amp; filters
+                      {total.toLocaleString()} row{total !== 1 ? "s" : ""} &middot; applies current search &amp; filters
                     </p>
                     {(link_type_filter || status_filter || client_filter || search.trim()) && (
                       <div className="mt-1.5 flex flex-wrap gap-1">
@@ -3342,7 +3386,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                         )}
                         {client_filter && (
                           <span className="inline-flex items-center rounded-full bg-teal-100 px-2 py-0.5 text-[10px] font-medium text-teal-700 dark:bg-teal-900/30 dark:text-teal-400">
-                            Client: {client_filter}
+                            Company: {client_filter}
                           </span>
                         )}
                         {search.trim() && (
@@ -3355,10 +3399,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                   </div>
                 </button>
 
-                {/* Divider */}
                 <div className="mx-4 border-t border-gray-100 dark:border-gray-700" />
 
-                {/* Option 2 — Export selected */}
+                {/* Option 2, export selected */}
                 <button
                   onClick={selected_row_ids.size > 0 ? handleExportSelected : undefined}
                   disabled={selected_row_ids.size === 0}
@@ -3396,13 +3439,33 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
               </div>
             )}
           </div>
-          {/* Add row — split button with bulk-add dropdown */}
-          <div ref={add_btn_ref} className="relative flex">
+
+          {/* Full screen, gives the grid the whole window so wide screens show as many columns as possible */}
+          <button
+            onClick={() => setIsFullscreen((v) => !v)}
+            title={is_fullscreen ? "Exit full screen (Esc)" : "Full screen, show as many columns as your screen allows"}
+            aria-label={is_fullscreen ? "Exit full screen" : "Enter full screen"}
+            aria-pressed={is_fullscreen}
+            className={`${toolbar_button_class} w-9 justify-center px-0`}
+          >
+            {is_fullscreen ? (
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
+              </svg>
+            ) : (
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+              </svg>
+            )}
+          </button>
+
+          {/* Add row, split button with a bulk add dropdown */}
+          <div ref={add_btn_ref} className="relative flex shadow-theme-xs">
             <button
               onClick={addRow}
-              className="flex h-8 items-center gap-1.5 rounded-l-lg bg-brand-500 px-3 text-xs font-medium text-white transition-colors hover:bg-brand-600"
+              className="flex h-9 items-center gap-1.5 rounded-l-lg bg-brand-500 px-3.5 text-sm font-medium text-white transition-colors hover:bg-brand-600"
             >
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
               </svg>
               Add Row
@@ -3410,9 +3473,12 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
             <button
               onClick={() => setShowAddMenu((v) => !v)}
               title="Add multiple rows at once"
-              className="flex h-8 items-center rounded-r-lg border-l border-brand-400 bg-brand-500 px-1.5 text-white transition-colors hover:bg-brand-600"
+              aria-label="Add multiple rows at once"
+              aria-haspopup="menu"
+              aria-expanded={show_add_menu}
+              className="flex h-9 items-center rounded-r-lg border-l border-brand-400 bg-brand-500 px-2 text-white transition-colors hover:bg-brand-600"
             >
-              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
               </svg>
             </button>
@@ -3420,8 +3486,8 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
             {show_add_menu && (
               <div className="absolute right-0 top-full z-50 mt-1.5 w-64 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl shadow-gray-200/60 dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/30">
                 <div className="border-b border-gray-100 px-4 py-3 dark:border-gray-700">
-                  <p className="text-xs font-semibold text-gray-800 dark:text-gray-100">Add Multiple Rows</p>
-                  <p className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">Rows are added to the top of the table</p>
+                  <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">Add multiple rows</p>
+                  <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">Rows are added to the top of the table</p>
                 </div>
                 <div className="p-3">
                   <p className="mb-2 text-[11px] font-medium text-gray-500 dark:text-gray-400">Quick add:</p>
@@ -3472,53 +3538,152 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         </div>
       </div>
 
-      {/* Active column filters: one chip per filtered column, so filters spread across
-          several columns (including hidden ones) stay visible and easy to edit or remove. */}
-      {active_sheet_filter_count > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-gray-100 bg-amber-50/40 px-4 py-2 dark:border-gray-800 dark:bg-amber-900/10">
-          <span className="mr-1 text-xs font-medium text-gray-500 dark:text-gray-400">
-            Filtered by:
-          </span>
-          {COLUMNS.filter((col) => isSheetFilterActive(sheet_filters[col.key])).map((col) => {
-            const description = describeSheetFilter(sheet_filters[col.key]!);
-            return (
-              <span
-                key={col.key}
-                className="inline-flex max-w-xs items-center overflow-hidden rounded-full border border-amber-200 bg-white text-xs text-gray-700 dark:border-amber-800/60 dark:bg-gray-800 dark:text-gray-200"
-              >
-                <button
-                  type="button"
-                  onClick={(e) => toggleColumnFilter(col.key, e.currentTarget)}
-                  className="min-w-0 truncate py-0.5 pl-2.5 pr-1 text-left hover:text-brand-600 dark:hover:text-brand-400"
-                  title={`${col.label}: ${description}. Click to edit.`}
-                >
-                  <span className="font-semibold">{col.label}:</span> {description}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => clearSheetFilter(col.key)}
-                  className="shrink-0 py-1 pl-1 pr-2 text-gray-400 hover:text-red-500"
-                  aria-label={`Remove the ${col.label} filter`}
-                  title="Remove filter"
-                >
-                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </span>
-            );
-          })}
-          {active_sheet_filter_count > 1 && (
-            <button
-              type="button"
-              onClick={clearAllSheetFilters}
-              className="ml-1 text-xs font-medium text-gray-500 hover:text-red-600 hover:underline dark:text-gray-400 dark:hover:text-red-400"
+      {/* Status pipeline: one pill per status with its row count */}
+      <div className="border-b border-gray-100 dark:border-gray-800">
+        <StatusFilterBar
+          status_counts={status_counts}
+          total_count={status_total}
+          active_status={status_filter}
+          needs_approval_active={needs_approval_filter}
+          needs_approval_count={needs_approval_count}
+          onSelectStatus={selectStatusFilter}
+          onToggleNeedsApproval={toggleNeedsApprovalFilter}
+        />
+      </div>
+
+      {/* Search and filters on the left, view tools on the right */}
+      <div className="flex flex-col gap-2.5 border-b border-gray-100 px-4 py-3 sm:px-5 2xl:flex-row 2xl:items-center 2xl:justify-between dark:border-gray-800">
+        <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative min-w-0 flex-1 2xl:max-w-md">
+            <svg
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+              aria-hidden="true"
             >
-              Clear column filters
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              ref={search_input_ref}
+              type="text"
+              placeholder="Search order ID, keyword, company, status..."
+              aria-label="Search orders"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className={`${toolbar_input_class} w-full pl-9 pr-8`}
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                aria-label="Clear search"
+                className="absolute right-2 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+              >
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+            <div className="relative">
+              <svg
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+                aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Company..."
+                aria-label="Filter by company"
+                value={client_filter}
+                onChange={(e) => setClientFilter(e.target.value)}
+                className={`${toolbar_input_class} w-full pl-9 pr-3 sm:w-44`}
+              />
+            </div>
+            <select
+              value={link_type_filter}
+              onChange={(e) => setLinkTypeFilter(e.target.value)}
+              aria-label="Filter by link type"
+              className={`${toolbar_input_class} w-full px-3 sm:w-44 ${link_type_filter ? "border-brand-300 text-brand-700 dark:border-brand-700 dark:text-brand-300" : ""}`}
+            >
+              <option value="">All link types</option>
+              {LINK_TYPE_OPTIONS.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Find in table, highlights matches without filtering (Ctrl/Cmd+F) */}
+          <button
+            onClick={is_find_open ? handleCloseFind : openFind}
+            title="Find in table (Ctrl+F / Cmd+F), highlights matches without hiding other rows"
+            aria-pressed={is_find_open}
+            className={
+              is_find_open
+                ? `${toolbar_button_base_class} border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400`
+                : toolbar_button_class
+            }
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0zM8 10.5h5" />
+            </svg>
+            Find
+          </button>
+          {/* Saved filters, save the current view or reapply one in a single click */}
+          <SavedFiltersMenu
+            current_state={current_filter_state}
+            has_active_filters={has_active_filters}
+            onApply={applySavedFilter}
+            onNotify={setNotificationBanner}
+          />
+          {/* Column chooser */}
+          <button
+            onClick={() => setShowFilterPanel((v) => !v)}
+            aria-expanded={show_filter_panel}
+            className={
+              show_filter_panel
+                ? `${toolbar_button_base_class} border-brand-300 bg-brand-50 text-brand-700 dark:border-brand-700 dark:bg-brand-500/10 dark:text-brand-300`
+                : toolbar_button_class
+            }
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 4.5v15m6-15v15m-10.875 0h15.75c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H4.125C3.504 4.5 3 5.004 3 5.625v12.75c0 .621.504 1.125 1.125 1.125z" />
+            </svg>
+            Columns
+            {hidden_columns.size > 0 && (
+              <span className="rounded-full bg-brand-500 px-1.5 py-px text-[10px] font-semibold text-white">
+                {hidden_columns.size} hidden
+              </span>
+            )}
+          </button>
+          {/* Reset filters, sort and hidden columns in one go */}
+          {has_active_filters && (
+            <button
+              onClick={clearAllFilters}
+              title="Clear every filter, sort and hidden column"
+              className={`${toolbar_button_base_class} border-transparent text-gray-500 hover:bg-red-50 hover:text-red-600 dark:text-gray-400 dark:hover:bg-red-900/20 dark:hover:text-red-400`}
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+              </svg>
+              Reset view
             </button>
           )}
         </div>
-      )}
+      </div>
+
+      {/* Every active filter, from the toolbar and from the column menus, in one place */}
+      <ActiveFiltersBar chips={active_filter_chips} onClearAll={clearFilterChips} />
 
       {/* Error banner */}
       {save_error && (
@@ -3840,58 +4005,17 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         </div>
       )}
 
-      {/* Column visibility panel */}
+      {/* Column chooser, grouped the same way as the colored column headers */}
       {show_filter_panel && (
-        <div className="border-b border-gray-100 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-gray-800/50">
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">
-              Toggle column visibility
-            </p>
-            <div className="flex items-center gap-3">
-              {has_custom_widths && (
-                <button
-                  onClick={resetAllColumnWidths}
-                  className="text-xs text-gray-500 hover:underline dark:text-gray-400"
-                  title="Restore every column to its default width"
-                >
-                  Reset column widths
-                </button>
-              )}
-              <button
-                onClick={() => setHiddenColumns(new Set())}
-                className="text-xs text-brand-500 hover:underline dark:text-brand-400"
-              >
-                Show all
-              </button>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {COLUMNS.map((col) => {
-              const is_visible = !hidden_columns.has(col.key);
-              return (
-                <button
-                  key={col.key}
-                  onClick={() => toggleColumn(col.key)}
-                  className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors ${is_visible
-                    ? "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-                    : "border-dashed border-gray-300 bg-transparent text-gray-400 line-through dark:border-gray-600 dark:text-gray-500"
-                    }`}
-                >
-                  {is_visible ? (
-                    <svg className="h-2.5 w-2.5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  ) : (
-                    <svg className="h-2.5 w-2.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  )}
-                  {col.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        <ColumnVisibilityPanel
+          groups={COLUMN_VISIBILITY_GROUPS}
+          hidden_columns={hidden_columns}
+          has_custom_widths={has_custom_widths}
+          onToggleColumn={toggleColumn}
+          onSetGroupHidden={setColumnsHidden}
+          onShowAll={() => setHiddenColumns(new Set())}
+          onResetWidths={resetAllColumnWidths}
+        />
       )}
 
       {/* Formula bar: address of the active cell (or range), its full value, and range totals */}
@@ -3925,6 +4049,57 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
               )}
             </div>
           )}
+          {(range_badge || clipboard_cell) && (
+            <div className={styles.formula_badges}>
+              {/* Range selection badge, shows while a drag or Shift+Click multi cell range is active */}
+              {range_badge && (
+                <div
+                  className="flex items-center gap-1.5 rounded-md border border-teal-200 bg-teal-50 px-2 py-0.5 text-xs text-teal-700 dark:border-teal-800 dark:bg-teal-900/20 dark:text-teal-300"
+                  title="Click and drag across cells (or Shift+Click) to select a range, then Ctrl+C to copy or Ctrl+V to paste"
+                >
+                  <span className="font-semibold">
+                    {range_badge.n_cells} cell{range_badge.n_cells !== 1 ? "s" : ""} selected
+                  </span>
+                  <span className="opacity-70">({range_badge.n_rows}×{range_badge.n_cols})</span>
+                  <button
+                    onClick={() => setCellRange(null)}
+                    className="rounded p-0.5 opacity-50 transition-opacity hover:opacity-100"
+                    title="Clear selection"
+                    aria-label="Clear selection"
+                  >
+                    <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+              {/* Clipboard badge, shows when a cell value has been copied */}
+              {clipboard_cell && (
+                <div
+                  className="flex items-center gap-1.5 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700 dark:border-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-300"
+                  title={`Clipboard: "${clipboard_cell.value}" (${COLUMN_LABELS[clipboard_cell.col_key] ?? clipboard_cell.col_key}). Select rows then press Ctrl+V to paste`}
+                >
+                  <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                  <span className="font-semibold">{COLUMN_LABELS[clipboard_cell.col_key] ?? clipboard_cell.col_key}:</span>
+                  <span className="max-w-[90px] overflow-hidden text-ellipsis whitespace-nowrap opacity-80">
+                    {clipboard_cell.value || "(empty)"}
+                  </span>
+                  <button
+                    onClick={() => setClipboardCell(null)}
+                    className="rounded p-0.5 opacity-50 transition-opacity hover:opacity-100"
+                    title="Clear clipboard"
+                    aria-label="Clear clipboard"
+                  >
+                    <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -3953,7 +4128,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
           aria-label="Link building orders spreadsheet"
           aria-rowcount={filtered_rows.length}
           onKeyDown={handleGridKeyDown}
-          className={`w-full min-w-0 overflow-auto max-h-[calc(100vh-200px)] ${styles.grid_container}`}
+          className={`w-full min-w-0 overflow-auto ${is_fullscreen ? "min-h-0 flex-1" : "max-h-[calc(100vh-200px)]"} ${styles.grid_container}`}
         >
           <table className={`text-xs ${styles.grid_table}`} style={{ width: table_width }}>
             {/* Exact column widths for the fixed table layout. The frozen columns'
@@ -4546,75 +4721,22 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         />
       )}
 
-      {/* Footer — summary · rows-per-page · pagination */}
-      <div className="flex flex-wrap items-center justify-between gap-y-2 border-t border-gray-100 px-4 py-2 dark:border-gray-800">
-
-        {/* Left: row range + column count */}
-        <p className="text-xs text-gray-400 dark:text-gray-600">
-          {is_loading ? (
-            "Loading…"
-          ) : total === 0 ? (
-            "No rows"
-          ) : (
-            <>
-              Showing{" "}
-              <span className="font-medium text-gray-600 dark:text-gray-300">
-                {from_row ?? 1}–{to_row ?? filtered_rows.length}
-              </span>{" "}
-              of{" "}
-              <span className="font-medium text-gray-600 dark:text-gray-300">{total}</span>{" "}
-              rows &middot; {visible_columns.length} of {COLUMNS.length} columns visible
-            </>
-          )}
-        </p>
-
-        {/* Center: rows-per-page select */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
-            Rows per page:
-          </span>
-          <select
-            value={per_page}
-            onChange={(e) => handlePerPageChange(parseInt(e.target.value, 10) as PerPageOption)}
-            disabled={is_loading}
-            className="h-7 rounded-lg border border-gray-200 bg-white px-2 pr-6 text-xs text-gray-600 outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
-          >
-            {PER_PAGE_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option} rows
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Right: prev / page counter / next */}
-        <div className="flex items-center gap-2">
-          <button
-            disabled={current_page <= 1 || is_loading}
-            onClick={() => fetchRows(current_page - 1, current_body_ref.current)}
-            className="flex h-6 w-6 items-center justify-center rounded border border-gray-200 text-gray-500 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
-            title="Previous page"
-          >
-            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-            </svg>
-          </button>
-          <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
-            {last_page <= 1 ? "1 page" : `Page ${current_page} of ${last_page}`}
-          </span>
-          <button
-            disabled={current_page >= last_page || is_loading}
-            onClick={() => fetchRows(current_page + 1, current_body_ref.current)}
-            className="flex h-6 w-6 items-center justify-center rounded border border-gray-200 text-gray-500 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
-            title="Next page"
-          >
-            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-            </svg>
-          </button>
-        </div>
-
-      </div>
+      {/* Footer: row range, rows per page and page numbers */}
+      <TablePagination
+        is_loading={is_loading}
+        total={total}
+        from_row={from_row}
+        to_row={to_row}
+        page_row_count={filtered_rows.length}
+        visible_column_count={visible_columns.length}
+        total_column_count={COLUMNS.length}
+        current_page={current_page}
+        last_page={last_page}
+        per_page={per_page}
+        per_page_options={PER_PAGE_OPTIONS}
+        onPageChange={(page) => fetchRows(page, current_body_ref.current)}
+        onPerPageChange={(option) => handlePerPageChange(option as PerPageOption)}
+      />
     </div>
   );
 }

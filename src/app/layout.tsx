@@ -9,8 +9,12 @@ import { NotificationsProvider } from '@/context/NotificationsContext';
 import { CartProvider } from '@/context/CartContext';
 import JsonLd from '@/components/seo/JsonLd';
 
+// `variable` exposes the loaded font as --font-outfit, so styles that use
+// var(--font-outfit) (the font-outfit utility, SCSS modules) get the real
+// Outfit font instead of falling back to a system font.
 const outfit = Outfit({
   subsets: ['latin'],
+  variable: '--font-outfit',
 });
 
 // Applies the saved theme before first paint so dark mode users do not see a
@@ -86,7 +90,7 @@ export default function RootLayout({
         />
         <JsonLd />
       </head>
-      <body className={`${outfit.className} dark:bg-gray-900`}>
+      <body className={`${outfit.variable} ${outfit.className} dark:bg-gray-900`}>
         <ThemeProvider>
           <AuthProvider>
             <NotificationsProvider>

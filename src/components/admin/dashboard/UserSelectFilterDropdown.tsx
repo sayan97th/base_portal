@@ -96,7 +96,7 @@ export default function UserSelectFilterDropdown({
   const content = (
     <div
       ref={dropdown_ref}
-      className="fixed z-[9999] w-64 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl shadow-gray-200/60 dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/30"
+      className="fixed z-[100001] w-64 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl shadow-gray-200/60 dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/30"
       style={{ top: position.top, left: position.left }}
     >
       {/* Header */}

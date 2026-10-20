@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useSidebar } from "@/context/SidebarContext";
 import { useAuth } from "@/context/AuthContext";
 import AppHeader from "@/layout/AppHeader";
@@ -9,6 +9,12 @@ import AdminSidebar from "@/layout/AdminSidebar";
 import Backdrop from "@/layout/Backdrop";
 import ImpersonationBanner from "@/components/ImpersonationBanner";
 import { AdminNotificationsProvider } from "@/context/AdminNotificationsContext";
+
+/**
+ * Pages built around wide spreadsheet style tables. They drop the usual content
+ * max width so large screens can show more table columns at once.
+ */
+const WIDE_CONTENT_ROUTES = ["/admin/dashboard"];
 
 export default function AdminLayout({
   children,
@@ -18,6 +24,10 @@ export default function AdminLayout({
   const { isExpanded, isHovered, isMobileOpen } = useSidebar();
   const { isStaff, isLoading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+  const is_wide_content = WIDE_CONTENT_ROUTES.some(
+    (route) => pathname === route || pathname?.startsWith(`${route}/`)
+  );
 
   useEffect(() => {
     if (!isLoading && !isStaff) {
@@ -52,7 +62,11 @@ export default function AdminLayout({
           {/* Impersonation Banner — shown when a super admin is impersonating a team member */}
           <ImpersonationBanner />
           <AppHeader />
-          <div className="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
+          <div
+            className={`p-4 mx-auto md:p-6 ${
+              is_wide_content ? "max-w-none 3xl:px-10" : "max-w-(--breakpoint-2xl)"
+            }`}
+          >
             {children}
           </div>
         </div>
