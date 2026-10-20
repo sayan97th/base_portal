@@ -18,6 +18,9 @@ export interface LinkBuildingOrderRow {
   link_builder: string;
   pen_name: string;
   partnership: string;
+  /** Niche of the partnership domain. Filled by the API from the domain catalog when
+   *  the Partnership changes, and saved to that catalog when an admin sets it. */
+  niche?: string;
   /** Status of the partnership check process. */
   partnership_check: string;
   article_title: string;

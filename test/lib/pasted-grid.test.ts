@@ -13,6 +13,8 @@ import {
   isBulkPaste,
   parseBooleanCell,
   parsePastedGrid,
+  serializeGridToHtml,
+  serializeGridToTsv,
 } from "@/lib/pasted-grid";
 
 describe("parsePastedGrid", () => {
@@ -240,5 +242,66 @@ describe("applyPastedGridToRows", () => {
     );
 
     expect(next_rows[0]).toEqual({ primary_keyword: "kw1", type_of_content: "Blog Article" });
+  });
+});
+
+describe("parsePastedGrid, quoted cells copied from Google Sheets or Excel", () => {
+  it("keeps the line breaks of a quoted cell inside that cell", () => {
+    expect(parsePastedGrid('kw1\t"line one\nline two"\nkw2\tsingle')).toEqual([
+      ["kw1", "line one\nline two"],
+      ["kw2", "single"],
+    ]);
+  });
+
+  it("keeps a tab inside a quoted cell", () => {
+    expect(parsePastedGrid('"a\tb"\tc')).toEqual([["a\tb", "c"]]);
+  });
+
+  it("turns doubled quotes inside a quoted cell into one quote", () => {
+    expect(parsePastedGrid('"say ""hi""\nnow"')).toEqual([['say "hi"\nnow']]);
+  });
+
+  it("keeps a value that only starts with a quote as typed", () => {
+    expect(parsePastedGrid('"Best" tools\tnext')).toEqual([['"Best" tools', "next"]]);
+  });
+
+  it("keeps an unclosed quote as plain text", () => {
+    expect(parsePastedGrid('"open\tnext')).toEqual([['"open', "next"]]);
+  });
+
+  it("parses a quoted cell at the end of the text", () => {
+    expect(parsePastedGrid('a\t"b"\n')).toEqual([["a", "b"]]);
+  });
+
+  it("parses an empty clipboard as one empty cell", () => {
+    expect(parsePastedGrid("")).toEqual([[""]]);
+  });
+});
+
+describe("serializeGridToTsv", () => {
+  it("joins cells with tabs and rows with line breaks", () => {
+    expect(serializeGridToTsv([["a", "b"], ["c", "d"]])).toBe("a\tb\nc\td");
+  });
+
+  it("quotes only the cells that would break the grid, the way Sheets does", () => {
+    expect(serializeGridToTsv([["line one\nline two", 'say "hi"', '"quoted"', "tab\there"]])).toBe(
+      '"line one\nline two"\tsay "hi"\t"""quoted"""\t"tab\there"'
+    );
+  });
+
+  it("reads back to the same grid", () => {
+    const grid = [
+      ["Live", "line one\nline two", '"Best" tools'],
+      ["", "DR 30+ External", "54"],
+    ];
+    expect(parsePastedGrid(serializeGridToTsv(grid))).toEqual(grid);
+  });
+});
+
+describe("serializeGridToHtml", () => {
+  it("writes an HTML table with escaped values and line breaks", () => {
+    expect(serializeGridToHtml([["<b>A&B</b>", "one\ntwo"]])).toBe(
+      "<table><tbody><tr><td>&lt;b&gt;A&amp;B&lt;/b&gt;</td><td>one<br>two</td></tr></tbody></table>"
+    );
   });
 });

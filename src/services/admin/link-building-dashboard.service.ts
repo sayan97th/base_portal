@@ -45,7 +45,11 @@ export function parseApiErrorMessage(
     if (body.errors && Object.keys(body.errors).length > 0) {
       const field_messages = Object.entries(body.errors)
         .map(([field, msgs]) => {
-          const label = field_labels?.[field] ?? field.replace(/_/g, " ");
+          // Errors of a batch create are keyed by row, e.g. "rows.1.keyword".
+          const row_match = /^rows\.(\d+)\.(.+)$/.exec(field);
+          const field_key = row_match ? row_match[2] : field;
+          const field_label = field_labels?.[field_key] ?? field_key.replace(/_/g, " ");
+          const label = row_match ? `Pasted row ${Number(row_match[1]) + 1}, ${field_label}` : field_label;
           return `${label}: ${msgs.join(", ")}`;
         })
         .join("; ");
@@ -101,6 +105,44 @@ export async function listAdminUsersForSelect(): Promise<AdminUserOption[]> {
  */
 export async function listPenNamesForSelect(): Promise<string[]> {
   const res = await apiClient.get<{ data: string[] }>("/api/admin/link-building-orders/pen-names");
+  return res.data;
+}
+
+/**
+ * GET /api/admin/link-building-orders/niches
+ * Returns every distinct niche (from the partnership domain catalog and from
+ * orders), sorted alphabetically, for the Niche cell dropdown.
+ */
+export async function listNichesForSelect(): Promise<string[]> {
+  const res = await apiClient.get<{ data: string[] }>("/api/admin/link-building-orders/niches");
+  return res.data;
+}
+
+/** A domain offered while choosing a Partnership, with its niche and latest order metrics. */
+export interface PartnershipDomainSuggestion {
+  domain: string;
+  niche: string | null;
+  dr: string | null;
+  traffic: string | null;
+  price: string | null;
+  /** How many recent orders used this domain. */
+  order_count: number;
+}
+
+/**
+ * GET /api/admin/link-building-orders/partnership-domains
+ * Domains matching the typed text, from the domain catalog and from previous
+ * orders, so the admin sees each domain's niche before picking it.
+ */
+export async function searchPartnershipDomains(
+  search: string,
+  limit = 20
+): Promise<PartnershipDomainSuggestion[]> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (search.trim() !== "") params.set("search", search.trim());
+  const res = await apiClient.get<{ data: PartnershipDomainSuggestion[] }>(
+    `/api/admin/link-building-orders/partnership-domains?${params.toString()}`
+  );
   return res.data;
 }
 
@@ -194,6 +236,18 @@ export async function createLinkBuildingOrder(
     "/api/admin/link-building-orders",
     payload
   );
+}
+
+/**
+ * POST /api/admin/link-building-orders/batch-store
+ * Creates several new rows in one request, for example a block of orders copied
+ * from Google Sheets and pasted into the grid's draft rows. The created rows come
+ * back in the same order as `payloads`, each with its server assigned BL- order id.
+ */
+export async function batchCreateLinkBuildingOrders(
+  payloads: LinkBuildingOrderPayload[]
+): Promise<{ message: string; data: LinkBuildingOrderRow[] }> {
+  return apiClient.post("/api/admin/link-building-orders/batch-store", { rows: payloads });
 }
 
 /**

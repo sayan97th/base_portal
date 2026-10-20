@@ -6,14 +6,111 @@
 
 export type PastedGrid = string[][];
 
-/** Parses tab/newline-delimited clipboard text into a grid of trimmed cells. */
+/**
+ * Parses tab/newline-delimited clipboard text into a grid of trimmed cells.
+ *
+ * Google Sheets and Excel wrap a cell in double quotes when its value holds a line
+ * break, a tab or a leading quote (inner quotes doubled), so a quoted cell keeps
+ * its line breaks instead of being split into extra rows. A quote that does not
+ * close right before a tab, a line break or the end of the text is kept as plain
+ * text, so a value that merely starts with a quote still pastes as typed.
+ */
 export function parsePastedGrid(text: string): PastedGrid {
   const normalized_text = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-  const lines = normalized_text.split("\n");
-  while (lines.length > 1 && lines[lines.length - 1] === "") {
-    lines.pop();
+  const rows: PastedGrid = [];
+  let row: string[] = [];
+  let position = 0;
+
+  for (;;) {
+    const { value, next_position } = readGridCell(normalized_text, position);
+    row.push(value.trim());
+    position = next_position;
+
+    if (position >= normalized_text.length) {
+      rows.push(row);
+      break;
+    }
+
+    if (normalized_text[position] === "\n") {
+      rows.push(row);
+      row = [];
+    }
+    position += 1;
   }
-  return lines.map((line) => line.split("\t").map((cell) => cell.trim()));
+
+  while (rows.length > 1 && rows[rows.length - 1].length === 1 && rows[rows.length - 1][0] === "") {
+    rows.pop();
+  }
+  return rows;
+}
+
+/** Reads one cell starting at `position`, stopping at the tab or line break that ends it. */
+function readGridCell(text: string, position: number): { value: string; next_position: number } {
+  if (text[position] === '"') {
+    let value = "";
+    let cursor = position + 1;
+    while (cursor < text.length) {
+      if (text[cursor] !== '"') {
+        value += text[cursor];
+        cursor += 1;
+        continue;
+      }
+      if (text[cursor + 1] === '"') {
+        value += '"';
+        cursor += 2;
+        continue;
+      }
+      const after_quote = text[cursor + 1];
+      if (after_quote === undefined || after_quote === "\t" || after_quote === "\n") {
+        return { value, next_position: cursor + 1 };
+      }
+      break;
+    }
+  }
+
+  let end = position;
+  while (end < text.length && text[end] !== "\t" && text[end] !== "\n") end += 1;
+  return { value: text.slice(position, end), next_position: end };
+}
+
+/** Quotes a cell the way Google Sheets does, only when it would otherwise break the grid. */
+function toTsvCell(value: string): string {
+  return /[\t\n\r]/.test(value) || value.startsWith('"') ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+/**
+ * Serializes a grid as tab/newline-delimited text, the plain text format Excel and
+ * Google Sheets read on paste. parsePastedGrid() reads it back to the same grid.
+ */
+export function serializeGridToTsv(grid: PastedGrid): string {
+  return grid.map((grid_row) => grid_row.map(toTsvCell).join("\t")).join("\n");
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/**
+ * Serializes a grid as an HTML table, the rich format spreadsheets prefer on
+ * paste, so every value lands in its own cell with its line breaks intact.
+ */
+export function serializeGridToHtml(grid: PastedGrid): string {
+  const body = grid
+    .map(
+      (grid_row) =>
+        `<tr>${grid_row.map((value) => `<td>${escapeHtml(value).replace(/\r?\n/g, "<br>")}</td>`).join("")}</tr>`
+    )
+    .join("");
+  return `<table><tbody>${body}</tbody></table>`;
+}
+
+/** Number of cells in a grid, counting every row (rows may differ in length). */
+export function countGridCells(grid: PastedGrid): number {
+  return grid.reduce((total, grid_row) => total + grid_row.length, 0);
 }
 
 /** True when the parsed grid spans more than a single cell. */

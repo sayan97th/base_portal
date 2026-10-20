@@ -51,17 +51,34 @@ import {
   exportLinkBuildingOrders,
   batchUpdateLinkBuildingOrders,
   batchUpdateLinkBuildingOrderCells,
+  batchCreateLinkBuildingOrders,
   getLinkBuildingOrderColumnValues,
   getLinkBuildingOrderFilterValues,
   listAdminUsersForSelect,
   listClientUsersForSelect,
   listPenNamesForSelect,
+  listNichesForSelect,
   getNeedsLbTlApprovalCount,
   parseApiErrorMessage,
   type AdminUserOption,
   type ClientUserOption,
 } from "@/services/admin/link-building-dashboard.service";
-import { parsePastedGrid, isBulkPaste, applyPastedGridToRows, type PastedGrid } from "@/lib/pasted-grid";
+import {
+  parsePastedGrid,
+  isBulkPaste,
+  applyPastedGridToRows,
+  serializeGridToHtml,
+  serializeGridToTsv,
+  type PastedGrid,
+} from "@/lib/pasted-grid";
+import {
+  ASSIGNMENT_CLIPBOARD_COLUMN_KEYS,
+  getAssignmentCellText,
+  isAssignmentColumnKey,
+  resolveAssignmentPasteValue,
+} from "@/lib/link-building-assignment-clipboard";
+import { usePartnershipDomainSuggestions } from "@/hooks/usePartnershipDomainSuggestions";
+import type { PartnershipDomainSuggestion } from "@/services/admin/link-building-dashboard.service";
 import LinkBuildingOrderImportModal from "./LinkBuildingOrderImportModal";
 import LinkBuildingMetricsUpdateModal from "./LinkBuildingMetricsUpdateModal";
 import UserSelectFilterDropdown from "./UserSelectFilterDropdown";
@@ -69,6 +86,7 @@ import ClientAssignCell from "./ClientAssignCell";
 import ClientSearchableSelect from "./ClientSearchableSelect";
 import AdminSearchableSelect from "./AdminSearchableSelect";
 import CellOptionsDropdown from "./CellOptionsDropdown";
+import PartnershipDomainDropdown from "./PartnershipDomainDropdown";
 import type {
   LinkBuildingOrderSearchBody,
   SortRulePayload,
@@ -137,6 +155,8 @@ interface ColumnDef {
   /** The options are loaded at runtime from existing data (e.g. Pen Name) rather
    *  than a preset list, so they act as suggestions and any new value is allowed. */
   dynamic_options?: boolean;
+  /** While editing, the cell offers known partnership domains along with their niche. */
+  domain_picker?: boolean;
   locked?: boolean;
   required?: boolean;
   sort_key?: string;
@@ -156,8 +176,11 @@ type CellNavDirection = "next" | "prev" | GridDirection;
  * click, Enter or F2, so the arrow keys move the caret inside the text instead. */
 type CellEditEntry = "edit" | "type";
 
-/** Cell keys after the data columns that are still part of keyboard navigation. */
-const ASSIGNMENT_COLUMN_KEYS = ["user_id", "assigned_admin_user_id"] as const;
+/** Cell keys after the data columns, part of keyboard navigation, range selection and copy/paste. */
+const ASSIGNMENT_COLUMN_KEYS = ASSIGNMENT_CLIPBOARD_COLUMN_KEYS;
+
+/** Most draft rows one paste may add, matching the API's batch-store limit. */
+const MAX_PASTED_DRAFT_ROWS = 500;
 
 const ASSIGNMENT_COLUMN_LABELS: Record<string, string> = {
   user_id: "Client Account",
@@ -229,7 +252,8 @@ const COLUMNS: ColumnDef[] = [
   { key: "request_date", label: "Request Date", group: "dates", min_width: 120, type: "date", locked: true },
   { key: "estimated_delivery_date", label: "Delivery Date", group: "dates", min_width: 175, type: "date", locked: true },
   { key: "pen_name", label: "Pen Name", group: "writer", min_width: 120, type: "select", options: [], dynamic_options: true },
-  { key: "partnership", label: "Partnership", group: "writer", min_width: 180, type: "url" },
+  { key: "partnership", label: "Partnership", group: "writer", min_width: 180, type: "url", domain_picker: true },
+  { key: "niche", label: "Niche", group: "writer", min_width: 150, type: "select", options: [], dynamic_options: true },
   { key: "article_title", label: "Article Title", group: "writer", min_width: 220, type: "text" },
   { key: "article", label: "Article", group: "writer", min_width: 120, type: "url" },
   { key: "live_link", label: "Live Link", group: "live", min_width: 220, type: "url" },
@@ -247,15 +271,15 @@ const COLUMNS: ColumnDef[] = [
 ];
 
 /**
- * Pen Name dropdown options: the names saved on the server merged with the ones
- * on the currently loaded rows, so a name typed moments ago (by this admin or a
- * collaborator) is offered right away without refetching. Deduplicated without
- * regard to casing and sorted alphabetically.
+ * Options of a column whose list grows with the data (Pen Name, Niche): the values
+ * saved on the server merged with the ones on the currently loaded rows, so a value
+ * typed moments ago (by this admin or a collaborator) is offered right away without
+ * refetching. Deduplicated without regard to casing and sorted alphabetically.
  */
-function buildPenNameOptions(saved_pen_names: string[], loaded_pen_names: string[]): string[] {
+function buildSuggestedOptions(saved_values: string[], loaded_values: string[]): string[] {
   const options_by_key = new Map<string, string>();
-  [...saved_pen_names, ...loaded_pen_names].forEach((pen_name) => {
-    const trimmed = pen_name.trim();
+  [...saved_values, ...loaded_values].forEach((option_value) => {
+    const trimmed = option_value.trim();
     const option_key = trimmed.toLowerCase();
     if (trimmed !== "" && !options_by_key.has(option_key)) options_by_key.set(option_key, trimmed);
   });
@@ -367,6 +391,7 @@ const QUICK_FILTER_COLUMNS: QuickFilterColumn[] = [
   { key: "link_type", label: "Link Type", options: LINK_TYPE_OPTIONS },
   { key: "client", label: "Company" },
   { key: "pen_name", label: "Pen Name" },
+  { key: "niche", label: "Niche" },
   { key: "current_poc", label: "Current POC" },
   { key: "lb_tl_approval", label: "LB TL Approval" },
   { key: "dr_lbs", label: "DR" },
@@ -485,6 +510,7 @@ function createEmptyRow(): LinkBuildingOrderRow {
     link_builder: "",
     pen_name: "",
     partnership: "",
+    niche: "",
     partnership_check: "",
     article_title: "",
     article: "",
@@ -516,7 +542,13 @@ interface UserAssignCellProps {
   onAssignUser: (value: string) => void;
   onCancelEdit: () => void;
   is_active?: boolean;
-  onSelectCell?: () => void;
+  /** True when this cell falls within the active multi-cell range selection. */
+  is_range_selected?: boolean;
+  /** Mouse down on the cell: selects it, or extends the range with Shift, and starts a drag selection. */
+  onSelectCell?: (shift_key: boolean) => void;
+  /** Mouse enter while a drag is in progress, extends the range to this cell. */
+  onCellMouseEnter?: () => void;
+  onCellMouseUp?: () => void;
   cell_key?: string;
   /** Find (Ctrl/Cmd+F) highlight for this cell, null when it does not match. */
   find_match_state?: TableFindMatchState;
@@ -532,7 +564,10 @@ function UserAssignCell({
   onAssignUser,
   onCancelEdit,
   is_active = false,
+  is_range_selected = false,
   onSelectCell,
+  onCellMouseEnter,
+  onCellMouseUp,
   cell_key,
   find_match_state = null,
   find_terms,
@@ -549,14 +584,16 @@ function UserAssignCell({
       <td
         ref={setCellEl}
         data-cell-key={cell_key}
-        className={`${styles.cell} whitespace-nowrap text-xs transition-colors ${
+        className={`${styles.cell} select-none whitespace-nowrap text-xs transition-colors ${
           is_editing
             ? "bg-indigo-50 ring-2 ring-inset ring-indigo-400 dark:bg-indigo-900/20 dark:ring-indigo-600"
             : is_active
               ? styles.cell_active
               : ""
-        }${getFindCellClass(find_match_state)}`}
-        onMouseDown={!is_editing ? onSelectCell : undefined}
+        }${is_range_selected && !is_editing ? ` ${styles.cell_in_range}` : ""}${getFindCellClass(find_match_state)}`}
+        onMouseDown={!is_editing ? (e) => onSelectCell?.(e.shiftKey) : undefined}
+        onMouseEnter={onCellMouseEnter}
+        onMouseUp={onCellMouseUp}
         onDoubleClick={!is_editing ? onStartEdit : undefined}
         title="Double click or press Enter to assign a team member"
       >
@@ -742,6 +779,14 @@ function EditableCell({
     }
   }
 
+  // Domain suggestions of the Partnership cell being edited. Like the select cells,
+  // the full list shows until the admin types, then it narrows to the typed text.
+  const is_choosing_domain = is_editing && !!col.domain_picker;
+  const { suggestions: domain_suggestions, is_loading: is_loading_domains } = usePartnershipDomainSuggestions(
+    is_choosing_domain && has_typed ? value : "",
+    is_choosing_domain
+  );
+
   useEffect(() => {
     if (!is_editing) return;
     const input_el = input_ref.current;
@@ -887,6 +932,79 @@ function EditableCell({
       );
     }
 
+    if (col.domain_picker) {
+      // Picking a suggestion stores the domain as a URL, like any typed Partnership.
+      const commitDomain = (suggestion: PartnershipDomainSuggestion) => {
+        flushSync(() => onUpdate(`https://${suggestion.domain}`));
+        onStopEdit();
+      };
+      const highlighted_suggestion = highlighted_idx >= 0 ? domain_suggestions[highlighted_idx] : undefined;
+
+      const handleDomainKeyDown = (e: React.KeyboardEvent) => {
+        // Up/Down drive the domain list, Left/Right can still commit and move.
+        if (handleArrowCommit(e, ["left", "right"])) return;
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          setHighlightedIdx((prev) => Math.min(prev + 1, domain_suggestions.length - 1));
+          return;
+        }
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          setHighlightedIdx((prev) => Math.max(prev - 1, -1));
+          return;
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          onCancelEdit();
+          return;
+        }
+        if (e.key === "Enter" || e.key === "Tab") {
+          e.preventDefault();
+          if (highlighted_suggestion) {
+            commitDomain(highlighted_suggestion);
+          } else {
+            onStopEdit();
+          }
+          if (e.key === "Enter") onKeyNav(e.shiftKey ? "up" : "down");
+          else onKeyNav(e.shiftKey ? "prev" : "next");
+        }
+      };
+
+      return (
+        <td
+          ref={setComboboxAnchorEl}
+          data-cell-key={cell_key}
+          className={`${styles.cell_editing}${is_sticky ? ` ${sticky_bg_class}` : ""}`}
+          style={is_sticky ? { position: "sticky", left: sticky_left, zIndex: 3 } : undefined}
+        >
+          <input
+            ref={input_ref}
+            type="text"
+            value={value}
+            onChange={(e) => {
+              setHighlightedIdx(-1);
+              setHasTyped(true);
+              onUpdate(e.target.value);
+            }}
+            onBlur={onStopEdit}
+            onKeyDown={handleDomainKeyDown}
+            onPaste={handleInputPaste}
+            className={styles.cell_input}
+            aria-label={`${col.label}, type a domain or pick one with its niche`}
+          />
+          <PartnershipDomainDropdown
+            suggestions={domain_suggestions}
+            is_loading={is_loading_domains}
+            current_value={value}
+            highlighted_idx={highlighted_idx}
+            anchor_el={combobox_anchor_el}
+            onHighlightChange={setHighlightedIdx}
+            onSelect={commitDomain}
+          />
+        </td>
+      );
+    }
+
     return (
       <td
         data-cell-key={cell_key}
@@ -1001,7 +1119,7 @@ function EditableCell({
       onMouseEnter={onCellMouseEnter}
       onMouseUp={onCellMouseUp}
       onDoubleClick={onCellDoubleClick}
-      title={is_required_error ? `Required: ${col.label} must be filled to save this row` : "Double click, Enter or start typing to edit · Arrow keys to move · Shift+Arrow or drag to select · Ctrl+C / Ctrl+V to copy and paste"}
+      title={is_required_error ? `Required: ${col.label} must be filled to save this row` : "Double click, Enter or start typing to edit · Arrow keys to move · Shift+Arrow or drag to select · Ctrl+C / Ctrl+X / Ctrl+V to copy, cut and paste, also to and from Google Sheets"}
     >
       {show_row_floater && <RowPresenceFloater editors={row_editors} />}
       {has_cell_editors && <CellPresenceOverlay editors={cell_editors} />}
@@ -1099,6 +1217,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   const [admin_users, setAdminUsers] = useState<AdminUserOption[]>([]);
   const [client_users, setClientUsers] = useState<ClientUserOption[]>([]);
   const [saved_pen_names, setSavedPenNames] = useState<string[]>([]);
+  const [saved_niches, setSavedNiches] = useState<string[]>([]);
   const [is_loading, setIsLoading] = useState(true);
   /** True once the first fetch settles. Later fetches refresh the grid in place instead of swapping it for the skeleton. */
   const [has_loaded_once, setHasLoadedOnce] = useState(false);
@@ -1381,6 +1500,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     listAdminUsersForSelect().then(setAdminUsers).catch(() => {/* non-critical */ });
     listClientUsersForSelect().then(setClientUsers).catch(() => {/* non-critical */ });
     listPenNamesForSelect().then(setSavedPenNames).catch(() => {/* non-critical */ });
+    listNichesForSelect().then(setSavedNiches).catch(() => {/* non-critical */ });
   }, []);
 
   // ── Fetch ───────────────────────────────────────────────────────────────────
@@ -1489,15 +1609,32 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     [rows, editing_row_id]
   );
   const pen_name_options = useMemo(
-    () => buildPenNameOptions(saved_pen_names, loaded_pen_names_key.split("\n")),
+    () => buildSuggestedOptions(saved_pen_names, loaded_pen_names_key.split("\n")),
     [saved_pen_names, loaded_pen_names_key]
+  );
+  const loaded_niches_key = useMemo(
+    () =>
+      rows
+        .filter((row) => row.id !== editing_row_id)
+        .map((row) => row.niche ?? "")
+        .join("\n"),
+    [rows, editing_row_id]
+  );
+  const niche_options = useMemo(
+    () => buildSuggestedOptions(saved_niches, loaded_niches_key.split("\n")),
+    [saved_niches, loaded_niches_key]
   );
 
   // COLUMNS with runtime loaded options filled in, used wherever a column's
   // options are read (cell dropdowns, paste normalization, batch edit).
   const columns = useMemo(
-    () => COLUMNS.map((col) => (col.key === "pen_name" ? { ...col, options: pen_name_options } : col)),
-    [pen_name_options]
+    () =>
+      COLUMNS.map((col) => {
+        if (col.key === "pen_name") return { ...col, options: pen_name_options };
+        if (col.key === "niche") return { ...col, options: niche_options };
+        return col;
+      }),
+    [pen_name_options, niche_options]
   );
 
   const visible_columns = useMemo(
@@ -1540,12 +1677,14 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
   // Resolves the active anchor/focus cell range into row/column index bounds so
   // every cell in the rectangle (inclusive) can be highlighted and later copied.
+  // Column indexes follow grid_column_keys, so a range can also span the Client
+  // Account and Assigned To columns after the data columns, like any sheet column.
   const range_bounds = useMemo(() => {
     if (!cell_range) return null;
     const anchor_row = filtered_rows.findIndex((r) => r.id === cell_range.anchor.row_id);
     const focus_row = filtered_rows.findIndex((r) => r.id === cell_range.focus.row_id);
-    const anchor_col = visible_columns.findIndex((c) => c.key === cell_range.anchor.col_key);
-    const focus_col = visible_columns.findIndex((c) => c.key === cell_range.focus.col_key);
+    const anchor_col = grid_column_keys.indexOf(cell_range.anchor.col_key);
+    const focus_col = grid_column_keys.indexOf(cell_range.focus.col_key);
     if (anchor_row === -1 || focus_row === -1 || anchor_col === -1 || focus_col === -1) return null;
     return {
       min_row: Math.min(anchor_row, focus_row),
@@ -1553,10 +1692,48 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       min_col: Math.min(anchor_col, focus_col),
       max_col: Math.max(anchor_col, focus_col),
     };
-  }, [cell_range, filtered_rows, visible_columns]);
+  }, [cell_range, filtered_rows, grid_column_keys]);
 
   const range_bounds_kbd_ref = useRef(range_bounds);
   range_bounds_kbd_ref.current = range_bounds;
+
+  /** True when a cell at this position falls within the active range selection. */
+  const isInRange = (row_idx: number, col_idx: number): boolean =>
+    !!range_bounds &&
+    row_idx >= range_bounds.min_row && row_idx <= range_bounds.max_row &&
+    col_idx >= range_bounds.min_col && col_idx <= range_bounds.max_col;
+
+  /** Text a cell shows and copies, the assignment cells resolve their ids to the displayed name. */
+  const getCellClipboardText = useCallback(
+    (row: LinkBuildingOrderRow, col_key: string): string =>
+      isAssignmentColumnKey(col_key)
+        ? getAssignmentCellText(col_key, row[col_key], { client_users, admin_users })
+        : String(row[col_key as keyof LinkBuildingOrderRow] ?? ""),
+    [client_users, admin_users]
+  );
+
+  /** Values of the selected range (or of the active cell when there is none), as a grid. */
+  const getSelectionGrid = useCallback((): PastedGrid | null => {
+    const bounds = range_bounds_kbd_ref.current;
+    if (bounds) {
+      const grid: PastedGrid = [];
+      for (let r = bounds.min_row; r <= bounds.max_row; r++) {
+        const row = filtered_rows[r];
+        if (!row) continue;
+        const cells: string[] = [];
+        for (let c = bounds.min_col; c <= bounds.max_col; c++) {
+          const col_key = grid_column_keys[c];
+          cells.push(col_key ? getCellClipboardText(row, col_key) : "");
+        }
+        grid.push(cells);
+      }
+      return grid.length > 0 ? grid : null;
+    }
+
+    const cell = active_cell_kbd_ref.current;
+    const row = cell ? filtered_rows.find((r) => r.id === cell.row_id) : undefined;
+    return cell && row ? [[getCellClipboardText(row, cell.col_key)]] : null;
+  }, [filtered_rows, grid_column_keys, getCellClipboardText]);
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -1608,6 +1785,48 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     }
   }, [refreshFilterCounts]);
 
+  /**
+   * Saves several draft rows as new orders in one request, used after a block of
+   * rows is pasted into the drafts. One request keeps the BL- order ids in paste
+   * order and avoids firing one create per pasted row. Returns how many were saved.
+   */
+  const persistNewRows = useCallback(async (draft_rows: LinkBuildingOrderRow[]): Promise<number> => {
+    if (draft_rows.length === 0) return 0;
+    if (draft_rows.length === 1) {
+      await persistNewRow(draft_rows[0]);
+      return new_row_ids_ref.current.has(draft_rows[0].id) ? 0 : 1;
+    }
+
+    draft_rows.forEach((row) => markSaving(row.id));
+    setSaveError(null);
+    try {
+      const res = await batchCreateLinkBuildingOrders(draft_rows.map(buildLboPayload));
+      const created_by_temp_id = new Map(draft_rows.map((row, idx) => [row.id, res.data[idx]] as const));
+      const created_ids = new Set(res.data.map((row) => row.id));
+      draft_rows.forEach((row) => new_row_ids_ref.current.delete(row.id));
+      // Same atomic swap as persistNewRow: drop any copy of a created row that a
+      // WebSocket broadcast already added, then replace each draft with its saved row.
+      setRows((prev) =>
+        prev
+          .filter((r) => !created_ids.has(r.id))
+          .map((r) => created_by_temp_id.get(r.id) ?? r)
+      );
+      saveDraftsToStorage(
+        rows_ref.current.filter((r) => new_row_ids_ref.current.has(r.id) && !created_by_temp_id.has(r.id))
+      );
+      on_order_mutated_ref.current?.();
+      refreshFilterCounts();
+      return res.data.length;
+    } catch (err) {
+      saveDraftsToStorage(rows_ref.current.filter((r) => new_row_ids_ref.current.has(r.id)));
+      const api_message = parseApiErrorMessage(err, COLUMN_LABELS);
+      setSaveError(`Could not save the ${draft_rows.length} pasted rows: ${api_message}`);
+      return 0;
+    } finally {
+      draft_rows.forEach((row) => unmarkSaving(row.id));
+    }
+  }, [persistNewRow, refreshFilterCounts]);
+
   const persistRowUpdate = useCallback(async (row: LinkBuildingOrderRow, changed_col_key?: string, value_changed = true) => {
     markSaving(row.id);
     setSaveError(null);
@@ -1618,6 +1837,13 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         // omit it so a client-purchased row's UUID-derived fallback display ID is
         // never silently persisted just because an unrelated field was edited.
         delete payload.order_id;
+      }
+      if (changed_col_key !== "niche") {
+        // The API refills the Niche from the domain catalog when the Partnership
+        // changes, so it is only sent when the admin edited the Niche cell itself.
+        // Sending the row's old Niche along with a new Partnership would save that
+        // old niche for the new domain.
+        delete payload.niche;
       }
       const res = await updateLinkBuildingOrder(row.id, payload);
       replaceRow(row.id, res.data);
@@ -2747,17 +2973,63 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     grid: PastedGrid,
     operation: "paste" | "clear" = "paste"
   ) => {
-    const start_row_index = filtered_rows.findIndex((r) => r.id === start_row_id);
-    const start_col_index = visible_columns.findIndex((c) => c.key === start_col_key);
+    let base_rows = filtered_rows;
+    const start_row_index = base_rows.findIndex((r) => r.id === start_row_id);
+    const start_col_index = grid_column_keys.indexOf(start_col_key);
     if (start_row_index === -1 || start_col_index === -1) return;
 
-    const field_order = visible_columns.map((c) => c.key);
+    // Pasting into a draft row creates new orders, the same way pasting rows into
+    // the bottom of a sheet adds them. The block only ever fills draft rows: more
+    // drafts are added under it when it is taller than the drafts left, so pasting
+    // a batch of new orders never overwrites a saved order further down the table.
+    let paste_grid = grid;
+    let skipped_row_count = 0;
+    const added_draft_ids: string[] = [];
+    if (operation === "paste" && new_row_ids_ref.current.has(start_row_id)) {
+      let draft_run = 0;
+      while (
+        start_row_index + draft_run < base_rows.length &&
+        new_row_ids_ref.current.has(base_rows[start_row_index + draft_run].id)
+      ) {
+        draft_run += 1;
+      }
+      const draft_room = Math.max(0, MAX_PASTED_DRAFT_ROWS - new_row_ids_ref.current.size);
+      const added_count = Math.min(Math.max(0, paste_grid.length - draft_run), draft_room);
+      if (added_count > 0) {
+        const added_rows = Array.from({ length: added_count }, () => createEmptyRow());
+        added_rows.forEach((r) => {
+          new_row_ids_ref.current.add(r.id);
+          added_draft_ids.push(r.id);
+        });
+        const insert_at = start_row_index + draft_run;
+        base_rows = [...base_rows.slice(0, insert_at), ...added_rows, ...base_rows.slice(insert_at)];
+      }
+      const fillable_row_count = draft_run + added_count;
+      if (paste_grid.length > fillable_row_count) {
+        skipped_row_count = paste_grid.length - fillable_row_count;
+        paste_grid = paste_grid.slice(0, fillable_row_count);
+      }
+    }
+
+    const field_order = grid_column_keys as (keyof LinkBuildingOrderRow)[];
+    let unmatched_assignment_count = 0;
 
     const parseCellForPaste = (
       field: keyof LinkBuildingOrderRow,
       raw_value: string,
       current_value: LinkBuildingOrderRow[keyof LinkBuildingOrderRow]
     ): LinkBuildingOrderRow[keyof LinkBuildingOrderRow] => {
+      // Client Account and Assigned To store a user id, so the pasted name (or
+      // email) is looked up. A name matching no user keeps the cell as it was.
+      if (isAssignmentColumnKey(field)) {
+        const result = resolveAssignmentPasteValue(field, raw_value, { client_users, admin_users });
+        if (result.status === "unmatched") {
+          unmatched_assignment_count += 1;
+          return current_value;
+        }
+        return result.user_id as LinkBuildingOrderRow[keyof LinkBuildingOrderRow];
+      }
+
       const col_def = visible_columns.find((c) => c.key === field);
       // order_id must stay unique per row and is server-generated, so it is never
       // overwritten by a bulk paste — same rule the batch-update endpoint enforces.
@@ -2782,43 +3054,62 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       return trimmed as LinkBuildingOrderRow[keyof LinkBuildingOrderRow];
     };
 
-    const { rows: next_rows, overflow_row_count } = applyPastedGridToRows(
-      filtered_rows,
+    const { rows: next_rows, overflow_row_count: rows_past_page_count } = applyPastedGridToRows(
+      base_rows,
       start_row_index,
       start_col_index,
       field_order,
-      grid,
+      paste_grid,
       parseCellForPaste
     );
+    const overflow_row_count = rows_past_page_count + skipped_row_count;
 
     // Diff against the previous rows to find exactly which cells changed, so only
     // the affected fields are sent to the server instead of the whole row.
-    const changed_fields_by_row_id: Record<string, Partial<Record<keyof LinkBuildingOrderRow, string>>> = {};
+    const changed_fields_by_row_id: Record<string, Partial<Record<keyof LinkBuildingOrderRow, string | null>>> = {};
     const history_changes: CellHistoryChange[] = [];
     let changed_cell_count = 0;
 
-    grid.forEach((grid_row, row_offset) => {
+    paste_grid.forEach((grid_row, row_offset) => {
       const target_row_index = start_row_index + row_offset;
-      if (target_row_index >= filtered_rows.length) return;
-      const row_id = filtered_rows[target_row_index].id;
+      if (target_row_index >= base_rows.length) return;
+      const row_id = base_rows[target_row_index].id;
 
       grid_row.forEach((_raw_value, col_offset) => {
         const field = field_order[start_col_index + col_offset];
         if (!field) return;
-        const old_value = String(filtered_rows[target_row_index][field] ?? "");
-        const new_value = String(next_rows[target_row_index][field] ?? "");
+        const old_raw = base_rows[target_row_index][field];
+        const new_raw = next_rows[target_row_index][field];
+        const old_value = String(old_raw ?? "");
+        const new_value = String(new_raw ?? "");
         if (old_value === new_value) return;
-        changed_fields_by_row_id[row_id] = { ...(changed_fields_by_row_id[row_id] ?? {}), [field]: new_value };
+        const is_assignment_field = isAssignmentColumnKey(field);
+        changed_fields_by_row_id[row_id] = {
+          ...(changed_fields_by_row_id[row_id] ?? {}),
+          [field]: is_assignment_field && new_value === "" ? null : new_value,
+        };
         if (!new_row_ids_ref.current.has(row_id)) {
-          history_changes.push({ row_id, col_key: field, old_value, new_value });
+          history_changes.push(
+            is_assignment_field
+              ? { row_id, col_key: field, old_value: (old_raw as number | null) ?? null, new_value: (new_raw as number | null) ?? null }
+              : { row_id, col_key: field, old_value, new_value }
+          );
         }
         changed_cell_count += 1;
       });
     });
 
+    const unmatched_note =
+      unmatched_assignment_count > 0
+        ? ` ${unmatched_assignment_count} Client Account or Assigned To value${unmatched_assignment_count !== 1 ? "s" : ""} did not match a user and ${unmatched_assignment_count !== 1 ? "were" : "was"} left unchanged.`
+        : "";
+
     if (changed_cell_count === 0) {
+      added_draft_ids.forEach((id) => new_row_ids_ref.current.delete(id));
       if (overflow_row_count > 0) {
-        setNotificationBanner(`Paste did not fit — ${overflow_row_count} row(s) beyond the visible table were skipped.`);
+        setNotificationBanner(`Paste did not fit. ${overflow_row_count} row(s) beyond the visible table were skipped.${unmatched_note}`);
+      } else if (unmatched_note) {
+        setNotificationBanner(unmatched_note.trim());
       }
       return;
     }
@@ -2828,15 +3119,17 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     saveDraftsToStorage(drafts_after_paste);
 
     const changed_row_ids = Object.keys(changed_fields_by_row_id);
-    const draft_row_ids = changed_row_ids.filter((id) => new_row_ids_ref.current.has(id));
     const persisted_row_ids = changed_row_ids.filter((id) => !new_row_ids_ref.current.has(id));
-
-    draft_row_ids.forEach((row_id) => {
-      const row = next_rows.find((r) => r.id === row_id);
-      if (row) persistNewRow(row);
-    });
+    const changed_drafts = next_rows.filter(
+      (r) => new_row_ids_ref.current.has(r.id) && changed_fields_by_row_id[r.id] !== undefined
+    );
+    // Only drafts with every required field are created, the others wait (marked
+    // "Required") until the admin fills them in, like a row typed by hand.
+    const complete_drafts = changed_drafts.filter((r) => getRowMissingRequired(r).length === 0);
+    const incomplete_draft_count = changed_drafts.length - complete_drafts.length;
 
     setSaveError(null);
+    const created_count_promise = persistNewRows(complete_drafts);
 
     if (persisted_row_ids.length > 0) {
       setIsBatchSaving(true);
@@ -2861,6 +3154,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       }
     }
 
+    const created_count = await created_count_promise;
     const row_count = changed_row_ids.length;
     if (operation === "clear") {
       setNotificationBanner(
@@ -2868,124 +3162,144 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       );
       return;
     }
+
+    const created_note =
+      created_count > 0 ? ` Created ${created_count} new order${created_count !== 1 ? "s" : ""}.` : "";
+    const incomplete_note =
+      incomplete_draft_count > 0
+        ? ` ${incomplete_draft_count} new row${incomplete_draft_count !== 1 ? "s" : ""} still need${incomplete_draft_count === 1 ? "s" : ""} Link Type, Company, Keyword and Landing Page before saving.`
+        : "";
+    const overflow_note =
+      skipped_row_count > 0
+        ? ` ${overflow_row_count} row(s) did not fit and were skipped, at most ${MAX_PASTED_DRAFT_ROWS} new rows can be pasted at once.`
+        : overflow_row_count > 0
+          ? ` ${overflow_row_count} row(s) beyond the visible table were skipped.`
+          : "";
     setNotificationBanner(
       `Pasted ${changed_cell_count} cell${changed_cell_count !== 1 ? "s" : ""} across ${row_count} row${row_count !== 1 ? "s" : ""}.` +
-      (overflow_row_count > 0 ? ` ${overflow_row_count} row(s) beyond the visible table were skipped.` : "")
+      created_note +
+      incomplete_note +
+      overflow_note +
+      unmatched_note
     );
-  }, [filtered_rows, visible_columns, persistNewRow, refreshFilterCounts, pushHistoryEntry]);
+  }, [filtered_rows, visible_columns, grid_column_keys, client_users, admin_users, persistNewRows, refreshFilterCounts, pushHistoryEntry]);
 
-  // ── Range copy/paste: Ctrl+C / Ctrl+V on an active multi-cell selection ──────
-
-  const copyRangeToClipboard = useCallback(() => {
+  /**
+   * Pastes a grid at the current selection, like Ctrl+V in Sheets. On a range, a
+   * smaller block that divides it evenly (a single value, or a row or column of
+   * values) is repeated to fill the whole range. Without a range, the block starts
+   * at the active cell and covers as many cells as it holds.
+   */
+  const pasteGridAtSelection = useCallback((grid: PastedGrid) => {
     const bounds = range_bounds_kbd_ref.current;
-    if (!bounds) return;
+    if (bounds) {
+      const start_row = filtered_rows[bounds.min_row];
+      const start_col_key = grid_column_keys[bounds.min_col];
+      if (!start_row || !start_col_key) return;
 
-    const lines: string[] = [];
-    for (let r = bounds.min_row; r <= bounds.max_row; r++) {
-      const row = filtered_rows[r];
-      if (!row) continue;
-      const cells: string[] = [];
-      for (let c = bounds.min_col; c <= bounds.max_col; c++) {
-        const col = visible_columns[c];
-        cells.push(col ? String(row[col.key] ?? "") : "");
-      }
-      lines.push(cells.join("\t"));
-    }
-    const text = lines.join("\n");
+      const range_rows = bounds.max_row - bounds.min_row + 1;
+      const range_cols = bounds.max_col - bounds.min_col + 1;
+      const grid_rows = grid.length;
+      const grid_cols = Math.max(...grid.map((grid_row) => grid_row.length));
+      const fills_evenly =
+        grid_rows > 0 && grid_cols > 0 &&
+        (range_rows > grid_rows || range_cols > grid_cols) &&
+        range_rows % grid_rows === 0 && range_cols % grid_cols === 0;
+      const paste_grid = fills_evenly
+        ? Array.from({ length: range_rows }, (_, r) =>
+          Array.from({ length: range_cols }, (_, c) => grid[r % grid_rows][c % grid_cols] ?? "")
+        )
+        : grid;
 
-    navigator.clipboard.writeText(text).catch(() => { });
-    setRangeClipboard(parsePastedGrid(text));
-
-    const n_rows = bounds.max_row - bounds.min_row + 1;
-    const n_cols = bounds.max_col - bounds.min_col + 1;
-    const n_cells = n_rows * n_cols;
-    setNotificationBanner(
-      `Copied ${n_cells} cell${n_cells !== 1 ? "s" : ""} (${n_rows}×${n_cols}) — press Ctrl+V on a cell to paste here, or paste into Excel/Sheets`
-    );
-  }, [filtered_rows, visible_columns]);
-
-  const pasteIntoRange = useCallback(async () => {
-    const bounds = range_bounds_kbd_ref.current;
-    if (!bounds) return;
-
-    let grid: PastedGrid | null = null;
-    try {
-      // Reading the OS clipboard lets a block copied from Excel/Sheets be pasted
-      // straight into a selected range, not just into one cell at a time.
-      const text = await navigator.clipboard.readText();
-      if (text) grid = parsePastedGrid(text);
-    } catch {
-      // Blocked by the browser's clipboard-read permission — fall back below.
-    }
-    if (!grid) grid = range_clipboard_kbd_ref.current;
-    if (!grid) return;
-
-    const range_rows = bounds.max_row - bounds.min_row + 1;
-    const range_cols = bounds.max_col - bounds.min_col + 1;
-
-    // Pasting a single copied value onto a larger selection fills the whole
-    // selection with it, matching the behavior admins already expect from Excel.
-    if (grid.length === 1 && grid[0].length === 1 && (range_rows > 1 || range_cols > 1)) {
-      const single_value = grid[0][0];
-      grid = Array.from({ length: range_rows }, () => Array.from({ length: range_cols }, () => single_value));
+      handleBulkPaste(start_row.id, start_col_key, paste_grid);
+      return;
     }
 
-    const start_row = filtered_rows[bounds.min_row];
-    const start_col = visible_columns[bounds.min_col];
-    if (!start_row || !start_col) return;
-
-    handleBulkPaste(start_row.id, start_col.key, grid);
-  }, [filtered_rows, visible_columns, handleBulkPaste]);
-
-  /** Ctrl+V on the active cell with no range: pastes the OS clipboard starting at that cell. */
-  const pasteIntoActiveCell = useCallback(async () => {
     const cell = active_cell_kbd_ref.current;
-    if (!cell || !visible_columns.some((col) => col.key === cell.col_key)) return;
-
-    let grid: PastedGrid | null = null;
-    try {
-      const text = await navigator.clipboard.readText();
-      if (text) grid = parsePastedGrid(text);
-    } catch {
-      // Blocked by the browser's clipboard-read permission, fall back below.
-    }
-    if (!grid) grid = range_clipboard_kbd_ref.current;
-    if (!grid) return;
-
+    if (!cell || !grid_column_keys.includes(cell.col_key)) return;
     handleBulkPaste(cell.row_id, cell.col_key, grid);
-  }, [visible_columns, handleBulkPaste]);
+  }, [filtered_rows, grid_column_keys, handleBulkPaste]);
 
   /** Delete / Backspace: empties every cell of the selected range, or just the active cell. */
   const clearSelectedCells = useCallback(() => {
     const bounds = range_bounds_kbd_ref.current;
     if (bounds) {
       const start_row = filtered_rows[bounds.min_row];
-      const start_col = visible_columns[bounds.min_col];
-      if (!start_row || !start_col) return;
+      const start_col_key = grid_column_keys[bounds.min_col];
+      if (!start_row || !start_col_key) return;
       const empty_grid = Array.from({ length: bounds.max_row - bounds.min_row + 1 }, () =>
         Array.from({ length: bounds.max_col - bounds.min_col + 1 }, () => "")
       );
-      handleBulkPaste(start_row.id, start_col.key, empty_grid, "clear");
+      handleBulkPaste(start_row.id, start_col_key, empty_grid, "clear");
       return;
     }
 
     const cell = active_cell_kbd_ref.current;
-    if (!cell || !visible_columns.some((col) => col.key === cell.col_key)) return;
+    if (!cell || !grid_column_keys.includes(cell.col_key)) return;
     handleBulkPaste(cell.row_id, cell.col_key, [[""]], "clear");
-  }, [filtered_rows, visible_columns, handleBulkPaste]);
+  }, [filtered_rows, grid_column_keys, handleBulkPaste]);
 
-  /** Row number click: selects every data cell of that row, like clicking a row header in Sheets. */
+  /**
+   * Ctrl+C / Ctrl+X: writes the selected range (or the active cell) to the clipboard
+   * as tab separated text plus an HTML table, so it pastes cell by cell into Google
+   * Sheets, Excel or back into this grid. `clipboard_data` comes from a native copy
+   * event; without it the async Clipboard API is used instead. A cut also clears
+   * the copied cells.
+   */
+  const copySelection = useCallback((clipboard_data: DataTransfer | null, mode: "copy" | "cut" = "copy"): boolean => {
+    const grid = getSelectionGrid();
+    if (!grid) return false;
+
+    const text = serializeGridToTsv(grid);
+    if (clipboard_data) {
+      clipboard_data.setData("text/plain", text);
+      clipboard_data.setData("text/html", serializeGridToHtml(grid));
+    } else {
+      navigator.clipboard?.writeText(text).catch(() => { });
+    }
+    setRangeClipboard(grid);
+
+    const verb = mode === "cut" ? "Cut" : "Copied";
+    const bounds = range_bounds_kbd_ref.current;
+    const cell = active_cell_kbd_ref.current;
+    const is_single_cell = grid.length === 1 && grid[0].length === 1;
+
+    if (is_single_cell && cell) {
+      const value = grid[0][0];
+      const col_label = COLUMN_LABELS[cell.col_key] ?? ASSIGNMENT_COLUMN_LABELS[cell.col_key] ?? cell.col_key;
+      setClipboardCell({ value, col_key: cell.col_key });
+      const short = value.length > 28 ? value.slice(0, 28) + "…" : value;
+      const n_selected = selected_row_ids_kbd_ref.current.size;
+      setNotificationBanner(
+        n_selected > 0
+          ? `${verb} "${short}". Press Ctrl+V to paste it into "${col_label}" for ${n_selected} row${n_selected > 1 ? "s" : ""}.`
+          : `${verb} "${short}" from "${col_label}". Select a cell or a range, then press Ctrl+V to paste.`
+      );
+    } else if (bounds) {
+      const n_rows = bounds.max_row - bounds.min_row + 1;
+      const n_cols = bounds.max_col - bounds.min_col + 1;
+      const n_cells = n_rows * n_cols;
+      setNotificationBanner(
+        `${verb} ${n_cells} cell${n_cells !== 1 ? "s" : ""} (${n_rows}×${n_cols}). Press Ctrl+V on a cell to paste here, or paste into Excel or Google Sheets.`
+      );
+    }
+
+    if (mode === "cut") clearSelectedCells();
+    return true;
+  }, [getSelectionGrid, clearSelectedCells]);
+
+  /** Row number click: selects every cell of that row, like clicking a row header in Sheets. */
   const selectEntireRow = useCallback((row_id: string) => {
-    const first_col = visible_columns[0];
-    const last_col = visible_columns[visible_columns.length - 1];
-    if (!first_col || !last_col) return;
-    const anchor = { row_id, col_key: first_col.key as string };
+    const first_col_key = grid_column_keys[0];
+    const last_col_key = grid_column_keys[grid_column_keys.length - 1];
+    if (!first_col_key || !last_col_key) return;
+    const anchor = { row_id, col_key: first_col_key };
     setEditingCell(null);
     setActiveCell(anchor);
-    setCellRange({ anchor, focus: { row_id, col_key: last_col.key } });
+    setCellRange({ anchor, focus: { row_id, col_key: last_col_key } });
     if (!new_row_ids_ref.current.has(row_id)) setSelectedRowId(row_id);
     focusGrid();
-  }, [visible_columns, focusGrid]);
+  }, [grid_column_keys, focusGrid]);
 
   /** Column letter click: selects that column for every row on the current page. */
   const selectEntireColumn = useCallback((col_key: string) => {
@@ -2995,14 +3309,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     const anchor = { row_id: first_row.id, col_key };
     setEditingCell(null);
     setActiveCell(anchor);
-    // The assignment columns are not part of range selection, so they only get the active cell.
-    setCellRange(
-      visible_columns.some((col) => col.key === col_key)
-        ? { anchor, focus: { row_id: last_row.id, col_key } }
-        : null
-    );
+    setCellRange({ anchor, focus: { row_id: last_row.id, col_key } });
     focusGrid();
-  }, [filtered_rows, visible_columns, focusGrid]);
+  }, [filtered_rows, focusGrid]);
 
   const handleBatchApply = useCallback(async () => {
     if (!batch_field || !batch_value || selected_row_ids.size === 0) return;
@@ -3142,11 +3451,97 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     }
   }, [clipboard_cell, selected_row_ids, clearSelection, refreshFilterCounts, pushHistoryEntry]);
 
-  // ── Global keyboard shortcuts: Ctrl+C = copy, Ctrl+V = paste, Ctrl+Z = undo, Ctrl+Y / Ctrl+Shift+Z = redo ──
+  // ── Clipboard: Ctrl+C / Ctrl+X / Ctrl+V on the grid ──────────────────────────
+
+  /**
+   * Pastes a grid at the selection. A single value copied from this grid while
+   * rows are ticked in the checkbox column fills that column for every ticked row
+   * instead, as before; any other content pastes at the active cell or range.
+   */
+  const pasteGrid = useCallback((grid: PastedGrid) => {
+    const clip = clipboard_cell_kbd_ref.current;
+    const is_single_value = grid.length === 1 && grid[0].length === 1;
+    if (
+      !range_bounds_kbd_ref.current &&
+      clip &&
+      selected_row_ids_kbd_ref.current.size > 0 &&
+      is_single_value &&
+      grid[0][0] === clip.value.trim()
+    ) {
+      handlePasteClipboard();
+      return;
+    }
+    pasteGridAtSelection(grid);
+  }, [handlePasteClipboard, pasteGridAtSelection]);
+
+  /** Fallback paste through the async Clipboard API, for browsers that send no paste event. */
+  const pasteFromClipboardApi = useCallback(async () => {
+    let grid: PastedGrid | null = null;
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) grid = parsePastedGrid(text);
+    } catch {
+      // Blocked by the browser's clipboard-read permission, fall back below.
+    }
+    if (!grid) grid = range_clipboard_kbd_ref.current;
+    if (grid) pasteGrid(grid);
+  }, [pasteGrid]);
+
+  // ── Global keyboard shortcuts: Ctrl+C = copy, Ctrl+X = cut, Ctrl+V = paste, Ctrl+Z = undo, Ctrl+Y / Ctrl+Shift+Z = redo ──
+  //
+  // Copy, cut and paste use the browser's native clipboard events, which give
+  // direct access to the clipboard (including blocks copied from Google Sheets or
+  // Excel) without a permission prompt. The key press only arms a fallback to the
+  // async Clipboard API for browsers that do not send those events while focus is
+  // on a non editable element.
 
   useEffect(() => {
     const isGridFocused = () =>
       !!table_scroll_ref.current && table_scroll_ref.current.contains(document.activeElement);
+
+    const isTextFieldFocused = () => {
+      const active_el = document.activeElement;
+      if (active_el instanceof HTMLInputElement) {
+        return !["checkbox", "radio", "button", "submit", "reset", "file", "range", "color"].includes(active_el.type);
+      }
+      return (
+        active_el instanceof HTMLTextAreaElement ||
+        active_el instanceof HTMLSelectElement ||
+        (active_el instanceof HTMLElement && active_el.isContentEditable)
+      );
+    };
+
+    /** The grid handles the clipboard while it has focus, or while a range is selected and nothing else is in use. */
+    const ownsClipboard = () => {
+      if (editing_cell_ref.current || isTextFieldFocused()) return false;
+      if (isGridFocused()) return true;
+      if (!cell_range_kbd_ref.current) return false;
+      // Text highlighted elsewhere on the page keeps the browser's own copy.
+      const page_selection = document.getSelection();
+      return !page_selection || page_selection.isCollapsed;
+    };
+
+    let fallback_timer: number | null = null;
+    const cancelFallback = () => {
+      if (fallback_timer === null) return;
+      window.clearTimeout(fallback_timer);
+      fallback_timer = null;
+    };
+
+    const handleCopyEvent = (e: ClipboardEvent) => {
+      cancelFallback();
+      if (!ownsClipboard()) return;
+      if (copySelection(e.clipboardData, e.type === "cut" ? "cut" : "copy")) e.preventDefault();
+    };
+
+    const handlePasteEvent = (e: ClipboardEvent) => {
+      cancelFallback();
+      if (!ownsClipboard()) return;
+      e.preventDefault();
+      const text = e.clipboardData?.getData("text/plain") ?? "";
+      const grid = text !== "" ? parsePastedGrid(text) : range_clipboard_kbd_ref.current;
+      if (grid) pasteGrid(grid);
+    };
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // Escape drops the active multi-cell range selection (mirrors editing's own
@@ -3159,84 +3554,17 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       if (!e.ctrlKey && !e.metaKey) return;
       const key = e.key.toLowerCase();
 
-      if (key === "c") {
-        const range = cell_range_kbd_ref.current;
-        const cell = editing_cell_ref.current;
-
-        // A drag/shift-click range selection takes priority over the single-cell
-        // clipboard when one is active and no cell is currently being edited.
-        if (range && !cell) {
-          copyRangeToClipboard();
-          return;
-        }
-
-        // Without an open editor, the active cell is copied, but only while the grid
-        // has focus so copying text elsewhere on the page is never hijacked.
-        const copy_cell = cell ?? (isGridFocused() ? active_cell_kbd_ref.current : null);
-        if (!copy_cell) return;
-
-        // If the user has text selected inside an input, let the browser handle it
-        const active_el = document.activeElement;
-        if (active_el instanceof HTMLInputElement || active_el instanceof HTMLTextAreaElement) {
-          const sel_len = (active_el.selectionEnd ?? 0) - (active_el.selectionStart ?? 0);
-          if (sel_len > 0) return;
-        }
-
-        const row = rows_ref.current.find((r) => r.id === copy_cell.row_id);
-        if (!row) return;
-        const value = String(row[copy_cell.col_key as keyof LinkBuildingOrderRow] ?? "");
-        const col_label = COLUMNS.find((c) => c.key === copy_cell.col_key)?.label ?? copy_cell.col_key;
-
-        e.preventDefault();
-        setClipboardCell({ value, col_key: copy_cell.col_key });
-        navigator.clipboard.writeText(value).catch(() => {});
-
-        const short = value.length > 28 ? value.slice(0, 28) + "…" : value;
-        const n_selected = selected_row_ids_kbd_ref.current.size;
-        setNotificationBanner(
-          n_selected > 0
-            ? `Copied "${short}" — press Ctrl+V to paste into "${col_label}" for ${n_selected} row${n_selected > 1 ? "s" : ""}`
-            : `Copied "${short}" from "${col_label}" — select rows, then press Ctrl+V to paste`
-        );
-        return;
-      }
-
-      if (key === "v") {
-        const range = cell_range_kbd_ref.current;
-
-        if (range && !editing_cell_ref.current) {
-          const active_el = document.activeElement;
-          if (
-            active_el instanceof HTMLInputElement ||
-            active_el instanceof HTMLSelectElement ||
-            active_el instanceof HTMLTextAreaElement
-          ) return;
-
-          e.preventDefault();
-          pasteIntoRange();
-          return;
-        }
-
-        // Do not override paste when the user is typing inside an input
-        const active_el = document.activeElement;
-        if (
-          active_el instanceof HTMLInputElement ||
-          active_el instanceof HTMLSelectElement ||
-          active_el instanceof HTMLTextAreaElement
-        ) return;
-
-        const clip = clipboard_cell_kbd_ref.current;
-        const selected = selected_row_ids_kbd_ref.current;
-        if (clip && selected.size > 0) {
-          e.preventDefault();
-          handlePasteClipboard();
-          return;
-        }
-
-        if (isGridFocused() && active_cell_kbd_ref.current && !editing_cell_ref.current) {
-          e.preventDefault();
-          pasteIntoActiveCell();
-        }
+      if (key === "c" || key === "x" || key === "v") {
+        if (!ownsClipboard()) return;
+        cancelFallback();
+        fallback_timer = window.setTimeout(() => {
+          fallback_timer = null;
+          if (key === "v") {
+            pasteFromClipboardApi();
+          } else {
+            copySelection(null, key === "x" ? "cut" : "copy");
+          }
+        }, 0);
         return;
       }
 
@@ -3263,8 +3591,17 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     };
 
     document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [handlePasteClipboard, copyRangeToClipboard, pasteIntoRange, pasteIntoActiveCell, undo, redo]);
+    document.addEventListener("copy", handleCopyEvent);
+    document.addEventListener("cut", handleCopyEvent);
+    document.addEventListener("paste", handlePasteEvent);
+    return () => {
+      cancelFallback();
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("copy", handleCopyEvent);
+      document.removeEventListener("cut", handleCopyEvent);
+      document.removeEventListener("paste", handlePasteEvent);
+    };
+  }, [copySelection, pasteGrid, pasteFromClipboardApi, undo, redo]);
 
   // Opening a cell for editing through any path (Client Account / Assigned To cells,
   // Tab/Enter navigation, etc. — not only the drag handlers above) always drops a
@@ -3409,17 +3746,10 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
     if (arrow_direction) {
       if (e.shiftKey) {
-        // Shift+Arrow grows the range from the active cell. Ranges cover the data
-        // columns only, so the assignment columns cannot be range selected.
+        // Shift+Arrow grows the range from the active cell, across every column.
         e.preventDefault();
-        if (position.col_idx >= visible_columns.length) return;
         const range_focus = cell_range ? toGridPosition(cell_range.focus) ?? position : position;
-        const next_focus = moveGridPosition(
-          range_focus,
-          arrow_direction,
-          { row_count: filtered_rows.length, col_count: visible_columns.length },
-          { jump_to_edge: is_ctrl }
-        );
+        const next_focus = moveGridPosition(range_focus, arrow_direction, size, { jump_to_edge: is_ctrl });
         const focus_cell = toCellRef(next_focus);
         setCellRange({ anchor: active_cell, focus: focus_cell });
         scrollToCell(focus_cell);
@@ -3493,19 +3823,8 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   const active_cell_value = useMemo(() => {
     if (!active_cell) return "";
     const row = filtered_rows.find((r) => r.id === active_cell.row_id);
-    if (!row) return "";
-    if (active_cell.col_key === "user_id") {
-      const client = client_users.find((u) => row.user_id != null && u.id === Number(row.user_id));
-      return client ? client.company || client.name : "";
-    }
-    if (active_cell.col_key === "assigned_admin_user_id") {
-      const admin = admin_users.find(
-        (u) => row.assigned_admin_user_id != null && u.id === Number(row.assigned_admin_user_id)
-      );
-      return admin ? admin.name : "";
-    }
-    return String(row[active_cell.col_key as keyof LinkBuildingOrderRow] ?? "");
-  }, [active_cell, filtered_rows, client_users, admin_users]);
+    return row ? getCellClipboardText(row, active_cell.col_key) : "";
+  }, [active_cell, filtered_rows, getCellClipboardText]);
 
   const active_column_label = active_cell
     ? (COLUMN_LABELS[active_cell.col_key] ?? ASSIGNMENT_COLUMN_LABELS[active_cell.col_key] ?? "")
@@ -3530,12 +3849,12 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       const row = filtered_rows[r];
       if (!row) continue;
       for (let c = range_bounds.min_col; c <= range_bounds.max_col; c++) {
-        const col = visible_columns[c];
-        if (col) values.push(String(row[col.key] ?? ""));
+        const col_key = grid_column_keys[c];
+        if (col_key) values.push(getCellClipboardText(row, col_key));
       }
     }
     return computeRangeStats(values);
-  }, [range_bounds, filtered_rows, visible_columns]);
+  }, [range_bounds, filtered_rows, grid_column_keys, getCellClipboardText]);
 
   const active_position = active_cell ? toGridPosition(active_cell) : null;
 
@@ -3944,6 +4263,11 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                       </button>
                     </div>
                   </div>
+                  <p className="mt-3 border-t border-gray-100 pt-3 text-[11px] leading-relaxed text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                    <span className="font-medium text-gray-700 dark:text-gray-200">Batch orders:</span> copy rows
+                    from Google Sheets, click a cell of a new row and press Ctrl+V. One new order is added per
+                    pasted row, and complete rows are saved right away.
+                  </p>
                 </div>
               </div>
             )}
@@ -4901,10 +5225,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                           editing_cell?.row_id === row.id &&
                           editing_cell?.col_key === col.key;
                         const is_first_col = col_idx === 0;
-                        const is_range_selected =
-                          !!range_bounds &&
-                          row_idx >= range_bounds.min_row && row_idx <= range_bounds.max_row &&
-                          col_idx >= range_bounds.min_col && col_idx <= range_bounds.max_col;
+                        const is_range_selected = isInRange(row_idx, col_idx);
                         const is_active =
                           active_cell?.row_id === row.id && active_cell?.col_key === col.key;
                         const find_match_state = getCellMatchState(row.id, col.key);
@@ -4951,7 +5272,10 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                         onAssignClient={(val) => handleAssignClientChange(row.id, val)}
                         onCancelEdit={cancelAssignEdit}
                         is_active={active_cell?.row_id === row.id && active_cell?.col_key === "user_id"}
-                        onSelectCell={() => selectCell({ row_id: row.id, col_key: "user_id" })}
+                        is_range_selected={isInRange(row_idx, visible_columns.length)}
+                        onSelectCell={(shift_key) => handleCellMouseDown(row.id, "user_id", shift_key)}
+                        onCellMouseEnter={() => handleCellMouseEnter(row.id, "user_id")}
+                        onCellMouseUp={handleCellMouseUp}
                         cell_key={toCellKey(row.id, "user_id")}
                         find_match_state={getCellMatchState(row.id, "user_id")}
                         find_terms={getCellMatchState(row.id, "user_id") ? find_terms : undefined}
@@ -4965,7 +5289,10 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                         onAssignUser={(val) => handleAssignUserChange(row.id, val)}
                         onCancelEdit={cancelAssignEdit}
                         is_active={active_cell?.row_id === row.id && active_cell?.col_key === "assigned_admin_user_id"}
-                        onSelectCell={() => selectCell({ row_id: row.id, col_key: "assigned_admin_user_id" })}
+                        is_range_selected={isInRange(row_idx, visible_columns.length + 1)}
+                        onSelectCell={(shift_key) => handleCellMouseDown(row.id, "assigned_admin_user_id", shift_key)}
+                        onCellMouseEnter={() => handleCellMouseEnter(row.id, "assigned_admin_user_id")}
+                        onCellMouseUp={handleCellMouseUp}
                         cell_key={toCellKey(row.id, "assigned_admin_user_id")}
                         find_match_state={getCellMatchState(row.id, "assigned_admin_user_id")}
                         find_terms={getCellMatchState(row.id, "assigned_admin_user_id") ? find_terms : undefined}

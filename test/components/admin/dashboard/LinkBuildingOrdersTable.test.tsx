@@ -22,6 +22,8 @@ import {
   listAdminUsersForSelect,
   listClientUsersForSelect,
   batchUpdateLinkBuildingOrderCells,
+  batchCreateLinkBuildingOrders,
+  searchPartnershipDomains,
   getLinkBuildingOrderColumnValues,
   getLinkBuildingOrderFilterValues,
   getLinkBuildingOrderQuickFilterValues,
@@ -53,6 +55,9 @@ jest.mock("@/services/admin/link-building-dashboard.service", () => {
     listAdminUsersForSelect:    jest.fn(),
     listClientUsersForSelect:   jest.fn(),
     listPenNamesForSelect:      jest.fn().mockResolvedValue([]),
+    listNichesForSelect:        jest.fn().mockResolvedValue([]),
+    searchPartnershipDomains:   jest.fn().mockResolvedValue([]),
+    batchCreateLinkBuildingOrders: jest.fn(),
     getNeedsLbTlApprovalCount:  jest.fn().mockResolvedValue(0),
     getLinkBuildingOrderQuickFilterValues: jest.fn().mockResolvedValue({ data: {}, total: 0 }),
   };
@@ -125,6 +130,8 @@ const mockUpdateLinkBuildingOrder = updateLinkBuildingOrder as jest.MockedFuncti
 const mockListAdminUsersForSelect = listAdminUsersForSelect as jest.MockedFunction<typeof listAdminUsersForSelect>;
 const mockListClientUsersForSelect = listClientUsersForSelect as jest.MockedFunction<typeof listClientUsersForSelect>;
 const mockBatchUpdateLinkBuildingOrderCells = batchUpdateLinkBuildingOrderCells as jest.MockedFunction<typeof batchUpdateLinkBuildingOrderCells>;
+const mockBatchCreateLinkBuildingOrders = batchCreateLinkBuildingOrders as jest.MockedFunction<typeof batchCreateLinkBuildingOrders>;
+const mockSearchPartnershipDomains = searchPartnershipDomains as jest.MockedFunction<typeof searchPartnershipDomains>;
 const mockGetLinkBuildingOrderColumnValues = getLinkBuildingOrderColumnValues as jest.MockedFunction<typeof getLinkBuildingOrderColumnValues>;
 const mockGetLinkBuildingOrderFilterValues = getLinkBuildingOrderFilterValues as jest.MockedFunction<typeof getLinkBuildingOrderFilterValues>;
 const mockGetLinkBuildingOrderQuickFilterValues = getLinkBuildingOrderQuickFilterValues as jest.MockedFunction<typeof getLinkBuildingOrderQuickFilterValues>;
@@ -1686,5 +1693,236 @@ describe("LinkBuildingOrdersTable, loading transitions", () => {
     await waitFor(() => expect(screen.getByRole("grid")).toHaveAttribute("aria-busy", "false"));
     expect(screen.queryByText("BL-2")).not.toBeInTheDocument();
     expect(screen.getByText("BL-3")).toBeInTheDocument();
+  });
+});
+
+// ─── Spreadsheet clipboard: native copy / paste events, Status, DR and new orders ──
+
+describe("LinkBuildingOrdersTable, spreadsheet clipboard", () => {
+  beforeEach(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: jest.fn().mockResolvedValue(undefined),
+        readText: jest.fn().mockResolvedValue(""),
+      },
+    });
+  });
+
+  /** Clicks a cell, which makes it the active cell, and gives the grid keyboard focus. */
+  function selectCellAndFocusGrid(cell: HTMLElement): void {
+    fireEvent.mouseDown(cell);
+    fireEvent.mouseUp(cell);
+    screen.getByRole("grid").focus();
+  }
+
+  function pasteIntoGrid(text: string): void {
+    fireEvent.paste(screen.getByRole("grid"), { clipboardData: { getData: () => text } });
+  }
+
+  it("pastes a block copied from Google Sheets through the native paste event, without reading the clipboard API", async () => {
+    const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", status: "New Request", dr_lbs: "30" });
+    const row2 = makeRow({ id: "uuid-2", order_id: "BL-2", status: "New Request", dr_lbs: "31" });
+    mockListLinkBuildingOrders.mockResolvedValue(mockSearchResponse([row1, row2]));
+    mockBatchUpdateLinkBuildingOrderCells.mockResolvedValue({
+      message: "2 row(s) updated successfully.",
+      updated_count: 2,
+      data: [
+        { ...row1, status: "Live" },
+        { ...row2, status: "Reviewing" },
+      ],
+    });
+    render(<LinkBuildingOrdersTable />);
+    await screen.findByText("BL-1");
+
+    selectCellAndFocusGrid(within(screen.getByRole("grid")).getAllByText("New Request")[0].closest("td")!);
+    pasteIntoGrid("live\nReviewing\n");
+
+    await waitFor(() => expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledTimes(1));
+    expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledWith([
+      { id: "uuid-1", fields: { status: "Live" } },
+      { id: "uuid-2", fields: { status: "Reviewing" } },
+    ]);
+    expect(navigator.clipboard.readText).not.toHaveBeenCalled();
+  });
+
+  it("pastes a column of DR values into the DR column", async () => {
+    const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", dr_lbs: "30" });
+    const row2 = makeRow({ id: "uuid-2", order_id: "BL-2", dr_lbs: "31" });
+    mockListLinkBuildingOrders.mockResolvedValue(mockSearchResponse([row1, row2]));
+    mockBatchUpdateLinkBuildingOrderCells.mockResolvedValue({
+      message: "2 row(s) updated successfully.",
+      updated_count: 2,
+      data: [
+        { ...row1, dr_lbs: "54" },
+        { ...row2, dr_lbs: "61" },
+      ],
+    });
+    render(<LinkBuildingOrdersTable />);
+    await screen.findByText("BL-1");
+
+    selectCellAndFocusGrid(screen.getByText("30").closest("td")!);
+    pasteIntoGrid("54\n61");
+
+    await waitFor(() => expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledTimes(1));
+    expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledWith([
+      { id: "uuid-1", fields: { dr_lbs: "54" } },
+      { id: "uuid-2", fields: { dr_lbs: "61" } },
+    ]);
+  });
+
+  it("keeps line breaks of a quoted Google Sheets cell inside that one cell", async () => {
+    const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", keyword: "seo tools" });
+    mockListLinkBuildingOrders.mockResolvedValue(mockSearchResponse([row1]));
+    mockBatchUpdateLinkBuildingOrderCells.mockResolvedValue({
+      message: "1 row(s) updated successfully.",
+      updated_count: 1,
+      data: [{ ...row1, keyword: "line one\nline two" }],
+    });
+    render(<LinkBuildingOrdersTable />);
+    await screen.findByText("BL-1");
+
+    selectCellAndFocusGrid(screen.getByText("seo tools").closest("td")!);
+    pasteIntoGrid('"line one\nline two"');
+
+    await waitFor(() => expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledTimes(1));
+    expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledWith([
+      { id: "uuid-1", fields: { keyword: "line one\nline two" } },
+    ]);
+  });
+
+  it("copies a range across the Status column as tab separated text and an HTML table through the native copy event", async () => {
+    const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", status: "Live", team_specific_link_id: "UHS-1" });
+    const row2 = makeRow({ id: "uuid-2", order_id: "BL-2", status: "Reviewing", team_specific_link_id: "UHS-2" });
+    mockListLinkBuildingOrders.mockResolvedValue(mockSearchResponse([row1, row2]));
+    render(<LinkBuildingOrdersTable />);
+    await screen.findByText("BL-1");
+
+    dragSelectRange("Live", "UHS-2");
+    await screen.findByText(/4 cells selected/i);
+    screen.getByRole("grid").focus();
+
+    const set_data = jest.fn();
+    fireEvent.copy(screen.getByRole("grid"), { clipboardData: { setData: set_data } });
+
+    expect(set_data).toHaveBeenCalledWith("text/plain", "Live\tUHS-1\nReviewing\tUHS-2");
+    expect(set_data).toHaveBeenCalledWith(
+      "text/html",
+      "<table><tbody><tr><td>Live</td><td>UHS-1</td></tr><tr><td>Reviewing</td><td>UHS-2</td></tr></tbody></table>"
+    );
+    expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+  });
+
+  it("fills a whole range by repeating a copied row of values, like Sheets", async () => {
+    const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", client: "Acme Corp", keyword: "seo tools" });
+    const row2 = makeRow({ id: "uuid-2", order_id: "BL-2", client: "Globex Inc", keyword: "ppc ads" });
+    mockListLinkBuildingOrders.mockResolvedValue(mockSearchResponse([row1, row2]));
+    mockBatchUpdateLinkBuildingOrderCells.mockResolvedValue({ message: "", updated_count: 2, data: [] });
+    render(<LinkBuildingOrdersTable />);
+    await screen.findByText("BL-1");
+
+    dragSelectRange("Acme Corp", "ppc ads");
+    await screen.findByText(/4 cells selected/i);
+    screen.getByRole("grid").focus();
+    pasteIntoGrid("Initech\tcrm software");
+
+    await waitFor(() => expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledTimes(1));
+    expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledWith([
+      { id: "uuid-1", fields: { client: "Initech", keyword: "crm software" } },
+      { id: "uuid-2", fields: { client: "Initech", keyword: "crm software" } },
+    ]);
+  });
+
+  it("creates every pasted order when a block is pasted into a draft row, without touching saved orders below", async () => {
+    const draft = {
+      order_id: "BL-####", team_specific_link_id: "", link_type: "", client: "", keyword: "", landing_page: "",
+      exact_match: "No", notes: "", internal_notes: "", request_date: "10/20/2026", estimated_delivery_date: "11/19/2026",
+      estimated_turnaround_days: "30", link_builder: "", pen_name: "", partnership: "", niche: "", partnership_check: "",
+      article_title: "", article: "", status: "New Request", live_link: "", live_link_date: "", dr_lbs: "",
+      posting_fee_lbs: "", current_traffic: "", dr_formula: "", current_poc: "", current_price: "", lb_tl_approval: "",
+      approval_date: "", final_price: "", currency: "USD", admin_team_id: null, assigned_admin_user_id: null,
+    };
+    localStorage.setItem("lbo_row_drafts_v1", JSON.stringify([draft]));
+    const saved_row = makeRow({ id: "uuid-1", order_id: "BL-1", keyword: "keep me" });
+    mockListLinkBuildingOrders.mockResolvedValue(mockSearchResponse([saved_row]));
+    mockBatchCreateLinkBuildingOrders.mockImplementation(async (payloads) => ({
+      message: "created",
+      data: payloads.map((payload, idx) => ({ ...makeRow(), ...payload, id: `new-${idx}`, order_id: `BL-${100 + idx}` })),
+    }));
+    render(<LinkBuildingOrdersTable />);
+    await screen.findByText("BL-1");
+
+    // The first "Required" cell of the draft row is its Link Type.
+    selectCellAndFocusGrid(screen.getAllByText("Required")[0].closest("td")!);
+    pasteIntoGrid(
+      "DR 30+ External\tAcme Corp\tkw one\tacme.com/one\n" +
+      "DR 40+ External\tAcme Corp\tkw two\tacme.com/two\n" +
+      "DR 50+ External\tGlobex\tkw three\thttps://globex.com"
+    );
+
+    await waitFor(() => expect(mockBatchCreateLinkBuildingOrders).toHaveBeenCalledTimes(1));
+    const payloads = mockBatchCreateLinkBuildingOrders.mock.calls[0][0];
+    expect(payloads.map((p) => p.keyword)).toEqual(["kw one", "kw two", "kw three"]);
+    expect(payloads.map((p) => p.landing_page)).toEqual([
+      "https://acme.com/one",
+      "https://acme.com/two",
+      "https://globex.com",
+    ]);
+    expect(mockBatchUpdateLinkBuildingOrderCells).not.toHaveBeenCalled();
+    expect(await screen.findByText("BL-102")).toBeInTheDocument();
+    expect(screen.getByText("keep me")).toBeInTheDocument();
+    expect(await screen.findByText(/Created 3 new orders/)).toBeInTheDocument();
+  });
+
+  it("keeps pasted draft rows that miss a required field as drafts instead of saving them", async () => {
+    const draft = {
+      order_id: "BL-####", link_type: "", client: "", keyword: "", landing_page: "", exact_match: "No",
+      status: "New Request", currency: "USD", request_date: "10/20/2026", estimated_delivery_date: "11/19/2026",
+    };
+    localStorage.setItem("lbo_row_drafts_v1", JSON.stringify([draft]));
+    mockListLinkBuildingOrders.mockResolvedValue(mockSearchResponse([makeRow({ id: "uuid-1", order_id: "BL-1" })]));
+    render(<LinkBuildingOrdersTable />);
+    await screen.findByText("BL-1");
+
+    selectCellAndFocusGrid(screen.getAllByText("Required")[0].closest("td")!);
+    pasteIntoGrid("DR 30+ External\tAcme Corp\n");
+
+    expect(await screen.findByText(/1 new row still needs/)).toBeInTheDocument();
+    expect(mockBatchCreateLinkBuildingOrders).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Niche of the partnership domain ─────────────────────────────────────────
+
+describe("LinkBuildingOrdersTable, partnership niche", () => {
+  it("shows the Niche column next to Partnership", async () => {
+    await renderTableWithRow(makeRow({ partnership: "https://techvera.com", niche: "Computer and Software" }));
+
+    expect(screen.getByRole("columnheader", { name: /niche/i })).toBeInTheDocument();
+    expect(within(screen.getByRole("grid")).getByText("Computer and Software")).toBeInTheDocument();
+  });
+
+  it("lists domains with their niche while choosing a Partnership, and saves the picked domain", async () => {
+    mockSearchPartnershipDomains.mockResolvedValue([
+      { domain: "techvera.com", niche: "Computer and Software", dr: "50", traffic: "2880", price: "250", order_count: 3 },
+      { domain: "travelnest.com", niche: "Travel and Tourism", dr: null, traffic: null, price: null, order_count: 0 },
+    ]);
+    const row = makeRow({ partnership: "https://old-domain.com", niche: "Business" });
+    mockUpdateLinkBuildingOrder.mockResolvedValue({
+      message: "ok",
+      data: { ...row, partnership: "https://techvera.com", niche: "Computer and Software" },
+    });
+    await renderTableWithRow(row);
+
+    openCellForEditing("old-domain.com");
+
+    expect(await screen.findByText("Travel and Tourism")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("techvera.com").closest("button")!);
+
+    await waitFor(() => expect(mockUpdateLinkBuildingOrder).toHaveBeenCalledTimes(1));
+    const payload = mockUpdateLinkBuildingOrder.mock.calls[0][1];
+    expect(payload.partnership).toBe("https://techvera.com");
+    // The API refills the niche for the new domain, the old one must not be sent along.
+    expect(payload).not.toHaveProperty("niche");
   });
 });

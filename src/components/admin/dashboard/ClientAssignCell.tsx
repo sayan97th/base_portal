@@ -14,8 +14,14 @@ export interface ClientAssignCellProps {
   onCancelEdit: () => void;
   /** True when this is the spreadsheet's active (keyboard selected) cell. */
   is_active?: boolean;
-  /** Mouse down on the cell, makes it the active cell without opening the picker. */
-  onSelectCell?: () => void;
+  /** True when this cell falls within the active multi-cell range selection. */
+  is_range_selected?: boolean;
+  /** Mouse down on the cell, makes it the active cell (or extends the range with
+   *  Shift) without opening the picker, and starts a drag selection. */
+  onSelectCell?: (shift_key: boolean) => void;
+  /** Mouse enter while a drag is in progress, extends the range to this cell. */
+  onCellMouseEnter?: () => void;
+  onCellMouseUp?: () => void;
   /** Lookup key the table uses to scroll this cell into view during keyboard navigation. */
   cell_key?: string;
   /** Find (Ctrl/Cmd+F) highlight for this cell, null when it does not match. */
@@ -32,7 +38,10 @@ export default function ClientAssignCell({
   onAssignClient,
   onCancelEdit,
   is_active = false,
+  is_range_selected = false,
   onSelectCell,
+  onCellMouseEnter,
+  onCellMouseUp,
   cell_key,
   find_match_state = null,
   find_terms,
@@ -49,20 +58,22 @@ export default function ClientAssignCell({
       <td
         ref={setCellEl}
         data-cell-key={cell_key}
-        className={`${styles.cell} whitespace-nowrap text-xs transition-colors ${
+        className={`${styles.cell} select-none whitespace-nowrap text-xs transition-colors ${
           is_editing
             ? "bg-teal-50 ring-2 ring-inset ring-teal-400 dark:bg-teal-900/20 dark:ring-teal-600"
             : is_active
               ? styles.cell_active
               : ""
-        }${
+        }${is_range_selected && !is_editing ? ` ${styles.cell_in_range}` : ""}${
           find_match_state === "current"
             ? ` ${styles.cell_find_current}`
             : find_match_state === "match"
               ? ` ${styles.cell_find_match}`
               : ""
         }`}
-        onMouseDown={!is_editing ? onSelectCell : undefined}
+        onMouseDown={!is_editing ? (e) => onSelectCell?.(e.shiftKey) : undefined}
+        onMouseEnter={onCellMouseEnter}
+        onMouseUp={onCellMouseUp}
         onDoubleClick={!is_editing ? onStartEdit : undefined}
         title="Double click or press Enter to assign a client account"
       >
