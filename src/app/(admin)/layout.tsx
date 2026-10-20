@@ -58,8 +58,11 @@ export default function AdminLayout({
       <div className="min-h-screen xl:flex bg-gray-50 dark:bg-gray-950">
         <AdminSidebar />
         <Backdrop />
+        {/* overflow-x-clip, not overflow-x-hidden: hidden turns this wrapper into a
+            scroll container, which stops the sticky AppHeader from sticking to the
+            viewport and leaves a gap above the mobile sidebar once the page scrolls. */}
         <div
-          className={`flex-1 min-w-0 overflow-x-hidden transition-all duration-300 ease-in-out ${main_content_margin}`}
+          className={`flex-1 min-w-0 overflow-x-clip transition-all duration-300 ease-in-out ${main_content_margin}`}
         >
           {/* Impersonation Banner — shown when a super admin is impersonating a team member */}
           <ImpersonationBanner />

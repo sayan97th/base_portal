@@ -488,7 +488,7 @@ const AdminSidebar: React.FC = () => {
   return (
     <aside
       aria-label="Admin navigation"
-      className={`fixed mt-16 flex flex-col overflow-hidden whitespace-nowrap lg:mt-0 top-0 left-0 bg-gray-900 dark:bg-gray-950 text-white h-screen transition-[width,padding,transform,box-shadow] duration-300 ease-in-out z-50 border-r border-gray-700 dark:border-gray-800
+      className={`fixed mt-14 flex flex-col overflow-hidden whitespace-nowrap lg:mt-0 top-0 left-0 bg-gray-900 dark:bg-gray-950 text-white h-[calc(100dvh-3.5rem)] lg:h-screen transition-[width,padding,transform,box-shadow] duration-300 ease-in-out z-50 border-r border-gray-700 dark:border-gray-800
         ${is_open ? "w-[290px] px-5" : "w-[72px] px-[14px]"}
         ${is_overlaying ? "lg:z-100000" : ""}
         ${is_overlaying && is_open ? "lg:shadow-2xl lg:shadow-black/40" : ""}

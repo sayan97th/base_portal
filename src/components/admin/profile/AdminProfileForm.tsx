@@ -363,7 +363,7 @@ export default function AdminProfileForm() {
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
         {/* ── Left: Identity Card ──────────────────────────────────────── */}
         <div className="lg:col-span-1">
-          <div className="sticky top-6 space-y-4">
+          <div className="sticky top-24 space-y-4">
             {/* Profile Card */}
             <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
               {/* Cover gradient */}

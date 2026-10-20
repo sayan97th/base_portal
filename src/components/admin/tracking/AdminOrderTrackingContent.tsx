@@ -811,7 +811,7 @@ const AdminOrderTrackingContent: React.FC<AdminOrderTrackingContentProps> = ({ o
 
         {/* ── Sticky right panel ──────────────────────────────────────────── */}
         <div className="col-span-12 lg:col-span-4">
-          <div className="sticky top-6 space-y-4">
+          <div className="sticky top-24 space-y-4">
             {/* Add update form */}
             <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
               <div className="flex items-center gap-2 border-b border-gray-100 px-5 py-4 dark:border-gray-800">

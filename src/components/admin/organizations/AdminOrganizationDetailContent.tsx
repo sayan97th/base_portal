@@ -767,7 +767,7 @@ const AdminOrganizationDetailContent: React.FC<AdminOrganizationDetailContentPro
 
         {/* ── Left Sidebar ──────────────────────────────────────────────────── */}
         <div className="lg:col-span-1">
-          <div className="sticky top-6 space-y-4">
+          <div className="sticky top-24 space-y-4">
 
             {/* Identity preview card */}
             <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">

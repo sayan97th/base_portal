@@ -51,7 +51,7 @@ export default function UserDropdown() {
         onClick={toggleDropdown}
         className="flex items-center text-gray-700 dark:text-gray-400 dropdown-toggle"
       >
-        <span className="mr-3 overflow-hidden rounded-full h-11 w-11 shrink-0">
+        <span className="mr-2 overflow-hidden rounded-full h-9 w-9 shrink-0 lg:mr-3 lg:h-11 lg:w-11">
           {profile_photo && !has_image_error ? (
             <img
               src={profile_photo}
@@ -60,7 +60,7 @@ export default function UserDropdown() {
               onError={() => setHasImageError(true)}
             />
           ) : (
-            <span className="flex h-full w-full items-center justify-center bg-brand-500 text-sm font-semibold text-white">
+            <span className="flex h-full w-full items-center justify-center bg-brand-500 text-xs font-semibold text-white lg:text-sm">
               {user_initials}
             </span>
           )}
