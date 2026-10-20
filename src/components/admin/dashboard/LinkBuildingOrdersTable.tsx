@@ -11,6 +11,8 @@ import {
   describeSheetFilter,
 } from "@/hooks/useSheetColumnFilters";
 import SheetColumnFilterDropdown from "./SheetColumnFilterDropdown";
+import ColumnHeaderFilterButton from "./ColumnHeaderFilterButton";
+import { getFilteredColumns } from "@/lib/link-building-filtered-columns";
 import SavedFiltersMenu from "./SavedFiltersMenu";
 import AdvancedFilterPanel from "./AdvancedFilterPanel";
 import LinkBuildingFilterPanel from "./LinkBuildingFilterPanel";
@@ -2331,6 +2333,19 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     setSpecialFilterAnchorEl(anchor_el);
   }, []);
 
+  /** Header funnel of Client Account and Assigned To: opens its picker, or closes it when already open. */
+  const toggleSpecialFilter = useCallback(
+    (filter_key: "client_account" | "assigned_to", anchor_el: HTMLElement) => {
+      if (open_special_filter === filter_key) {
+        setOpenSpecialFilter(null);
+        setSpecialFilterAnchorEl(null);
+      } else {
+        openSpecialFilter(filter_key, anchor_el);
+      }
+    },
+    [open_special_filter, openSpecialFilter]
+  );
+
   const search_input_ref = useRef<HTMLInputElement>(null);
 
   const handlePerPageChange = useCallback((option: PerPageOption) => {
@@ -2669,6 +2684,44 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     openSpecialFilter,
     toggleColumnFilter,
     clearSheetFilter,
+  ]);
+
+  /** Columns that currently narrow the rows, by column key, so their headers can be marked. */
+  const filtered_columns = useMemo(() => {
+    const client_user = client_users.find((u) => u.id === client_account_filter);
+    const admin_user = admin_users.find((u) => u.id === assigned_user_id_filter);
+    return getFilteredColumns({
+      sheet_filters,
+      advanced_filters,
+      advanced_filter_columns: ADVANCED_FILTER_COLUMNS,
+      status_filter,
+      link_type_filter,
+      client_filter,
+      needs_approval_filter,
+      client_account_filter_label:
+        client_account_filter === null
+          ? null
+          : client_user
+            ? client_user.company || client_user.name
+            : `#${client_account_filter}`,
+      assigned_user_filter_label:
+        assigned_user_id_filter === null
+          ? null
+          : assigned_user_id_filter === 0
+            ? "Unassigned"
+            : admin_user?.name ?? `#${assigned_user_id_filter}`,
+    });
+  }, [
+    sheet_filters,
+    advanced_filters,
+    status_filter,
+    link_type_filter,
+    client_filter,
+    needs_approval_filter,
+    client_account_filter,
+    assigned_user_id_filter,
+    client_users,
+    admin_users,
   ]);
 
   // ── Bulk grid paste: fills a rectangular block of cells from clipboard data ──
@@ -4544,16 +4597,22 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                 {grid_column_keys.map((col_key, col_idx) => {
                   const col_def = visible_columns[col_idx];
                   const is_sticky_col = !!col_def?.sticky;
+                  const is_filtered_col = filtered_columns[col_key] !== undefined;
                   return (
                     <th
                       key={col_key}
                       onClick={() => selectEntireColumn(col_key)}
-                      title={`Select column ${toColumnLetter(col_idx)}`}
-                      className={`${is_sticky_col ? "sticky z-[30]" : ""}${isColumnHighlighted(col_idx) ? ` ${styles.header_highlighted}` : ""}`}
+                      title={`Select column ${toColumnLetter(col_idx)}${is_filtered_col ? ", filtered" : ""}`}
+                      className={`${is_sticky_col ? "sticky z-[30]" : ""}${is_filtered_col ? ` ${styles.letter_filtered}` : ""}${isColumnHighlighted(col_idx) ? ` ${styles.header_highlighted}` : ""}`}
                       style={is_sticky_col ? { left: sticky_left_offsets[col_key] } : undefined}
                     >
                       <div className={styles.letter_cell}>
                         {toColumnLetter(col_idx)}
+                        {is_filtered_col && (
+                          <svg className={styles.letter_filter_icon} fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                          </svg>
+                        )}
                         {/* Drag to resize the column, double click to reset it */}
                         <span
                           role="separator"
@@ -4607,12 +4666,12 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                   const is_sortable = col.sortable !== false;
                   const sort_rule = sort_rules.find((r) => r.key === effective_sort_key);
                   const sort_priority = sort_rules.findIndex((r) => r.key === effective_sort_key);
-                  const filter_is_active = isSheetFilterActive(sheet_filters[col.key]);
+                  const filter_indicator = filtered_columns[col.key];
 
                   return (
                     <th
                       key={col.key}
-                      className={`${styles.column_header} text-left font-semibold tracking-wide ${GROUP_HEADER_STYLES[col.group]}${col.sticky ? " sticky z-[30]" : ""}`}
+                      className={`${styles.column_header} text-left font-semibold tracking-wide ${GROUP_HEADER_STYLES[col.group]}${col.sticky ? " sticky z-[30]" : ""}${filter_indicator ? ` ${styles.column_header_filtered}` : ""}`}
                       style={col.sticky ? { left: sticky_left_offsets[col.key] } : undefined}
                       title={col.label}
                     >
@@ -4682,28 +4741,12 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                           )}
                         </button>
 
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleColumnFilter(col.key, e.currentTarget);
-                          }}
-                          title={filter_is_active ? "Edit this column's filter" : "Sort or filter this column"}
-                          aria-label={`Filter ${col.label}`}
-                          className={`shrink-0 rounded p-0.5 transition ${filter_is_active
-                            ? "bg-white/20 opacity-100 text-yellow-200"
-                            : "opacity-70 hover:bg-white/15 hover:opacity-100"
-                            }`}
-                        >
-                          <svg
-                            className="h-3 w-3"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                          </svg>
-                        </button>
+                        <ColumnHeaderFilterButton
+                          column_label={col.label}
+                          indicator={filter_indicator}
+                          idle_title="Sort or filter this column"
+                          onClick={(e) => toggleColumnFilter(col.key, e.currentTarget)}
+                        />
 
                         <button
                           onClick={(e) => {
@@ -4734,61 +4777,29 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                   );
                 })}
                 <th
-                  className={`${styles.column_header} bg-teal-700 text-left text-xs font-semibold text-white`}
+                  className={`${styles.column_header} bg-teal-700 text-left text-xs font-semibold text-white${filtered_columns.user_id ? ` ${styles.column_header_filtered}` : ""}`}
                 >
                   <div className="flex min-w-0 items-center gap-1">
                     <span className="min-w-0 flex-1 truncate">Client Account</span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (open_special_filter === "client_account") {
-                          setOpenSpecialFilter(null);
-                          setSpecialFilterAnchorEl(null);
-                        } else {
-                          setOpenSpecialFilter("client_account");
-                          setSpecialFilterAnchorEl(e.currentTarget);
-                        }
-                      }}
-                      title="Filter by client account"
-                      className={`shrink-0 rounded p-0.5 transition-opacity ${
-                        client_account_filter !== null
-                          ? "opacity-100 text-yellow-200"
-                          : "opacity-30 hover:opacity-80"
-                      }`}
-                    >
-                      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                      </svg>
-                    </button>
+                    <ColumnHeaderFilterButton
+                      column_label="Client Account"
+                      indicator={filtered_columns.user_id}
+                      idle_title="Filter by client account"
+                      onClick={(e) => toggleSpecialFilter("client_account", e.currentTarget)}
+                    />
                   </div>
                 </th>
                 <th
-                  className={`${styles.column_header} bg-indigo-700 text-left text-xs font-semibold text-white`}
+                  className={`${styles.column_header} bg-indigo-700 text-left text-xs font-semibold text-white${filtered_columns.assigned_admin_user_id ? ` ${styles.column_header_filtered}` : ""}`}
                 >
                   <div className="flex min-w-0 items-center gap-1">
                     <span className="min-w-0 flex-1 truncate">Assigned To</span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (open_special_filter === "assigned_to") {
-                          setOpenSpecialFilter(null);
-                          setSpecialFilterAnchorEl(null);
-                        } else {
-                          setOpenSpecialFilter("assigned_to");
-                          setSpecialFilterAnchorEl(e.currentTarget);
-                        }
-                      }}
-                      title="Filter by assigned user"
-                      className={`shrink-0 rounded p-0.5 transition-opacity ${
-                        assigned_user_id_filter !== null
-                          ? "opacity-100 text-yellow-200"
-                          : "opacity-30 hover:opacity-80"
-                      }`}
-                    >
-                      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                      </svg>
-                    </button>
+                    <ColumnHeaderFilterButton
+                      column_label="Assigned To"
+                      indicator={filtered_columns.assigned_admin_user_id}
+                      idle_title="Filter by assigned user"
+                      onClick={(e) => toggleSpecialFilter("assigned_to", e.currentTarget)}
+                    />
                   </div>
                 </th>
                 <th
