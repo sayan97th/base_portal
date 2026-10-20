@@ -46,29 +46,31 @@ export default function ClientAssignCell({
               ? styles.cell_active
               : ""
         }`}
-        style={{ minWidth: 200 }}
         onMouseDown={!is_editing ? onSelectCell : undefined}
         onDoubleClick={!is_editing ? onStartEdit : undefined}
         title="Double click or press Enter to assign a client account"
       >
         {selected_client ? (
-          <span className="inline-flex items-center gap-1.5">
+          <span
+            className="flex min-w-0 items-center gap-1.5"
+            title={selected_client.company ? `${selected_client.company} (${selected_client.name})` : selected_client.name}
+          >
             {selected_client.avatar_url ? (
               <img
                 src={selected_client.avatar_url}
                 alt={selected_client.name}
-                className="h-5 w-5 rounded-full object-cover"
+                className="h-5 w-5 shrink-0 rounded-full object-cover"
               />
             ) : (
-              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-teal-600 text-[10px] font-bold text-white">
+              <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-teal-600 text-[10px] font-bold text-white">
                 {(selected_client.company || selected_client.name).charAt(0).toUpperCase()}
               </span>
             )}
-            <span className="font-medium text-gray-700 dark:text-gray-200">
+            <span className="min-w-0 truncate font-medium text-gray-700 dark:text-gray-200">
               {selected_client.company || selected_client.name}
             </span>
             {selected_client.company && (
-              <span className="text-[10px] text-gray-400 dark:text-gray-500">
+              <span className="min-w-0 truncate text-[10px] text-gray-400 dark:text-gray-500">
                 {selected_client.name}
               </span>
             )}

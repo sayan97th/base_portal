@@ -65,6 +65,7 @@ import {
   type GridDirection,
   type GridPosition,
 } from "@/lib/spreadsheet-navigation";
+import { useResizableColumnWidths } from "@/hooks/useResizableColumnWidths";
 import styles from "./LinkBuildingOrdersTable.module.scss";
 
 // ── Column types ───────────────────────────────────────────────────────────────
@@ -215,10 +216,32 @@ const COLUMN_LABELS: Record<string, string> = Object.fromEntries(
   COLUMNS.map((col) => [col.key, col.label])
 );
 
-// Fixed pixel widths of the row number gutter and the checkbox column, used to
-// compute sticky left offsets.
+// Fixed pixel widths of the row number gutter, the checkbox column and the row
+// actions column. Every other column width comes from DEFAULT_COLUMN_WIDTHS (or
+// an admin's resized width), see useResizableColumnWidths.
 const ROW_HEADER_WIDTH = 46;
 const CHECKBOX_COL_WIDTH = 40;
+const ACTIONS_COL_WIDTH = 104;
+
+const COLUMN_WIDTHS_STORAGE_KEY = "lbo_column_widths_v1";
+
+/**
+ * Default width of a data column: its min_width, widened when needed so the
+ * header label still fits next to its sort, filter and copy icons (about 7px
+ * per character at the header's font size, plus padding, icons and the lock
+ * icon on locked columns). The grid uses a fixed table layout, so this is the
+ * column's exact width, and the frozen columns' sticky offsets are built from it.
+ */
+function getDefaultColumnWidth(col: ColumnDef): number {
+  const header_width = Math.ceil(col.label.length * 7) + 16 + 56 + (col.locked ? 16 : 0);
+  return Math.max(col.min_width, header_width);
+}
+
+const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
+  ...Object.fromEntries(COLUMNS.map((col) => [col.key, getDefaultColumnWidth(col)])),
+  user_id: 200,
+  assigned_admin_user_id: 200,
+};
 
 // ── Group header styles ────────────────────────────────────────────────────────
 
@@ -394,28 +417,27 @@ function UserAssignCell({
               ? styles.cell_active
               : ""
         }`}
-        style={{ minWidth: 180 }}
         onMouseDown={!is_editing ? onSelectCell : undefined}
         onDoubleClick={!is_editing ? onStartEdit : undefined}
         title="Double click or press Enter to assign a team member"
       >
         {selected_user ? (
-          <span className="inline-flex items-center gap-1.5">
+          <span className="flex min-w-0 items-center gap-1.5" title={`${selected_user.name} (${selected_user.email})`}>
             {selected_user.avatar_url ? (
               <img
                 src={selected_user.avatar_url}
                 alt={selected_user.name}
-                className="h-5 w-5 rounded-full object-cover"
+                className="h-5 w-5 shrink-0 rounded-full object-cover"
               />
             ) : (
-              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-bold text-white">
+              <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-bold text-white">
                 {selected_user.name.charAt(0).toUpperCase()}
               </span>
             )}
-            <span className="font-medium text-gray-700 dark:text-gray-200">
+            <span className="shrink-0 font-medium text-gray-700 dark:text-gray-200">
               {selected_user.name}
             </span>
-            <span className="text-[10px] text-gray-400 dark:text-gray-500">
+            <span className="min-w-0 truncate text-[10px] text-gray-400 dark:text-gray-500">
               {selected_user.email}
             </span>
           </span>
@@ -700,7 +722,6 @@ function EditableCell({
             onKeyDown={handleComboboxKeyDown}
             onPaste={handleInputPaste}
             className={styles.cell_input}
-            style={{ minWidth: col.min_width }}
           />
           <CellOptionsDropdown
             options={col.options}
@@ -730,7 +751,6 @@ function EditableCell({
           onKeyDown={handleKeyDown}
           onPaste={handleInputPaste}
           className={styles.cell_input}
-          style={{ minWidth: col.min_width }}
         />
       </td>
     );
@@ -815,11 +835,11 @@ function EditableCell({
         col.type === "number" ? ` ${styles.cell_numeric}` : ""
       }${is_range_selected ? ` ${styles.cell_in_range}` : ""}${is_active ? ` ${styles.cell_active}` : ""} ${
         is_required_error
-          ? "bg-red-50/80 ring-1 ring-inset ring-red-300 dark:bg-red-900/20 dark:ring-red-700"
+          ? "bg-red-50 ring-1 ring-inset ring-red-300 dark:bg-red-950 dark:ring-red-700"
           : is_sticky
             ? sticky_bg_class
             : ""
-      }${is_sticky && show_shadow && !is_active ? " shadow-[4px_0_6px_-3px_rgba(0,0,0,0.35)]" : ""}`}
+      }${is_sticky && show_shadow ? ` ${styles.frozen_edge}` : ""}`}
       style={{
         ...(has_cell_editors
           ? { outline: `2px solid ${cell_editors[0].color}`, outlineOffset: "-2px" }
@@ -840,7 +860,7 @@ function EditableCell({
     >
       {show_row_floater && <RowPresenceFloater editors={row_editors} />}
       {has_cell_editors && <CellPresenceOverlay editors={cell_editors} />}
-      <div className="overflow-hidden" style={{ maxWidth: col.min_width }}>
+      <div className="truncate">
         {is_required_error ? (
           <span className="flex items-center gap-1 text-red-400 dark:text-red-500">
             <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-red-400 dark:bg-red-500" />
@@ -978,6 +998,15 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   /** The selected cell the arrow keys move and Enter / F2 / typing opens for editing. */
   const [active_cell, setActiveCell] = useState<CellRef | null>(null);
   const [edit_entry, setEditEntry] = useState<CellEditEntry>("edit");
+
+  const {
+    getColumnWidth,
+    startColumnResize,
+    resetColumnWidth,
+    resetAllColumnWidths,
+    resizing_col_key,
+    has_custom_widths,
+  } = useResizableColumnWidths(COLUMN_WIDTHS_STORAGE_KEY, DEFAULT_COLUMN_WIDTHS);
 
   // ── Undo / redo history ──────────────────────────────────────────────────────
   const [undo_stack, setUndoStack] = useState<HistoryEntry[]>([]);
@@ -1256,16 +1285,26 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     for (const col of visible_columns) {
       if (col.sticky) {
         offsets[col.key] = cumulative;
-        cumulative += col.min_width;
+        cumulative += getColumnWidth(col.key);
       }
     }
     return { sticky_left_offsets: offsets, frozen_columns_width: cumulative };
-  }, [visible_columns]);
+  }, [visible_columns, getColumnWidth]);
 
   /** Every column the active cell can move through, in on-screen order. */
   const grid_column_keys = useMemo<string[]>(
     () => [...visible_columns.map((col) => col.key as string), ...ASSIGNMENT_COLUMN_KEYS],
     [visible_columns]
+  );
+
+  /** Exact table width for the fixed layout, so columns never stretch past their set widths. */
+  const table_width = useMemo(
+    () =>
+      ROW_HEADER_WIDTH +
+      CHECKBOX_COL_WIDTH +
+      grid_column_keys.reduce((sum, col_key) => sum + getColumnWidth(col_key), 0) +
+      ACTIONS_COL_WIDTH,
+    [grid_column_keys, getColumnWidth]
   );
 
   // Key of the rightmost visible sticky column — receives the separator shadow.
@@ -3638,12 +3677,23 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
             <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">
               Toggle column visibility
             </p>
-            <button
-              onClick={() => setHiddenColumns(new Set())}
-              className="text-xs text-brand-500 hover:underline dark:text-brand-400"
-            >
-              Show all
-            </button>
+            <div className="flex items-center gap-3">
+              {has_custom_widths && (
+                <button
+                  onClick={resetAllColumnWidths}
+                  className="text-xs text-gray-500 hover:underline dark:text-gray-400"
+                  title="Restore every column to its default width"
+                >
+                  Reset column widths
+                </button>
+              )}
+              <button
+                onClick={() => setHiddenColumns(new Set())}
+                className="text-xs text-brand-500 hover:underline dark:text-brand-400"
+              >
+                Show all
+              </button>
+            </div>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {COLUMNS.map((col) => {
@@ -3721,7 +3771,17 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
           onKeyDown={handleGridKeyDown}
           className={`w-full min-w-0 overflow-auto max-h-[calc(100vh-200px)] ${styles.grid_container}`}
         >
-          <table className={`min-w-full text-xs ${styles.grid_table}`}>
+          <table className={`text-xs ${styles.grid_table}`} style={{ width: table_width }}>
+            {/* Exact column widths for the fixed table layout. The frozen columns'
+                sticky offsets are computed from these same widths, so they always line up. */}
+            <colgroup>
+              <col style={{ width: ROW_HEADER_WIDTH }} />
+              <col style={{ width: CHECKBOX_COL_WIDTH }} />
+              {grid_column_keys.map((col_key) => (
+                <col key={col_key} style={{ width: getColumnWidth(col_key) }} />
+              ))}
+              <col style={{ width: ACTIONS_COL_WIDTH }} />
+            </colgroup>
             <thead className="sticky top-0 z-20">
               {/* Column letters, like the A, B, C header of a spreadsheet. Click one to select the column. */}
               <tr className={styles.letter_row}>
@@ -3738,15 +3798,32 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                 {grid_column_keys.map((col_key, col_idx) => {
                   const col_def = visible_columns[col_idx];
                   const is_sticky_col = !!col_def?.sticky;
+                  const is_last_sticky_col = is_sticky_col && col_key === last_sticky_col_key;
                   return (
                     <th
                       key={col_key}
                       onClick={() => selectEntireColumn(col_key)}
                       title={`Select column ${toColumnLetter(col_idx)}`}
-                      className={`${is_sticky_col ? "sticky z-[30]" : ""}${isColumnHighlighted(col_idx) ? ` ${styles.header_highlighted}` : ""}`}
+                      className={`${is_sticky_col ? "sticky z-[30]" : ""}${is_last_sticky_col ? ` ${styles.frozen_edge}` : ""}${isColumnHighlighted(col_idx) ? ` ${styles.header_highlighted}` : ""}`}
                       style={is_sticky_col ? { left: sticky_left_offsets[col_key] } : undefined}
                     >
-                      {toColumnLetter(col_idx)}
+                      <div className={styles.letter_cell}>
+                        {toColumnLetter(col_idx)}
+                        {/* Drag to resize the column, double click to reset it */}
+                        <span
+                          role="separator"
+                          aria-orientation="vertical"
+                          aria-label={`Resize column ${toColumnLetter(col_idx)}`}
+                          title="Drag to resize · Double click to reset"
+                          className={`${styles.resize_handle}${resizing_col_key === col_key ? ` ${styles.resize_handle_active}` : ""}`}
+                          onMouseDown={(e) => startColumnResize(col_key, e)}
+                          onClick={(e) => e.stopPropagation()}
+                          onDoubleClick={(e) => {
+                            e.stopPropagation();
+                            resetColumnWidth(col_key);
+                          }}
+                        />
+                      </div>
                     </th>
                   );
                 })}
@@ -3790,13 +3867,11 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                   return (
                     <th
                       key={col.key}
-                      className={`border border-gray-700/30 px-2 py-1.5 text-left font-semibold tracking-wide ${GROUP_HEADER_STYLES[col.group]}${col.sticky ? ` sticky z-[30]${col.key === last_sticky_col_key ? " shadow-[4px_0_6px_-3px_rgba(0,0,0,0.35)]" : ""}` : ""}`}
-                      style={{
-                        minWidth: col.min_width,
-                        ...(col.sticky ? { left: sticky_left_offsets[col.key] } : {}),
-                      }}
+                      className={`${styles.column_header} text-left font-semibold tracking-wide ${GROUP_HEADER_STYLES[col.group]}${col.sticky ? ` sticky z-[30]${col.key === last_sticky_col_key ? ` ${styles.frozen_edge}` : ""}` : ""}`}
+                      style={col.sticky ? { left: sticky_left_offsets[col.key] } : undefined}
+                      title={col.label}
                     >
-                      <div className="flex items-center gap-1">
+                      <div className="flex min-w-0 items-center gap-1">
                         <button
                           onClick={(e) => {
                             if (!is_sortable) return;
@@ -3810,7 +3885,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                                 ? "Click to sort · Shift+Click to add secondary sort"
                                 : "Click to sort · Shift+Click for multi-column sort"
                           }
-                          className={`flex flex-1 items-center gap-1 whitespace-nowrap text-left ${is_sortable ? "hover:opacity-75" : "cursor-default opacity-50"
+                          className={`flex min-w-0 flex-1 items-center gap-1 whitespace-nowrap text-left ${is_sortable ? "hover:opacity-75" : "cursor-default opacity-50"
                             }`}
                         >
                           {col.locked && (
@@ -3827,7 +3902,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                               />
                             </svg>
                           )}
-                          <span>{col.label}</span>
+                          <span className="truncate">{col.label}</span>
                           {sort_rule ? (
                             <span className="ml-0.5 flex items-center gap-0.5">
                               <svg
@@ -3914,11 +3989,10 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                   );
                 })}
                 <th
-                  className="border border-gray-700/30 bg-teal-700 px-2 py-1.5 text-left text-xs font-semibold text-white"
-                  style={{ minWidth: 200 }}
+                  className={`${styles.column_header} bg-teal-700 text-left text-xs font-semibold text-white`}
                 >
-                  <div className="flex items-center gap-1">
-                    <span className="flex-1 whitespace-nowrap">Client Account</span>
+                  <div className="flex min-w-0 items-center gap-1">
+                    <span className="min-w-0 flex-1 truncate">Client Account</span>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -3944,11 +4018,10 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                   </div>
                 </th>
                 <th
-                  className="border border-gray-700/30 bg-indigo-700 px-2 py-1.5 text-left text-xs font-semibold text-white"
-                  style={{ minWidth: 180 }}
+                  className={`${styles.column_header} bg-indigo-700 text-left text-xs font-semibold text-white`}
                 >
-                  <div className="flex items-center gap-1">
-                    <span className="flex-1 whitespace-nowrap">Assigned To</span>
+                  <div className="flex min-w-0 items-center gap-1">
+                    <span className="min-w-0 flex-1 truncate">Assigned To</span>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -3975,7 +4048,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                 </th>
                 <th
                   aria-label="Row actions"
-                  className="w-px border border-gray-700/30 bg-gray-800 px-2 py-2 text-center text-xs font-semibold text-white"
+                  className={`${styles.column_header} bg-gray-800 text-center text-xs font-semibold text-white`}
                 >
                   <svg className="mx-auto h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
@@ -4006,12 +4079,14 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                   const is_locally_selected =
                     !is_new && selected_row_id === row.id && !has_collaborators;
 
+                  // Frozen cells sit on top of the columns scrolling underneath them,
+                  // so their background must be fully opaque (no /opacity modifiers).
                   const sticky_row_bg_class = is_new
-                    ? "bg-amber-50/80 dark:bg-amber-900/10"
+                    ? "bg-amber-50 dark:bg-amber-950"
                     : is_multi_selected
-                    ? "bg-indigo-50/80 dark:bg-indigo-950/20"
+                    ? "bg-indigo-50 dark:bg-indigo-950"
                     : is_locally_selected
-                    ? "bg-brand-50/80 dark:bg-brand-900/10"
+                    ? "bg-brand-50 dark:bg-brand-950"
                     : "bg-white dark:bg-gray-900";
 
                   return (

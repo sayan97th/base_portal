@@ -1421,3 +1421,25 @@ describe("LinkBuildingOrdersTable — spreadsheet keyboard navigation", () => {
     expect(await screen.findByText(/Cleared 1 cell across 1 row/i)).toBeInTheDocument();
   });
 });
+
+// ─── Fixed column layout ─────────────────────────────────────────────────────
+
+describe("LinkBuildingOrdersTable — fixed column layout", () => {
+  it("builds the frozen columns' sticky offsets from the same widths as the colgroup", async () => {
+    await renderTableWithRow(makeRow());
+
+    const table = screen.getByRole("grid").querySelector("table");
+    const col_widths = Array.from(table!.querySelectorAll("colgroup col")).map((col) =>
+      parseInt((col as HTMLElement).style.width, 10)
+    );
+    // gutter, checkbox, Order ID, ...
+    const [gutter_width, checkbox_width, order_id_width] = col_widths;
+
+    const company_header = screen.getByTitle("Company");
+    expect(company_header.style.left).toBe(`${gutter_width + checkbox_width + order_id_width}px`);
+
+    // The table is exactly as wide as its columns, so nothing stretches past them.
+    const total_width = col_widths.reduce((sum, width) => sum + width, 0);
+    expect(table!.style.width).toBe(`${total_width}px`);
+  });
+});
