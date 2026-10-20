@@ -8,6 +8,7 @@ import type {
   LinkBuildingOrderSearchBody,
   LinkBuildingOrderFilterValuesResponse,
   LinkBuildingOrderStatusCountsResponse,
+  LinkBuildingOrderQuickFilterValuesResponse,
 } from "@/types/admin/link-building-order";
 
 // ── Validation ─────────────────────────────────────────────────────────────────
@@ -145,6 +146,24 @@ export async function getLinkBuildingOrderStatusCounts(
   return apiClient.post<LinkBuildingOrderStatusCountsResponse>(
     "/api/admin/link-building-orders/status-counts",
     filters
+  );
+}
+
+/**
+ * POST /api/admin/link-building-orders/quick-filter-values
+ * Distinct values and row counts of several columns in one request, for the
+ * Quick filters panel. Each column's list ignores its own filter only.
+ */
+export async function getLinkBuildingOrderQuickFilterValues(
+  columns: string[],
+  body: LinkBuildingOrderSearchBody = {},
+  limit?: number
+): Promise<LinkBuildingOrderQuickFilterValuesResponse> {
+  const { page: _page, per_page: _per_page, sort_rules: _sort_rules, ...filters } = body;
+
+  return apiClient.post<LinkBuildingOrderQuickFilterValuesResponse>(
+    "/api/admin/link-building-orders/quick-filter-values",
+    { ...filters, columns, limit }
   );
 }
 

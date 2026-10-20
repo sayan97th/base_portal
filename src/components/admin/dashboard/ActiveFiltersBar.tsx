@@ -6,12 +6,21 @@ export interface ActiveFilterChip {
   description: string;
   /** Text read out by the remove button, e.g. "Remove the Link Type filter". */
   remove_label: string;
-  /** "quick" chips come from the toolbar controls, "column" chips from a column's filter menu. */
-  kind: "quick" | "column";
+  /**
+   * "quick" chips come from the toolbar controls, "column" chips from a column's
+   * filter menu and "advanced" chips from the Advanced filters panel.
+   */
+  kind: "quick" | "column" | "advanced";
   /** Opens the control that edits this filter, receives the chip so menus can anchor to it. */
   onEdit?: (anchor_el: HTMLElement) => void;
   onRemove: () => void;
 }
+
+const CHIP_KIND_CLASSES: Record<ActiveFilterChip["kind"], string> = {
+  quick: "border-brand-200 bg-brand-50 text-brand-800 dark:border-brand-800/60 dark:bg-brand-500/10 dark:text-brand-200",
+  column: "border-amber-200 bg-white text-gray-700 dark:border-amber-800/60 dark:bg-gray-800 dark:text-gray-200",
+  advanced: "border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-800/60 dark:bg-violet-500/10 dark:text-violet-200",
+};
 
 interface ActiveFiltersBarProps {
   chips: ActiveFilterChip[];
@@ -19,9 +28,10 @@ interface ActiveFiltersBarProps {
 }
 
 /**
- * One row that lists every filter shaping the table, from the toolbar and from
- * the column menus alike (hidden columns included), so the current view is always
- * explained in one place and each filter can be edited or removed on its own.
+ * One row that lists every filter shaping the table, from the toolbar, the column
+ * menus (hidden columns included) and the Advanced filters panel, so the current
+ * view is always explained in one place and each filter can be edited or removed
+ * on its own.
  */
 export default function ActiveFiltersBar({ chips, onClearAll }: ActiveFiltersBarProps) {
   if (chips.length === 0) return null;
@@ -37,11 +47,7 @@ export default function ActiveFiltersBar({ chips, onClearAll }: ActiveFiltersBar
       {chips.map((chip) => (
         <span
           key={chip.key}
-          className={`inline-flex max-w-xs items-center overflow-hidden rounded-full border text-xs ${
-            chip.kind === "column"
-              ? "border-amber-200 bg-white text-gray-700 dark:border-amber-800/60 dark:bg-gray-800 dark:text-gray-200"
-              : "border-brand-200 bg-brand-50 text-brand-800 dark:border-brand-800/60 dark:bg-brand-500/10 dark:text-brand-200"
-          }`}
+          className={`inline-flex max-w-xs items-center overflow-hidden rounded-full border text-xs ${CHIP_KIND_CLASSES[chip.kind]}`}
         >
           {chip.onEdit ? (
             <button

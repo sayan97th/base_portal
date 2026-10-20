@@ -1,4 +1,10 @@
 import { isSheetFilterActive } from "@/hooks/useSheetColumnFilters";
+import {
+  EMPTY_ADVANCED_FILTERS,
+  countActiveAdvancedRules,
+  normalizeAdvancedFilters,
+  serializeAdvancedFilters,
+} from "@/lib/link-building-advanced-filters";
 import type {
   FilterConditionOperator,
   LinkBuildingOrderFilterState,
@@ -23,6 +29,7 @@ export const EMPTY_FILTER_STATE: LinkBuildingOrderFilterState = {
   sort_rules: [],
   sheet_filters: {},
   hidden_columns: [],
+  advanced_filters: EMPTY_ADVANCED_FILTERS,
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -75,7 +82,8 @@ function normalizeSheetFilter(value: unknown): SavedSheetColumnFilter | null {
 /**
  * Converts a snapshot returned by the API into a complete table state. Missing
  * keys fall back to their defaults, and when `known_columns` is given, column
- * filters and hidden columns that no longer exist in the table are dropped.
+ * filters, hidden columns and advanced filter rules that no longer exist in the
+ * table are dropped.
  */
 export function normalizeFilterState(
   raw: unknown,
@@ -109,6 +117,7 @@ export function normalizeFilterState(
     sort_rules: normalizeSortRules(raw.sort_rules),
     sheet_filters,
     hidden_columns: Array.from(new Set(hidden_columns)),
+    advanced_filters: normalizeAdvancedFilters(raw.advanced_filters, isKnown),
   };
 }
 
@@ -145,6 +154,7 @@ export function serializeFilterState(state: LinkBuildingOrderFilterState): strin
     state.sort_rules.map((r) => [r.key, r.direction]),
     sheet_filters,
     [...state.hidden_columns].sort(),
+    serializeAdvancedFilters(state.advanced_filters),
   ]);
 }
 
@@ -157,7 +167,8 @@ export function areFilterStatesEqual(
 
 /**
  * Number of individual filters in a state, shown next to each saved filter.
- * Sorting and hidden columns are not counted, since they do not remove rows.
+ * Every active advanced filter rule counts as one. Sorting and hidden columns
+ * are not counted, since they do not remove rows.
  */
 export function countActiveFilters(state: LinkBuildingOrderFilterState): number {
   return [
@@ -169,5 +180,6 @@ export function countActiveFilters(state: LinkBuildingOrderFilterState): number 
     state.assigned_user_id !== null,
     state.needs_lb_tl_approval,
   ].filter(Boolean).length +
-    Object.values(state.sheet_filters).filter(isSheetFilterActive).length;
+    Object.values(state.sheet_filters).filter(isSheetFilterActive).length +
+    countActiveAdvancedRules(state.advanced_filters);
 }

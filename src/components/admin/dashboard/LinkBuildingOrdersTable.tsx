@@ -12,6 +12,29 @@ import {
 } from "@/hooks/useSheetColumnFilters";
 import SheetColumnFilterDropdown from "./SheetColumnFilterDropdown";
 import SavedFiltersMenu from "./SavedFiltersMenu";
+import AdvancedFilterPanel from "./AdvancedFilterPanel";
+import LinkBuildingFilterPanel from "./LinkBuildingFilterPanel";
+import QuickFilterPanel from "./QuickFilterPanel";
+import { useQuickFilterValues } from "@/hooks/useQuickFilterValues";
+import {
+  ASSIGNED_USER_QUICK_FILTER_KEY,
+  buildQuickFilterFacets,
+  toggleQuickFilterValue,
+  type QuickFilterColumn,
+} from "@/lib/link-building-quick-filters";
+import { useAdvancedFilters } from "@/hooks/useAdvancedFilters";
+import {
+  countActiveAdvancedRules,
+  describeAdvancedFilters,
+  describeAdvancedGroup,
+  describeAdvancedRuleCondition,
+  getAdvancedColumnLabel,
+  hasAdvancedFilterRules,
+  isAdvancedRuleActive,
+  toAdvancedFiltersPayload,
+  type AdvancedFilterColumn,
+  type AdvancedFilterColumnKind,
+} from "@/lib/link-building-advanced-filters";
 import { normalizeFilterState, serializeFilterState } from "@/lib/link-building-saved-filters";
 import {
   getFilterPreference,
@@ -82,6 +105,8 @@ import {
   LINK_BUILDING_ORDER_STATUSES,
   STATUS_BADGE_CLASSES,
   DEFAULT_STATUS_BADGE_CLASS,
+  STATUS_DOT_CLASSES,
+  DEFAULT_STATUS_DOT_CLASS,
 } from "@/lib/link-building-order-statuses";
 import FindHighlightedText from "./FindHighlightedText";
 import styles from "./LinkBuildingOrdersTable.module.scss";
@@ -305,10 +330,59 @@ const COLUMN_VISIBILITY_GROUPS: ColumnVisibilityGroup[] = COLUMNS.reduce<ColumnV
   return groups;
 }, []);
 
+/** Text columns that hold prices, filtered as numbers like the API's NUMERIC_COLUMNS. */
+const PRICE_COLUMN_KEYS: ReadonlySet<string> = new Set(["posting_fee_lbs", "current_price", "final_price"]);
+
+function getAdvancedFilterKind(col: ColumnDef): AdvancedFilterColumnKind {
+  if (col.type === "date") return "date";
+  if (col.type === "number" || PRICE_COLUMN_KEYS.has(col.key)) return "number";
+  if (col.type === "select") return "option";
+  return "text";
+}
+
+/**
+ * Columns offered by the Advanced filters panel. Columns with a fixed list of
+ * options show it in the "is" picker, the others (Pen Name included, whose list
+ * grows with the data) load their distinct values from the server.
+ */
+const ADVANCED_FILTER_COLUMNS: AdvancedFilterColumn[] = COLUMNS.map((col) => ({
+  key: col.key as string,
+  label: col.label,
+  kind: getAdvancedFilterKind(col),
+  options: col.dynamic_options ? undefined : col.options,
+  swatch_class: COLUMN_GROUP_META[col.group].swatch_class,
+  ...(col.key === "status" ? { dot_classes: STATUS_DOT_CLASSES, default_dot_class: DEFAULT_STATUS_DOT_CLASS } : {}),
+}));
+
+/**
+ * Columns of the Quick filters panel, in display order. Only columns with a
+ * manageable set of repeated values are listed, free text columns such as
+ * Keyword or Notes are filtered from the Advanced filters view instead.
+ */
+const QUICK_FILTER_COLUMNS: QuickFilterColumn[] = [
+  { key: "status", label: "Status", options: STATUS_OPTIONS, dot_classes: STATUS_DOT_CLASSES, default_dot_class: DEFAULT_STATUS_DOT_CLASS },
+  { key: ASSIGNED_USER_QUICK_FILTER_KEY, label: "Assigned To" },
+  { key: "link_type", label: "Link Type", options: LINK_TYPE_OPTIONS },
+  { key: "client", label: "Company" },
+  { key: "pen_name", label: "Pen Name" },
+  { key: "current_poc", label: "Current POC" },
+  { key: "lb_tl_approval", label: "LB TL Approval" },
+  { key: "dr_lbs", label: "DR" },
+  { key: "exact_match", label: "Exact Match?", options: ["Yes", "No"] },
+  { key: "currency", label: "Currency", options: ["USD", "EUR"] },
+];
+
+const QUICK_FILTER_COLUMN_KEYS = QUICK_FILTER_COLUMNS.map((column) => column.key);
+
 // Shared toolbar control styles, so every button and input in the header lines up at the same height.
 const toolbar_button_base_class =
   "flex h-9 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30";
 const toolbar_button_class = `${toolbar_button_base_class} border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700`;
+// Frame of a split toolbar button (the Filter button and its arrow), each half pads itself.
+const toolbar_split_button_base_class =
+  "flex h-9 shrink-0 items-stretch overflow-hidden rounded-lg border text-sm font-medium transition-colors focus-within:ring-2 focus-within:ring-brand-500/30";
+const toolbar_split_button_class = `${toolbar_split_button_base_class} border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200`;
+const toolbar_split_button_active_class = `${toolbar_split_button_base_class} border-brand-300 bg-brand-50 text-brand-700 dark:border-brand-700 dark:bg-brand-500/10 dark:text-brand-300`;
 const toolbar_input_class =
   "h-9 rounded-lg border border-gray-200 bg-white text-sm text-gray-800 placeholder-gray-400 outline-none transition focus:border-brand-400 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500";
 
@@ -1113,6 +1187,10 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     replaceSheetFilters,
     active_sheet_filter_count,
   } = useSheetColumnFilters();
+  const { advanced_filters, advanced_filter_actions, replaceAdvancedFilters } = useAdvancedFilters();
+  const [is_filter_panel_open, setIsFilterPanelOpen] = useState(false);
+  // The Filter button opens Quick filters, its arrow opens Advanced filters.
+  const [is_advanced_filter_mode, setIsAdvancedFilterMode] = useState(false);
 
   const [open_filter_col, setOpenFilterCol] = useState<keyof LinkBuildingOrderRow | null>(null);
   const [filter_anchor_el, setFilterAnchorEl] = useState<HTMLElement | null>(null);
@@ -1163,6 +1241,13 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
   const debounced_search = useDebounce(search, 400);
   const debounced_client_filter = useDebounce(client_filter, 400);
+  // Only complete, enabled rules reach the API. Text typed into a rule waits like
+  // the search box does, so the table does not refetch on every keystroke.
+  const advanced_filters_key = useMemo(
+    () => JSON.stringify(toAdvancedFiltersPayload(advanced_filters) ?? null),
+    [advanced_filters]
+  );
+  const debounced_advanced_filters_key = useDebounce(advanced_filters_key, 400);
 
   const current_body_ref = useRef<LinkBuildingOrderSearchBody>({});
 
@@ -1354,16 +1439,10 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   // debounced copies to catch up instead of loading the unfiltered table first.
   const awaiting_restored_text_ref = useRef(false);
 
-  useEffect(() => {
-    if (!is_view_restored) return;
-    if (awaiting_restored_text_ref.current) {
-      if (debounced_search !== search || debounced_client_filter !== client_filter) return;
-      awaiting_restored_text_ref.current = false;
-    }
-
+  /** The filters sent with every request, rebuilt only when one of them changes. */
+  const search_body = useMemo<LinkBuildingOrderSearchBody>(() => {
     const active_col_filters = toColumnFilterPayloads(sheet_filters);
-
-    const body: LinkBuildingOrderSearchBody = {
+    return {
       search: debounced_search.trim() || undefined,
       status: status_filter || undefined,
       link_type: link_type_filter || undefined,
@@ -1373,14 +1452,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       needs_lb_tl_approval: needs_approval_filter || undefined,
       sort_rules: sort_rules.length > 0 ? sort_rules : undefined,
       column_filters: active_col_filters.length > 0 ? active_col_filters : undefined,
+      advanced_filters: JSON.parse(debounced_advanced_filters_key) ?? undefined,
     };
-
-    current_body_ref.current = body;
-    fetchRows(1, body);
-    refreshStatusCounts();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    is_view_restored,
     debounced_search,
     status_filter,
     link_type_filter,
@@ -1390,8 +1464,27 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     needs_approval_filter,
     sort_rules,
     sheet_filters,
-    per_page,
+    debounced_advanced_filters_key,
   ]);
+
+  useEffect(() => {
+    if (!is_view_restored) return;
+    if (awaiting_restored_text_ref.current) {
+      if (
+        debounced_search !== search ||
+        debounced_client_filter !== client_filter ||
+        debounced_advanced_filters_key !== advanced_filters_key
+      ) {
+        return;
+      }
+      awaiting_restored_text_ref.current = false;
+    }
+
+    current_body_ref.current = search_body;
+    fetchRows(1, search_body);
+    refreshStatusCounts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [is_view_restored, search_body, per_page]);
 
   // ── Derived state ───────────────────────────────────────────────────────────
 
@@ -2064,6 +2157,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     needs_approval_filter ||
     hidden_columns.size > 0 ||
     active_sheet_filter_count > 0 ||
+    hasAdvancedFilterRules(advanced_filters) ||
     sort_is_non_default;
 
   const clearAllFilters = useCallback(() => {
@@ -2077,8 +2171,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     setHiddenColumns(new Set());
     setAppliedSavedFilterId(null);
     clearAllSheetFilters();
+    advanced_filter_actions.clearAll();
     clearSort();
-  }, [clearAllSheetFilters, clearSort]);
+  }, [clearAllSheetFilters, advanced_filter_actions, clearSort]);
 
   // ── Saved filters ───────────────────────────────────────────────────────────
 
@@ -2095,6 +2190,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       sort_rules,
       sheet_filters,
       hidden_columns: Array.from(hidden_columns),
+      advanced_filters,
     }),
     [
       search,
@@ -2107,6 +2203,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       sort_rules,
       sheet_filters,
       hidden_columns,
+      advanced_filters,
     ]
   );
 
@@ -2124,9 +2221,10 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       setNeedsApprovalFilter(next.needs_lb_tl_approval);
       setHiddenColumns(new Set(next.hidden_columns));
       replaceSheetFilters(next.sheet_filters);
+      replaceAdvancedFilters(next.advanced_filters);
       replaceSort(next.sort_rules);
     },
-    [replaceSheetFilters, replaceSort]
+    [replaceSheetFilters, replaceAdvancedFilters, replaceSort]
   );
 
   // ── Auto saved view (per user) ──────────────────────────────────────────────
@@ -2144,7 +2242,10 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         if (is_cancelled) return;
         if (preference.filters) {
           const restored = normalizeFilterState(preference.filters, KNOWN_COLUMN_KEYS);
-          awaiting_restored_text_ref.current = restored.search !== "" || restored.client !== "";
+          awaiting_restored_text_ref.current =
+            restored.search !== "" ||
+            restored.client !== "" ||
+            toAdvancedFiltersPayload(restored.advanced_filters) !== undefined;
           applySavedFilter(restored);
           setAppliedSavedFilterId(preference.applied_saved_filter_id);
         }
@@ -2212,7 +2313,8 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     setAssignedUserIdFilter(null);
     setNeedsApprovalFilter(false);
     clearAllSheetFilters();
-  }, [clearAllSheetFilters]);
+    advanced_filter_actions.clearAll();
+  }, [clearAllSheetFilters, advanced_filter_actions]);
 
   const toggleNeedsApprovalFilter = useCallback(() => {
     setNeedsApprovalFilter((prev) => {
@@ -2326,6 +2428,92 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
   // ── Active filter chips ─────────────────────────────────────────────────────
 
+  // ── Quick filters ───────────────────────────────────────────────────────────
+
+  const quick_filter_values = useQuickFilterValues(QUICK_FILTER_COLUMN_KEYS, search_body, is_filter_panel_open);
+
+  /** Values picked in the Quick filters panel, per column. */
+  const quick_filter_selections = useMemo(() => {
+    const selections: Partial<Record<string, string[]>> = {};
+    QUICK_FILTER_COLUMNS.forEach((column) => {
+      if (column.key === ASSIGNED_USER_QUICK_FILTER_KEY) {
+        selections[column.key] = assigned_user_id_filter === null ? [] : [String(assigned_user_id_filter)];
+        return;
+      }
+      const values = sheet_filters[column.key]?.values;
+      selections[column.key] = values?.mode === "include" ? values.values : [];
+    });
+    return selections;
+  }, [sheet_filters, assigned_user_id_filter]);
+
+  const quick_filter_facets = useMemo(
+    () =>
+      buildQuickFilterFacets({
+        columns: QUICK_FILTER_COLUMNS,
+        values_by_column: quick_filter_values.values_by_column,
+        selections: quick_filter_selections,
+        users: admin_users,
+        current_user_id: typeof user?.id === "number" ? user.id : null,
+      }),
+    [quick_filter_values.values_by_column, quick_filter_selections, admin_users, user]
+  );
+
+  /**
+   * Picks or unpicks a value. Regular columns store the picks as their "Filter by
+   * values" selection (keeping any condition already set on the column), and
+   * Assigned To uses its own single person filter.
+   */
+  const toggleQuickFilterOption = useCallback(
+    (key: string, value: string) => {
+      if (key === ASSIGNED_USER_QUICK_FILTER_KEY) {
+        const user_id = Number(value);
+        setAssignedUserIdFilter((prev) => (prev === user_id ? null : user_id));
+        return;
+      }
+      const current = sheet_filters[key];
+      const picked = current?.values?.mode === "include" ? current.values.values : [];
+      const next_values = toggleQuickFilterValue(picked, value);
+      setSheetFilter(key, {
+        condition: current?.condition ?? null,
+        values: next_values.length > 0 ? { mode: "include", values: next_values } : null,
+      });
+    },
+    [sheet_filters, setSheetFilter]
+  );
+
+  const clearQuickFilterColumn = useCallback(
+    (key: string) => {
+      if (key === ASSIGNED_USER_QUICK_FILTER_KEY) {
+        setAssignedUserIdFilter(null);
+        return;
+      }
+      const current = sheet_filters[key];
+      setSheetFilter(key, { condition: current?.condition ?? null, values: null });
+    },
+    [sheet_filters, setSheetFilter]
+  );
+
+  // Filters set from the panel, shown on its button: column filters, Assigned To and active advanced rules.
+  const quick_pick_count = active_sheet_filter_count + (assigned_user_id_filter !== null ? 1 : 0);
+  const advanced_rule_count = countActiveAdvancedRules(advanced_filters);
+  const panel_filter_count = quick_pick_count + advanced_rule_count;
+  const filter_panel_footer_note = is_advanced_filter_mode
+    ? quick_pick_count > 0
+      ? "Quick filters and column filters are also applied."
+      : null
+    : advanced_rule_count > 0
+      ? `${advanced_rule_count} advanced ${advanced_rule_count === 1 ? "filter is" : "filters are"} also applied.`
+      : null;
+
+  /**
+   * Values listed by the Advanced filters "is" picker. The other filters are not
+   * sent, so a rule joined with "or" can still pick values they currently hide.
+   */
+  const loadAdvancedFilterValues = useCallback(async (key: string, value_search: string) => {
+    const response = await getLinkBuildingOrderFilterValues(key as keyof LinkBuildingOrderRow, {}, value_search, 200);
+    return response.data.map((item) => item.value);
+  }, []);
+
   const active_filter_chips = useMemo<ActiveFilterChip[]>(() => {
     const chips: ActiveFilterChip[] = [];
     if (search.trim()) {
@@ -2395,7 +2583,8 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       chips.push({
         key: "assigned_to",
         label: "Assigned To",
-        description: admin_user ? admin_user.name : `#${assigned_user_id_filter}`,
+        description:
+          assigned_user_id_filter === 0 ? "Unassigned" : admin_user ? admin_user.name : `#${assigned_user_id_filter}`,
         remove_label: "Remove the Assigned To filter",
         kind: "quick",
         onEdit: (anchor_el) => openSpecialFilter("assigned_to", anchor_el),
@@ -2415,6 +2604,53 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         onRemove: () => clearSheetFilter(col.key),
       });
     });
+    // Advanced filters joined with "and" narrow the table one by one, so each rule
+    // and group gets its own chip. Joined with "or" they only make sense together,
+    // so they are summed up in a single chip.
+    const openAdvancedFilters = () => {
+      setIsAdvancedFilterMode(true);
+      setIsFilterPanelOpen(true);
+    };
+    if (advanced_filters.operator === "and") {
+      advanced_filters.rules.filter(isAdvancedRuleActive).forEach((rule) => {
+        const label = getAdvancedColumnLabel(rule.key, ADVANCED_FILTER_COLUMNS);
+        chips.push({
+          key: `advanced_${rule.id}`,
+          label,
+          description: describeAdvancedRuleCondition(rule, ADVANCED_FILTER_COLUMNS),
+          remove_label: `Remove the ${label} advanced filter`,
+          kind: "advanced",
+          onEdit: openAdvancedFilters,
+          onRemove: () => advanced_filter_actions.removeRule(rule.id),
+        });
+      });
+      advanced_filters.groups.forEach((group) => {
+        const description = describeAdvancedGroup(group, ADVANCED_FILTER_COLUMNS);
+        if (description === "") return;
+        chips.push({
+          key: `advanced_${group.id}`,
+          label: "Group",
+          description,
+          remove_label: "Remove this condition group",
+          kind: "advanced",
+          onEdit: openAdvancedFilters,
+          onRemove: () => advanced_filter_actions.removeGroup(group.id),
+        });
+      });
+    } else {
+      const description = describeAdvancedFilters(advanced_filters, ADVANCED_FILTER_COLUMNS);
+      if (description !== "") {
+        chips.push({
+          key: "advanced_any",
+          label: "Any of",
+          description,
+          remove_label: "Remove the advanced filters",
+          kind: "advanced",
+          onEdit: openAdvancedFilters,
+          onRemove: advanced_filter_actions.clearAll,
+        });
+      }
+    }
     return chips;
   }, [
     search,
@@ -2427,6 +2663,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     client_users,
     admin_users,
     sheet_filters,
+    advanced_filters,
+    advanced_filter_actions,
+    setIsAdvancedFilterMode,
     openSpecialFilter,
     toggleColumnFilter,
     clearSheetFilter,
@@ -3746,6 +3985,39 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
             </svg>
             Find
           </button>
+          {/* Filter panel, monday style: Quick filters (click values) or Advanced filters (And / Or rules) */}
+          <LinkBuildingFilterPanel
+            is_open={is_filter_panel_open}
+            onOpenChange={setIsFilterPanelOpen}
+            is_advanced_mode={is_advanced_filter_mode}
+            onModeChange={setIsAdvancedFilterMode}
+            active_filter_count={panel_filter_count}
+            result_count={total}
+            total_count={quick_filter_values.total_count}
+            is_loading={is_loading || quick_filter_values.is_loading}
+            can_clear={active_filter_chips.length > 0 || hasAdvancedFilterRules(advanced_filters)}
+            onClearAll={clearFilterChips}
+            footer_note={filter_panel_footer_note}
+            button_class={toolbar_split_button_class}
+            active_button_class={toolbar_split_button_active_class}
+          >
+            {is_advanced_filter_mode ? (
+              <AdvancedFilterPanel
+                columns={ADVANCED_FILTER_COLUMNS}
+                advanced_filters={advanced_filters}
+                actions={advanced_filter_actions}
+                loadValues={loadAdvancedFilterValues}
+              />
+            ) : (
+              <QuickFilterPanel
+                facets={quick_filter_facets}
+                is_loading={quick_filter_values.is_loading}
+                has_error={quick_filter_values.has_error}
+                onToggle={toggleQuickFilterOption}
+                onClearFacet={clearQuickFilterColumn}
+              />
+            )}
+          </LinkBuildingFilterPanel>
           {/* Saved filters, save the current view or reapply one in a single click */}
           <SavedFiltersMenu
             current_state={current_filter_state}

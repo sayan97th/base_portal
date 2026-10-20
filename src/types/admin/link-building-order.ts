@@ -185,6 +185,18 @@ export interface LinkBuildingOrderFilterValuesResponse {
   has_more: boolean;
 }
 
+/** Values of one column in the Quick filters panel. */
+export interface LinkBuildingOrderQuickFilterColumnValues {
+  values: LinkBuildingOrderFilterValue[];
+  has_more: boolean;
+}
+
+export interface LinkBuildingOrderQuickFilterValuesResponse {
+  data: Partial<Record<string, LinkBuildingOrderQuickFilterColumnValues>>;
+  /** Every dashboard row, ignoring all filters, for "Showing X of Y orders". */
+  total: number;
+}
+
 export interface LinkBuildingOrderStatusCount {
   /** Status value as stored on the row, "" for rows without a status. */
   status: string;
@@ -207,12 +219,13 @@ export interface LinkBuildingOrderSearchBody {
   link_builder?: string;
   /** Filter by assigned client account (user_id). */
   client_user_id?: number | null;
-  /** Filter by assigned admin user (assigned_admin_user_id). */
+  /** Filter by assigned admin user (assigned_admin_user_id), 0 for unassigned rows. */
   assigned_user_id?: number | null;
   /** When true, restricts results to "Live" orders whose lb_tl_approval is still empty. */
   needs_lb_tl_approval?: boolean;
   sort_rules?: SortRulePayload[];
   column_filters?: ColumnFilterPayload[];
+  advanced_filters?: AdvancedFiltersPayload;
 }
 
 // ── Saved filters ──────────────────────────────────────────────────────────────
@@ -223,10 +236,59 @@ export interface SavedSheetColumnFilter {
   values: { mode: "include" | "exclude"; values: string[] } | null;
 }
 
+// ── Advanced filters ───────────────────────────────────────────────────────────
+
+/** How the rules of an advanced filter level (top level or one condition group) are combined. */
+export type AdvancedFilterJoinOperator = "and" | "or";
+
+/**
+ * Condition of one advanced filter rule: every spreadsheet condition, plus
+ * "is any of" / "is none of", which match a list of values like monday's "is" / "is not".
+ */
+export type AdvancedFilterOperator = FilterConditionOperator | "is_any_of" | "is_none_of";
+
+/**
+ * One "Where [column] [condition] [value]" row of the Advanced filters panel. A rule
+ * stays in the view while it is half built, but only complete, enabled rules filter rows.
+ */
+export interface AdvancedFilterRule {
+  id: string;
+  key: string | null;
+  operator: AdvancedFilterOperator | null;
+  value: string;
+  /** Upper bound, only used by "is_between" and "is_not_between". */
+  value_to: string;
+  /** Picked values, only used by "is_any_of" and "is_none_of". "" stands for "(Blanks)". */
+  values: string[];
+  /** A paused rule stays in the panel without narrowing the table. */
+  is_disabled: boolean;
+}
+
+export interface AdvancedFilterGroup {
+  id: string;
+  operator: AdvancedFilterJoinOperator;
+  rules: AdvancedFilterRule[];
+}
+
+export interface LinkBuildingOrderAdvancedFilters {
+  /** Joins the top level rules and groups. */
+  operator: AdvancedFilterJoinOperator;
+  rules: AdvancedFilterRule[];
+  groups: AdvancedFilterGroup[];
+}
+
+/** What the search endpoint receives: only complete, enabled rules, as column filter payloads. */
+export interface AdvancedFiltersPayload {
+  operator: AdvancedFilterJoinOperator;
+  rules: ColumnFilterPayload[];
+  groups: { operator: AdvancedFilterJoinOperator; rules: ColumnFilterPayload[] }[];
+}
+
 /**
  * Snapshot of everything that shapes the Link Building Orders table: toolbar
- * filters, spreadsheet column filters, sort rules and hidden columns. Saved
- * filters store this exact shape so it can be restored without any mapping.
+ * filters, spreadsheet column filters, advanced filters, sort rules and hidden
+ * columns. Saved filters store this exact shape so it can be restored without
+ * any mapping.
  */
 export interface LinkBuildingOrderFilterState {
   search: string;
@@ -239,6 +301,7 @@ export interface LinkBuildingOrderFilterState {
   sort_rules: SortRulePayload[];
   sheet_filters: Partial<Record<string, SavedSheetColumnFilter>>;
   hidden_columns: string[];
+  advanced_filters: LinkBuildingOrderAdvancedFilters;
 }
 
 export interface LinkBuildingOrderSavedFilter {

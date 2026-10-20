@@ -25,6 +25,7 @@ import {
   getLinkBuildingOrderColumnValues,
   getLinkBuildingOrderFilterValues,
   getLinkBuildingOrderStatusCounts,
+  getLinkBuildingOrderQuickFilterValues,
 } from "@/services/admin/link-building-dashboard.service";
 import {
   listSavedFilters,
@@ -55,6 +56,7 @@ jest.mock("@/services/admin/link-building-dashboard.service", () => {
     listPenNamesForSelect:      jest.fn().mockResolvedValue([]),
     getNeedsLbTlApprovalCount:  jest.fn().mockResolvedValue(0),
     getLinkBuildingOrderStatusCounts: jest.fn().mockResolvedValue({ data: [], total: 0 }),
+    getLinkBuildingOrderQuickFilterValues: jest.fn().mockResolvedValue({ data: {}, total: 0 }),
   };
 });
 
@@ -128,6 +130,7 @@ const mockBatchUpdateLinkBuildingOrderCells = batchUpdateLinkBuildingOrderCells 
 const mockGetLinkBuildingOrderColumnValues = getLinkBuildingOrderColumnValues as jest.MockedFunction<typeof getLinkBuildingOrderColumnValues>;
 const mockGetLinkBuildingOrderFilterValues = getLinkBuildingOrderFilterValues as jest.MockedFunction<typeof getLinkBuildingOrderFilterValues>;
 const mockGetLinkBuildingOrderStatusCounts = getLinkBuildingOrderStatusCounts as jest.MockedFunction<typeof getLinkBuildingOrderStatusCounts>;
+const mockGetLinkBuildingOrderQuickFilterValues = getLinkBuildingOrderQuickFilterValues as jest.MockedFunction<typeof getLinkBuildingOrderQuickFilterValues>;
 const mockListSavedFilters = listSavedFilters as jest.MockedFunction<typeof listSavedFilters>;
 const mockCreateSavedFilter = createSavedFilter as jest.MockedFunction<typeof createSavedFilter>;
 const mockGetFilterPreference = getFilterPreference as jest.MockedFunction<typeof getFilterPreference>;
@@ -1328,6 +1331,77 @@ describe("LinkBuildingOrdersTable, saved filters", () => {
     // The saved filter the view came from is shown on the toolbar again.
     expect(await screen.findByRole("button", { name: /Live links by Jane/ })).toBeInTheDocument();
     expect(mockSaveFilterPreference).not.toHaveBeenCalled();
+  });
+
+  it("restores advanced filters, sends them with the first request and lists them as chips", async () => {
+    mockGetFilterPreference.mockResolvedValueOnce({
+      filters: {
+        ...EMPTY_FILTER_STATE,
+        advanced_filters: {
+          operator: "or",
+          rules: [
+            { id: "r1", key: "status", operator: "is_any_of", value: "", value_to: "", values: ["Live"], is_disabled: false },
+            { id: "r2", key: "dr_lbs", operator: "greater_than", value: "50", value_to: "", values: [], is_disabled: false },
+            // Paused rules stay in the view but never reach the API.
+            { id: "r3", key: "keyword", operator: "text_contains", value: "seo", value_to: "", values: [], is_disabled: true },
+          ],
+          groups: [],
+        },
+      },
+      applied_saved_filter_id: null,
+      updated_at: null,
+    });
+    await renderTableWithRow(makeRow());
+
+    expect(mockListLinkBuildingOrders.mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        advanced_filters: {
+          operator: "or",
+          rules: [
+            { key: "status", type: "values", mode: "include", values: ["Live"] },
+            { key: "dr_lbs", type: "condition", operator: "greater_than", value: "50", value_to: undefined },
+          ],
+          groups: [],
+        },
+      })
+    );
+    // Rules joined with "or" are summed up in a single chip.
+    expect(screen.getByTitle("Any of: Status is Live or DR is greater than 50. Click to edit.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Filter, 2 active" })).toHaveTextContent("Filter / 2");
+  });
+
+  it("picks several Quick filter values with one click each and sends them as one column filter", async () => {
+    mockGetLinkBuildingOrderQuickFilterValues.mockResolvedValue({
+      data: { status: { values: [{ value: "Live", count: 3 }, { value: "Pending", count: 2 }], has_more: false } },
+      total: 400,
+    });
+    await renderTableWithRow(makeRow());
+
+    fireEvent.click(screen.getByRole("button", { name: "Filter" }));
+    const dialog = await screen.findByRole("dialog", { name: "Quick filters" });
+    expect(await within(dialog).findByText("Showing 1 of 400 orders")).toBeInTheDocument();
+
+    const status = within(dialog).getByRole("group", { name: "Status" });
+    fireEvent.click(within(status).getByRole("button", { name: /^Live/ }));
+    fireEvent.click(within(status).getByRole("button", { name: /^Pending/ }));
+
+    await waitFor(() =>
+      expect(lastSearchBody().column_filters).toEqual([
+        { key: "status", type: "values", mode: "include", values: ["Live", "Pending"] },
+      ])
+    );
+    expect(screen.getByRole("button", { name: "Filter, 1 active" })).toBeInTheDocument();
+
+    // The arrow next to Filter switches the open panel to Advanced filters.
+    fireEvent.click(screen.getByRole("button", { name: "Advanced filters" }));
+    expect(await screen.findByRole("dialog", { name: "Advanced filters" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "New filter" })).toBeInTheDocument();
+    // The quick values are reloaded with the current filters, so their counts match the table.
+    expect(mockGetLinkBuildingOrderQuickFilterValues).toHaveBeenLastCalledWith(
+      expect.arrayContaining(["status", "assigned_admin_user_id"]),
+      expect.objectContaining({ column_filters: expect.any(Array) }),
+      50
+    );
   });
 
   it("saves the view to the user's account after a filter changes", async () => {
