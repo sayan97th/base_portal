@@ -216,6 +216,28 @@ export interface LinkBuildingOrderSearchBody {
   advanced_filters?: AdvancedFiltersPayload;
 }
 
+// ── In-table find (Ctrl/Cmd+F) ─────────────────────────────────────────────────
+
+export interface LinkBuildingOrderFindPagesBody extends LinkBuildingOrderSearchBody {
+  /** Normalized find terms, a row matches when any of its cells contains any term. */
+  find_terms: string[];
+  /** Visible columns to look through, computed only columns are ignored by the API. */
+  find_columns?: string[];
+}
+
+/** One page of the current result set holding rows that match the find terms. */
+export interface LinkBuildingOrderFindPage {
+  page: number;
+  row_count: number;
+}
+
+export interface LinkBuildingOrderFindPagesResponse {
+  /** Only pages with matches, ascending. */
+  pages: LinkBuildingOrderFindPage[];
+  matched_row_count: number;
+  total_rows: number;
+}
+
 // ── Saved filters ──────────────────────────────────────────────────────────────
 
 /** One column's spreadsheet style filter, as stored inside a saved filter. */

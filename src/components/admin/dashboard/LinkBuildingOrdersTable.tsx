@@ -97,6 +97,7 @@ import {
 } from "@/lib/spreadsheet-navigation";
 import { useResizableColumnWidths } from "@/hooks/useResizableColumnWidths";
 import { useTableFind, type TableFindMatch, type TableFindMatchState } from "@/hooks/useTableFind";
+import { useLinkBuildingOrderFindPages } from "@/hooks/useLinkBuildingOrderFindPages";
 import TableFindBar from "./TableFindBar";
 import NeedsApprovalToggle from "./NeedsApprovalToggle";
 import ActiveFiltersBar, { type ActiveFilterChip } from "./ActiveFiltersBar";
@@ -519,8 +520,8 @@ interface UserAssignCellProps {
   cell_key?: string;
   /** Find (Ctrl/Cmd+F) highlight for this cell, null when it does not match. */
   find_match_state?: TableFindMatchState;
-  /** Normalized find query, only passed while this cell matches. */
-  find_query?: string;
+  /** Normalized find terms, only passed while this cell matches. */
+  find_terms?: string[];
 }
 
 function UserAssignCell({
@@ -534,7 +535,7 @@ function UserAssignCell({
   onSelectCell,
   cell_key,
   find_match_state = null,
-  find_query = "",
+  find_terms,
 }: UserAssignCellProps) {
   // Kept in state (through a callback ref) rather than read from a ref during render,
   // so the dropdown re-renders with its anchor as soon as the cell mounts.
@@ -573,10 +574,10 @@ function UserAssignCell({
               </span>
             )}
             <span className="shrink-0 font-medium text-gray-700 dark:text-gray-200">
-              <FindHighlightedText text={selected_user.name} normalized_query={find_query} />
+              <FindHighlightedText text={selected_user.name} find_terms={find_terms} />
             </span>
             <span className="min-w-0 truncate text-[10px] text-gray-400 dark:text-gray-500">
-              <FindHighlightedText text={selected_user.email} normalized_query={find_query} />
+              <FindHighlightedText text={selected_user.email} find_terms={find_terms} />
             </span>
           </span>
         ) : (
@@ -655,8 +656,8 @@ interface EditableCellProps {
   sticky_bg_class?: string;
   /** Find (Ctrl/Cmd+F) highlight for this cell, null when it does not match. */
   find_match_state?: TableFindMatchState;
-  /** Normalized find query, only passed while this cell matches, so its text can be marked. */
-  find_query?: string;
+  /** Normalized find terms, only passed while this cell matches, so its text can be marked. */
+  find_terms?: string[];
 }
 
 function EditableCell({
@@ -685,7 +686,7 @@ function EditableCell({
   sticky_left = 0,
   sticky_bg_class = "bg-white dark:bg-gray-900",
   find_match_state = null,
-  find_query = "",
+  find_terms,
 }: EditableCellProps) {
   const input_ref = useRef<HTMLInputElement>(null);
   const [just_copied, setJustCopied] = useState(false);
@@ -924,21 +925,21 @@ function EditableCell({
           onMouseDown={(e) => e.stopPropagation()}
           title={value}
         >
-          <FindHighlightedText text={label} normalized_query={find_query} />
+          <FindHighlightedText text={label} find_terms={find_terms} />
           {value.replace(/^https?:\/\//, "").length > 28 ? "…" : ""}
         </a>
       );
     } else {
       display = (
         <span title={value}>
-          <FindHighlightedText text={value} normalized_query={find_query} />
+          <FindHighlightedText text={value} find_terms={find_terms} />
         </span>
       );
     }
   } else if (col.key === "estimated_delivery_date" && isDateOverdue(value)) {
     display = (
       <span className="font-semibold text-red-500">
-        <FindHighlightedText text={value} normalized_query={find_query} />
+        <FindHighlightedText text={value} find_terms={find_terms} />
       </span>
     );
   } else if (col.key === "status" && value) {
@@ -947,7 +948,7 @@ function EditableCell({
         className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs font-medium ${STATUS_BADGE_CLASSES[value] ?? DEFAULT_STATUS_BADGE_CLASS}`}
       >
         {value === "Live" && <span className="h-1.5 w-1.5 rounded-full bg-green-500" />}
-        <FindHighlightedText text={value} normalized_query={find_query} />
+        <FindHighlightedText text={value} find_terms={find_terms} />
       </span>
     );
   } else if (col.key === "exact_match") {
@@ -961,7 +962,7 @@ function EditableCell({
   } else {
     display = value ? (
       <span title={value}>
-        <FindHighlightedText text={value} normalized_query={find_query} />
+        <FindHighlightedText text={value} find_terms={find_terms} />
       </span>
     ) : (
       <span className="text-gray-300 dark:text-gray-600">—</span>
@@ -1819,19 +1820,41 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     [scrollToCell]
   );
 
+  // The terms come from useTableFind below, but the pages holding matches are
+  // needed by it too, so the API lookup reads them back through this state.
+  const [find_lookup_terms, setFindLookupTerms] = useState<string[]>([]);
+
+  const {
+    pages: find_match_pages,
+    pages_with_matches: find_pages_with_matches,
+    matched_row_count: find_matched_row_count,
+    is_loading: is_finding_pages,
+    has_error: has_find_pages_error,
+  } = useLinkBuildingOrderFindPages({
+    find_terms: find_lookup_terms,
+    find_columns: grid_column_keys,
+    search_body,
+    per_page,
+    refresh_key: rows_version,
+  });
+
+  const goToFindPage = useCallback((page: number) => fetchRows(page, current_body_ref.current), [fetchRows]);
+
   const {
     is_find_open,
     find_query,
-    normalized_query: find_normalized_query,
+    find_terms,
     find_input_ref,
     matches: find_matches,
     matched_row_ids: find_matched_row_ids,
     current_match_idx: find_current_match_idx,
+    is_changing_page: is_find_changing_page,
     setFindQuery,
     openFind,
     closeFind,
     goToNextMatch,
     goToPreviousMatch,
+    goToMatchPage,
     getCellMatchState,
   } = useTableFind({
     rows: filtered_rows,
@@ -1839,7 +1862,17 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     getRowId: getFindRowId,
     getCellText: getFindCellText,
     onNavigateToMatch: navigateToFindMatch,
+    pagination: {
+      current_page,
+      pages_with_matches: find_pages_with_matches,
+      onGoToPage: goToFindPage,
+    },
   });
+
+  // find_terms keeps its identity until the query changes, so this only runs then.
+  if (find_lookup_terms !== find_terms) setFindLookupTerms(find_terms);
+
+  const handleGoToFindPage = useCallback((page: number) => goToMatchPage(page, "first"), [goToMatchPage]);
 
   const handleCloseFind = useCallback(() => {
     closeFind();
@@ -4501,12 +4534,20 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       {is_find_open && (
         <TableFindBar
           query={find_query}
+          find_terms={find_terms}
           match_count={find_matches.length}
           current_match_idx={find_current_match_idx}
           input_ref={find_input_ref}
+          current_page={current_page}
+          match_pages={find_match_pages}
+          matched_row_count={find_matched_row_count}
+          is_searching_pages={is_finding_pages}
+          has_pages_error={has_find_pages_error}
+          is_changing_page={is_find_changing_page && is_loading}
           onQueryChange={setFindQuery}
           onNext={goToNextMatch}
           onPrevious={goToPreviousMatch}
+          onGoToPage={handleGoToFindPage}
           onClose={handleCloseFind}
         />
       )}
@@ -4897,7 +4938,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                             sticky_left={col.sticky ? sticky_left_offsets[col.key] : undefined}
                             sticky_bg_class={col.sticky ? sticky_row_bg_class : undefined}
                             find_match_state={find_match_state}
-                            find_query={find_match_state ? find_normalized_query : ""}
+                            find_terms={find_match_state ? find_terms : undefined}
                           />
                         );
                       })}
@@ -4913,7 +4954,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                         onSelectCell={() => selectCell({ row_id: row.id, col_key: "user_id" })}
                         cell_key={toCellKey(row.id, "user_id")}
                         find_match_state={getCellMatchState(row.id, "user_id")}
-                        find_query={getCellMatchState(row.id, "user_id") ? find_normalized_query : ""}
+                        find_terms={getCellMatchState(row.id, "user_id") ? find_terms : undefined}
                       />
                       {/* Assign admin user cell */}
                       <UserAssignCell
@@ -4927,7 +4968,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                         onSelectCell={() => selectCell({ row_id: row.id, col_key: "assigned_admin_user_id" })}
                         cell_key={toCellKey(row.id, "assigned_admin_user_id")}
                         find_match_state={getCellMatchState(row.id, "assigned_admin_user_id")}
-                        find_query={getCellMatchState(row.id, "assigned_admin_user_id") ? find_normalized_query : ""}
+                        find_terms={getCellMatchState(row.id, "assigned_admin_user_id") ? find_terms : undefined}
                       />
 
                       {/* Actions cell */}

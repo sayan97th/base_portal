@@ -779,17 +779,69 @@ $toolbar_focus_ring: rgba(236, 60, 137, 0.12);
 
 .find_mark {
   border-radius: 2px;
-  background-color: $find_mark_bg;
   color: inherit;
 
   @include dark {
-    background-color: $find_mark_bg_dark;
     color: #fff;
   }
+}
 
-  .cell_find_current & {
-    background-color: $find_current_ring;
+// One color per find term (cycled by getFindTermColorIdx), shared by the cell
+// marks and the term chips of the find bar, so each order being compared keeps
+// the same color everywhere. The first one is the classic find yellow.
+// Each entry: term index, light fill, dark fill.
+$find_term_colors: (
+  (0, $find_mark_bg, $find_mark_bg_dark),
+  (1, #bfdbfe, #1e40af),
+  (2, #bbf7d0, #166534),
+  (3, #fbcfe8, #9d174d),
+  (4, #ddd6fe, #5b21b6),
+  (5, #fed7aa, #9a3412),
+);
+
+@each $idx, $light_bg, $dark_bg in $find_term_colors {
+  .find_term_#{$idx} {
+    background-color: $light_bg;
+
+    @include dark {
+      background-color: $dark_bg;
+    }
+  }
+}
+
+// The current match fill is yellow too, so the yellow term switches to the
+// amber ring color there to stay readable.
+.cell_find_current .find_term_0 {
+  background-color: $find_current_ring;
+  color: #fff;
+}
+
+.find_term_chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  max-width: 180px;
+  overflow: hidden;
+  border-radius: 9999px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--color-gray-800);
+  transition: filter 0.15s ease;
+
+  &:hover {
+    filter: brightness(0.95);
+  }
+
+  @include dark {
     color: #fff;
+
+    &:hover {
+      filter: brightness(1.15);
+    }
   }
 }
 

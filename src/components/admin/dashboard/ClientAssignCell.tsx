@@ -20,8 +20,8 @@ export interface ClientAssignCellProps {
   cell_key?: string;
   /** Find (Ctrl/Cmd+F) highlight for this cell, null when it does not match. */
   find_match_state?: TableFindMatchState;
-  /** Normalized find query, only passed while this cell matches. */
-  find_query?: string;
+  /** Normalized find terms, only passed while this cell matches. */
+  find_terms?: string[];
 }
 
 export default function ClientAssignCell({
@@ -35,7 +35,7 @@ export default function ClientAssignCell({
   onSelectCell,
   cell_key,
   find_match_state = null,
-  find_query = "",
+  find_terms,
 }: ClientAssignCellProps) {
   // Kept in state (through a callback ref) rather than read from a ref during render,
   // so the dropdown re-renders with its anchor as soon as the cell mounts.
@@ -85,12 +85,12 @@ export default function ClientAssignCell({
             <span className="min-w-0 truncate font-medium text-gray-700 dark:text-gray-200">
               <FindHighlightedText
                 text={selected_client.company || selected_client.name}
-                normalized_query={find_query}
+                find_terms={find_terms}
               />
             </span>
             {selected_client.company && (
               <span className="min-w-0 truncate text-[10px] text-gray-400 dark:text-gray-500">
-                <FindHighlightedText text={selected_client.name} normalized_query={find_query} />
+                <FindHighlightedText text={selected_client.name} find_terms={find_terms} />
               </span>
             )}
           </span>

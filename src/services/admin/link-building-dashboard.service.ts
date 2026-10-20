@@ -8,6 +8,8 @@ import type {
   LinkBuildingOrderSearchBody,
   LinkBuildingOrderFilterValuesResponse,
   LinkBuildingOrderQuickFilterValuesResponse,
+  LinkBuildingOrderFindPagesBody,
+  LinkBuildingOrderFindPagesResponse,
 } from "@/types/admin/link-building-order";
 
 // ── Validation ─────────────────────────────────────────────────────────────────
@@ -161,6 +163,23 @@ export async function listLinkBuildingOrders(
   return apiClient.post<LinkBuildingOrdersResponse>(
     "/api/admin/link-building-orders/search",
     body
+  );
+}
+
+/**
+ * POST /api/admin/link-building-orders/find-pages
+ * Pages of the current filtered and sorted result set that hold rows matching
+ * the in-table find terms. Rows are never filtered out, so find can jump to
+ * matches on other pages while every other order stays visible.
+ */
+export async function findLinkBuildingOrderPages(
+  body: LinkBuildingOrderFindPagesBody
+): Promise<LinkBuildingOrderFindPagesResponse> {
+  const { page: _page, ...request_body } = body;
+
+  return apiClient.post<LinkBuildingOrderFindPagesResponse>(
+    "/api/admin/link-building-orders/find-pages",
+    request_body
   );
 }
 
