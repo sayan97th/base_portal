@@ -202,3 +202,49 @@ export interface LinkBuildingOrderSearchBody {
   sort_rules?: SortRulePayload[];
   column_filters?: ColumnFilterPayload[];
 }
+
+// ── Saved filters ──────────────────────────────────────────────────────────────
+
+/** One column's spreadsheet style filter, as stored inside a saved filter. */
+export interface SavedSheetColumnFilter {
+  condition: { operator: FilterConditionOperator; value: string; value_to: string } | null;
+  values: { mode: "include" | "exclude"; values: string[] } | null;
+}
+
+/**
+ * Snapshot of everything that shapes the Link Building Orders table: toolbar
+ * filters, spreadsheet column filters, sort rules and hidden columns. Saved
+ * filters store this exact shape so it can be restored without any mapping.
+ */
+export interface LinkBuildingOrderFilterState {
+  search: string;
+  status: string;
+  link_type: string;
+  client: string;
+  client_user_id: number | null;
+  assigned_user_id: number | null;
+  needs_lb_tl_approval: boolean;
+  sort_rules: SortRulePayload[];
+  sheet_filters: Partial<Record<string, SavedSheetColumnFilter>>;
+  hidden_columns: string[];
+}
+
+export interface LinkBuildingOrderSavedFilter {
+  id: string;
+  name: string;
+  filters: LinkBuildingOrderFilterState;
+  /** When true, every admin side user can apply this filter. Only the owner can edit it. */
+  is_shared: boolean;
+  is_owner: boolean;
+  /** Owners can always delete; super admins can also delete filters others shared. */
+  can_delete: boolean;
+  owner_name: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface LinkBuildingOrderSavedFilterPayload {
+  name?: string;
+  filters?: LinkBuildingOrderFilterState;
+  is_shared?: boolean;
+}

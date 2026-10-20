@@ -66,5 +66,10 @@ export function useTableSort(default_rules: SortRulePayload[] = []) {
 
   const clearSort = useCallback(() => setSortRules(default_rules_ref.current), []);
 
-  return { sort_rules, toggleSort, setSort, clearSort };
+  /** Restores a full set of rules (e.g. from a saved filter). An empty list falls back to the default. */
+  const replaceSort = useCallback((rules: SortRulePayload[]) => {
+    setSortRules(rules.length > 0 ? rules : default_rules_ref.current);
+  }, []);
+
+  return { sort_rules, toggleSort, setSort, clearSort, replaceSort };
 }

@@ -6,7 +6,8 @@
  *  - undo/redo (Ctrl+Z / Ctrl+Y and the toolbar buttons) for single-cell edits and
  *    bulk pastes;
  *  - Excel-style multi-cell range selection, copy (Ctrl+C) and paste (Ctrl+V);
- *  - spreadsheet style column filters (several values per column, several columns).
+ *  - spreadsheet style column filters (several values per column, several columns);
+ *  - saved filters (saving the current view and reapplying a saved one).
  */
 
 import React from "react";
@@ -21,7 +22,12 @@ import {
   getLinkBuildingOrderColumnValues,
   getLinkBuildingOrderFilterValues,
 } from "@/services/admin/link-building-dashboard.service";
-import type { LinkBuildingOrderRow } from "@/types/admin/link-building-order";
+import {
+  listSavedFilters,
+  createSavedFilter,
+} from "@/services/admin/link-building-saved-filters.service";
+import { EMPTY_FILTER_STATE } from "@/lib/link-building-saved-filters";
+import type { LinkBuildingOrderRow, LinkBuildingOrderSavedFilter } from "@/types/admin/link-building-order";
 
 // ─── Module mocks ────────────────────────────────────────────────────────────
 
@@ -43,6 +49,13 @@ jest.mock("@/services/admin/link-building-dashboard.service", () => {
   };
 });
 
+jest.mock("@/services/admin/link-building-saved-filters.service", () => ({
+  listSavedFilters:  jest.fn(),
+  createSavedFilter: jest.fn(),
+  updateSavedFilter: jest.fn(),
+  deleteSavedFilter: jest.fn(),
+}));
+
 // NOTE: sort_rules must be referentially stable across renders, since
 // the table's fetch effect depends on them, and a fresh array/object literal on
 // every call would re-trigger the fetch effect forever (infinite "Loading…" loop).
@@ -54,6 +67,7 @@ jest.mock("@/hooks/useTableSort", () => {
       toggleSort: jest.fn(),
       setSort: jest.fn(),
       clearSort: jest.fn(),
+      replaceSort: jest.fn(),
     }),
   };
 });
@@ -102,6 +116,8 @@ const mockListClientUsersForSelect = listClientUsersForSelect as jest.MockedFunc
 const mockBatchUpdateLinkBuildingOrderCells = batchUpdateLinkBuildingOrderCells as jest.MockedFunction<typeof batchUpdateLinkBuildingOrderCells>;
 const mockGetLinkBuildingOrderColumnValues = getLinkBuildingOrderColumnValues as jest.MockedFunction<typeof getLinkBuildingOrderColumnValues>;
 const mockGetLinkBuildingOrderFilterValues = getLinkBuildingOrderFilterValues as jest.MockedFunction<typeof getLinkBuildingOrderFilterValues>;
+const mockListSavedFilters = listSavedFilters as jest.MockedFunction<typeof listSavedFilters>;
+const mockCreateSavedFilter = createSavedFilter as jest.MockedFunction<typeof createSavedFilter>;
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -1187,5 +1203,82 @@ describe("LinkBuildingOrdersTable, spreadsheet style column filters", () => {
 
     expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled();
     expect(screen.getByText("Select at least one value.")).toBeInTheDocument();
+  });
+});
+
+describe("LinkBuildingOrdersTable, saved filters", () => {
+  function lastSearchBody() {
+    const calls = mockListLinkBuildingOrders.mock.calls;
+    return calls[calls.length - 1][0];
+  }
+
+  function makeSavedFilter(overrides: Partial<LinkBuildingOrderSavedFilter> = {}): LinkBuildingOrderSavedFilter {
+    return {
+      id:         "saved-1",
+      name:       "Live links by Jane",
+      filters:    {
+        ...EMPTY_FILTER_STATE,
+        status:         "Live",
+        sheet_filters:  {
+          pen_name:     { condition: null, values: { mode: "include", values: ["Jane"] } },
+          link_builder: { condition: null, values: { mode: "include", values: ["Ignored"] } },
+        },
+        hidden_columns: ["internal_notes", "column_that_no_longer_exists"],
+      },
+      is_shared:  false,
+      is_owner:   true,
+      can_delete: true,
+      owner_name: "Admin User",
+      created_at: null,
+      updated_at: null,
+      ...overrides,
+    };
+  }
+
+  it("applies every part of a saved filter to the search request in one click", async () => {
+    mockListSavedFilters.mockResolvedValue([makeSavedFilter()]);
+    await renderTableWithRow(makeRow());
+
+    fireEvent.click(screen.getByRole("button", { name: /Saved Filters/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Live links by Jane/ }));
+
+    await waitFor(() =>
+      expect(lastSearchBody()).toEqual(
+        expect.objectContaining({
+          status: "Live",
+          // link_builder is not a column of this table, so the guard drops it.
+          column_filters: [{ key: "pen_name", type: "values", mode: "include", values: ["Jane"] }],
+        })
+      )
+    );
+    // The toolbar now shows the applied filter by name.
+    expect(screen.getByRole("button", { name: /Live links by Jane/ })).toBeInTheDocument();
+  });
+
+  it("saves the current toolbar and column filters under a name", async () => {
+    mockListSavedFilters.mockResolvedValue([]);
+    mockCreateSavedFilter.mockImplementation(async (payload) =>
+      makeSavedFilter({ id: "saved-2", name: payload.name, filters: payload.filters })
+    );
+    await renderTableWithRow(makeRow());
+
+    fireEvent.change(screen.getByDisplayValue("All Statuses"), { target: { value: "Pending" } });
+    fireEvent.click(screen.getByRole("button", { name: /Saved Filters/ }));
+    await screen.findByText(/No saved filters yet/);
+
+    fireEvent.change(screen.getByRole("textbox", { name: "New saved filter name" }), {
+      target: { value: "Pending orders" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(mockCreateSavedFilter).toHaveBeenCalledTimes(1));
+    expect(mockCreateSavedFilter.mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        name: "Pending orders",
+        is_shared: false,
+        filters: expect.objectContaining({ status: "Pending" }),
+      })
+    );
+    expect(await screen.findByText('Saved the current filters as "Pending orders".')).toBeInTheDocument();
   });
 });

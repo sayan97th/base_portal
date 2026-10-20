@@ -11,6 +11,8 @@ import {
   describeSheetFilter,
 } from "@/hooks/useSheetColumnFilters";
 import SheetColumnFilterDropdown from "./SheetColumnFilterDropdown";
+import SavedFiltersMenu from "./SavedFiltersMenu";
+import { normalizeFilterState } from "@/lib/link-building-saved-filters";
 import {
   listLinkBuildingOrders,
   createLinkBuildingOrder,
@@ -37,7 +39,12 @@ import ClientAssignCell from "./ClientAssignCell";
 import ClientSearchableSelect from "./ClientSearchableSelect";
 import AdminSearchableSelect from "./AdminSearchableSelect";
 import CellOptionsDropdown from "./CellOptionsDropdown";
-import type { LinkBuildingOrderSearchBody, SortRulePayload, LinkBuildingOrderPayload } from "@/types/admin/link-building-order";
+import type {
+  LinkBuildingOrderSearchBody,
+  SortRulePayload,
+  LinkBuildingOrderPayload,
+  LinkBuildingOrderFilterState,
+} from "@/types/admin/link-building-order";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useAuth } from "@/context/AuthContext";
 import { useLinkBuildingCollaboration } from "@/hooks/useLinkBuildingCollaboration";
@@ -804,6 +811,9 @@ const DEFAULT_SORT_RULES: SortRulePayload[] = [
   { key: "order_id", direction: "desc", nulls_last: true },
 ];
 
+/** Column keys a saved filter may reference; anything else is dropped when it is applied. */
+const KNOWN_COLUMN_KEYS: ReadonlySet<string> = new Set(COLUMNS.map((col) => col.key as string));
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMutated?: () => void }) {
@@ -862,12 +872,13 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   const [redo_stack, setRedoStack] = useState<HistoryEntry[]>([]);
   const [is_undo_redo_saving, setIsUndoRedoSaving] = useState(false);
 
-  const { sort_rules, toggleSort, setSort, clearSort } = useTableSort(DEFAULT_SORT_RULES);
+  const { sort_rules, toggleSort, setSort, clearSort, replaceSort } = useTableSort(DEFAULT_SORT_RULES);
   const {
     sheet_filters,
     setSheetFilter,
     clearSheetFilter,
     clearAllSheetFilters,
+    replaceSheetFilters,
     active_sheet_filter_count,
   } = useSheetColumnFilters();
 
@@ -1630,6 +1641,55 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     clearAllSheetFilters();
     clearSort();
   }, [clearAllSheetFilters, clearSort]);
+
+  // ── Saved filters ───────────────────────────────────────────────────────────
+
+  /** Everything that shapes the current view, in the shape saved filters store. */
+  const current_filter_state = useMemo<LinkBuildingOrderFilterState>(
+    () => ({
+      search,
+      status: status_filter,
+      link_type: link_type_filter,
+      client: client_filter,
+      client_user_id: client_account_filter,
+      assigned_user_id: assigned_user_id_filter,
+      needs_lb_tl_approval: needs_approval_filter,
+      sort_rules,
+      sheet_filters,
+      hidden_columns: Array.from(hidden_columns),
+    }),
+    [
+      search,
+      status_filter,
+      link_type_filter,
+      client_filter,
+      client_account_filter,
+      assigned_user_id_filter,
+      needs_approval_filter,
+      sort_rules,
+      sheet_filters,
+      hidden_columns,
+    ]
+  );
+
+  /** Replaces the whole view with a saved filter, the same way "Clear All" resets it. */
+  const applySavedFilter = useCallback(
+    (state: LinkBuildingOrderFilterState) => {
+      const next = normalizeFilterState(state, KNOWN_COLUMN_KEYS);
+      setSearch(next.search);
+      // "Needs LB TL Approval" already implies status = Live, see toggleNeedsApprovalFilter.
+      setStatusFilter(next.needs_lb_tl_approval ? "" : next.status);
+      setLinkTypeFilter(next.link_type);
+      setClientFilter(next.client);
+      setClientAccountFilter(next.client_user_id);
+      setAssignedUserIdFilter(next.assigned_user_id);
+      setNeedsApprovalFilter(next.needs_lb_tl_approval);
+      setHiddenColumns(new Set(next.hidden_columns));
+      replaceSheetFilters(next.sheet_filters);
+      replaceSort(next.sort_rules);
+    },
+    [replaceSheetFilters, replaceSort]
+  );
 
   const toggleNeedsApprovalFilter = useCallback(() => {
     setNeedsApprovalFilter((prev) => {
@@ -2408,6 +2468,13 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
               </span>
             )}
           </button>
+          {/* Saved filters, save the current view or reapply one in a single click */}
+          <SavedFiltersMenu
+            current_state={current_filter_state}
+            has_active_filters={has_active_filters}
+            onApply={applySavedFilter}
+            onNotify={setNotificationBanner}
+          />
           {/* Clear all filters */}
           {has_active_filters && (
             <button

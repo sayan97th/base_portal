@@ -200,6 +200,15 @@ export function useSheetColumnFilters() {
 
   const clearAllSheetFilters = useCallback(() => setSheetFilters({}), []);
 
+  /** Replaces every column filter at once (e.g. from a saved filter), dropping inactive ones. */
+  const replaceSheetFilters = useCallback((filters: SheetColumnFilters) => {
+    const next: SheetColumnFilters = {};
+    for (const [key, filter] of Object.entries(filters)) {
+      if (isSheetFilterActive(filter)) next[key] = filter;
+    }
+    setSheetFilters(next);
+  }, []);
+
   const active_sheet_filter_count = useMemo(
     () => Object.values(sheet_filters).filter(isSheetFilterActive).length,
     [sheet_filters]
@@ -210,6 +219,7 @@ export function useSheetColumnFilters() {
     setSheetFilter,
     clearSheetFilter,
     clearAllSheetFilters,
+    replaceSheetFilters,
     active_sheet_filter_count,
   };
 }
