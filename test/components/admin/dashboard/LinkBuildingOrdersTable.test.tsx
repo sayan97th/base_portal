@@ -7,7 +7,8 @@
  *    bulk pastes;
  *  - Excel-style multi-cell range selection, copy (Ctrl+C) and paste (Ctrl+V);
  *  - spreadsheet style column filters (several values per column, several columns);
- *  - saved filters (saving the current view and reapplying a saved one);
+ *  - saved filters (saving the current view and reapplying a saved one) and the
+ *    per user auto saved view (restored before the first fetch, saved on change);
  *  - the status filter bar (per status counts, picking a status, active filter chips).
  *  - loading transitions (the grid stays mounted while a filter reloads, stale responses are ignored).
  */
@@ -28,6 +29,8 @@ import {
 import {
   listSavedFilters,
   createSavedFilter,
+  getFilterPreference,
+  saveFilterPreference,
 } from "@/services/admin/link-building-saved-filters.service";
 import { EMPTY_FILTER_STATE } from "@/lib/link-building-saved-filters";
 import type { LinkBuildingOrderRow, LinkBuildingOrderSavedFilter } from "@/types/admin/link-building-order";
@@ -60,6 +63,8 @@ jest.mock("@/services/admin/link-building-saved-filters.service", () => ({
   createSavedFilter: jest.fn(),
   updateSavedFilter: jest.fn(),
   deleteSavedFilter: jest.fn(),
+  getFilterPreference: jest.fn().mockResolvedValue({ filters: null, applied_saved_filter_id: null, updated_at: null }),
+  saveFilterPreference: jest.fn().mockResolvedValue({ filters: null, applied_saved_filter_id: null, updated_at: null }),
 }));
 
 // NOTE: sort_rules must be referentially stable across renders, since
@@ -125,6 +130,8 @@ const mockGetLinkBuildingOrderFilterValues = getLinkBuildingOrderFilterValues as
 const mockGetLinkBuildingOrderStatusCounts = getLinkBuildingOrderStatusCounts as jest.MockedFunction<typeof getLinkBuildingOrderStatusCounts>;
 const mockListSavedFilters = listSavedFilters as jest.MockedFunction<typeof listSavedFilters>;
 const mockCreateSavedFilter = createSavedFilter as jest.MockedFunction<typeof createSavedFilter>;
+const mockGetFilterPreference = getFilterPreference as jest.MockedFunction<typeof getFilterPreference>;
+const mockSaveFilterPreference = saveFilterPreference as jest.MockedFunction<typeof saveFilterPreference>;
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -1303,6 +1310,38 @@ describe("LinkBuildingOrdersTable, saved filters", () => {
       })
     );
     expect(await screen.findByText('Saved the current filters as "Pending orders".')).toBeInTheDocument();
+  });
+
+  it("restores the user's last view before loading any rows", async () => {
+    mockListSavedFilters.mockResolvedValue([makeSavedFilter()]);
+    mockGetFilterPreference.mockResolvedValueOnce({
+      filters: { ...EMPTY_FILTER_STATE, status: "Live", search: "acme" },
+      applied_saved_filter_id: "saved-1",
+      updated_at: null,
+    });
+    await renderTableWithRow(makeRow());
+
+    // The very first request already carries the restored filters, no unfiltered load first.
+    expect(mockListLinkBuildingOrders.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ status: "Live", search: "acme" })
+    );
+    // The saved filter the view came from is shown on the toolbar again.
+    expect(await screen.findByRole("button", { name: /Live links by Jane/ })).toBeInTheDocument();
+    expect(mockSaveFilterPreference).not.toHaveBeenCalled();
+  });
+
+  it("saves the view to the user's account after a filter changes", async () => {
+    await renderTableWithRow(makeRow());
+
+    fireEvent.click(
+      within(screen.getByRole("radiogroup", { name: "Filter by status" })).getByRole("radio", { name: /^Pending/ })
+    );
+
+    await waitFor(() => expect(mockSaveFilterPreference).toHaveBeenCalledTimes(1), { timeout: 2000 });
+    expect(mockSaveFilterPreference.mock.calls[0][0]).toEqual({
+      filters: expect.objectContaining({ status: "Pending" }),
+      applied_saved_filter_id: null,
+    });
   });
 });
 

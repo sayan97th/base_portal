@@ -260,3 +260,14 @@ export interface LinkBuildingOrderSavedFilterPayload {
   filters?: LinkBuildingOrderFilterState;
   is_shared?: boolean;
 }
+
+/**
+ * The user's own auto saved view of the table, restored on every visit.
+ * `filters` is null until the user changes the default view for the first time.
+ */
+export interface LinkBuildingOrderFilterPreference {
+  filters: LinkBuildingOrderFilterState | null;
+  /** The saved filter the current view came from, null when none is applied. */
+  applied_saved_filter_id: string | null;
+  updated_at: string | null;
+}

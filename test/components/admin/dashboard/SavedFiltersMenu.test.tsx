@@ -49,11 +49,28 @@ function makeSavedFilter(overrides: Partial<LinkBuildingOrderSavedFilter> = {}):
   };
 }
 
-function renderMenu(props: Partial<React.ComponentProps<typeof SavedFiltersMenu>> = {}) {
+type MenuProps = React.ComponentProps<typeof SavedFiltersMenu>;
+
+/** The table owns the applied filter id, this wrapper plays that role in the tests. */
+function ControlledMenu(props: Omit<MenuProps, "applied_filter_id" | "onAppliedFilterChange"> & Partial<MenuProps>) {
+  const [applied_filter_id, setAppliedFilterId] = React.useState<string | null>(props.applied_filter_id ?? null);
+  return (
+    <SavedFiltersMenu
+      {...props}
+      applied_filter_id={applied_filter_id}
+      onAppliedFilterChange={(id) => {
+        setAppliedFilterId(id);
+        props.onAppliedFilterChange?.(id);
+      }}
+    />
+  );
+}
+
+function renderMenu(props: Partial<MenuProps> = {}) {
   const onApply = jest.fn();
   const onNotify = jest.fn();
   const utils = render(
-    <SavedFiltersMenu
+    <ControlledMenu
       current_state={LIVE_STATE}
       has_active_filters
       onApply={onApply}
@@ -167,7 +184,7 @@ describe("SavedFiltersMenu", () => {
 
     // The table state drifts away from what was saved.
     rerender(
-      <SavedFiltersMenu current_state={PENDING_STATE} has_active_filters onApply={onApply} onNotify={onNotify} />
+      <ControlledMenu current_state={PENDING_STATE} has_active_filters onApply={onApply} onNotify={onNotify} />
     );
     expect(screen.getByLabelText("Modified")).toBeInTheDocument();
 
@@ -222,5 +239,21 @@ describe("SavedFiltersMenu", () => {
 
     await waitFor(() => expect(mockDeleteSavedFilter).toHaveBeenCalledWith("saved-1"));
     expect(await screen.findByText(/No saved filters yet/)).toBeInTheDocument();
+  });
+
+  it("loads the list right away to show a saved filter restored with the view", async () => {
+    mockListSavedFilters.mockResolvedValue([makeSavedFilter()]);
+    renderMenu({ applied_filter_id: "saved-1" });
+
+    expect(await screen.findByRole("button", { name: /Live links/ })).toBeInTheDocument();
+  });
+
+  it("forgets a restored saved filter that no longer exists", async () => {
+    mockListSavedFilters.mockResolvedValue([]);
+    const onAppliedFilterChange = jest.fn();
+    renderMenu({ applied_filter_id: "deleted-filter", onAppliedFilterChange });
+
+    await waitFor(() => expect(onAppliedFilterChange).toHaveBeenCalledWith(null));
+    expect(screen.getByRole("button", { name: /Saved Filters/ })).toBeInTheDocument();
   });
 });

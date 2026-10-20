@@ -19,6 +19,9 @@ interface SavedFiltersMenuProps {
   current_state: LinkBuildingOrderFilterState;
   /** False when the table shows its default view, so there is nothing worth saving. */
   has_active_filters: boolean;
+  /** Saved filter the current view came from, owned by the table so it is saved with the view. */
+  applied_filter_id: string | null;
+  onAppliedFilterChange: (id: string | null) => void;
   onApply: (state: LinkBuildingOrderFilterState) => void;
   onNotify?: (message: string) => void;
 }
@@ -33,6 +36,8 @@ const MAX_NAME_LENGTH = 100;
 export default function SavedFiltersMenu({
   current_state,
   has_active_filters,
+  applied_filter_id,
+  onAppliedFilterChange,
   onApply,
   onNotify,
 }: SavedFiltersMenuProps) {
@@ -41,7 +46,6 @@ export default function SavedFiltersMenu({
   const [has_loaded, setHasLoaded] = useState(false);
   const [is_loading, setIsLoading] = useState(false);
   const [error_message, setErrorMessage] = useState<string | null>(null);
-  const [applied_filter_id, setAppliedFilterId] = useState<string | null>(null);
 
   const [new_name, setNewName] = useState("");
   const [new_is_shared, setNewIsShared] = useState(false);
@@ -68,6 +72,29 @@ export default function SavedFiltersMenu({
       setIsLoading(false);
     }
   }, []);
+
+  // A view restored with a saved filter applied needs the list to show that filter's name.
+  useEffect(() => {
+    if (!applied_filter_id || has_loaded) return;
+    let is_cancelled = false;
+    listSavedFilters()
+      .then((list) => {
+        if (is_cancelled) return;
+        setSavedFilters(list);
+        setHasLoaded(true);
+      })
+      .catch(() => {/* non-critical, the list loads again when the menu is opened */ });
+    return () => {
+      is_cancelled = true;
+    };
+  }, [applied_filter_id, has_loaded]);
+
+  // The applied filter was deleted or unshared since the view was saved.
+  useEffect(() => {
+    if (has_loaded && applied_filter_id && !saved_filters.some((f) => f.id === applied_filter_id)) {
+      onAppliedFilterChange(null);
+    }
+  }, [has_loaded, applied_filter_id, saved_filters, onAppliedFilterChange]);
 
   // ── Open / close ──────────────────────────────────────────────────────────
 
@@ -126,11 +153,11 @@ export default function SavedFiltersMenu({
   const handleApply = useCallback(
     (saved_filter: LinkBuildingOrderSavedFilter) => {
       onApply(saved_filter.filters);
-      setAppliedFilterId(saved_filter.id);
+      onAppliedFilterChange(saved_filter.id);
       closeMenu();
       onNotify?.(`Applied the "${saved_filter.name}" saved filter.`);
     },
-    [onApply, onNotify, closeMenu]
+    [onApply, onAppliedFilterChange, onNotify, closeMenu]
   );
 
   const handleSaveNew = useCallback(
@@ -148,7 +175,7 @@ export default function SavedFiltersMenu({
           is_shared: new_is_shared,
         });
         setSavedFilters((prev) => [created, ...prev]);
-        setAppliedFilterId(created.id);
+        onAppliedFilterChange(created.id);
         setNewName("");
         setNewIsShared(false);
         onNotify?.(`Saved the current filters as "${created.name}".`);
@@ -158,7 +185,7 @@ export default function SavedFiltersMenu({
         setIsSaving(false);
       }
     },
-    [new_name, new_is_shared, is_saving, current_state, onNotify]
+    [new_name, new_is_shared, is_saving, current_state, onAppliedFilterChange, onNotify]
   );
 
   const handleOverwrite = useCallback(
@@ -168,7 +195,7 @@ export default function SavedFiltersMenu({
       try {
         const updated = await updateSavedFilter(saved_filter.id, { filters: current_state });
         replaceInList(updated);
-        setAppliedFilterId(updated.id);
+        onAppliedFilterChange(updated.id);
         onNotify?.(`Updated "${updated.name}" with the current filters.`);
       } catch (err) {
         setErrorMessage(parseApiErrorMessage(err));
@@ -176,7 +203,7 @@ export default function SavedFiltersMenu({
         setBusyFilterId(null);
       }
     },
-    [current_state, replaceInList, onNotify]
+    [current_state, replaceInList, onAppliedFilterChange, onNotify]
   );
 
   const handleToggleShare = useCallback(
@@ -229,7 +256,7 @@ export default function SavedFiltersMenu({
       try {
         await deleteSavedFilter(saved_filter.id);
         setSavedFilters((prev) => prev.filter((f) => f.id !== saved_filter.id));
-        if (applied_filter_id === saved_filter.id) setAppliedFilterId(null);
+        if (applied_filter_id === saved_filter.id) onAppliedFilterChange(null);
         setConfirmDeleteId(null);
         onNotify?.(`Deleted the "${saved_filter.name}" saved filter.`);
       } catch (err) {
@@ -238,7 +265,7 @@ export default function SavedFiltersMenu({
         setBusyFilterId(null);
       }
     },
-    [applied_filter_id, onNotify]
+    [applied_filter_id, onAppliedFilterChange, onNotify]
   );
 
   // ── Rendering ─────────────────────────────────────────────────────────────

@@ -12,7 +12,11 @@ import {
 } from "@/hooks/useSheetColumnFilters";
 import SheetColumnFilterDropdown from "./SheetColumnFilterDropdown";
 import SavedFiltersMenu from "./SavedFiltersMenu";
-import { normalizeFilterState } from "@/lib/link-building-saved-filters";
+import { normalizeFilterState, serializeFilterState } from "@/lib/link-building-saved-filters";
+import {
+  getFilterPreference,
+  saveFilterPreference,
+} from "@/services/admin/link-building-saved-filters.service";
 import {
   listLinkBuildingOrders,
   createLinkBuildingOrder,
@@ -351,6 +355,8 @@ function getRowMissingRequired(row: LinkBuildingOrderRow): string[] {
 
 const DRAFT_STORAGE_KEY = "lbo_row_drafts_v1";
 const PER_PAGE_STORAGE_KEY = "lbo_per_page_v1";
+/** How long the view must stay unchanged before it is saved to the user's account. */
+const VIEW_AUTOSAVE_DELAY_MS = 800;
 const PER_PAGE_OPTIONS = [10, 25, 50, 100, 150, 200, 250, 500] as const;
 type PerPageOption = (typeof PER_PAGE_OPTIONS)[number];
 
@@ -1047,6 +1053,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   const [special_filter_anchor_el, setSpecialFilterAnchorEl] = useState<HTMLElement | null>(null);
   const [show_filter_panel, setShowFilterPanel] = useState(false);
   const [hidden_columns, setHiddenColumns] = useState<Set<string>>(new Set());
+  const [applied_saved_filter_id, setAppliedSavedFilterId] = useState<string | null>(null);
+  /** False until the user's auto saved view is loaded, rows are not fetched before that. */
+  const [is_view_restored, setIsViewRestored] = useState(false);
   const [current_page, setCurrentPage] = useState(1);
   const [last_page, setLastPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -1341,7 +1350,17 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     }
   }, []);
 
+  // Set when a restored view has text filters, so the first fetch waits for their
+  // debounced copies to catch up instead of loading the unfiltered table first.
+  const awaiting_restored_text_ref = useRef(false);
+
   useEffect(() => {
+    if (!is_view_restored) return;
+    if (awaiting_restored_text_ref.current) {
+      if (debounced_search !== search || debounced_client_filter !== client_filter) return;
+      awaiting_restored_text_ref.current = false;
+    }
+
     const active_col_filters = toColumnFilterPayloads(sheet_filters);
 
     const body: LinkBuildingOrderSearchBody = {
@@ -1361,6 +1380,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     refreshStatusCounts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    is_view_restored,
     debounced_search,
     status_filter,
     link_type_filter,
@@ -2055,6 +2075,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     setAssignedUserIdFilter(null);
     setNeedsApprovalFilter(false);
     setHiddenColumns(new Set());
+    setAppliedSavedFilterId(null);
     clearAllSheetFilters();
     clearSort();
   }, [clearAllSheetFilters, clearSort]);
@@ -2107,6 +2128,65 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     },
     [replaceSheetFilters, replaceSort]
   );
+
+  // ── Auto saved view (per user) ──────────────────────────────────────────────
+
+  /** Serialized view last stored on the server, used to skip saves that change nothing. */
+  const last_saved_view_ref = useRef<string | null>(null);
+  /** Sends the pending save right away, so a change made just before leaving is not lost. */
+  const flush_view_save_ref = useRef<(() => void) | null>(null);
+
+  // Restores the view this user had last time, before the first fetch.
+  useEffect(() => {
+    let is_cancelled = false;
+    getFilterPreference()
+      .then((preference) => {
+        if (is_cancelled) return;
+        if (preference.filters) {
+          const restored = normalizeFilterState(preference.filters, KNOWN_COLUMN_KEYS);
+          awaiting_restored_text_ref.current = restored.search !== "" || restored.client !== "";
+          applySavedFilter(restored);
+          setAppliedSavedFilterId(preference.applied_saved_filter_id);
+        }
+        setIsViewRestored(true);
+      })
+      .catch(() => {
+        // Non-critical, the table falls back to its default view.
+        if (!is_cancelled) setIsViewRestored(true);
+      });
+    return () => {
+      is_cancelled = true;
+    };
+  }, [applySavedFilter]);
+
+  // Saves the view to the user's account a moment after it stops changing.
+  useEffect(() => {
+    flush_view_save_ref.current = null;
+    if (!is_view_restored) return;
+
+    const view_key = JSON.stringify([serializeFilterState(current_filter_state), applied_saved_filter_id]);
+    // The first run after restoring is the restored view itself, nothing new to save.
+    if (last_saved_view_ref.current === null) {
+      last_saved_view_ref.current = view_key;
+      return;
+    }
+    if (view_key === last_saved_view_ref.current) return;
+
+    const save = () => {
+      flush_view_save_ref.current = null;
+      saveFilterPreference({ filters: current_filter_state, applied_saved_filter_id })
+        .then(() => {
+          last_saved_view_ref.current = view_key;
+        })
+        .catch(() => {/* non-critical, retried on the next change */ });
+    };
+    flush_view_save_ref.current = save;
+    const timer = setTimeout(save, VIEW_AUTOSAVE_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [is_view_restored, current_filter_state, applied_saved_filter_id]);
+
+  // Declared after the save effect so its cleanup runs last and can still flush.
+  useEffect(() => () => flush_view_save_ref.current?.(), []);
 
   /** Picks a status from the status bar. A plain status replaces the "Needs LB TL Approval" view. */
   const selectStatusFilter = useCallback((status: string) => {
@@ -3670,6 +3750,8 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
           <SavedFiltersMenu
             current_state={current_filter_state}
             has_active_filters={has_active_filters}
+            applied_filter_id={applied_saved_filter_id}
+            onAppliedFilterChange={setAppliedSavedFilterId}
             onApply={applySavedFilter}
             onNotify={setNotificationBanner}
           />
@@ -3697,13 +3779,13 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
           {has_active_filters && (
             <button
               onClick={clearAllFilters}
-              title="Clear every filter, sort and hidden column"
+              title="Clear every filter, sort and hidden column and show the table as usual"
               className={`${toolbar_button_base_class} border-transparent text-gray-500 hover:bg-red-50 hover:text-red-600 dark:text-gray-400 dark:hover:bg-red-900/20 dark:hover:text-red-400`}
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
               </svg>
-              Reset view
+              Clear filters
             </button>
           )}
         </div>
