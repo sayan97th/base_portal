@@ -957,9 +957,12 @@ function EditableCell({
 
 // ── Table skeleton ─────────────────────────────────────────────────────────────
 
+/** Widths (in %) cycled through the skeleton bars so the placeholder reads like real, uneven content. */
+const SKELETON_BAR_WIDTHS = [72, 54, 88, 40, 66, 80, 48, 92, 60, 36];
+
 function TableSkeleton() {
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto" role="status" aria-busy="true" aria-label="Loading link building orders">
       <table className="min-w-full border-collapse text-xs">
         <thead>
           <tr>
@@ -976,15 +979,18 @@ function TableSkeleton() {
           </tr>
         </thead>
         <tbody>
-          {Array.from({ length: 8 }).map((_, i) => (
-            <tr key={i} className="border-b border-gray-100 dark:border-gray-800">
-              {COLUMNS.slice(0, 10).map((col) => (
-                <td key={col.key} className="px-2 py-2">
-                  <div className="h-3.5 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+          {Array.from({ length: 10 }).map((_, row_idx) => (
+            <tr key={row_idx} className={`border-b border-gray-100 dark:border-gray-800 ${styles.skeleton_row}`}>
+              {COLUMNS.slice(0, 10).map((col, col_idx) => (
+                <td key={col.key} className="h-[34px] px-2">
+                  <div
+                    className={styles.skeleton_bar}
+                    style={{ width: `${SKELETON_BAR_WIDTHS[(row_idx + col_idx * 3) % SKELETON_BAR_WIDTHS.length]}%` }}
+                  />
                 </td>
               ))}
-              <td className="px-2 py-2">
-                <div className="h-3.5 w-6 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+              <td className="h-[34px] px-2">
+                <div className={`${styles.skeleton_bar} mx-auto`} style={{ width: 16 }} />
               </td>
             </tr>
           ))}
@@ -1011,6 +1017,14 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   const [client_users, setClientUsers] = useState<ClientUserOption[]>([]);
   const [saved_pen_names, setSavedPenNames] = useState<string[]>([]);
   const [is_loading, setIsLoading] = useState(true);
+  /** True once the first fetch settles. Later fetches refresh the grid in place instead of swapping it for the skeleton. */
+  const [has_loaded_once, setHasLoadedOnce] = useState(false);
+  /** Bumped on every successful fetch so the table body replays its enter animation for the new result set. */
+  const [rows_version, setRowsVersion] = useState(0);
+  /** Id of the latest fetch, so a slow response never overwrites the result of a newer filter. */
+  const fetch_request_id_ref = useRef(0);
+  /** A fetch that runs while rows are already on screen (filter, sort or page change). */
+  const is_refreshing = is_loading && has_loaded_once;
   const [save_error, setSaveError] = useState<string | null>(null);
   const [notification_banner, setNotificationBanner] = useState<string | null>(null);
   const [editing_cell, setEditingCell] = useState<{ row_id: string; col_key: string } | null>(null);
@@ -1287,10 +1301,14 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   // ── Fetch ───────────────────────────────────────────────────────────────────
 
   const fetchRows = useCallback(async (page: number, body: LinkBuildingOrderSearchBody) => {
+    const request_id = ++fetch_request_id_ref.current;
+    const isStale = () => request_id !== fetch_request_id_ref.current;
+
     setIsLoading(true);
     setSaveError(null);
     try {
       const res = await listLinkBuildingOrders({ ...body, page, per_page: per_page_ref.current });
+      if (isStale()) return;
       setCurrentPage(res.current_page);
       setLastPage(res.last_page);
       setTotal(res.total);
@@ -1307,10 +1325,17 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       } else {
         setRows(res.data);
       }
+      setRowsVersion((version) => version + 1);
+      // A new result set starts from its first row, not from wherever the previous one was scrolled.
+      table_scroll_ref.current?.scrollTo({ top: 0 });
     } catch {
+      if (isStale()) return;
       setSaveError("Failed to load link building orders. Please refresh.");
     } finally {
-      setIsLoading(false);
+      if (!isStale()) {
+        setIsLoading(false);
+        setHasLoadedOnce(true);
+      }
     }
   }, []);
 
@@ -3190,14 +3215,14 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
               <CollaborationBar collaborators={collaborators} ready_state={ready_state} />
             </div>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              {is_loading ? (
+              {!has_loaded_once ? (
                 "Loading orders..."
               ) : (
-                <>
+                <span className={`transition-opacity duration-300 ${is_refreshing ? "opacity-50" : "opacity-100"}`}>
                   <span className="font-medium text-gray-700 tabular-nums dark:text-gray-200">{total.toLocaleString()}</span>{" "}
                   {total === 1 ? "order" : "orders"} &middot; {visible_columns.length} of {COLUMNS.length} columns
                   <span className="hidden md:inline"> &middot; Arrow keys to move, Enter or type to edit</span>
-                </>
+                </span>
               )}
             </p>
           </div>
@@ -4019,7 +4044,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       )}
 
       {/* Formula bar: address of the active cell (or range), its full value, and range totals */}
-      {!is_loading && (
+      {has_loaded_once && (
         <div className={styles.formula_bar} aria-live="polite">
           <div className={styles.name_box} title="Active cell">
             {name_box_label ?? ""}
@@ -4118,15 +4143,21 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       )}
 
       {/* Table body */}
-      {is_loading ? (
+      {!has_loaded_once ? (
         <TableSkeleton />
       ) : (
+        <div
+          className={`${styles.grid_frame} ${is_fullscreen ? "flex min-h-0 flex-1 flex-col" : ""}${is_refreshing ? ` ${styles.grid_refreshing}` : ""}`}
+        >
+        {/* Indeterminate bar shown over the grid while a filter, sort or page change loads */}
+        <div className={styles.refresh_bar} aria-hidden="true" />
         <div
           ref={table_scroll_ref}
           tabIndex={0}
           role="grid"
           aria-label="Link building orders spreadsheet"
           aria-rowcount={filtered_rows.length}
+          aria-busy={is_refreshing}
           onKeyDown={handleGridKeyDown}
           className={`w-full min-w-0 overflow-auto ${is_fullscreen ? "min-h-0 flex-1" : "max-h-[calc(100vh-200px)]"} ${styles.grid_container}`}
         >
@@ -4414,7 +4445,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                 </th>
               </tr>
             </thead>
-            <tbody>
+            <tbody key={rows_version} className={styles.grid_body_enter}>
               {filtered_rows.length === 0 ? (
                 <tr>
                   <td
@@ -4654,6 +4685,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
             </tbody>
           </table>
         </div>
+        </div>
       )}
 
       {/* Import modal */}
@@ -4724,6 +4756,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       {/* Footer: row range, rows per page and page numbers */}
       <TablePagination
         is_loading={is_loading}
+        has_loaded_once={has_loaded_once}
         total={total}
         from_row={from_row}
         to_row={to_row}

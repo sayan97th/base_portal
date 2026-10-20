@@ -10,6 +10,7 @@ import TablePagination, { buildPageItems } from "@/components/admin/dashboard/Ta
 function renderPagination(overrides: Partial<React.ComponentProps<typeof TablePagination>> = {}) {
   const props: React.ComponentProps<typeof TablePagination> = {
     is_loading: false,
+    has_loaded_once: true,
     total: 500,
     from_row: 51,
     to_row: 100,

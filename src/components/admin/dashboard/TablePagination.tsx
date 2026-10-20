@@ -2,6 +2,8 @@ import React from "react";
 
 interface TablePaginationProps {
   is_loading: boolean;
+  /** False until the first page arrives. Later loads keep the current summary visible, dimmed. */
+  has_loaded_once: boolean;
   total: number;
   from_row: number | null;
   to_row: number | null;
@@ -39,6 +41,7 @@ export function buildPageItems(current_page: number, last_page: number): (number
 /** Footer of the Link Building Orders table: row range, rows per page and page numbers. */
 export default function TablePagination({
   is_loading,
+  has_loaded_once,
   total,
   from_row,
   to_row,
@@ -57,8 +60,10 @@ export default function TablePagination({
 
   return (
     <div className="flex flex-col gap-3 border-t border-gray-100 px-4 py-3 sm:px-5 lg:flex-row lg:items-center lg:justify-between dark:border-gray-800">
-      <p className="text-xs text-gray-500 dark:text-gray-400">
-        {is_loading ? (
+      <p
+        className={`text-xs text-gray-500 transition-opacity duration-300 dark:text-gray-400 ${has_loaded_once && is_loading ? "opacity-50" : "opacity-100"}`}
+      >
+        {!has_loaded_once ? (
           "Loading..."
         ) : total === 0 ? (
           "No rows"

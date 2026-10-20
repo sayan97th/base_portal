@@ -9,6 +9,7 @@
  *  - spreadsheet style column filters (several values per column, several columns);
  *  - saved filters (saving the current view and reapplying a saved one);
  *  - the status filter bar (per status counts, picking a status, active filter chips).
+ *  - loading transitions (the grid stays mounted while a filter reloads, stale responses are ignored).
  */
 
 import React from "react";
@@ -1529,5 +1530,60 @@ describe("LinkBuildingOrdersTable, status filter bar", () => {
         expect.objectContaining({ link_type: "DR 50+ External" })
       )
     );
+  });
+});
+
+// ─── Loading transitions ─────────────────────────────────────────────────────
+
+describe("LinkBuildingOrdersTable, loading transitions", () => {
+  function statusBar() {
+    return within(screen.getByRole("radiogroup", { name: "Filter by status" }));
+  }
+
+  /** A promise for a search response that the test resolves by hand. */
+  function deferredSearch() {
+    let resolve!: (value: ReturnType<typeof mockSearchResponse>) => void;
+    const promise = new Promise<ReturnType<typeof mockSearchResponse>>((res) => {
+      resolve = res;
+    });
+    return { promise, resolve };
+  }
+
+  it("keeps the grid and its rows on screen, marked busy, while a filter reloads", async () => {
+    await renderTableWithRow(makeRow({ order_id: "BL-1" }));
+
+    const pending = deferredSearch();
+    mockListLinkBuildingOrders.mockReturnValueOnce(pending.promise);
+    fireEvent.click(statusBar().getByRole("radio", { name: /^Live/ }));
+
+    const grid = screen.getByRole("grid");
+    await waitFor(() => expect(grid).toHaveAttribute("aria-busy", "true"));
+    expect(screen.getByText("BL-1")).toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: "Loading link building orders" })).not.toBeInTheDocument();
+
+    pending.resolve(mockSearchResponse([makeRow({ id: "uuid-2", order_id: "BL-2" })]));
+
+    expect(await screen.findByText("BL-2")).toBeInTheDocument();
+    expect(screen.queryByText("BL-1")).not.toBeInTheDocument();
+    expect(screen.getByRole("grid")).toHaveAttribute("aria-busy", "false");
+  });
+
+  it("ignores a slow response once a newer filter has already loaded", async () => {
+    await renderTableWithRow(makeRow({ order_id: "BL-1" }));
+
+    const slow = deferredSearch();
+    const fast = deferredSearch();
+    mockListLinkBuildingOrders.mockReturnValueOnce(slow.promise).mockReturnValueOnce(fast.promise);
+
+    fireEvent.click(statusBar().getByRole("radio", { name: /^Live/ }));
+    fireEvent.click(statusBar().getByRole("radio", { name: /^Pending/ }));
+
+    fast.resolve(mockSearchResponse([makeRow({ id: "uuid-3", order_id: "BL-3" })]));
+    expect(await screen.findByText("BL-3")).toBeInTheDocument();
+
+    slow.resolve(mockSearchResponse([makeRow({ id: "uuid-2", order_id: "BL-2" })]));
+    await waitFor(() => expect(screen.getByRole("grid")).toHaveAttribute("aria-busy", "false"));
+    expect(screen.queryByText("BL-2")).not.toBeInTheDocument();
+    expect(screen.getByText("BL-3")).toBeInTheDocument();
   });
 });
