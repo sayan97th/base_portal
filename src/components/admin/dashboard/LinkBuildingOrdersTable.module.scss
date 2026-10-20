@@ -258,16 +258,6 @@ $cell_font_size: 12px;
   vertical-align: middle;
 }
 
-// Soft shadow on the right edge of the last frozen column, separating it from
-// the columns that scroll underneath.
-.frozen_edge {
-  box-shadow: 4px 0 6px -3px rgba(0, 0, 0, 0.3);
-
-  @include dark {
-    box-shadow: 4px 0 6px -3px rgba(0, 0, 0, 0.7);
-  }
-}
-
 .corner_header {
   cursor: default !important;
 }
@@ -335,14 +325,6 @@ $cell_font_size: 12px;
 
   @include dark {
     box-shadow: inset 0 0 0 2px $selection_color_dark;
-  }
-
-  &.frozen_edge {
-    box-shadow: inset 0 0 0 2px $selection_color, 4px 0 6px -3px rgba(0, 0, 0, 0.3);
-
-    @include dark {
-      box-shadow: inset 0 0 0 2px $selection_color_dark, 4px 0 6px -3px rgba(0, 0, 0, 0.7);
-    }
   }
 
   // Like Sheets, the active cell inside a range keeps a plain background so

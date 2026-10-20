@@ -508,7 +508,6 @@ interface EditableCellProps {
   is_sticky?: boolean;
   sticky_left?: number;
   sticky_bg_class?: string;
-  show_shadow?: boolean;
 }
 
 function EditableCell({
@@ -536,7 +535,6 @@ function EditableCell({
   is_sticky = false,
   sticky_left = 0,
   sticky_bg_class = "bg-white dark:bg-gray-900",
-  show_shadow = false,
 }: EditableCellProps) {
   const input_ref = useRef<HTMLInputElement>(null);
   const [just_copied, setJustCopied] = useState(false);
@@ -839,7 +837,7 @@ function EditableCell({
           : is_sticky
             ? sticky_bg_class
             : ""
-      }${is_sticky && show_shadow ? ` ${styles.frozen_edge}` : ""}`}
+      }`}
       style={{
         ...(has_cell_editors
           ? { outline: `2px solid ${cell_editors[0].color}`, outlineOffset: "-2px" }
@@ -1305,12 +1303,6 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       grid_column_keys.reduce((sum, col_key) => sum + getColumnWidth(col_key), 0) +
       ACTIONS_COL_WIDTH,
     [grid_column_keys, getColumnWidth]
-  );
-
-  // Key of the rightmost visible sticky column — receives the separator shadow.
-  const last_sticky_col_key = useMemo(
-    () => visible_columns.filter((c) => c.sticky).at(-1)?.key ?? null,
-    [visible_columns]
   );
 
   // Resolves the active anchor/focus cell range into row/column index bounds so
@@ -3798,13 +3790,12 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                 {grid_column_keys.map((col_key, col_idx) => {
                   const col_def = visible_columns[col_idx];
                   const is_sticky_col = !!col_def?.sticky;
-                  const is_last_sticky_col = is_sticky_col && col_key === last_sticky_col_key;
                   return (
                     <th
                       key={col_key}
                       onClick={() => selectEntireColumn(col_key)}
                       title={`Select column ${toColumnLetter(col_idx)}`}
-                      className={`${is_sticky_col ? "sticky z-[30]" : ""}${is_last_sticky_col ? ` ${styles.frozen_edge}` : ""}${isColumnHighlighted(col_idx) ? ` ${styles.header_highlighted}` : ""}`}
+                      className={`${is_sticky_col ? "sticky z-[30]" : ""}${isColumnHighlighted(col_idx) ? ` ${styles.header_highlighted}` : ""}`}
                       style={is_sticky_col ? { left: sticky_left_offsets[col_key] } : undefined}
                     >
                       <div className={styles.letter_cell}>
@@ -3867,7 +3858,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                   return (
                     <th
                       key={col.key}
-                      className={`${styles.column_header} text-left font-semibold tracking-wide ${GROUP_HEADER_STYLES[col.group]}${col.sticky ? ` sticky z-[30]${col.key === last_sticky_col_key ? ` ${styles.frozen_edge}` : ""}` : ""}`}
+                      className={`${styles.column_header} text-left font-semibold tracking-wide ${GROUP_HEADER_STYLES[col.group]}${col.sticky ? " sticky z-[30]" : ""}`}
                       style={col.sticky ? { left: sticky_left_offsets[col.key] } : undefined}
                       title={col.label}
                     >
@@ -4179,7 +4170,6 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                             is_sticky={col.sticky}
                             sticky_left={col.sticky ? sticky_left_offsets[col.key] : undefined}
                             sticky_bg_class={col.sticky ? sticky_row_bg_class : undefined}
-                            show_shadow={col.sticky && col.key === last_sticky_col_key}
                           />
                         );
                       })}
