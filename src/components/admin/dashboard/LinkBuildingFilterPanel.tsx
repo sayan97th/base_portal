@@ -21,6 +21,8 @@ interface LinkBuildingFilterPanelProps {
   /** Classes of the split button frame (no padding, each half pads itself), idle and active. */
   button_class: string;
   active_button_class: string;
+  /** Saved views shown above both modes, e.g. the "Needs LB TL Approval" switch. */
+  quick_views?: React.ReactNode;
   /** The Quick filters or Advanced filters content. */
   children: React.ReactNode;
 }
@@ -52,6 +54,7 @@ export default function LinkBuildingFilterPanel({
   footer_note,
   button_class,
   active_button_class,
+  quick_views,
   children,
 }: LinkBuildingFilterPanelProps) {
   const container_ref = useRef<HTMLDivElement>(null);
@@ -174,6 +177,8 @@ export default function LinkBuildingFilterPanel({
               </button>
             </div>
           </div>
+
+          {quick_views}
 
           {children}
 

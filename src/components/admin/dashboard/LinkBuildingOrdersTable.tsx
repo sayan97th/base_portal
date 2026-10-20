@@ -57,7 +57,6 @@ import {
   listClientUsersForSelect,
   listPenNamesForSelect,
   getNeedsLbTlApprovalCount,
-  getLinkBuildingOrderStatusCounts,
   parseApiErrorMessage,
   type AdminUserOption,
   type ClientUserOption,
@@ -99,7 +98,7 @@ import {
 import { useResizableColumnWidths } from "@/hooks/useResizableColumnWidths";
 import { useTableFind, type TableFindMatch, type TableFindMatchState } from "@/hooks/useTableFind";
 import TableFindBar from "./TableFindBar";
-import StatusFilterBar from "./StatusFilterBar";
+import NeedsApprovalToggle from "./NeedsApprovalToggle";
 import ActiveFiltersBar, { type ActiveFilterChip } from "./ActiveFiltersBar";
 import ColumnVisibilityPanel, { type ColumnVisibilityGroup } from "./ColumnVisibilityPanel";
 import TablePagination from "./TablePagination";
@@ -376,7 +375,8 @@ const QUICK_FILTER_COLUMNS: QuickFilterColumn[] = [
 
 const QUICK_FILTER_COLUMN_KEYS = QUICK_FILTER_COLUMNS.map((column) => column.key);
 
-// Shared toolbar control styles, so every button and input in the header lines up at the same height.
+// Shared toolbar button styles, so every button in the header lines up at the same height.
+// The toolbar layout and its search field live in LinkBuildingOrdersTable.module.scss.
 const toolbar_button_base_class =
   "flex h-9 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30";
 const toolbar_button_class = `${toolbar_button_base_class} border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700`;
@@ -385,8 +385,6 @@ const toolbar_split_button_base_class =
   "flex h-9 shrink-0 items-stretch overflow-hidden rounded-lg border text-sm font-medium transition-colors focus-within:ring-2 focus-within:ring-brand-500/30";
 const toolbar_split_button_class = `${toolbar_split_button_base_class} border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200`;
 const toolbar_split_button_active_class = `${toolbar_split_button_base_class} border-brand-300 bg-brand-50 text-brand-700 dark:border-brand-700 dark:bg-brand-500/10 dark:text-brand-300`;
-const toolbar_input_class =
-  "h-9 rounded-lg border border-gray-200 bg-white text-sm text-gray-800 placeholder-gray-400 outline-none transition focus:border-brand-400 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500";
 
 // ── Empty row factory ──────────────────────────────────────────────────────────
 
@@ -1122,8 +1120,6 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   const [assigned_user_id_filter, setAssignedUserIdFilter] = useState<number | null>(null);
   const [needs_approval_filter, setNeedsApprovalFilter] = useState(false);
   const [needs_approval_count, setNeedsApprovalCount] = useState<number | null>(null);
-  const [status_counts, setStatusCounts] = useState<Record<string, number> | null>(null);
-  const [status_total, setStatusTotal] = useState<number | null>(null);
   const [is_fullscreen, setIsFullscreen] = useState(false);
   const [open_special_filter, setOpenSpecialFilter] = useState<"client_account" | "assigned_to" | null>(null);
   const [special_filter_anchor_el, setSpecialFilterAnchorEl] = useState<HTMLElement | null>(null);
@@ -1256,20 +1252,10 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   const on_order_mutated_ref = useRef(onOrderMutated);
   on_order_mutated_ref.current = onOrderMutated;
 
-  const refreshStatusCounts = useCallback(() => {
-    getLinkBuildingOrderStatusCounts(current_body_ref.current)
-      .then((res) => {
-        setStatusCounts(Object.fromEntries(res.data.map((item) => [item.status, item.count])));
-        setStatusTotal(res.total);
-      })
-      .catch(() => {/* non-critical */ });
-  }, []);
-
-  /** Refreshes the badges on the status filter bar after rows change. */
+  /** Refreshes the "Needs LB TL Approval" badge after rows change. */
   const refreshFilterCounts = useCallback(() => {
     getNeedsLbTlApprovalCount().then(setNeedsApprovalCount).catch(() => {/* non-critical */ });
-    refreshStatusCounts();
-  }, [refreshStatusCounts]);
+  }, []);
 
   useEffect(() => {
     getNeedsLbTlApprovalCount().then(setNeedsApprovalCount).catch(() => {/* non-critical */ });
@@ -1484,7 +1470,6 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
     current_body_ref.current = search_body;
     fetchRows(1, search_body);
-    refreshStatusCounts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [is_view_restored, search_body, per_page]);
 
@@ -2290,12 +2275,6 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
   // Declared after the save effect so its cleanup runs last and can still flush.
   useEffect(() => () => flush_view_save_ref.current?.(), []);
-
-  /** Picks a status from the status bar. A plain status replaces the "Needs LB TL Approval" view. */
-  const selectStatusFilter = useCallback((status: string) => {
-    setNeedsApprovalFilter(false);
-    setStatusFilter(status);
-  }, []);
 
   const setColumnsHidden = useCallback((col_keys: string[], is_hidden: boolean) => {
     setHiddenColumns((prev) => {
@@ -3937,31 +3916,12 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         </div>
       </div>
 
-      {/* Status pipeline: one pill per status with its row count */}
-      <div className="border-b border-gray-100 dark:border-gray-800">
-        <StatusFilterBar
-          status_counts={status_counts}
-          total_count={status_total}
-          active_status={status_filter}
-          needs_approval_active={needs_approval_filter}
-          needs_approval_count={needs_approval_count}
-          onSelectStatus={selectStatusFilter}
-          onToggleNeedsApproval={toggleNeedsApprovalFilter}
-        />
-      </div>
-
-      {/* Search and filters on the left, view tools on the right */}
-      <div className="flex flex-col gap-2.5 border-b border-gray-100 px-4 py-3 sm:px-5 2xl:flex-row 2xl:items-center 2xl:justify-between dark:border-gray-800">
-        <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="relative min-w-0 flex-1 2xl:max-w-md">
-            <svg
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-              aria-hidden="true"
-            >
+      {/* Toolbar: search, Company and Link type on the left, the approval view and the
+          table tools on the right. Per status filtering lives in the Filter menu. */}
+      <div className={styles.toolbar}>
+        <div className={styles.search_group} role="search" aria-label="Search and narrow orders">
+          <div className={`${styles.search_field} ${styles.search_field_main}`}>
+            <svg className={styles.search_icon} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
@@ -3971,73 +3931,58 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
               aria-label="Search orders"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className={`${toolbar_input_class} w-full pl-9 pr-8`}
+              className={styles.search_input}
             />
             {search && (
-              <button
-                type="button"
-                onClick={() => setSearch("")}
-                aria-label="Clear search"
-                className="absolute right-2 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
-              >
+              <button type="button" onClick={() => setSearch("")} aria-label="Clear search" className={styles.search_clear}>
                 <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
-            <div className="relative">
-              <svg
-                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-                aria-hidden="true"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Company..."
-                aria-label="Filter by company"
-                value={client_filter}
-                onChange={(e) => setClientFilter(e.target.value)}
-                className={`${toolbar_input_class} w-full pl-9 pr-3 sm:w-44`}
-              />
-            </div>
+          <div className={`${styles.search_field}${client_filter ? ` ${styles.search_field_active}` : ""}`}>
+            <svg className={styles.search_icon} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Company..."
+              aria-label="Filter by company"
+              value={client_filter}
+              onChange={(e) => setClientFilter(e.target.value)}
+              className={styles.search_input}
+            />
+          </div>
+          <div className={`${styles.search_field}${link_type_filter ? ` ${styles.search_field_active}` : ""}`}>
+            <svg className={styles.search_icon} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+            </svg>
             <select
               value={link_type_filter}
               onChange={(e) => setLinkTypeFilter(e.target.value)}
               aria-label="Filter by link type"
-              className={`${toolbar_input_class} w-full px-3 sm:w-44 ${link_type_filter ? "border-brand-300 text-brand-700 dark:border-brand-700 dark:text-brand-300" : ""}`}
+              className={styles.search_select}
             >
               <option value="">All link types</option>
               {LINK_TYPE_OPTIONS.map((t) => (
                 <option key={t} value={t}>{t}</option>
               ))}
             </select>
+            <svg className={styles.select_chevron} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+            </svg>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Find in table, highlights matches without filtering (Ctrl/Cmd+F) */}
-          <button
-            onClick={is_find_open ? handleCloseFind : openFind}
-            title="Find in table (Ctrl+F / Cmd+F), highlights matches without hiding other rows"
-            aria-pressed={is_find_open}
-            className={
-              is_find_open
-                ? `${toolbar_button_base_class} border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400`
-                : toolbar_button_class
-            }
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0zM8 10.5h5" />
-            </svg>
-            Find
-          </button>
+        <div className={styles.toolbar_actions}>
+          {/* The client's most used view, kept one click away and mirrored inside the Filter menu */}
+          <NeedsApprovalToggle
+            is_active={needs_approval_filter}
+            pending_count={needs_approval_count}
+            onToggle={toggleNeedsApprovalFilter}
+          />
+          <span className={styles.toolbar_divider} aria-hidden="true" />
           {/* Filter panel, monday style: Quick filters (click values) or Advanced filters (And / Or rules) */}
           <LinkBuildingFilterPanel
             is_open={is_filter_panel_open}
@@ -4053,6 +3998,14 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
             footer_note={filter_panel_footer_note}
             button_class={toolbar_split_button_class}
             active_button_class={toolbar_split_button_active_class}
+            quick_views={
+              <NeedsApprovalToggle
+                variant="row"
+                is_active={needs_approval_filter}
+                pending_count={needs_approval_count}
+                onToggle={toggleNeedsApprovalFilter}
+              />
+            }
           >
             {is_advanced_filter_mode ? (
               <AdvancedFilterPanel
@@ -4100,17 +4053,30 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
               </span>
             )}
           </button>
+          <span className={styles.toolbar_divider} aria-hidden="true" />
+          {/* Find in table, highlights matches without filtering (Ctrl/Cmd+F) */}
+          <button
+            onClick={is_find_open ? handleCloseFind : openFind}
+            title="Find in table (Ctrl+F / Cmd+F), highlights matches without hiding other rows"
+            aria-label="Find"
+            aria-pressed={is_find_open}
+            className={`${styles.icon_button}${is_find_open ? ` ${styles.icon_button_find_active}` : ""}`}
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0zM8 10.5h5" />
+            </svg>
+          </button>
           {/* Reset filters, sort and hidden columns in one go */}
           {has_active_filters && (
             <button
               onClick={clearAllFilters}
               title="Clear every filter, sort and hidden column and show the table as usual"
-              className={`${toolbar_button_base_class} border-transparent text-gray-500 hover:bg-red-50 hover:text-red-600 dark:text-gray-400 dark:hover:bg-red-900/20 dark:hover:text-red-400`}
+              aria-label="Clear filters"
+              className={`${styles.icon_button} ${styles.icon_button_danger}`}
             >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
               </svg>
-              Clear filters
             </button>
           )}
         </div>

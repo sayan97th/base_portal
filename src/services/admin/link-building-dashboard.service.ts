@@ -7,7 +7,6 @@ import type {
   LinkBuildingOrderDeleteResponse,
   LinkBuildingOrderSearchBody,
   LinkBuildingOrderFilterValuesResponse,
-  LinkBuildingOrderStatusCountsResponse,
   LinkBuildingOrderQuickFilterValuesResponse,
 } from "@/types/admin/link-building-order";
 
@@ -130,23 +129,6 @@ export async function listClientUsersForSelect(): Promise<ClientUserOption[]> {
 export async function getNeedsLbTlApprovalCount(): Promise<number> {
   const res = await apiClient.get<{ count: number }>("/api/admin/link-building-orders/needs-approval-count");
   return res.count;
-}
-
-/**
- * POST /api/admin/link-building-orders/status-counts
- * Row count per Status for the status filter bar. The backend applies every
- * filter in `body` except the Status ones, so each count shows how many rows
- * picking that status would return.
- */
-export async function getLinkBuildingOrderStatusCounts(
-  body: LinkBuildingOrderSearchBody = {}
-): Promise<LinkBuildingOrderStatusCountsResponse> {
-  const { page: _page, per_page: _per_page, sort_rules: _sort_rules, ...filters } = body;
-
-  return apiClient.post<LinkBuildingOrderStatusCountsResponse>(
-    "/api/admin/link-building-orders/status-counts",
-    filters
-  );
 }
 
 /**

@@ -72,6 +72,297 @@ $font_family: var(--font-outfit), ui-sans-serif, system-ui, -apple-system, "Sego
   }
 }
 
+// ── Toolbar ────────────────────────────────────────────────────────────────────
+
+// One wrapping row: the search fields grow on the left and the actions
+// keep their natural width on the right. When space runs out the actions drop
+// below the search field, right aligned, instead of squeezing it.
+$toolbar_control_height: 36px;
+$toolbar_border: var(--color-gray-200);
+$toolbar_border_dark: var(--color-gray-700);
+$toolbar_focus_ring: rgba(236, 60, 137, 0.12);
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-gray-100);
+  background: linear-gradient(180deg, #fff 0%, var(--color-gray-50) 100%);
+
+  @include dark {
+    border-bottom-color: var(--color-gray-800);
+    background: linear-gradient(180deg, var(--color-gray-900) 0%, rgba(29, 41, 57, 0.55) 100%);
+  }
+
+  @media (min-width: 640px) {
+    padding: 12px 20px;
+  }
+}
+
+.toolbar_actions {
+  display: flex;
+  flex: 0 0 auto;
+  max-width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.toolbar_divider {
+  width: 1px;
+  height: 20px;
+  flex-shrink: 0;
+  background: $toolbar_border;
+
+  @include dark {
+    background: $toolbar_border_dark;
+  }
+}
+
+// Square, icon only button for the secondary tools (Find, Clear filters).
+.icon_button {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: $toolbar_control_height;
+  height: $toolbar_control_height;
+  border: 1px solid $toolbar_border;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--color-gray-500);
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+
+  &:hover {
+    background: var(--color-gray-50);
+    color: var(--color-gray-700);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px $toolbar_focus_ring;
+  }
+
+  @include dark {
+    border-color: $toolbar_border_dark;
+    background: var(--color-gray-800);
+    color: var(--color-gray-400);
+
+    &:hover {
+      background: var(--color-gray-700);
+      color: var(--color-gray-200);
+    }
+  }
+}
+
+.icon_button_find_active {
+  border-color: var(--color-warning-300);
+  background: var(--color-warning-50);
+  color: var(--color-warning-700);
+
+  @include dark {
+    border-color: rgba(247, 144, 9, 0.35);
+    background: rgba(247, 144, 9, 0.12);
+    color: #fdb022;
+  }
+}
+
+.icon_button_danger {
+  border-color: transparent;
+  background: transparent;
+
+  &:hover {
+    background: var(--color-error-50);
+    color: var(--color-error-600);
+  }
+
+  @include dark {
+    border-color: transparent;
+    background: transparent;
+
+    &:hover {
+      background: rgba(217, 45, 32, 0.15);
+      color: #f97066;
+    }
+  }
+}
+
+// ── Search fields ──────────────────────────────────────────────────────────────
+
+// Search, Company and Link type as three separate compact controls. The search
+// box grows into the free space, the other two keep a fixed width.
+.search_group {
+  display: flex;
+  flex: 1 1 520px;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+
+  // Phones: the search box takes the first line, Company and Link type share the second.
+  @media (max-width: 639px) {
+    flex-wrap: wrap;
+  }
+}
+
+.search_field {
+  position: relative;
+  display: flex;
+  flex: 0 0 168px;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  height: $toolbar_control_height;
+  padding: 0 12px;
+  border: 1px solid $toolbar_border;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--color-gray-400);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease;
+
+  &:hover {
+    border-color: var(--color-gray-300);
+  }
+
+  &:focus-within {
+    border-color: var(--color-brand-300);
+    box-shadow: 0 0 0 3px $toolbar_focus_ring;
+    color: var(--color-brand-500);
+  }
+
+  @include dark {
+    border-color: $toolbar_border_dark;
+    background: var(--color-gray-800);
+
+    &:focus-within {
+      border-color: var(--color-brand-700);
+    }
+  }
+
+  @media (max-width: 639px) {
+    flex: 1 1 calc(50% - 4px);
+  }
+}
+
+.search_field_main {
+  flex: 1 1 200px;
+  max-width: 360px;
+
+  @media (max-width: 639px) {
+    flex-basis: 100%;
+    max-width: none;
+  }
+}
+
+// A Company or Link type value is applied: tint the field so it stands out.
+.search_field_active {
+  border-color: var(--color-brand-300);
+  background: var(--color-brand-25);
+  color: var(--color-brand-500);
+
+  .search_input,
+  .search_select {
+    color: var(--color-brand-700);
+    font-weight: 500;
+  }
+
+  @include dark {
+    border-color: var(--color-brand-700);
+    background: rgba(236, 60, 137, 0.1);
+
+    .search_input,
+    .search_select {
+      color: var(--color-brand-300);
+    }
+  }
+}
+
+.search_icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.search_input,
+.search_select {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--color-gray-800);
+  font-size: 13px;
+  outline: none;
+
+  @include dark {
+    color: var(--color-gray-100);
+  }
+}
+
+.search_input::placeholder {
+  color: var(--color-gray-400);
+
+  @include dark {
+    color: var(--color-gray-500);
+  }
+}
+
+.search_select {
+  padding-right: 16px;
+  appearance: none;
+  cursor: pointer;
+  text-overflow: ellipsis;
+
+  option {
+    color: var(--color-gray-800);
+  }
+}
+
+.select_chevron {
+  position: absolute;
+  right: 10px;
+  width: 12px;
+  height: 12px;
+  color: var(--color-gray-400);
+  pointer-events: none;
+}
+
+.search_clear {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  color: var(--color-gray-400);
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+
+  &:hover {
+    background: var(--color-gray-100);
+    color: var(--color-gray-600);
+  }
+
+  @include dark {
+    &:hover {
+      background: var(--color-gray-700);
+      color: var(--color-gray-200);
+    }
+  }
+}
+
 // ── Formula bar ────────────────────────────────────────────────────────────────
 
 .formula_bar {

@@ -24,7 +24,6 @@ import {
   batchUpdateLinkBuildingOrderCells,
   getLinkBuildingOrderColumnValues,
   getLinkBuildingOrderFilterValues,
-  getLinkBuildingOrderStatusCounts,
   getLinkBuildingOrderQuickFilterValues,
 } from "@/services/admin/link-building-dashboard.service";
 import {
@@ -55,7 +54,6 @@ jest.mock("@/services/admin/link-building-dashboard.service", () => {
     listClientUsersForSelect:   jest.fn(),
     listPenNamesForSelect:      jest.fn().mockResolvedValue([]),
     getNeedsLbTlApprovalCount:  jest.fn().mockResolvedValue(0),
-    getLinkBuildingOrderStatusCounts: jest.fn().mockResolvedValue({ data: [], total: 0 }),
     getLinkBuildingOrderQuickFilterValues: jest.fn().mockResolvedValue({ data: {}, total: 0 }),
   };
 });
@@ -129,7 +127,6 @@ const mockListClientUsersForSelect = listClientUsersForSelect as jest.MockedFunc
 const mockBatchUpdateLinkBuildingOrderCells = batchUpdateLinkBuildingOrderCells as jest.MockedFunction<typeof batchUpdateLinkBuildingOrderCells>;
 const mockGetLinkBuildingOrderColumnValues = getLinkBuildingOrderColumnValues as jest.MockedFunction<typeof getLinkBuildingOrderColumnValues>;
 const mockGetLinkBuildingOrderFilterValues = getLinkBuildingOrderFilterValues as jest.MockedFunction<typeof getLinkBuildingOrderFilterValues>;
-const mockGetLinkBuildingOrderStatusCounts = getLinkBuildingOrderStatusCounts as jest.MockedFunction<typeof getLinkBuildingOrderStatusCounts>;
 const mockGetLinkBuildingOrderQuickFilterValues = getLinkBuildingOrderQuickFilterValues as jest.MockedFunction<typeof getLinkBuildingOrderQuickFilterValues>;
 const mockListSavedFilters = listSavedFilters as jest.MockedFunction<typeof listSavedFilters>;
 const mockCreateSavedFilter = createSavedFilter as jest.MockedFunction<typeof createSavedFilter>;
@@ -256,17 +253,13 @@ function getTableCellByText(label: string): HTMLElement {
 /**
  * Locates an option row inside the floating CellOptionsDropdown panel (rendered via
  * a portal into document.body) by its visible label, disambiguated from any other
- * element carrying the same text by requiring a <button> ancestor that is not one of
- * the status filter bar's pills (which also render plain status labels).
+ * element carrying the same text by requiring a <button> ancestor.
  */
 function getDropdownOptionButton(label: string): HTMLElement {
   const button = screen
     .getAllByText(label)
     .map((el) => el.closest("button"))
-    .find(
-      (btn): btn is HTMLButtonElement =>
-        btn !== null && btn.closest("[data-status-filter-bar]") === null
-    );
+    .find((btn): btn is HTMLButtonElement => btn !== null);
   if (!button) throw new Error(`No dropdown option button found for "${label}"`);
   return button;
 }
@@ -1293,26 +1286,26 @@ describe("LinkBuildingOrdersTable, saved filters", () => {
     );
     await renderTableWithRow(makeRow());
 
-    fireEvent.click(
-      within(screen.getByRole("radiogroup", { name: "Filter by status" })).getByRole("radio", { name: /^Pending/ })
-    );
+    fireEvent.change(screen.getByRole("combobox", { name: "Filter by link type" }), {
+      target: { value: "DR 50+ External" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /Saved Filters/ }));
     await screen.findByText(/No saved filters yet/);
 
     fireEvent.change(screen.getByRole("textbox", { name: "New saved filter name" }), {
-      target: { value: "Pending orders" },
+      target: { value: "DR 50 orders" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(mockCreateSavedFilter).toHaveBeenCalledTimes(1));
     expect(mockCreateSavedFilter.mock.calls[0][0]).toEqual(
       expect.objectContaining({
-        name: "Pending orders",
+        name: "DR 50 orders",
         is_shared: false,
-        filters: expect.objectContaining({ status: "Pending" }),
+        filters: expect.objectContaining({ link_type: "DR 50+ External" }),
       })
     );
-    expect(await screen.findByText('Saved the current filters as "Pending orders".')).toBeInTheDocument();
+    expect(await screen.findByText('Saved the current filters as "DR 50 orders".')).toBeInTheDocument();
   });
 
   it("restores the user's last view before loading any rows", async () => {
@@ -1407,13 +1400,13 @@ describe("LinkBuildingOrdersTable, saved filters", () => {
   it("saves the view to the user's account after a filter changes", async () => {
     await renderTableWithRow(makeRow());
 
-    fireEvent.click(
-      within(screen.getByRole("radiogroup", { name: "Filter by status" })).getByRole("radio", { name: /^Pending/ })
-    );
+    fireEvent.change(screen.getByRole("combobox", { name: "Filter by link type" }), {
+      target: { value: "DR 50+ External" },
+    });
 
     await waitFor(() => expect(mockSaveFilterPreference).toHaveBeenCalledTimes(1), { timeout: 2000 });
     expect(mockSaveFilterPreference.mock.calls[0][0]).toEqual({
-      filters: expect.objectContaining({ status: "Pending" }),
+      filters: expect.objectContaining({ link_type: "DR 50+ External" }),
       applied_saved_filter_id: null,
     });
   });
@@ -1571,83 +1564,81 @@ describe("LinkBuildingOrdersTable — fixed column layout", () => {
   });
 });
 
-// ─── Status filter bar ───────────────────────────────────────────────────────
+// ─── Needs LB TL Approval switch ─────────────────────────────────────────────
 
-describe("LinkBuildingOrdersTable, status filter bar", () => {
-  function statusBar() {
-    return within(screen.getByRole("radiogroup", { name: "Filter by status" }));
+describe("LinkBuildingOrdersTable, Needs LB TL Approval switch", () => {
+  /** The toolbar switch, as opposed to its copy inside the Filter menu dialog. */
+  function approvalSwitch() {
+    const toolbar_switch = screen
+      .getAllByRole("switch", { name: /^Needs LB TL Approval/ })
+      .find((el) => el.closest("[role='dialog']") === null);
+    if (!toolbar_switch) throw new Error("No Needs LB TL Approval switch on the toolbar");
+    return toolbar_switch;
   }
 
-  it("shows the row count of every status and of All orders", async () => {
-    mockGetLinkBuildingOrderStatusCounts.mockResolvedValue({
-      data: [
-        { status: "Live", count: 12 },
-        { status: "Pending", count: 3 },
-        { status: "Waiting On Writer", count: 2 },
-      ],
-      total: 17,
-    });
+  it("is a single on / off switch on the toolbar, per status filters live in the Filter menu", async () => {
     await renderTableWithRow(makeRow());
 
-    expect(await statusBar().findByRole("radio", { name: "All orders 17" })).toBeChecked();
-    expect(statusBar().getByRole("radio", { name: "Live 12" })).toBeInTheDocument();
-    expect(statusBar().getByRole("radio", { name: "Reviewing 0" })).toBeInTheDocument();
-    // A status typed by hand, outside the preset list, still gets its own pill.
-    expect(statusBar().getByRole("radio", { name: "Waiting On Writer 2" })).toBeInTheDocument();
+    expect(approvalSwitch()).not.toBeChecked();
+    expect(screen.queryByRole("radio", { name: /^All orders/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup", { name: "Filter by status" })).not.toBeInTheDocument();
   });
 
-  it("filters by the picked status, lists it as a chip, and clicking it again shows every status", async () => {
+  it("turns the Needs LB TL Approval view on and off", async () => {
     await renderTableWithRow(makeRow());
 
-    fireEvent.click(statusBar().getByRole("radio", { name: /^Live/ }));
+    fireEvent.click(approvalSwitch());
 
-    await waitFor(() => expect(lastSearchBody()).toEqual(expect.objectContaining({ status: "Live" })));
-    expect(statusBar().getByRole("radio", { name: /^Live/ })).toBeChecked();
-    expect(screen.getByRole("button", { name: "Remove the Status quick filter" })).toBeInTheDocument();
-
-    fireEvent.click(statusBar().getByRole("radio", { name: /^Live/ }));
-
-    await waitFor(() => expect(lastSearchBody().status).toBeUndefined());
-    expect(statusBar().getByRole("radio", { name: /^All orders/ })).toBeChecked();
-  });
-
-  it("picking a status turns the Needs LB TL Approval view off", async () => {
-    await renderTableWithRow(makeRow());
-
-    fireEvent.click(statusBar().getByRole("radio", { name: /^Needs LB TL Approval/ }));
     await waitFor(() =>
       expect(lastSearchBody()).toEqual(expect.objectContaining({ needs_lb_tl_approval: true }))
     );
+    expect(approvalSwitch()).toBeChecked();
+    expect(screen.getByRole("button", { name: "Remove the Needs LB TL Approval filter" })).toBeInTheDocument();
 
-    fireEvent.click(statusBar().getByRole("radio", { name: /^Pending/ }));
+    fireEvent.click(approvalSwitch());
 
-    await waitFor(() =>
-      expect(lastSearchBody()).toEqual(
-        expect.objectContaining({ status: "Pending", needs_lb_tl_approval: undefined })
-      )
-    );
+    await waitFor(() => expect(lastSearchBody().needs_lb_tl_approval).toBeUndefined());
+    expect(approvalSwitch()).not.toBeChecked();
   });
 
-  it("asks for the status counts with the current filters", async () => {
+  it("keeps the other filters when the view is turned off", async () => {
     await renderTableWithRow(makeRow());
 
     fireEvent.change(screen.getByRole("combobox", { name: "Filter by link type" }), {
       target: { value: "DR 50+ External" },
     });
+    fireEvent.click(approvalSwitch());
+    fireEvent.click(approvalSwitch());
 
     await waitFor(() =>
-      expect(mockGetLinkBuildingOrderStatusCounts).toHaveBeenLastCalledWith(
-        expect.objectContaining({ link_type: "DR 50+ External" })
+      expect(lastSearchBody()).toEqual(
+        expect.objectContaining({ link_type: "DR 50+ External", needs_lb_tl_approval: undefined })
       )
     );
+  });
+
+  it("is mirrored at the top of the Filter menu, bound to the same state", async () => {
+    await renderTableWithRow(makeRow());
+
+    fireEvent.click(screen.getByRole("button", { name: "Filter" }));
+    const dialog = await screen.findByRole("dialog", { name: "Quick filters" });
+    fireEvent.click(within(dialog).getByRole("switch", { name: /^Needs LB TL Approval/ }));
+
+    await waitFor(() =>
+      expect(lastSearchBody()).toEqual(expect.objectContaining({ needs_lb_tl_approval: true }))
+    );
+    expect(approvalSwitch()).toBeChecked();
+    expect(within(dialog).getByRole("switch", { name: /^Needs LB TL Approval/ })).toBeChecked();
   });
 });
 
 // ─── Loading transitions ─────────────────────────────────────────────────────
 
 describe("LinkBuildingOrdersTable, loading transitions", () => {
-  function statusBar() {
-    return within(screen.getByRole("radiogroup", { name: "Filter by status" }));
+  function pickLinkType(link_type: string) {
+    fireEvent.change(screen.getByRole("combobox", { name: "Filter by link type" }), {
+      target: { value: link_type },
+    });
   }
 
   /** A promise for a search response that the test resolves by hand. */
@@ -1664,7 +1655,7 @@ describe("LinkBuildingOrdersTable, loading transitions", () => {
 
     const pending = deferredSearch();
     mockListLinkBuildingOrders.mockReturnValueOnce(pending.promise);
-    fireEvent.click(statusBar().getByRole("radio", { name: /^Live/ }));
+    pickLinkType("DR 50+ External");
 
     const grid = screen.getByRole("grid");
     await waitFor(() => expect(grid).toHaveAttribute("aria-busy", "true"));
@@ -1685,8 +1676,8 @@ describe("LinkBuildingOrdersTable, loading transitions", () => {
     const fast = deferredSearch();
     mockListLinkBuildingOrders.mockReturnValueOnce(slow.promise).mockReturnValueOnce(fast.promise);
 
-    fireEvent.click(statusBar().getByRole("radio", { name: /^Live/ }));
-    fireEvent.click(statusBar().getByRole("radio", { name: /^Pending/ }));
+    pickLinkType("DR 50+ External");
+    pickLinkType("DR 60+ External");
 
     fast.resolve(mockSearchResponse([makeRow({ id: "uuid-3", order_id: "BL-3" })]));
     expect(await screen.findByText("BL-3")).toBeInTheDocument();
