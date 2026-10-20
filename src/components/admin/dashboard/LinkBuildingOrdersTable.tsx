@@ -456,7 +456,9 @@ function UserAssignCell({
   find_match_state = null,
   find_query = "",
 }: UserAssignCellProps) {
-  const cell_ref = useRef<HTMLTableCellElement>(null);
+  // Kept in state (through a callback ref) rather than read from a ref during render,
+  // so the dropdown re-renders with its anchor as soon as the cell mounts.
+  const [cell_el, setCellEl] = useState<HTMLTableCellElement | null>(null);
   const selected_user = admin_users.find(
     (u) => assigned_admin_user_id != null && u.id === Number(assigned_admin_user_id)
   );
@@ -464,7 +466,7 @@ function UserAssignCell({
   return (
     <>
       <td
-        ref={cell_ref}
+        ref={setCellEl}
         data-cell-key={cell_key}
         className={`${styles.cell} whitespace-nowrap text-xs transition-colors ${
           is_editing
@@ -505,7 +507,7 @@ function UserAssignCell({
         <AdminSearchableSelect
           admin_users={admin_users}
           selected_user_id={assigned_admin_user_id}
-          anchor_el={cell_ref.current}
+          anchor_el={cell_el}
           onSelect={onAssignUser}
           onClose={onCancelEdit}
         />

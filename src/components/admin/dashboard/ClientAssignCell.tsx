@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useState } from "react";
 import type { ClientUserOption } from "@/services/admin/link-building-dashboard.service";
 import ClientSearchableSelect from "./ClientSearchableSelect";
 import FindHighlightedText from "./FindHighlightedText";
@@ -37,7 +37,9 @@ export default function ClientAssignCell({
   find_match_state = null,
   find_query = "",
 }: ClientAssignCellProps) {
-  const cell_ref = useRef<HTMLTableCellElement>(null);
+  // Kept in state (through a callback ref) rather than read from a ref during render,
+  // so the dropdown re-renders with its anchor as soon as the cell mounts.
+  const [cell_el, setCellEl] = useState<HTMLTableCellElement | null>(null);
   const selected_client = client_users.find(
     (u) => user_id != null && u.id === Number(user_id)
   );
@@ -45,7 +47,7 @@ export default function ClientAssignCell({
   return (
     <>
       <td
-        ref={cell_ref}
+        ref={setCellEl}
         data-cell-key={cell_key}
         className={`${styles.cell} whitespace-nowrap text-xs transition-colors ${
           is_editing
@@ -100,7 +102,7 @@ export default function ClientAssignCell({
         <ClientSearchableSelect
           client_users={client_users}
           selected_user_id={user_id}
-          anchor_el={cell_ref.current}
+          anchor_el={cell_el}
           onSelect={onAssignClient}
           onClose={onCancelEdit}
         />

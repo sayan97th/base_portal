@@ -1,5 +1,8 @@
 "use client";
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useCallback, useContext, useState, useEffect } from "react";
+import { usePersistentBoolean } from "@/hooks/usePersistentBoolean";
+
+export const SIDEBAR_EXPANDED_STORAGE_KEY = "sidebar_expanded";
 
 type SidebarContextType = {
   isExpanded: boolean;
@@ -27,7 +30,8 @@ export const useSidebar = () => {
 export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(true);
+  // Remembered per browser so a collapsed sidebar stays collapsed across reloads.
+  const [isExpanded, , toggleExpanded] = usePersistentBoolean(SIDEBAR_EXPANDED_STORAGE_KEY, true);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -51,9 +55,10 @@ export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   }, []);
 
-  const toggleSidebar = () => {
-    setIsExpanded((prev) => !prev);
-  };
+  const toggleSidebar = useCallback(() => {
+    setIsHovered(false);
+    toggleExpanded();
+  }, [toggleExpanded]);
 
   const toggleMobileSidebar = () => {
     setIsMobileOpen((prev) => !prev);

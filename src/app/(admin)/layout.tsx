@@ -21,7 +21,7 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isExpanded, isHovered, isMobileOpen } = useSidebar();
+  const { isExpanded, isMobileOpen } = useSidebar();
   const { isStaff, isLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -45,11 +45,13 @@ export default function AdminLayout({
 
   if (!isStaff) return null;
 
+  // Only the pinned state moves the content. A hover peek floats over it, so the
+  // spreadsheet never reflows just because the cursor touched the sidebar.
   const main_content_margin = isMobileOpen
     ? "ml-0"
-    : isExpanded || isHovered
+    : isExpanded
     ? "lg:ml-[290px]"
-    : "lg:ml-[90px]";
+    : "lg:ml-[72px]";
 
   return (
     <AdminNotificationsProvider>

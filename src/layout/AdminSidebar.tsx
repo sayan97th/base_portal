@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "@/context/SidebarContext";
@@ -378,11 +378,57 @@ const admin_sidebar_sections: SidebarSection[] = [
   },
 ];
 
+/** Must match the `duration-300` on the sidebar and on the admin layout content margin. */
+const SIDEBAR_TRANSITION_MS = 300;
+
+/** Hover delay before a collapsed sidebar peeks open, so sweeping the cursor past it does nothing. */
+const PEEK_DELAY_MS = 200;
+
+const DESKTOP_MIN_WIDTH = 1024;
+
+function isToggleShortcut(event: KeyboardEvent): boolean {
+  return (event.ctrlKey || event.metaKey) && event.key === "\\";
+}
+
 const AdminSidebar: React.FC = () => {
-  const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
+  const { isExpanded, isMobileOpen, isHovered, setIsHovered, toggleSidebar } = useSidebar();
   const { hasPermission } = useAuth();
   const pathname = usePathname();
   const [expanded_menus, setExpandedMenus] = useState<Record<string, boolean>>({});
+  const peek_timer_ref = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearPeekTimer = useCallback(() => {
+    if (peek_timer_ref.current) {
+      clearTimeout(peek_timer_ref.current);
+      peek_timer_ref.current = null;
+    }
+  }, []);
+
+  const handleMouseEnter = useCallback(() => {
+    if (isExpanded) return;
+    clearPeekTimer();
+    peek_timer_ref.current = setTimeout(() => setIsHovered(true), PEEK_DELAY_MS);
+  }, [isExpanded, clearPeekTimer, setIsHovered]);
+
+  const handleMouseLeave = useCallback(() => {
+    clearPeekTimer();
+    setIsHovered(false);
+  }, [clearPeekTimer, setIsHovered]);
+
+  useEffect(() => clearPeekTimer, [clearPeekTimer]);
+
+  // Ctrl + \ (Cmd + \ on macOS) collapses or expands the sidebar on desktop.
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!isToggleShortcut(event) || window.innerWidth < DESKTOP_MIN_WIDTH) return;
+      event.preventDefault();
+      clearPeekTimer();
+      toggleSidebar();
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [toggleSidebar, clearPeekTimer]);
 
   const isActive = useCallback(
     (path: string) => path === pathname || pathname.startsWith(path + "/"),
@@ -409,7 +455,23 @@ const AdminSidebar: React.FC = () => {
     setExpandedMenus((prev) => ({ ...prev, [key]: !current_open }));
   }, []);
 
-  const showText = isExpanded || isHovered || isMobileOpen;
+  const is_open = isExpanded || isHovered || isMobileOpen;
+
+  // Labels appear as soon as the sidebar starts opening, but stay mounted until the
+  // closing width transition ends, so they are clipped smoothly instead of popping out.
+  const [labels_visible, setLabelsVisible] = useState(is_open);
+  if (is_open && !labels_visible) setLabelsVisible(true);
+
+  useEffect(() => {
+    if (is_open || !labels_visible) return;
+    const timer = setTimeout(() => setLabelsVisible(false), SIDEBAR_TRANSITION_MS);
+    return () => clearTimeout(timer);
+  }, [is_open, labels_visible]);
+
+  const showText = labels_visible;
+  // Wider than the rail while the content is laid out for the rail (hover peek, or
+  // still animating closed), so it must float above the sticky header.
+  const is_overlaying = !isExpanded && !isMobileOpen && labels_visible;
 
   const getVisibleItems = useCallback(
     (items: SidebarItem[]) =>
@@ -425,23 +487,23 @@ const AdminSidebar: React.FC = () => {
 
   return (
     <aside
-      className={`fixed mt-16 flex flex-col lg:mt-0 top-0 px-5 left-0 bg-gray-900 dark:bg-gray-950 text-white h-screen transition-all duration-300 ease-in-out z-50 border-r border-gray-700 dark:border-gray-800
-        ${isExpanded || isMobileOpen
-          ? "w-[290px]"
-          : isHovered
-            ? "w-[290px]"
-            : "w-[90px]"
-        }
+      aria-label="Admin navigation"
+      className={`fixed mt-16 flex flex-col overflow-hidden whitespace-nowrap lg:mt-0 top-0 left-0 bg-gray-900 dark:bg-gray-950 text-white h-screen transition-[width,padding,transform,box-shadow] duration-300 ease-in-out z-50 border-r border-gray-700 dark:border-gray-800
+        ${is_open ? "w-[290px] px-5" : "w-[72px] px-[14px]"}
+        ${is_overlaying ? "lg:z-100000" : ""}
+        ${is_overlaying && is_open ? "lg:shadow-2xl lg:shadow-black/40" : ""}
         ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
         lg:translate-x-0`}
-      onMouseEnter={() => !isExpanded && setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
-      {/* Logo */}
+      {/* Logo + collapse toggle */}
       <div
-        className={`py-8 flex ${!isExpanded && !isHovered ? "lg:justify-center" : "justify-start"}`}
+        className={`py-8 flex gap-3 ${
+          showText ? "items-start justify-between" : "flex-col items-center"
+        }`}
       >
-        <Link href="/admin/dashboard" className="flex items-center gap-2">
+        <Link href="/admin/dashboard" className="flex min-w-0 items-center gap-2 overflow-hidden">
           {showText ? (
             <div className="flex flex-col">
               <span className="text-xl font-bold text-white">
@@ -458,10 +520,34 @@ const AdminSidebar: React.FC = () => {
             <span className="text-xl font-bold text-white">B</span>
           )}
         </Link>
+
+        {/* Desktop only, mobile uses the header menu button */}
+        <button
+          type="button"
+          onClick={() => {
+            clearPeekTimer();
+            toggleSidebar();
+          }}
+          aria-label={isExpanded ? "Collapse sidebar" : "Expand sidebar"}
+          aria-expanded={isExpanded}
+          title={`${isExpanded ? "Collapse sidebar" : "Keep sidebar open"} (Ctrl + \\)`}
+          className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60 lg:flex"
+        >
+          <svg
+            className={`h-4 w-4 transition-transform duration-300 ${isExpanded ? "" : "rotate-180"}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M18.75 19.5l-7.5-7.5 7.5-7.5m-6 15L5.25 12l7.5-7.5" />
+          </svg>
+        </button>
       </div>
 
       {/* Navigation */}
-      <div className="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
+      <div className="flex flex-1 min-h-0 flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
         <nav className="mb-6">
           <div className="flex flex-col gap-4">
             {visible_sections.map((section, section_index) => (
@@ -491,14 +577,13 @@ const AdminSidebar: React.FC = () => {
                             {/* ── Level 1: collapsible group ── */}
                             <button
                               onClick={() => toggleMenu(menu_key, is_open)}
+                              title={showText ? undefined : item.name}
+                              aria-label={showText ? undefined : item.name}
+                              aria-expanded={is_open}
                               className={`relative flex items-center w-full gap-3 px-3 py-2 font-medium rounded-lg text-theme-sm transition-colors ${
                                 group_active
                                   ? "bg-brand-500/20 text-brand-400"
                                   : "text-gray-300 hover:bg-white/5 hover:text-white"
-                              } ${
-                                !isExpanded && !isHovered
-                                  ? "lg:justify-center"
-                                  : "lg:justify-start"
                               }`}
                             >
                               <span className={group_active ? "text-brand-400" : "text-gray-500"}>
@@ -596,16 +681,14 @@ const AdminSidebar: React.FC = () => {
                           /* ── Level 1 leaf: direct link ── */
                           <Link
                             href={item.path}
+                            title={showText ? undefined : item.name}
+                            aria-label={showText ? undefined : item.name}
                             className={`relative flex items-center w-full gap-3 px-3 py-2 font-medium rounded-lg text-theme-sm transition-colors ${
                               item.highlight && isActive(item.path)
                                 ? "bg-brand-500 text-white"
                                 : isActive(item.path)
                                   ? "bg-white/10 text-white"
                                   : "text-gray-300 hover:bg-white/5 hover:text-white"
-                            } ${
-                              !isExpanded && !isHovered
-                                ? "lg:justify-center"
-                                : "lg:justify-start"
                             }`}
                           >
                             <span

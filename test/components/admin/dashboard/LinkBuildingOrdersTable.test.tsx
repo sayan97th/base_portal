@@ -181,6 +181,13 @@ function mockSearchResponse(rows: LinkBuildingOrderRow[]) {
   };
 }
 
+/** Search body of the most recent listLinkBuildingOrders call, failing loudly when there is none. */
+function lastSearchBody(): NonNullable<Parameters<typeof listLinkBuildingOrders>[0]> {
+  const last_body = mockListLinkBuildingOrders.mock.calls.at(-1)?.[0];
+  if (!last_body) throw new Error("listLinkBuildingOrders has not been called with a search body yet");
+  return last_body;
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   localStorage.clear();
@@ -1226,11 +1233,6 @@ describe("LinkBuildingOrdersTable, spreadsheet style column filters", () => {
 });
 
 describe("LinkBuildingOrdersTable, saved filters", () => {
-  function lastSearchBody() {
-    const calls = mockListLinkBuildingOrders.mock.calls;
-    return calls[calls.length - 1][0];
-  }
-
   function makeSavedFilter(overrides: Partial<LinkBuildingOrderSavedFilter> = {}): LinkBuildingOrderSavedFilter {
     return {
       id:         "saved-1",
@@ -1459,11 +1461,6 @@ describe("LinkBuildingOrdersTable — fixed column layout", () => {
 // ─── Status filter bar ───────────────────────────────────────────────────────
 
 describe("LinkBuildingOrdersTable, status filter bar", () => {
-  function lastSearchBody() {
-    const calls = mockListLinkBuildingOrders.mock.calls;
-    return calls[calls.length - 1][0];
-  }
-
   function statusBar() {
     return within(screen.getByRole("radiogroup", { name: "Filter by status" }));
   }
