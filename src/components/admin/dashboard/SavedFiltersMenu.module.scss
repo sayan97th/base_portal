@@ -1,0 +1,1198 @@
+// "Saved Filters" toolbar menu of the Link Building Orders table. The trigger
+// matches the other toolbar buttons (36px, 14px text) and the panel follows the
+// portal's dropdown look: soft card, icon header, grouped list with hover actions.
+
+// ── Tokens ─────────────────────────────────────────────────────────────────────
+
+// Fallbacks keep the menu readable if Tailwind ever prunes an unused theme variable.
+$brand_25: var(--color-brand-25, #fef5f9);
+$brand_50: var(--color-brand-50, #fdeef5);
+$brand_100: var(--color-brand-100, #fcdceb);
+$brand_200: var(--color-brand-200, #f9b8d5);
+$brand_300: var(--color-brand-300, #f48fbc);
+$brand_500: var(--color-brand-500, #ec3c89);
+$brand_600: var(--color-brand-600, #d4316f);
+$brand_700: var(--color-brand-700, #b02659);
+$brand_dark_bg: rgba(236, 60, 137, 0.12);
+$brand_dark_bg_hover: rgba(236, 60, 137, 0.2);
+$brand_dark_border: rgba(236, 60, 137, 0.4);
+$brand_dark_text: #f48fbc;
+$brand_ring: rgba(236, 60, 137, 0.2);
+
+$gray_25: var(--color-gray-25, #fcfcfd);
+$gray_50: var(--color-gray-50, #f9fafb);
+$gray_100: var(--color-gray-100, #f2f4f7);
+$gray_200: var(--color-gray-200, #e4e7ec);
+$gray_300: var(--color-gray-300, #d0d5dd);
+$gray_400: var(--color-gray-400, #98a2b3);
+$gray_500: var(--color-gray-500, #667085);
+$gray_600: var(--color-gray-600, #475467);
+$gray_700: var(--color-gray-700, #344054);
+$gray_800: var(--color-gray-800, #1d2939);
+$gray_900: var(--color-gray-900, #101828);
+
+$sky_50: var(--color-blue-light-50, #f0f9ff);
+$sky_100: var(--color-blue-light-100, #e0f2fe);
+$sky_600: var(--color-blue-light-600, #0086c9);
+$sky_700: var(--color-blue-light-700, #026aa2);
+$sky_dark_bg: rgba(11, 165, 236, 0.15);
+$sky_dark_text: #7cd4fd;
+
+$error_50: var(--color-error-50, #fef3f2);
+$error_100: var(--color-error-100, #fee4e2);
+$error_600: var(--color-error-600, #d92d20);
+$error_700: var(--color-error-700, #b42318);
+$error_dark_bg: rgba(240, 68, 56, 0.12);
+$error_dark_text: #fda29b;
+
+$amber_50: #fffaeb;
+$amber_200: #fedf89;
+$amber_500: #f79009;
+$amber_600: #dc6803;
+$amber_800: #93370d;
+$amber_dark_bg: rgba(247, 144, 9, 0.12);
+$amber_dark_text: #fdb022;
+
+$dark_surface: #1d2939;
+$dark_surface_raised: #253247;
+$dark_border: #344054;
+$dark_text: #f2f4f7;
+$dark_text_muted: #98a2b3;
+
+$control_height: 36px;
+$panel_width: 384px;
+$panel_radius: 16px;
+$font_family: var(--font-outfit), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+@mixin dark {
+  :global(.dark) & {
+    @content;
+  }
+}
+
+@mixin focus_ring($ring: $brand_ring) {
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px $ring;
+  }
+}
+
+// ── Root ───────────────────────────────────────────────────────────────────────
+
+.root {
+  position: relative;
+  flex-shrink: 0;
+  font-family: $font_family;
+
+  input,
+  button {
+    font-family: inherit;
+  }
+}
+
+// ── Toolbar trigger ────────────────────────────────────────────────────────────
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 15rem;
+  height: $control_height;
+  padding: 0 10px 0 12px;
+  border: 1px solid $gray_200;
+  border-radius: 8px;
+  background: #fff;
+  color: $gray_700;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+  @include focus_ring;
+
+  &:hover {
+    background: $gray_50;
+  }
+
+  @include dark {
+    border-color: $dark_border;
+    background: $dark_surface;
+    color: #e4e7ec;
+
+    &:hover {
+      background: $gray_700;
+    }
+  }
+
+  &.is_open {
+    border-color: $gray_300;
+    background: $gray_50;
+
+    @include dark {
+      border-color: $gray_600;
+      background: $gray_700;
+    }
+  }
+
+  // A saved filter is applied, so the button shows its name in the brand color.
+  &.is_applied {
+    border-color: $brand_300;
+    background: $brand_50;
+    color: $brand_700;
+
+    &:hover {
+      background: $brand_100;
+    }
+
+    @include dark {
+      border-color: $brand_dark_border;
+      background: $brand_dark_bg;
+      color: $brand_dark_text;
+
+      &:hover {
+        background: $brand_dark_bg_hover;
+      }
+    }
+  }
+}
+
+.trigger_icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.trigger_label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trigger_chevron {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  opacity: 0.5;
+  transition: transform 0.2s ease;
+
+  .is_open & {
+    transform: rotate(180deg);
+  }
+}
+
+// Amber dot, the applied filter has changes that are not saved yet.
+.modified_dot {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: $amber_500;
+  box-shadow: 0 0 0 2px rgba(247, 144, 9, 0.2);
+}
+
+// ── Panel ──────────────────────────────────────────────────────────────────────
+
+.panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  width: $panel_width;
+  max-width: calc(100vw - 2rem);
+  max-height: min(36rem, calc(100vh - 10rem));
+  overflow: hidden;
+  border: 1px solid $gray_200;
+  border-radius: $panel_radius;
+  background: #fff;
+  box-shadow:
+    0 20px 24px -4px rgba(16, 24, 40, 0.08),
+    0 8px 8px -4px rgba(16, 24, 40, 0.03);
+  transform-origin: top right;
+  animation: panel_in 0.16s ease-out;
+
+  @include dark {
+    border-color: $dark_border;
+    background: $dark_surface;
+    box-shadow: 0 20px 24px -4px rgba(0, 0, 0, 0.4);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes panel_in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+// ── Header ─────────────────────────────────────────────────────────────────────
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 20px 14px;
+}
+
+.header_icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid $brand_100;
+  border-radius: 10px;
+  background: $brand_50;
+  color: $brand_600;
+
+  svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  @include dark {
+    border-color: $brand_dark_border;
+    background: $brand_dark_bg;
+    color: $brand_dark_text;
+  }
+}
+
+.header_text {
+  flex: 1;
+  min-width: 0;
+}
+
+.header_title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: $gray_900;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+
+  @include dark {
+    color: $dark_text;
+  }
+}
+
+.header_description {
+  margin-top: 2px;
+  color: $gray_500;
+  font-size: 12.5px;
+  line-height: 1.45;
+
+  @include dark {
+    color: $dark_text_muted;
+  }
+}
+
+.header_close {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: -4px -8px 0 0;
+  border-radius: 8px;
+  color: $gray_400;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+  @include focus_ring;
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  &:hover {
+    background: $gray_100;
+    color: $gray_700;
+  }
+
+  @include dark {
+    &:hover {
+      background: $gray_700;
+      color: $dark_text;
+    }
+  }
+}
+
+// ── Notice banners (unsaved changes, errors) ───────────────────────────────────
+
+.notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 16px 12px;
+  padding: 10px 12px;
+  border: 1px solid;
+  border-radius: 10px;
+  font-size: 12.5px;
+  line-height: 1.4;
+
+  svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+}
+
+.notice_text {
+  flex: 1;
+  min-width: 0;
+
+  strong {
+    font-weight: 600;
+  }
+}
+
+.notice_warning {
+  border-color: $amber_200;
+  background: $amber_50;
+  color: $amber_800;
+
+  @include dark {
+    border-color: rgba(247, 144, 9, 0.35);
+    background: $amber_dark_bg;
+    color: $amber_dark_text;
+  }
+}
+
+.notice_error {
+  border-color: $error_100;
+  background: $error_50;
+  color: $error_700;
+
+  @include dark {
+    border-color: rgba(240, 68, 56, 0.35);
+    background: $error_dark_bg;
+    color: $error_dark_text;
+  }
+}
+
+.notice_button {
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  .notice_warning & {
+    background: $amber_500;
+    color: #fff;
+    @include focus_ring(rgba(247, 144, 9, 0.3));
+
+    &:hover:not(:disabled) {
+      background: $amber_600;
+    }
+  }
+
+  .notice_error & {
+    background: transparent;
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+}
+
+// ── Save form ──────────────────────────────────────────────────────────────────
+
+.save_section {
+  margin: 0 16px;
+  padding: 14px;
+  border: 1px solid $gray_200;
+  border-radius: 12px;
+  background: $gray_25;
+
+  @include dark {
+    border-color: $dark_border;
+    background: rgba(255, 255, 255, 0.02);
+  }
+}
+
+.section_label {
+  display: block;
+  margin-bottom: 8px;
+  color: $gray_700;
+  font-size: 13px;
+  font-weight: 600;
+
+  @include dark {
+    color: #e4e7ec;
+  }
+}
+
+.save_row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.input_wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.input_icon {
+  position: absolute;
+  top: 50%;
+  left: 11px;
+  width: 16px;
+  height: 16px;
+  color: $gray_400;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.input {
+  width: 100%;
+  height: $control_height;
+  padding: 0 12px 0 34px;
+  border: 1px solid $gray_300;
+  border-radius: 8px;
+  background: #fff;
+  color: $gray_900;
+  font-size: 14px;
+  outline: none;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+
+  &::placeholder {
+    color: $gray_400;
+  }
+
+  &:focus {
+    border-color: $brand_300;
+    box-shadow: 0 0 0 3px $brand_ring;
+  }
+
+  &:disabled {
+    background: $gray_50;
+    cursor: not-allowed;
+  }
+
+  @include dark {
+    border-color: $dark_border;
+    background: #101828;
+    color: $dark_text;
+
+    &:focus {
+      border-color: $brand_dark_border;
+    }
+
+    &:disabled {
+      background: rgba(255, 255, 255, 0.03);
+    }
+  }
+}
+
+// Same height as the toolbar buttons so the form feels part of the toolbar family.
+.primary_button {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: $control_height;
+  padding: 0 16px;
+  border-radius: 8px;
+  background: $brand_500;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  transition:
+    background-color 0.15s ease,
+    opacity 0.15s ease;
+  @include focus_ring;
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  &:hover:not(:disabled) {
+    background: $brand_600;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+}
+
+.spinner {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// What the save will capture, so the user knows before naming it.
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.summary_hint {
+  margin-top: 10px;
+  color: $gray_500;
+  font-size: 12px;
+
+  @include dark {
+    color: $dark_text_muted;
+  }
+}
+
+// Switch styled checkbox, keeps the native input for keyboard and screen readers.
+.share_toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  margin-top: 12px;
+  color: $gray_600;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+
+  @include dark {
+    color: #d0d5dd;
+  }
+
+  &.is_disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+}
+
+.share_input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.share_switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 30px;
+  height: 18px;
+  border-radius: 999px;
+  background: $gray_200;
+  transition:
+    background-color 0.2s ease,
+    box-shadow 0.15s ease;
+
+  &::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.2);
+    transition: transform 0.2s ease;
+  }
+
+  @include dark {
+    background: $gray_600;
+  }
+
+  .share_input:checked + & {
+    background: $brand_500;
+
+    &::after {
+      transform: translateX(12px);
+    }
+  }
+
+  .share_input:focus-visible + & {
+    box-shadow: 0 0 0 3px $brand_ring;
+  }
+}
+
+// ── Saved list ─────────────────────────────────────────────────────────────────
+
+.list_area {
+  flex: 1;
+  min-height: 0;
+  margin-top: 8px;
+  padding: 4px 8px 10px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.group + .group {
+  margin-top: 6px;
+}
+
+.group_heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px 6px;
+  color: $gray_500;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+
+  @include dark {
+    color: $dark_text_muted;
+  }
+}
+
+.group_count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: $gray_100;
+  color: $gray_600;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+
+  @include dark {
+    background: $gray_700;
+    color: #d0d5dd;
+  }
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 6px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+
+  &:hover,
+  &:focus-within {
+    background: $gray_50;
+
+    @include dark {
+      background: rgba(255, 255, 255, 0.04);
+    }
+  }
+
+  &.is_applied {
+    border-color: $brand_100;
+    background: $brand_25;
+
+    @include dark {
+      border-color: $brand_dark_border;
+      background: $brand_dark_bg;
+    }
+  }
+}
+
+.item_main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 6px 10px 10px;
+  border-radius: 10px;
+  text-align: left;
+  cursor: pointer;
+  @include focus_ring;
+
+  &:disabled {
+    cursor: progress;
+    opacity: 0.6;
+  }
+}
+
+// Leading tile: bookmark for own filters, owner initials for the team's.
+.item_avatar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: $gray_100;
+  color: $gray_500;
+  font-size: 12px;
+  font-weight: 600;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  @include dark {
+    background: $gray_700;
+    color: #d0d5dd;
+  }
+
+  &.is_team {
+    background: $sky_50;
+    color: $sky_700;
+
+    @include dark {
+      background: $sky_dark_bg;
+      color: $sky_dark_text;
+    }
+  }
+
+  // Doubled class so it beats the dark mode team tile.
+  .item.is_applied & {
+    background: $brand_500;
+    color: #fff;
+  }
+}
+
+.item_text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.item_title_row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.item_name {
+  overflow: hidden;
+  color: $gray_800;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  @include dark {
+    color: $dark_text;
+  }
+
+  .is_applied & {
+    color: $brand_700;
+    font-weight: 600;
+
+    @include dark {
+      color: $brand_dark_text;
+    }
+  }
+}
+
+.item_meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.item_owner {
+  overflow: hidden;
+  color: $gray_500;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  @include dark {
+    color: $dark_text_muted;
+  }
+}
+
+// ── Tags and badges ────────────────────────────────────────────────────────────
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 6px;
+  background: $gray_100;
+  color: $gray_600;
+  font-size: 11.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+
+  svg {
+    width: 11px;
+    height: 11px;
+    opacity: 0.75;
+  }
+
+  @include dark {
+    background: rgba(255, 255, 255, 0.06);
+    color: #d0d5dd;
+  }
+
+  .save_section & {
+    border: 1px solid $gray_200;
+    background: #fff;
+
+    @include dark {
+      border-color: $dark_border;
+      background: $dark_surface_raised;
+    }
+  }
+}
+
+.badge {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.badge_shared {
+  background: $sky_100;
+  color: $sky_700;
+
+  @include dark {
+    background: $sky_dark_bg;
+    color: $sky_dark_text;
+  }
+}
+
+.badge_applied {
+  background: $brand_500;
+  color: #fff;
+}
+
+.badge_modified {
+  background: #fef0c7;
+  color: $amber_800;
+
+  @include dark {
+    background: $amber_dark_bg;
+    color: $amber_dark_text;
+  }
+}
+
+// ── Row actions ────────────────────────────────────────────────────────────────
+
+.item_actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+  transition: opacity 0.15s ease;
+
+  // Hover reveal on pointer devices, always visible on touch screens.
+  @media (hover: hover) {
+    opacity: 0;
+
+    .item:hover &,
+    .item:focus-within & {
+      opacity: 1;
+    }
+  }
+}
+
+.icon_button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  color: $gray_400;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+  @include focus_ring;
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  &:hover:not(:disabled) {
+    background: #fff;
+    color: $gray_700;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.08);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.35;
+  }
+
+  @include dark {
+    &:hover:not(:disabled) {
+      background: $gray_700;
+      color: $dark_text;
+    }
+  }
+
+  &.is_active {
+    color: $sky_600;
+
+    @include dark {
+      color: $sky_dark_text;
+    }
+  }
+
+  &.is_danger:hover:not(:disabled) {
+    background: $error_50;
+    color: $error_600;
+
+    @include dark {
+      background: $error_dark_bg;
+      color: $error_dark_text;
+    }
+  }
+}
+
+// ── Inline rename and delete confirmation ──────────────────────────────────────
+
+.item_inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: $gray_50;
+
+  @include dark {
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .input {
+    height: 32px;
+    padding-left: 12px;
+    font-size: 13.5px;
+  }
+}
+
+.item_confirm {
+  border: 1px solid $error_100;
+  background: $error_50;
+
+  @include dark {
+    border-color: rgba(240, 68, 56, 0.35);
+    background: $error_dark_bg;
+  }
+}
+
+.confirm_text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: $error_700;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  @include dark {
+    color: $error_dark_text;
+  }
+
+  strong {
+    font-weight: 600;
+  }
+}
+
+.small_button {
+  flex-shrink: 0;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  @include focus_ring;
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}
+
+.small_button_primary {
+  background: $brand_500;
+  color: #fff;
+
+  &:hover:not(:disabled) {
+    background: $brand_600;
+  }
+}
+
+.small_button_danger {
+  background: $error_600;
+  color: #fff;
+
+  &:hover:not(:disabled) {
+    background: $error_700;
+  }
+}
+
+.small_button_ghost {
+  color: $gray_600;
+
+  &:hover:not(:disabled) {
+    background: rgba(16, 24, 40, 0.06);
+  }
+
+  @include dark {
+    color: #d0d5dd;
+
+    &:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.08);
+    }
+  }
+}
+
+// ── Loading and empty states ───────────────────────────────────────────────────
+
+.skeleton_row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+}
+
+.skeleton_block {
+  border-radius: 6px;
+  background: $gray_100;
+  animation: skeleton_pulse 1.4s ease-in-out infinite;
+
+  @include dark {
+    background: $gray_700;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes skeleton_pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 24px 18px;
+  text-align: center;
+}
+
+.empty_icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 12px;
+  border: 6px solid $gray_50;
+  border-radius: 50%;
+  background: $gray_100;
+  color: $gray_500;
+  box-sizing: content-box;
+
+  svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  @include dark {
+    border-color: rgba(255, 255, 255, 0.03);
+    background: $gray_700;
+    color: #d0d5dd;
+  }
+}
+
+.empty_title {
+  color: $gray_800;
+  font-size: 14px;
+  font-weight: 600;
+
+  @include dark {
+    color: $dark_text;
+  }
+}
+
+.empty_text {
+  max-width: 17rem;
+  margin-top: 4px;
+  color: $gray_500;
+  font-size: 12.5px;
+  line-height: 1.5;
+
+  @include dark {
+    color: $dark_text_muted;
+  }
+}
