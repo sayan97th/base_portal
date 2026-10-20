@@ -91,6 +91,16 @@ export async function listAdminUsersForSelect(): Promise<AdminUserOption[]> {
   return res.data;
 }
 
+/**
+ * GET /api/admin/link-building-orders/pen-names
+ * Returns every distinct pen name already used on the dashboard, sorted
+ * alphabetically, for the Pen Name cell dropdown.
+ */
+export async function listPenNamesForSelect(): Promise<string[]> {
+  const res = await apiClient.get<{ data: string[] }>("/api/admin/link-building-orders/pen-names");
+  return res.data;
+}
+
 // ── Client users for client-account dropdown ──────────────────────────────────
 
 export interface ClientUserOption {

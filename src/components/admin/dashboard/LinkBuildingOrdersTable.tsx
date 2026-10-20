@@ -26,6 +26,7 @@ import {
   getLinkBuildingOrderFilterValues,
   listAdminUsersForSelect,
   listClientUsersForSelect,
+  listPenNamesForSelect,
   getNeedsLbTlApprovalCount,
   parseApiErrorMessage,
   type AdminUserOption,
@@ -92,6 +93,9 @@ interface ColumnDef {
   min_width: number;
   type: "text" | "select" | "date" | "url" | "number";
   options?: string[];
+  /** The options are loaded at runtime from existing data (e.g. Pen Name) rather
+   *  than a preset list, so they act as suggestions and any new value is allowed. */
+  dynamic_options?: boolean;
   locked?: boolean;
   required?: boolean;
   sort_key?: string;
@@ -197,7 +201,7 @@ const COLUMNS: ColumnDef[] = [
   { key: "internal_notes", label: "Internal Notes", group: "internal", min_width: 200, type: "text" },
   { key: "request_date", label: "Request Date", group: "dates", min_width: 120, type: "date", locked: true },
   { key: "estimated_delivery_date", label: "Delivery Date", group: "dates", min_width: 175, type: "date", locked: true },
-  { key: "pen_name", label: "Pen Name", group: "writer", min_width: 120, type: "text" },
+  { key: "pen_name", label: "Pen Name", group: "writer", min_width: 120, type: "select", options: [], dynamic_options: true },
   { key: "partnership", label: "Partnership", group: "writer", min_width: 180, type: "url" },
   { key: "article_title", label: "Article Title", group: "writer", min_width: 220, type: "text" },
   { key: "article", label: "Article", group: "writer", min_width: 120, type: "url" },
@@ -214,6 +218,22 @@ const COLUMNS: ColumnDef[] = [
   { key: "final_price", label: "Final Price", group: "pricing", min_width: 110, type: "text" },
   { key: "currency", label: "Currency", group: "pricing", min_width: 100, type: "select", options: ["USD", "EUR"] },
 ];
+
+/**
+ * Pen Name dropdown options: the names saved on the server merged with the ones
+ * on the currently loaded rows, so a name typed moments ago (by this admin or a
+ * collaborator) is offered right away without refetching. Deduplicated without
+ * regard to casing and sorted alphabetically.
+ */
+function buildPenNameOptions(saved_pen_names: string[], loaded_pen_names: string[]): string[] {
+  const options_by_key = new Map<string, string>();
+  [...saved_pen_names, ...loaded_pen_names].forEach((pen_name) => {
+    const trimmed = pen_name.trim();
+    const option_key = trimmed.toLowerCase();
+    if (trimmed !== "" && !options_by_key.has(option_key)) options_by_key.set(option_key, trimmed);
+  });
+  return Array.from(options_by_key.values()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+}
 
 const COLUMN_LABELS: Record<string, string> = Object.fromEntries(
   COLUMNS.map((col) => [col.key, col.label])
@@ -751,6 +771,7 @@ function EditableCell({
             anchor_el={combobox_anchor_el}
             onHighlightChange={setHighlightedIdx}
             onSelect={commitDropdownValue}
+            empty_message={col.dynamic_options ? "No saved values yet. Type to add one." : undefined}
           />
         </td>
       );
@@ -977,6 +998,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   const [rows, setRows] = useState<LinkBuildingOrderRow[]>([]);
   const [admin_users, setAdminUsers] = useState<AdminUserOption[]>([]);
   const [client_users, setClientUsers] = useState<ClientUserOption[]>([]);
+  const [saved_pen_names, setSavedPenNames] = useState<string[]>([]);
   const [is_loading, setIsLoading] = useState(true);
   const [save_error, setSaveError] = useState<string | null>(null);
   const [notification_banner, setNotificationBanner] = useState<string | null>(null);
@@ -1229,11 +1251,12 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     prev_activity_ref.current = { editing: editing_cell, selected: selected_row_id };
   }, [editing_cell, selected_row_id, sendRowFocus, sendRowBlur, sendRowSelect]);
 
-  // ── Fetch admin users and client users for dropdowns ───────────────────────
+  // ── Fetch admin users, client users and pen names for dropdowns ────────────
 
   useEffect(() => {
     listAdminUsersForSelect().then(setAdminUsers).catch(() => {/* non-critical */ });
     listClientUsersForSelect().then(setClientUsers).catch(() => {/* non-critical */ });
+    listPenNamesForSelect().then(setSavedPenNames).catch(() => {/* non-critical */ });
   }, []);
 
   // ── Fetch ───────────────────────────────────────────────────────────────────
@@ -1299,9 +1322,33 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
   // ── Derived state ───────────────────────────────────────────────────────────
 
+  // The row being edited is left out so its half-typed text never shows up as an
+  // option. Joined into a string so the options (and the columns built from them)
+  // only change when the set of names does, not on every keystroke.
+  const editing_row_id = editing_cell?.row_id ?? null;
+  const loaded_pen_names_key = useMemo(
+    () =>
+      rows
+        .filter((row) => row.id !== editing_row_id)
+        .map((row) => row.pen_name ?? "")
+        .join("\n"),
+    [rows, editing_row_id]
+  );
+  const pen_name_options = useMemo(
+    () => buildPenNameOptions(saved_pen_names, loaded_pen_names_key.split("\n")),
+    [saved_pen_names, loaded_pen_names_key]
+  );
+
+  // COLUMNS with runtime loaded options filled in, used wherever a column's
+  // options are read (cell dropdowns, paste normalization, batch edit).
+  const columns = useMemo(
+    () => COLUMNS.map((col) => (col.key === "pen_name" ? { ...col, options: pen_name_options } : col)),
+    [pen_name_options]
+  );
+
   const visible_columns = useMemo(
-    () => COLUMNS.filter((col) => !hidden_columns.has(col.key)),
-    [hidden_columns]
+    () => columns.filter((col) => !hidden_columns.has(col.key)),
+    [columns, hidden_columns]
   );
   const filtered_rows = rows;
 
@@ -2133,7 +2180,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       raw_value: string,
       current_value: LinkBuildingOrderRow[keyof LinkBuildingOrderRow]
     ): LinkBuildingOrderRow[keyof LinkBuildingOrderRow] => {
-      const col_def = COLUMNS.find((c) => c.key === field);
+      const col_def = visible_columns.find((c) => c.key === field);
       // order_id must stay unique per row and is server-generated, so it is never
       // overwritten by a bulk paste — same rule the batch-update endpoint enforces.
       if (!col_def || col_def.locked || field === "order_id") return current_value;
@@ -3690,8 +3737,31 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
               }
 
               // ── Standard column types ────────────────────────────────────────
-              const col_def = COLUMNS.find((c) => c.key === batch_field);
+              const col_def = columns.find((c) => c.key === batch_field);
               if (!col_def) return null;
+              if (col_def.dynamic_options && col_def.options) {
+                // Runtime loaded options are suggestions only, so a free-text input
+                // backed by a datalist lets the admin pick an existing value or type a new one.
+                const datalist_id = `batch-options-${col_def.key}`;
+                return (
+                  <>
+                    <input
+                      type="text"
+                      list={datalist_id}
+                      placeholder={`Select or type ${col_def.label}…`}
+                      value={batch_value}
+                      onChange={(e) => setBatchValue(e.target.value)}
+                      className="h-7 rounded border border-indigo-200 bg-white px-2 text-xs outline-none focus:border-indigo-400 dark:border-indigo-800 dark:bg-gray-800 dark:text-gray-200"
+                      style={{ minWidth: 160 }}
+                    />
+                    <datalist id={datalist_id}>
+                      {col_def.options.map((opt) => (
+                        <option key={opt} value={opt} />
+                      ))}
+                    </datalist>
+                  </>
+                );
+              }
               if (col_def.type === "select" && col_def.options) {
                 return (
                   <select

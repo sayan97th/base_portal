@@ -19,6 +19,8 @@ interface CellOptionsDropdownProps {
   onHighlightChange: (idx: number) => void;
   /** Fires when an option (or the custom-value row) is picked with the mouse. */
   onSelect: (value: string) => void;
+  /** Shown when there are no options to list and nothing has been typed yet. */
+  empty_message?: string;
 }
 
 /**
@@ -35,6 +37,7 @@ export default function CellOptionsDropdown({
   anchor_el,
   onHighlightChange,
   onSelect,
+  empty_message = "No options configured",
 }: CellOptionsDropdownProps) {
   const panel_ref = useRef<HTMLDivElement>(null);
   const item_refs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -149,7 +152,7 @@ export default function CellOptionsDropdown({
       })}
 
       {item_count === 0 && (
-        <p className="px-3 py-2 text-xs text-gray-400 dark:text-gray-500">No options configured</p>
+        <p className="px-3 py-2 text-xs text-gray-400 dark:text-gray-500">{empty_message}</p>
       )}
     </div>
   );
