@@ -36,6 +36,12 @@ export interface LinkBuildingOrderRow {
   final_price: string;
   /** Currency for pricing fields: USD or EUR. */
   currency: string;
+  /**
+   * Spreadsheet formulas typed into this row's cells, by column key, in the
+   * engine's stored notation (see src/lib/spreadsheet-formulas/references.ts).
+   * The column itself holds the computed value. Null when the row has none.
+   */
+  cell_formulas?: Record<string, string> | null;
   /** Optional: links this standalone admin row to a specific client user account. */
   user_id?: number | null;
   /** Admin team responsible for this placement (UUID of admin_teams record). */
@@ -343,4 +349,41 @@ export interface LinkBuildingOrderFilterPreference {
   /** The saved filter the current view came from, null when none is applied. */
   applied_saved_filter_id: string | null;
   updated_at: string | null;
+}
+
+// ── Spreadsheet formulas ───────────────────────────────────────────────────────
+
+/** Display format of a formula column, see FORMULA_COLUMN_FORMATS. */
+export type LinkBuildingOrderFormulaFormat = "auto" | "number" | "currency" | "percent" | "date" | "text";
+
+/**
+ * A team wide formula of the Link Building Orders spreadsheet: a calculated
+ * column (kind "column") or one cell of the totals row (kind "summary").
+ */
+export interface LinkBuildingOrderSheetFormula {
+  id: number;
+  kind: "column" | "summary";
+  /** "formula_{id}" for a column, the column the cell sits under for a totals cell. */
+  key: string;
+  name: string | null;
+  target_key: string | null;
+  /** Stored notation, references by column key and row offset. */
+  formula: string;
+  format: LinkBuildingOrderFormulaFormat;
+  position: number;
+  updated_by_name: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface LinkBuildingOrderSheetFormulas {
+  columns: LinkBuildingOrderSheetFormula[];
+  summary: LinkBuildingOrderSheetFormula[];
+}
+
+export interface LinkBuildingOrderFormulaColumnPayload {
+  name?: string;
+  formula?: string;
+  format?: LinkBuildingOrderFormulaFormat;
+  position?: number;
 }

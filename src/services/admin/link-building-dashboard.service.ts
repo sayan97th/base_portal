@@ -240,6 +240,8 @@ export async function batchUpdateLinkBuildingOrderCells(
   updates: {
     id: string;
     fields: Partial<Record<keyof LinkBuildingOrderRow, string | null>>;
+    /** When present, replaces the row's whole formulas map (null removes them all). */
+    cell_formulas?: Record<string, string> | null;
   }[]
 ): Promise<{ message: string; updated_count: number; data: LinkBuildingOrderRow[] }> {
   return apiClient.post("/api/admin/link-building-orders/batch-update-cells", {

@@ -103,6 +103,8 @@ export interface UseLinkBuildingCollaborationOptions {
   onRowUpdated: (row: LinkBuildingOrderRow, by_session_id: string) => void;
   onRowCreated: (row: LinkBuildingOrderRow, by_session_id: string) => void;
   onRowDeleted: (row_id: string, by_session_id: string) => void;
+  /** A formula column or totals row formula changed, the table should reload them. */
+  onSheetFormulasChanged?: (by_session_id: string | null) => void;
 }
 
 export interface UseLinkBuildingCollaborationReturn {
@@ -141,6 +143,7 @@ export function useLinkBuildingCollaboration(
     onRowUpdated,
     onRowCreated,
     onRowDeleted,
+    onSheetFormulasChanged,
   } = options;
 
   const [collaborators, setCollaborators] = useState<CollaboratorPresence[]>([]);
@@ -152,6 +155,8 @@ export function useLinkBuildingCollaboration(
   on_row_updated_ref.current = onRowUpdated;
   on_row_created_ref.current = onRowCreated;
   on_row_deleted_ref.current = onRowDeleted;
+  const on_sheet_formulas_changed_ref = useRef(onSheetFormulasChanged);
+  on_sheet_formulas_changed_ref.current = onSheetFormulasChanged;
 
   const channel_ref = useRef<EchoPresenceChannel | null>(null);
 
@@ -290,6 +295,11 @@ export function useLinkBuildingCollaboration(
         deleted_by_session_id: string;
       };
       on_row_deleted_ref.current(row_id, deleted_by_session_id);
+    });
+
+    channel.listen(".LinkBuildingOrderSheetFormulasChanged", (data: unknown) => {
+      const { changed_by_session_id } = data as { changed_by_session_id: string | null };
+      on_sheet_formulas_changed_ref.current?.(changed_by_session_id);
     });
 
     return () => {

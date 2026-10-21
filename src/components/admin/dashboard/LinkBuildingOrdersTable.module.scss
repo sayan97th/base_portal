@@ -363,78 +363,9 @@ $toolbar_focus_ring: rgba(236, 60, 137, 0.12);
   }
 }
 
-// ── Formula bar ────────────────────────────────────────────────────────────────
-
-.formula_bar {
-  display: flex;
-  align-items: stretch;
-  min-height: 34px;
-  border-bottom: 1px solid $grid_line;
-  background: #fff;
-  font-size: $cell_font_size;
-
-  @include dark {
-    border-bottom-color: $grid_line_dark;
-    background: $cell_bg_dark;
-  }
-}
-
-.name_box {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  width: 110px;
-  padding: 0 10px;
-  border-right: 1px solid $grid_line;
-  color: $header_text;
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-
-  @include dark {
-    border-right-color: $grid_line_dark;
-    color: $header_text_dark;
-  }
-}
-
-.formula_icon {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  padding: 0 10px;
-  border-right: 1px solid $grid_line;
-  color: #9aa0a6;
-  font-style: italic;
-  font-weight: 600;
-
-  @include dark {
-    border-right-color: $grid_line_dark;
-  }
-}
-
-.formula_value {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  min-width: 0;
-  padding: 0 10px;
-  color: #1f1f1f;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-
-  @include dark {
-    color: #e5e7eb;
-  }
-}
-
-.formula_placeholder {
-  color: #9aa0a6;
-  font-style: italic;
-}
+// ── Formula bar extras ─────────────────────────────────────────────────────────
+// The formula bar itself lives in SpreadsheetFormulas.module.scss, these are the
+// range totals and badges the table shows on its right.
 
 .range_stats {
   display: flex;
@@ -916,6 +847,322 @@ $find_term_colors: (
     border-color: $selection_color_dark;
     background: #1f2937;
     color: #fff;
+  }
+}
+
+// ── Spreadsheet formulas ───────────────────────────────────────────────────────
+// Formula cells, the references of a formula being typed, formula columns and the
+// totals row. Colors follow Google Sheets: green for formulas, one color per
+// reference while editing, red for errors.
+
+$formula_green: #188038;
+$formula_green_dark: #81c995;
+$formula_column_tint: #f5faf6;
+$formula_column_tint_dark: rgba(129, 201, 149, 0.05);
+$formula_error: #d93025;
+$formula_error_dark: #f28b82;
+$summary_bg: #f1f3f4;
+$summary_bg_dark: #18212f;
+$summary_border: #9aa0a6;
+$summary_border_dark: #4b5563;
+$mono_font: ui-monospace, "SFMono-Regular", "Roboto Mono", Menlo, Consolas, monospace;
+
+// The same palette Sheets cycles through for the references of a formula.
+$formula_reference_colors: (
+  (0, #1a73e8, #8ab4f8),
+  (1, #d93025, #f28b82),
+  (2, #8430ce, #c58af9),
+  (3, #188038, #81c995),
+  (4, #e37400, #fcad70),
+  (5, #12b5cb, #78d9ec),
+);
+
+.cell_input_formula {
+  font-family: $mono_font;
+  font-size: 12.5px;
+  letter-spacing: -0.01em;
+}
+
+// A small green corner marks a cell whose value comes from a formula.
+.cell_formula::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 6px 6px 0 0;
+  border-color: rgba($formula_green, 0.55) transparent transparent transparent;
+  pointer-events: none;
+
+  @include dark {
+    border-color: rgba($formula_green_dark, 0.6) transparent transparent transparent;
+  }
+}
+
+// A formula that evaluates to an error gets a red corner, its explanation is in the tooltip.
+.cell_formula_error::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 7px 7px 0;
+  border-color: transparent $formula_error transparent transparent;
+  pointer-events: none;
+
+  @include dark {
+    border-color: transparent $formula_error_dark transparent transparent;
+  }
+}
+
+.cell_error_text {
+  color: $formula_error;
+  font-weight: 600;
+
+  @include dark {
+    color: $formula_error_dark;
+  }
+}
+
+// While a formula is typed, each of its references colors the cells it reads.
+@each $idx, $light, $dark in $formula_reference_colors {
+  .formula_ref_#{$idx} {
+    background-color: rgba($light, 0.09) !important;
+    box-shadow: inset 0 0 0 2px $light !important;
+
+    @include dark {
+      background-color: rgba($dark, 0.14) !important;
+      box-shadow: inset 0 0 0 2px $dark !important;
+    }
+  }
+
+  .letter_row th.formula_ref_letter_#{$idx} {
+    background: rgba($light, 0.14);
+    box-shadow: inset 0 -3px 0 $light;
+    color: $light;
+    font-weight: 700;
+
+    @include dark {
+      background: rgba($dark, 0.18);
+      box-shadow: inset 0 -3px 0 $dark;
+      color: $dark;
+    }
+  }
+}
+
+// Clicking a cell while typing a formula inserts its reference, the crosshair says so.
+.grid_pointing tbody td,
+.grid_pointing .letter_row th {
+  cursor: crosshair;
+}
+
+// ── Formula columns ────────────────────────────────────────────────────────────
+
+.letter_row th.letter_formula_column {
+  color: $formula_green;
+
+  @include dark {
+    color: $formula_green_dark;
+  }
+}
+
+.formula_column_header {
+  background: linear-gradient(180deg, #1e8e3e, #188038);
+  color: #fff;
+
+  @include dark {
+    background: linear-gradient(180deg, #1e6f37, #175f30);
+  }
+}
+
+.formula_column_badge {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  font-family: $mono_font;
+  font-size: 10px;
+  font-style: italic;
+  font-weight: 700;
+}
+
+.formula_column_edit {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 2px;
+  border-radius: 4px;
+  opacity: 0.6;
+  transition:
+    opacity 0.12s ease,
+    background-color 0.12s ease;
+
+  &:hover,
+  &:focus-visible {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.18);
+    outline: none;
+  }
+}
+
+.formula_column_cell {
+  background-color: $formula_column_tint;
+
+  @include dark {
+    background-color: $formula_column_tint_dark;
+  }
+}
+
+.computed_cell {
+  position: relative;
+}
+
+// The "fx" hint of an empty totals cell only shows on hover, so the row stays quiet.
+.computed_cell_placeholder {
+  color: #9aa0a6;
+  font-family: $mono_font;
+  font-size: 11px;
+  font-style: italic;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+
+  .computed_cell:hover &,
+  .cell_active & {
+    opacity: 1;
+  }
+}
+
+.add_formula_column {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px dashed rgba(255, 255, 255, 0.35);
+  border-radius: 6px;
+  font-family: $mono_font;
+  font-size: 11px;
+  font-style: italic;
+  font-weight: 700;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease;
+
+  &:hover,
+  &:focus-visible {
+    border-color: #81c995;
+    background: rgba(129, 201, 149, 0.18);
+    outline: none;
+  }
+}
+
+// ── Totals row ─────────────────────────────────────────────────────────────────
+
+// Pinned to the bottom of the scroll area, above the rows and under the header.
+.summary_footer td {
+  position: sticky;
+  bottom: 0;
+  z-index: 5 !important;
+}
+
+.summary_row td {
+  height: $row_height;
+  border-top: 2px solid $summary_border;
+  border-right: 1px solid $grid_line;
+  background: $summary_bg;
+  font-weight: 600;
+  vertical-align: middle;
+
+  @include dark {
+    border-top-color: $summary_border_dark;
+    border-right-color: $grid_line_dark;
+    background: $summary_bg_dark;
+  }
+}
+
+// Frozen totals cells cover the ones scrolling underneath them.
+.summary_footer td.summary_sticky_bg {
+  z-index: 6 !important;
+}
+
+.summary_footer td.summary_row_header {
+  z-index: 7 !important;
+  color: $formula_green;
+  font-size: 14px;
+  font-weight: 700;
+
+  @include dark {
+    color: $formula_green_dark;
+  }
+}
+
+.summary_spacer {
+  background: $summary_bg;
+
+  @include dark {
+    background: $summary_bg_dark;
+  }
+}
+
+.summary_cell {
+  color: #1f1f1f;
+
+  @include dark {
+    color: #e5e7eb;
+  }
+}
+
+// ── Toolbar ────────────────────────────────────────────────────────────────────
+
+.fx_glyph,
+.sigma_glyph {
+  font-family: $mono_font;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.fx_glyph {
+  font-style: italic;
+}
+
+.sigma_glyph {
+  font-size: 15px;
+}
+
+.icon_button_formula {
+  color: $formula_green;
+
+  &:hover {
+    background: rgba($formula_green, 0.08);
+    color: $formula_green;
+  }
+
+  @include dark {
+    color: $formula_green_dark;
+
+    &:hover {
+      background: rgba($formula_green_dark, 0.12);
+      color: $formula_green_dark;
+    }
+  }
+}
+
+.icon_button_summary_active {
+  border-color: rgba($formula_green, 0.45);
+  background: rgba($formula_green, 0.08);
+  color: $formula_green;
+
+  @include dark {
+    border-color: rgba($formula_green_dark, 0.45);
+    background: rgba($formula_green_dark, 0.12);
+    color: $formula_green_dark;
   }
 }
 

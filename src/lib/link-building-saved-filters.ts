@@ -87,7 +87,7 @@ function normalizeSheetFilter(value: unknown): SavedSheetColumnFilter | null {
  */
 export function normalizeFilterState(
   raw: unknown,
-  known_columns?: ReadonlySet<string>
+  known_columns?: Pick<ReadonlySet<string>, "has">
 ): LinkBuildingOrderFilterState {
   if (!isRecord(raw)) return { ...EMPTY_FILTER_STATE };
 

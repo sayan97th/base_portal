@@ -1,0 +1,1097 @@
+// Formula editing UI of the Link Building Orders spreadsheet: the formula bar,
+// the function autocomplete and argument hint, the Functions reference panel and
+// the formula column dialog. Colors follow the Google Sheets look of
+// LinkBuildingOrdersTable.module.scss.
+
+// ── Tokens ─────────────────────────────────────────────────────────────────────
+
+$grid_line: #e1e3e1;
+$grid_line_dark: #374151;
+$surface: #fff;
+$surface_dark: #111827;
+$surface_raised_dark: #1f2937;
+$header_text: #444746;
+$header_text_dark: #9ca3af;
+$text: #1f1f1f;
+$text_dark: #e5e7eb;
+$muted: #5f6368;
+$muted_dark: #9ca3af;
+$accent: #1a73e8;
+$accent_dark: #8ab4f8;
+$accent_soft: #e8f0fe;
+$accent_soft_dark: rgba(138, 180, 248, 0.16);
+$formula_green: #188038;
+$formula_green_dark: #81c995;
+$error: #d93025;
+$error_dark: #f28b82;
+$error_soft: #fce8e6;
+$error_soft_dark: rgba(242, 139, 130, 0.14);
+$mono: ui-monospace, "SFMono-Regular", "Roboto Mono", Menlo, Consolas, monospace;
+$font_family: var(--font-outfit), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+$popover_z: 100003;
+
+@mixin dark {
+  :global(.dark) & {
+    @content;
+  }
+}
+
+@mixin popover_surface {
+  border: 1px solid $grid_line;
+  border-radius: 10px;
+  background: $surface;
+  box-shadow:
+    0 10px 30px -8px rgba(60, 64, 67, 0.3),
+    0 2px 6px rgba(60, 64, 67, 0.15);
+
+  @include dark {
+    border-color: $grid_line_dark;
+    background: $surface_raised_dark;
+    box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.6);
+  }
+}
+
+// ── Autocomplete and argument hint ─────────────────────────────────────────────
+
+.assist_panel {
+  @include popover_surface;
+  position: fixed;
+  z-index: $popover_z;
+  display: flex;
+  width: min(460px, calc(100vw - 16px));
+  max-height: 260px;
+  overflow: hidden;
+  font-family: $font_family;
+  font-size: 12px;
+  color: $text;
+  animation: assist_in 0.12s ease-out;
+
+  @include dark {
+    color: $text_dark;
+  }
+}
+
+@keyframes assist_in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.assist_list {
+  flex: 0 0 170px;
+  overflow-y: auto;
+  padding: 4px 0;
+  border-right: 1px solid $grid_line;
+
+  @include dark {
+    border-right-color: $grid_line_dark;
+  }
+}
+
+.assist_item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 10px;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: rgba(60, 64, 67, 0.06);
+  }
+
+  @include dark {
+    &:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+  }
+}
+
+.assist_item_active,
+.assist_item_active:hover {
+  background: $accent_soft;
+
+  @include dark {
+    background: $accent_soft_dark;
+  }
+}
+
+.assist_name {
+  font-family: $mono;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.assist_category {
+  color: $muted;
+  font-size: 10px;
+
+  @include dark {
+    color: $muted_dark;
+  }
+}
+
+.assist_detail {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 10px 12px;
+}
+
+.assist_signature {
+  display: block;
+  font-family: $mono;
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-word;
+  color: $text;
+
+  @include dark {
+    color: $text_dark;
+  }
+}
+
+.assist_arg_active {
+  font-weight: 700;
+  color: $accent;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+
+  @include dark {
+    color: $accent_dark;
+  }
+}
+
+.assist_description {
+  margin-top: 6px;
+  color: $muted;
+  line-height: 1.45;
+
+  @include dark {
+    color: $muted_dark;
+  }
+}
+
+.assist_example {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 8px;
+
+  span {
+    color: $muted;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  code {
+    font-family: $mono;
+    color: $formula_green;
+
+    @include dark {
+      color: $formula_green_dark;
+    }
+  }
+}
+
+.assist_keys {
+  margin-top: 8px;
+  color: $muted;
+  font-size: 10px;
+
+  kbd {
+    padding: 0 4px;
+    border: 1px solid $grid_line;
+    border-radius: 3px;
+    font-family: $mono;
+    font-size: 10px;
+
+    @include dark {
+      border-color: $grid_line_dark;
+    }
+  }
+}
+
+// ── Formula bar ────────────────────────────────────────────────────────────────
+
+.bar {
+  display: flex;
+  align-items: stretch;
+  min-height: 34px;
+  border-bottom: 1px solid $grid_line;
+  background: $surface;
+  font-family: $font_family;
+  font-size: 13px;
+
+  @include dark {
+    border-bottom-color: $grid_line_dark;
+    background: $surface_dark;
+  }
+}
+
+.name_box {
+  flex-shrink: 0;
+  width: 110px;
+  padding: 0 10px;
+  border: 0;
+  border-right: 1px solid $grid_line;
+  background: transparent;
+  color: $header_text;
+  font-family: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  outline: none;
+
+  &:focus {
+    box-shadow: inset 0 0 0 2px $accent;
+    color: $text;
+  }
+
+  &::placeholder {
+    color: #9aa0a6;
+    font-weight: 400;
+  }
+
+  @include dark {
+    border-right-color: $grid_line_dark;
+    color: $header_text_dark;
+
+    &:focus {
+      box-shadow: inset 0 0 0 2px $accent_dark;
+      color: $text_dark;
+    }
+  }
+}
+
+button.name_box {
+  overflow: hidden;
+  text-align: left;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: text;
+
+  &:hover {
+    background: rgba(60, 64, 67, 0.04);
+  }
+
+  @include dark {
+    &:hover {
+      background: rgba(255, 255, 255, 0.04);
+    }
+  }
+}
+
+.name_box_invalid {
+  animation: name_box_shake 0.3s ease;
+  box-shadow: inset 0 0 0 2px $error !important;
+}
+
+@keyframes name_box_shake {
+  25% {
+    transform: translateX(-3px);
+  }
+
+  75% {
+    transform: translateX(3px);
+  }
+}
+
+.fx_button {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px;
+  border-right: 1px solid $grid_line;
+  color: #9aa0a6;
+  font-style: italic;
+  font-weight: 700;
+  transition:
+    color 0.12s ease,
+    background-color 0.12s ease;
+
+  &:hover,
+  &:focus-visible {
+    background: $accent_soft;
+    color: $accent;
+    outline: none;
+  }
+
+  @include dark {
+    border-right-color: $grid_line_dark;
+
+    &:hover,
+    &:focus-visible {
+      background: $accent_soft_dark;
+      color: $accent_dark;
+    }
+  }
+}
+
+.fx_button_formula {
+  color: $formula_green;
+
+  @include dark {
+    color: $formula_green_dark;
+  }
+}
+
+.formula_field {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+}
+
+.formula_input {
+  width: 100%;
+  height: 100%;
+  min-height: 33px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: $text;
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  text-overflow: ellipsis;
+
+  &:read-only {
+    cursor: default;
+  }
+
+  &::placeholder {
+    color: #9aa0a6;
+    font-style: italic;
+  }
+
+  @include dark {
+    color: $text_dark;
+  }
+}
+
+// The active cell's text while the bar is not being edited.
+.formula_display {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  min-height: 33px;
+  padding: 0 10px;
+  overflow: hidden;
+  color: $text;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+
+  @include dark {
+    color: $text_dark;
+  }
+}
+
+.formula_display_editable {
+  cursor: text;
+}
+
+.formula_placeholder {
+  overflow: hidden;
+  color: #9aa0a6;
+  font-family: $font_family;
+  font-size: 13px;
+  font-style: italic;
+  text-overflow: ellipsis;
+}
+
+// A formula reads in a monospace face, like code, so references stand out.
+.formula_input_formula {
+  font-family: $mono;
+  font-size: 12.5px;
+}
+
+.formula_input_editing {
+  box-shadow: inset 0 -2px 0 $accent;
+  background: rgba(26, 115, 232, 0.03);
+
+  @include dark {
+    box-shadow: inset 0 -2px 0 $accent_dark;
+    background: rgba(138, 180, 248, 0.05);
+  }
+}
+
+.formula_error_chip {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  max-width: 280px;
+  margin-right: 8px;
+  padding: 2px 8px;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: $error_soft;
+  color: $error;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+
+  @include dark {
+    background: $error_soft_dark;
+    color: $error_dark;
+  }
+}
+
+.formula_scope_chip {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  margin-right: 8px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: #e6f4ea;
+  color: $formula_green;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+
+  @include dark {
+    background: rgba(129, 201, 149, 0.14);
+    color: $formula_green_dark;
+  }
+}
+
+// ── Functions reference panel ──────────────────────────────────────────────────
+
+.functions_panel {
+  @include popover_surface;
+  position: fixed;
+  z-index: $popover_z;
+  display: flex;
+  flex-direction: column;
+  width: min(420px, calc(100vw - 16px));
+  max-height: min(560px, calc(100vh - 32px));
+  overflow: hidden;
+  font-family: $font_family;
+  font-size: 12px;
+  color: $text;
+  animation: assist_in 0.14s ease-out;
+
+  @include dark {
+    color: $text_dark;
+  }
+}
+
+.functions_header {
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid $grid_line;
+
+  @include dark {
+    border-bottom-color: $grid_line_dark;
+  }
+
+  h3 {
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  p {
+    margin-top: 2px;
+    color: $muted;
+    font-size: 11px;
+    line-height: 1.4;
+
+    @include dark {
+      color: $muted_dark;
+    }
+  }
+}
+
+.functions_search {
+  width: 100%;
+  height: 32px;
+  margin-top: 10px;
+  padding: 0 10px;
+  border: 1px solid $grid_line;
+  border-radius: 8px;
+  background: $surface;
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+
+  &:focus {
+    border-color: $accent;
+    box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.15);
+  }
+
+  @include dark {
+    border-color: $grid_line_dark;
+    background: $surface_dark;
+
+    &:focus {
+      border-color: $accent_dark;
+    }
+  }
+}
+
+.functions_categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.category_chip {
+  padding: 2px 8px;
+  border: 1px solid $grid_line;
+  border-radius: 9999px;
+  color: $muted;
+  font-size: 11px;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+
+  &:hover {
+    background: rgba(60, 64, 67, 0.06);
+  }
+
+  @include dark {
+    border-color: $grid_line_dark;
+    color: $muted_dark;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+  }
+}
+
+.category_chip_active,
+.category_chip_active:hover {
+  border-color: transparent;
+  background: $accent;
+  color: #fff;
+
+  @include dark {
+    background: $accent_dark;
+    color: #0b1220;
+  }
+}
+
+.functions_list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.function_row {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  border-bottom: 1px solid rgba(225, 227, 225, 0.6);
+  text-align: left;
+  transition: background-color 0.1s ease;
+
+  &:hover,
+  &:focus-visible {
+    background: $accent_soft;
+    outline: none;
+  }
+
+  @include dark {
+    border-bottom-color: rgba(55, 65, 81, 0.6);
+
+    &:hover,
+    &:focus-visible {
+      background: $accent_soft_dark;
+    }
+  }
+}
+
+.function_row_head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.function_row_insert {
+  flex-shrink: 0;
+  color: $accent;
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+
+  .function_row:hover &,
+  .function_row:focus-visible & {
+    opacity: 1;
+  }
+
+  @include dark {
+    color: $accent_dark;
+  }
+}
+
+.function_row_description {
+  margin-top: 2px;
+  color: $muted;
+  line-height: 1.4;
+
+  @include dark {
+    color: $muted_dark;
+  }
+}
+
+.functions_empty {
+  padding: 24px 14px;
+  color: $muted;
+  text-align: center;
+}
+
+.functions_footer {
+  padding: 8px 14px;
+  border-top: 1px solid $grid_line;
+  color: $muted;
+  font-size: 11px;
+  line-height: 1.4;
+
+  @include dark {
+    border-top-color: $grid_line_dark;
+    color: $muted_dark;
+  }
+}
+
+// ── Formula column dialog ──────────────────────────────────────────────────────
+
+.dialog_root {
+  position: fixed;
+  inset: 0;
+  z-index: 100002;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  font-family: $font_family;
+}
+
+.dialog_backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.45);
+  backdrop-filter: blur(2px);
+  animation: fade_in 0.15s ease-out;
+}
+
+@keyframes fade_in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 640px;
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
+  border: 1px solid $grid_line;
+  border-radius: 16px;
+  background: $surface;
+  box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.35);
+  color: $text;
+  animation: dialog_in 0.18s ease-out;
+
+  @include dark {
+    border-color: $grid_line_dark;
+    background: $surface_dark;
+    color: $text_dark;
+  }
+}
+
+@keyframes dialog_in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.dialog_header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid $grid_line;
+
+  @include dark {
+    border-bottom-color: $grid_line_dark;
+  }
+}
+
+.dialog_icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #e6f4ea;
+  color: $formula_green;
+  font-family: $mono;
+  font-size: 14px;
+  font-style: italic;
+  font-weight: 700;
+
+  @include dark {
+    background: rgba(129, 201, 149, 0.14);
+    color: $formula_green_dark;
+  }
+}
+
+.dialog_title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.dialog_subtitle {
+  margin-top: 2px;
+  color: $muted;
+  font-size: 12px;
+  line-height: 1.45;
+
+  @include dark {
+    color: $muted_dark;
+  }
+}
+
+.dialog_body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+
+.field {
+  & + & {
+    margin-top: 14px;
+  }
+}
+
+.field_label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  color: $header_text;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+
+  @include dark {
+    color: $header_text_dark;
+  }
+}
+
+.text_input,
+.select_input {
+  width: 100%;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid $grid_line;
+  border-radius: 8px;
+  background: $surface;
+  color: inherit;
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
+
+  &:focus {
+    border-color: $accent;
+    box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.15);
+  }
+
+  @include dark {
+    border-color: $grid_line_dark;
+    background: $surface_raised_dark;
+
+    &:focus {
+      border-color: $accent_dark;
+      box-shadow: 0 0 0 3px rgba(138, 180, 248, 0.18);
+    }
+  }
+}
+
+.formula_text_input {
+  font-family: $mono;
+  font-size: 12.5px;
+}
+
+.text_input_invalid {
+  border-color: $error !important;
+  box-shadow: 0 0 0 3px rgba(217, 48, 37, 0.12) !important;
+}
+
+.field_hint {
+  margin-top: 6px;
+  color: $muted;
+  font-size: 11px;
+  line-height: 1.45;
+
+  code {
+    font-family: $mono;
+    color: $formula_green;
+
+    @include dark {
+      color: $formula_green_dark;
+    }
+  }
+
+  @include dark {
+    color: $muted_dark;
+  }
+}
+
+.field_error {
+  margin-top: 6px;
+  color: $error;
+  font-size: 11px;
+
+  @include dark {
+    color: $error_dark;
+  }
+}
+
+.field_row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 14px;
+
+  @media (max-width: 520px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.preview {
+  margin-top: 16px;
+  overflow: hidden;
+  border: 1px solid $grid_line;
+  border-radius: 10px;
+
+  @include dark {
+    border-color: $grid_line_dark;
+  }
+}
+
+.preview_title {
+  padding: 6px 10px;
+  border-bottom: 1px solid $grid_line;
+  background: #f8f9fa;
+  color: $header_text;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+
+  @include dark {
+    border-bottom-color: $grid_line_dark;
+    background: $surface_raised_dark;
+    color: $header_text_dark;
+  }
+}
+
+.preview_row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 5px 10px;
+  font-size: 12px;
+
+  & + & {
+    border-top: 1px solid rgba(225, 227, 225, 0.6);
+
+    @include dark {
+      border-top-color: rgba(55, 65, 81, 0.6);
+    }
+  }
+}
+
+.preview_row_number {
+  color: $muted;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+
+  @include dark {
+    color: $muted_dark;
+  }
+}
+
+.preview_label {
+  overflow: hidden;
+  color: $muted;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+
+  @include dark {
+    color: $muted_dark;
+  }
+}
+
+.preview_value {
+  overflow: hidden;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.preview_value_error {
+  color: $error;
+
+  @include dark {
+    color: $error_dark;
+  }
+}
+
+.dialog_footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid $grid_line;
+  background: #f8f9fa;
+
+  @include dark {
+    border-top-color: $grid_line_dark;
+    background: $surface_raised_dark;
+  }
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid $grid_line;
+  border-radius: 8px;
+  background: $surface;
+  color: $text;
+  font-size: 13px;
+  font-weight: 500;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease;
+
+  &:hover:not(:disabled) {
+    background: #f1f3f4;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  @include dark {
+    border-color: $grid_line_dark;
+    background: $surface_dark;
+    color: $text_dark;
+
+    &:hover:not(:disabled) {
+      background: #273244;
+    }
+  }
+}
+
+.button_primary {
+  border-color: transparent;
+  background: $accent;
+  color: #fff;
+
+  &:hover:not(:disabled) {
+    background: #1765cc;
+  }
+
+  @include dark {
+    background: $accent_dark;
+    color: #0b1220;
+
+    &:hover:not(:disabled) {
+      background: #aecbfa;
+    }
+  }
+}
+
+.button_danger {
+  border-color: transparent;
+  background: transparent;
+  color: $error;
+
+  &:hover:not(:disabled) {
+    background: $error_soft;
+  }
+
+  @include dark {
+    background: transparent;
+    color: $error_dark;
+
+    &:hover:not(:disabled) {
+      background: $error_soft_dark;
+    }
+  }
+}
+
+.button_danger_confirm {
+  background: $error;
+  color: #fff;
+
+  &:hover:not(:disabled) {
+    background: #b3261e;
+  }
+
+  @include dark {
+    background: $error_dark;
+    color: #0b1220;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .assist_panel,
+  .functions_panel,
+  .dialog,
+  .dialog_backdrop,
+  .name_box_invalid {
+    animation: none;
+  }
+}

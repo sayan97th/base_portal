@@ -111,6 +111,43 @@ import {
   DEFAULT_STATUS_DOT_CLASS,
 } from "@/lib/link-building-order-statuses";
 import FindHighlightedText from "./FindHighlightedText";
+import {
+  analyzeFormula,
+  canInsertReferenceAt,
+  findReferences,
+  formatScalar,
+  formatWithColumnFormat,
+  FormulaError,
+  isFormulaText,
+  parseFormula,
+  toA1Range,
+  toDisplayFormula,
+  toStoredFormula,
+  tokenizeFormula,
+  type FormulaColumnFormat,
+  type FormulaResult,
+  type SheetColumn,
+  type SheetColumnKind,
+} from "@/lib/spreadsheet-formulas";
+import {
+  buildOrdersSheet,
+  collectStaleFormulaCells,
+  createColumnKeyMapper,
+  FORMULA_CELL_COLUMN_KEYS,
+  getCellFormula,
+  isFormulaColumnKey,
+  SUMMARY_ROW_ID,
+  toFieldValue,
+  withCellFormula,
+  type OrdersSheetConfig,
+} from "@/lib/link-building-sheet";
+import { useLinkBuildingSheetFormulas } from "@/hooks/useLinkBuildingSheetFormulas";
+import type { LinkBuildingOrderSheetFormula } from "@/types/admin/link-building-order";
+import FormulaInput from "./FormulaInput";
+import FormulaBar, { type FormulaBarCommitDirection } from "./FormulaBar";
+import FormulaColumnDialog, { type FormulaColumnDraft, type FormulaPreviewRow } from "./FormulaColumnDialog";
+import FunctionsReferencePanel from "./FunctionsReferencePanel";
+import { FormulaEditingContext, type ActiveFormulaEditor, type FormulaEditingContextValue } from "./FormulaEditingContext";
 import styles from "./LinkBuildingOrdersTable.module.scss";
 
 // ── Column types ───────────────────────────────────────────────────────────────
@@ -187,6 +224,12 @@ interface CellHistoryChange {
   col_key: keyof LinkBuildingOrderRow;
   old_value: CellHistoryValue;
   new_value: CellHistoryValue;
+  /**
+   * The cell's stored formula before and after, set only when the change added,
+   * replaced or removed a formula, so undo brings that formula back.
+   */
+  old_formula?: string | null;
+  new_formula?: string | null;
 }
 
 /** One undo/redo unit: every cell touched by a single user action (a cell edit, a
@@ -197,6 +240,14 @@ interface HistoryEntry {
 }
 
 const MAX_HISTORY_ENTRIES = 50;
+
+/** A data cell's value and formula before an edit, to build the undo entry once it is committed. */
+interface CellEditSnapshot {
+  row_id: string;
+  col_key: string;
+  old_value: string;
+  old_formula: string | null;
+}
 
 // ── Column definitions ─────────────────────────────────────────────────────────
 
@@ -334,6 +385,47 @@ const COLUMN_VISIBILITY_GROUPS: ColumnVisibilityGroup[] = COLUMNS.reduce<ColumnV
 
 /** Text columns that hold prices, filtered as numbers like the API's NUMERIC_COLUMNS. */
 const PRICE_COLUMN_KEYS: ReadonlySet<string> = new Set(["posting_fee_lbs", "current_price", "final_price"]);
+
+// ── Spreadsheet formulas ───────────────────────────────────────────────────────
+
+/** How formulas read a column's text: price columns hold numbers such as "$150.00". */
+function getSheetColumnKind(col: ColumnDef): SheetColumnKind {
+  if (col.type === "date") return "date";
+  if (col.type === "number" || PRICE_COLUMN_KEYS.has(col.key)) return "number";
+  return "text";
+}
+
+/**
+ * Columns formulas can reference, in letter order: the table columns (A to AB),
+ * then Client Account and Assigned To. Formula columns follow them. A column keeps
+ * its letter when others are hidden, like in Google Sheets.
+ */
+const BASE_SHEET_COLUMNS: SheetColumn[] = [
+  ...COLUMNS.map((col) => ({ key: col.key as string, kind: getSheetColumnKind(col) })),
+  ...ASSIGNMENT_COLUMN_KEYS.map((key) => ({ key, kind: "text" as const })),
+];
+
+const SHEET_KIND_BY_KEY: ReadonlyMap<string, SheetColumnKind> = new Map(
+  BASE_SHEET_COLUMNS.map((column) => [column.key, column.kind])
+);
+
+const FORMULA_COLUMN_DEFAULT_WIDTH = 170;
+/** Colors cycled through the references of the formula being edited, see .formula_ref_N. */
+const FORMULA_REFERENCE_COLOR_COUNT = 6;
+/** Highest number of cells colored for one reference, so a huge range cannot slow typing down. */
+const MAX_HIGHLIGHTED_REFERENCE_CELLS = 2000;
+/** How long recalculated values wait before they are saved, so a burst of edits is saved once. */
+const FORMULA_SYNC_DELAY_MS = 1500;
+const FORMULA_SYNC_MAX_ROWS = 100;
+const SUMMARY_ROW_STORAGE_KEY = "lbo_summary_row_v1";
+
+/** Text a formula column cell or totals cell shows for a result. */
+function formatComputedResult(result: FormulaResult, format: FormulaColumnFormat, kind: SheetColumnKind): string {
+  if (format === "auto" && kind === "date" && typeof result.value === "number") {
+    return formatWithColumnFormat(result.value, "date", result.format);
+  }
+  return format === "auto" ? formatScalar(result.value, result.format) : formatWithColumnFormat(result.value, format, result.format);
+}
 
 function getAdvancedFilterKind(col: ColumnDef): AdvancedFilterColumnKind {
   if (col.type === "date") return "date";
@@ -643,8 +735,9 @@ interface EditableCellProps {
   onCopy?: (value: string) => void;
   /** Fires when a multi-cell (tab/newline delimited) block is pasted into this cell's input. */
   onBulkPaste?: (grid: PastedGrid) => void;
-  /** Mouse-down on the display cell — starts either a click-to-edit or an Excel-style drag range selection. */
-  onCellMouseDown?: (shift_key: boolean) => void;
+  /** Mouse-down on the display cell — starts either a click-to-edit or an Excel-style drag range selection.
+   *  Receives the event so a formula being typed elsewhere can keep focus and take this cell's reference. */
+  onCellMouseDown?: (e: React.MouseEvent) => void;
   /** Mouse-enter while a drag is in progress — extends the active range selection to this cell. */
   onCellMouseEnter?: () => void;
   /** Mouse-up on the display cell — ends the drag, resolving it into either an edit or a finished range selection. */
@@ -658,6 +751,14 @@ interface EditableCellProps {
   find_match_state?: TableFindMatchState;
   /** Normalized find terms, only passed while this cell matches, so its text can be marked. */
   find_terms?: string[];
+  /** For a formula cell, the computed value it shows. Undefined for a plain value. */
+  formula_display?: string;
+  /** For a formula cell that evaluates to an error, the error (shown as a red marker with its explanation). */
+  formula_error?: FormulaError | null;
+  /** False for columns that cannot hold a formula, the editor then stays a plain text input. */
+  formula_enabled?: boolean;
+  /** Color index when the formula being edited references this cell. */
+  formula_ref_color?: number;
 }
 
 function EditableCell({
@@ -687,6 +788,10 @@ function EditableCell({
   sticky_bg_class = "bg-white dark:bg-gray-900",
   find_match_state = null,
   find_terms,
+  formula_display,
+  formula_error = null,
+  formula_enabled = false,
+  formula_ref_color,
 }: EditableCellProps) {
   const input_ref = useRef<HTMLInputElement>(null);
   const [just_copied, setJustCopied] = useState(false);
@@ -700,9 +805,10 @@ function EditableCell({
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!value || !onCopy) return;
-    navigator.clipboard.writeText(value).catch(() => { });
-    onCopy(value);
+    const copy_value = formula_display ?? value;
+    if (!copy_value || !onCopy) return;
+    navigator.clipboard.writeText(copy_value).catch(() => { });
+    onCopy(copy_value);
     setJustCopied(true);
     setTimeout(() => setJustCopied(false), 1200);
   };
@@ -759,9 +865,10 @@ function EditableCell({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [is_editing]);
 
-  /** Arrow keys commit and move only when the edit started from typing (Excel's Enter mode). */
+  /** Arrow keys commit and move only when the edit started from typing (Excel's Enter mode).
+   *  While a formula is typed they move the caret instead, so references can be edited. */
   const handleArrowCommit = (e: React.KeyboardEvent, allowed: ReadonlyArray<GridDirection>): boolean => {
-    if (edit_entry !== "type") return false;
+    if (edit_entry !== "type" || (formula_enabled && value.trimStart().startsWith("="))) return false;
     const direction = ARROW_KEY_DIRECTIONS[e.key];
     if (!direction || !allowed.includes(direction)) return false;
     e.preventDefault();
@@ -887,21 +994,27 @@ function EditableCell({
       );
     }
 
+    // Text, number and date cells edit through FormulaInput: typing "=" turns the
+    // input into a formula editor (function suggestions, argument hints, clicked
+    // cells inserted as references). The <td> anchors the helper popover.
+    const is_formula_text = formula_enabled && value.trimStart().startsWith("=");
     return (
       <td
+        ref={setComboboxAnchorEl}
         data-cell-key={cell_key}
         className={`${styles.cell_editing}${is_sticky ? ` ${sticky_bg_class}` : ""}`}
         style={is_sticky ? { position: "sticky", left: sticky_left, zIndex: 3 } : undefined}
       >
-        <input
-          ref={input_ref}
-          type="text"
+        <FormulaInput
+          input_ref={input_ref}
           value={value}
-          onChange={(e) => onUpdate(e.target.value)}
+          onValueChange={onUpdate}
           onBlur={onStopEdit}
           onKeyDown={handleKeyDown}
           onPaste={handleInputPaste}
-          className={styles.cell_input}
+          formula_enabled={formula_enabled}
+          anchor_el={combobox_anchor_el}
+          className={`${styles.cell_input}${is_formula_text ? ` ${styles.cell_input_formula}` : ""}`}
         />
       </td>
     );
@@ -909,6 +1022,10 @@ function EditableCell({
 
   // ── Display mode ─────────────────────────────────────────────────────────────
 
+  // A formula cell shows its computed value. It normally equals the stored value,
+  // but it is recomputed live, so it is already up to date before the sync saves it.
+  const shown_value = formula_display ?? value;
+  const is_formula_cell = formula_display !== undefined;
   let display: React.ReactNode;
 
   if (col.type === "url" && value) {
@@ -936,10 +1053,16 @@ function EditableCell({
         </span>
       );
     }
-  } else if (col.key === "estimated_delivery_date" && isDateOverdue(value)) {
+  } else if (col.key === "estimated_delivery_date" && isDateOverdue(shown_value)) {
     display = (
       <span className="font-semibold text-red-500">
-        <FindHighlightedText text={value} find_terms={find_terms} />
+        <FindHighlightedText text={shown_value} find_terms={find_terms} />
+      </span>
+    );
+  } else if (formula_error) {
+    display = (
+      <span className={styles.cell_error_text} title={`${formula_error.code}: ${formula_error.detail}`}>
+        {shown_value || formula_error.code}
       </span>
     );
   } else if (col.key === "status" && value) {
@@ -960,16 +1083,16 @@ function EditableCell({
       display = <span className="text-gray-300">—</span>;
     }
   } else {
-    display = value ? (
-      <span title={value}>
-        <FindHighlightedText text={value} find_terms={find_terms} />
+    display = shown_value ? (
+      <span title={shown_value}>
+        <FindHighlightedText text={shown_value} find_terms={find_terms} />
       </span>
     ) : (
       <span className="text-gray-300 dark:text-gray-600">—</span>
     );
   }
 
-  const is_required_error = is_draft && (col.required ?? false) && !value;
+  const is_required_error = is_draft && (col.required ?? false) && !shown_value;
   const has_cell_editors = cell_editors.length > 0;
   const show_row_floater = is_first_col && row_editors.length > 0;
 
@@ -978,6 +1101,8 @@ function EditableCell({
       data-cell-key={cell_key}
       className={`group/cell relative select-none whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 ${styles.cell}${
         col.type === "number" ? ` ${styles.cell_numeric}` : ""
+      }${is_formula_cell ? ` ${styles.cell_formula}` : ""}${formula_error ? ` ${styles.cell_formula_error}` : ""}${
+        formula_ref_color !== undefined ? ` ${styles[`formula_ref_${formula_ref_color}`]}` : ""
       }${getFindCellClass(find_match_state)}${is_range_selected ? ` ${styles.cell_in_range}` : ""}${is_active ? ` ${styles.cell_active}` : ""} ${
         is_required_error
           ? "bg-red-50 ring-1 ring-inset ring-red-300 dark:bg-red-950 dark:ring-red-700"
@@ -995,13 +1120,22 @@ function EditableCell({
         // No preventDefault here: doing so would also suppress the browser's default
         // blur of a currently-focused input in another cell, which is what triggers
         // that cell's save-on-click-away. select-none on this cell is what stops the
-        // native text-selection highlight while dragging instead.
-        onCellMouseDown?.(e.shiftKey);
+        // native text-selection highlight while dragging instead. The table calls it
+        // only when this click inserts a reference into a formula being typed.
+        onCellMouseDown?.(e);
       }}
       onMouseEnter={onCellMouseEnter}
       onMouseUp={onCellMouseUp}
       onDoubleClick={onCellDoubleClick}
-      title={is_required_error ? `Required: ${col.label} must be filled to save this row` : "Double click, Enter or start typing to edit · Arrow keys to move · Shift+Arrow or drag to select · Ctrl+C / Ctrl+V to copy and paste"}
+      title={
+        is_required_error
+          ? `Required: ${col.label} must be filled to save this row`
+          : formula_error
+            ? `${formula_error.code}: ${formula_error.detail}`
+            : is_formula_cell
+              ? "Formula cell, its formula shows in the formula bar · Double click or Enter to edit it"
+              : "Double click, Enter or start typing to edit · Type = to start a formula · Arrow keys to move · Shift+Arrow or drag to select · Ctrl+C / Ctrl+V to copy and paste"
+      }
     >
       {show_row_floater && <RowPresenceFloater editors={row_editors} />}
       {has_cell_editors && <CellPresenceOverlay editors={cell_editors} />}
@@ -1015,7 +1149,7 @@ function EditableCell({
           display
         )}
       </div>
-      {onCopy && value && !is_required_error && (
+      {onCopy && shown_value && !is_required_error && (
         <button
           className={`absolute right-0.5 top-1/2 -translate-y-1/2 rounded p-0.5 opacity-0 transition-all group-hover:opacity-20 group-hover/cell:opacity-70 hover:!opacity-100 hover:bg-white dark:hover:bg-gray-700 ${just_copied ? "!opacity-100 text-green-500" : "text-gray-400"
             }`}
@@ -1034,6 +1168,139 @@ function EditableCell({
           )}
         </button>
       )}
+    </td>
+  );
+}
+
+// ── Computed cell (formula columns and the totals row) ─────────────────────────
+
+interface ComputedCellProps {
+  /** Formatted result. */
+  text: string;
+  error: FormulaError | null;
+  is_numeric: boolean;
+  is_active: boolean;
+  is_editing: boolean;
+  /** Formula being typed while editing. */
+  draft: string;
+  onDraftChange: (text: string) => void;
+  /** Saves the typed formula and moves the active cell (null keeps it in place). */
+  onCommit: (direction: CellNavDirection | null) => void;
+  onCancel: () => void;
+  onCellMouseDown: (e: React.MouseEvent) => void;
+  onCellMouseEnter?: () => void;
+  onDoubleClick: () => void;
+  cell_key: string;
+  title: string;
+  /** Faint text shown while the cell has no formula (totals row). */
+  placeholder?: string;
+  class_name?: string;
+  find_match_state?: TableFindMatchState;
+  find_terms?: string[];
+  formula_ref_color?: number;
+  sticky_left?: number;
+  sticky_bg_class?: string;
+}
+
+/**
+ * A cell whose value is computed by a formula that is not its own: a formula
+ * column cell (the column's formula applied to this row) or a totals row cell.
+ * Editing it edits that formula, with the same helper as any formula cell.
+ */
+function ComputedCell({
+  text,
+  error,
+  is_numeric,
+  is_active,
+  is_editing,
+  draft,
+  onDraftChange,
+  onCommit,
+  onCancel,
+  onCellMouseDown,
+  onCellMouseEnter,
+  onDoubleClick,
+  cell_key,
+  title,
+  placeholder,
+  class_name = "",
+  find_match_state = null,
+  find_terms,
+  formula_ref_color,
+  sticky_left,
+  sticky_bg_class = "",
+}: ComputedCellProps) {
+  const input_ref = useRef<HTMLInputElement>(null);
+  const [cell_el, setCellEl] = useState<HTMLTableCellElement | null>(null);
+  const sticky_style: React.CSSProperties | undefined =
+    sticky_left !== undefined ? { position: "sticky", left: sticky_left, zIndex: is_editing ? 3 : 1 } : undefined;
+
+  useEffect(() => {
+    if (!is_editing) return;
+    const input = input_ref.current;
+    if (!input) return;
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  }, [is_editing]);
+
+  if (is_editing) {
+    return (
+      <td
+        ref={setCellEl}
+        data-cell-key={cell_key}
+        className={`${styles.cell_editing} ${class_name}${sticky_left !== undefined ? ` ${sticky_bg_class}` : ""}`}
+        style={sticky_style}
+      >
+        <FormulaInput
+          input_ref={input_ref}
+          value={draft}
+          onValueChange={onDraftChange}
+          anchor_el={cell_el}
+          placeholder="=SUM(AA:AA)"
+          className={`${styles.cell_input} ${styles.cell_input_formula}`}
+          onBlur={() => onCommit(null)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.preventDefault();
+              onCancel();
+            } else if (e.key === "Enter") {
+              e.preventDefault();
+              onCommit(e.shiftKey ? "up" : "down");
+            } else if (e.key === "Tab") {
+              e.preventDefault();
+              onCommit(e.shiftKey ? "prev" : "next");
+            }
+          }}
+        />
+      </td>
+    );
+  }
+
+  return (
+    <td
+      data-cell-key={cell_key}
+      className={`group/cell relative select-none whitespace-nowrap ${styles.cell} ${styles.computed_cell} ${class_name}${
+        is_numeric ? ` ${styles.cell_numeric}` : ""
+      }${error ? ` ${styles.cell_formula_error}` : ""}${
+        formula_ref_color !== undefined ? ` ${styles[`formula_ref_${formula_ref_color}`]}` : ""
+      }${getFindCellClass(find_match_state)}${is_active ? ` ${styles.cell_active}` : ""}${
+        sticky_left !== undefined ? ` ${sticky_bg_class}` : ""
+      }`}
+      style={sticky_style}
+      onMouseDown={onCellMouseDown}
+      onMouseEnter={onCellMouseEnter}
+      onDoubleClick={onDoubleClick}
+      title={error ? `${error.code}: ${error.detail}` : title}
+    >
+      <div className="truncate">
+        {text !== "" ? (
+          <span className={error ? styles.cell_error_text : undefined}>
+            <FindHighlightedText text={text} find_terms={find_terms} />
+          </span>
+        ) : placeholder ? (
+          <span className={styles.computed_cell_placeholder}>{placeholder}</span>
+        ) : null}
+      </div>
     </td>
   );
 }
@@ -1091,6 +1358,9 @@ const DEFAULT_SORT_RULES: SortRulePayload[] = [
 
 /** Column keys a saved filter may reference; anything else is dropped when it is applied. */
 const KNOWN_COLUMN_KEYS: ReadonlySet<string> = new Set(COLUMNS.map((col) => col.key as string));
+
+/** Column keys a saved view may hide: the table columns and the formula columns ("formula_{id}"). */
+const VIEW_COLUMN_KEYS = { has: (key: string) => KNOWN_COLUMN_KEYS.has(key) || isFormulaColumnKey(key) };
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
@@ -1163,6 +1433,45 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   const [active_cell, setActiveCell] = useState<CellRef | null>(null);
   const [edit_entry, setEditEntry] = useState<CellEditEntry>("edit");
 
+  // ── Spreadsheet formulas ─────────────────────────────────────────────────────
+  // Team wide formula columns and totals row, plus the editing state of formulas
+  // typed into the formula bar, a formula column cell or a totals cell.
+  const {
+    formula_columns,
+    summary_formulas,
+    reload: reloadSheetFormulas,
+    createColumn: createFormulaColumn,
+    updateColumn: updateFormulaColumn,
+    deleteColumn: deleteFormulaColumn,
+    saveSummary: saveSummaryFormula,
+  } = useLinkBuildingSheetFormulas();
+  const [formula_dialog, setFormulaDialog] = useState<
+    { mode: "create" } | { mode: "edit"; column: LinkBuildingOrderSheetFormula } | null
+  >(null);
+  const [functions_anchor_el, setFunctionsAnchorEl] = useState<HTMLElement | null>(null);
+  /** Text typed into the formula bar, null while it is not being edited. */
+  const [formula_bar_draft, setFormulaBarDraft] = useState<string | null>(null);
+  const formula_bar_input_ref = useRef<HTMLInputElement>(null);
+  /** Formula typed into a formula column cell or a totals cell edited in place. */
+  const [computed_cell_draft, setComputedCellDraft] = useState("");
+  const computed_cell_draft_ref = useRef(computed_cell_draft);
+  computed_cell_draft_ref.current = computed_cell_draft;
+  const [is_summary_row_visible, setIsSummaryRowVisible] = useState(() => {
+    try {
+      return typeof window === "undefined" || localStorage.getItem(SUMMARY_ROW_STORAGE_KEY) !== "hidden";
+    } catch {
+      return true;
+    }
+  });
+
+  const column_default_widths = useMemo(
+    () => ({
+      ...DEFAULT_COLUMN_WIDTHS,
+      ...Object.fromEntries(formula_columns.map((column) => [column.key, FORMULA_COLUMN_DEFAULT_WIDTH])),
+    }),
+    [formula_columns]
+  );
+
   const {
     getColumnWidth,
     startColumnResize,
@@ -1170,7 +1479,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     resetAllColumnWidths,
     resizing_col_key,
     has_custom_widths,
-  } = useResizableColumnWidths(COLUMN_WIDTHS_STORAGE_KEY, DEFAULT_COLUMN_WIDTHS);
+  } = useResizableColumnWidths(COLUMN_WIDTHS_STORAGE_KEY, column_default_widths);
 
   // ── Undo / redo history ──────────────────────────────────────────────────────
   const [undo_stack, setUndoStack] = useState<HistoryEntry[]>([]);
@@ -1229,9 +1538,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   const redo_stack_kbd_ref = useRef(redo_stack);
   redo_stack_kbd_ref.current = redo_stack;
 
-  /** Snapshot of a cell's value taken the moment it starts editing, so `stopEditing` can
-   * diff against it to build an undo entry (by then `rows_ref` only holds the new value). */
-  const edit_start_value_ref = useRef<{ row_id: string; col_key: string; old_value: string } | null>(null);
+  /** Snapshot of a cell's value (and formula) taken the moment it starts editing, so `stopEditing`
+   * can diff against it to build an undo entry (by then `rows_ref` only holds the new value). */
+  const edit_start_value_ref = useRef<CellEditSnapshot | null>(null);
 
   // Tracks an in-progress drag: the cell where the mouse went down, and whether
   // the pointer has since entered a different cell (i.e. an actual drag, not a click).
@@ -1316,6 +1625,11 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     [refreshFilterCounts]
   );
 
+  /** Another admin added or changed a formula column or totals cell. */
+  const handleRemoteSheetFormulasChanged = useCallback(() => {
+    reloadSheetFormulas().catch(() => {/* non-critical, the next change reloads them again */ });
+  }, [reloadSheetFormulas]);
+
   const { user } = useAuth();
 
   const {
@@ -1333,6 +1647,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     onRowUpdated: handleRemoteRowUpdated,
     onRowCreated: handleRemoteRowCreated,
     onRowDeleted: handleRemoteRowDeleted,
+    onSheetFormulasChanged: handleRemoteSheetFormulasChanged,
   });
 
   const local_session_id_ref = useRef(local_session_id);
@@ -1522,11 +1837,166 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     return { sticky_left_offsets: offsets, frozen_columns_width: cumulative };
   }, [visible_columns, getColumnWidth]);
 
+  const visible_formula_columns = useMemo(
+    () => formula_columns.filter((column) => !hidden_columns.has(column.key)),
+    [formula_columns, hidden_columns]
+  );
+
   /** Every column the active cell can move through, in on-screen order. */
   const grid_column_keys = useMemo<string[]>(
-    () => [...visible_columns.map((col) => col.key as string), ...ASSIGNMENT_COLUMN_KEYS],
-    [visible_columns]
+    () => [
+      ...visible_columns.map((col) => col.key as string),
+      ...ASSIGNMENT_COLUMN_KEYS,
+      ...visible_formula_columns.map((column) => column.key),
+    ],
+    [visible_columns, visible_formula_columns]
   );
+
+  // ── Formula sheet ───────────────────────────────────────────────────────────
+  // The loaded rows as a recalculating spreadsheet. Column letters are fixed per
+  // column (hiding one does not shift the others), row numbers follow the gutter.
+
+  /** Row number shown in the gutter for the first loaded row. */
+  const row_number_offset = from_row ?? 1;
+
+  const sheet_columns = useMemo<SheetColumn[]>(
+    () => [...BASE_SHEET_COLUMNS, ...formula_columns.map((column) => ({ key: column.key, kind: "text" as const }))],
+    [formula_columns]
+  );
+  const column_mapper = useMemo(() => createColumnKeyMapper(sheet_columns), [sheet_columns]);
+  const formula_column_by_key = useMemo(
+    () => new Map(formula_columns.map((column) => [column.key, column])),
+    [formula_columns]
+  );
+
+  /** Letter of a column, fixed by its position among every column, hidden ones included. */
+  const getColumnLetter = useCallback(
+    (col_key: string) => toColumnLetter(column_mapper.getColumnIndex(col_key) ?? 0),
+    [column_mapper]
+  );
+
+  /** Text an assignment cell shows, so formulas read the client or team member name, not the id. */
+  const getAssignmentText = useCallback(
+    (row: LinkBuildingOrderRow, col_key: string): string | null => {
+      if (col_key === "user_id") {
+        const client = client_users.find((u) => row.user_id != null && u.id === Number(row.user_id));
+        return client ? client.company || client.name : "";
+      }
+      if (col_key === "assigned_admin_user_id") {
+        const admin = admin_users.find((u) => row.assigned_admin_user_id != null && u.id === Number(row.assigned_admin_user_id));
+        return admin ? admin.name : "";
+      }
+      return null;
+    },
+    [client_users, admin_users]
+  );
+
+  const sheet_config = useMemo<OrdersSheetConfig>(
+    () => ({
+      columns: sheet_columns,
+      column_formulas: new Map(formula_columns.map((column) => [column.key, column.formula])),
+      row_number_offset,
+      getAssignmentText,
+    }),
+    [sheet_columns, formula_columns, row_number_offset, getAssignmentText]
+  );
+  const sheet_config_ref = useRef(sheet_config);
+  sheet_config_ref.current = sheet_config;
+
+  /** Recalculated on every change of the rows, formula cells are evaluated lazily as they render. */
+  const sheet = useMemo(() => buildOrdersSheet(filtered_rows, sheet_config), [filtered_rows, sheet_config]);
+
+  const row_index_by_id = useMemo(() => new Map(filtered_rows.map((row, idx) => [row.id, idx])), [filtered_rows]);
+
+  /** Computed value and error of a data cell holding a formula, null for a plain value. */
+  const getDataCellFormulaDisplay = useCallback(
+    (row_idx: number, col_key: string): { text: string; error: FormulaError | null } | null => {
+      const row = filtered_rows[row_idx];
+      if (!row || !getCellFormula(row, col_key)) return null;
+      const result = sheet.getFormulaResult(row_idx, col_key);
+      if (!result) return null;
+      return {
+        text: toFieldValue(result, SHEET_KIND_BY_KEY.get(col_key) ?? "text"),
+        error: result.value instanceof FormulaError ? result.value : null,
+      };
+    },
+    [filtered_rows, sheet]
+  );
+
+  /** Result of a formula column cell, formatted with the column's format. */
+  const getFormulaColumnDisplay = useCallback(
+    (row_idx: number, column: LinkBuildingOrderSheetFormula): { text: string; error: FormulaError | null; is_numeric: boolean } => {
+      const result = sheet.getFormulaResult(row_idx, column.key);
+      if (!result) return { text: "", error: null, is_numeric: false };
+      return {
+        text: formatComputedResult(result, column.format, "text"),
+        error: result.value instanceof FormulaError ? result.value : null,
+        is_numeric: typeof result.value === "number",
+      };
+    },
+    [sheet]
+  );
+
+  /** Totals cell under a column: the result of its formula over the loaded rows. */
+  const getSummaryDisplay = useCallback(
+    (col_key: string): { text: string; error: FormulaError | null; is_numeric: boolean } | null => {
+      const formula = summary_formulas[col_key];
+      if (!formula) return null;
+      const result = sheet.evaluate(formula, filtered_rows.length);
+      const format = formula_column_by_key.get(col_key)?.format ?? "auto";
+      return {
+        text: formatComputedResult(result, format, SHEET_KIND_BY_KEY.get(col_key) ?? "text"),
+        error: result.value instanceof FormulaError ? result.value : null,
+        is_numeric: typeof result.value === "number",
+      };
+    },
+    [summary_formulas, sheet, filtered_rows.length, formula_column_by_key]
+  );
+
+  /**
+   * A cell's formula in A1 notation, as seen from its row, for the formula bar and
+   * for editing. Null when the cell holds a plain value.
+   */
+  const getCellFormulaText = useCallback(
+    (cell: CellRef): string | null => {
+      if (cell.row_id === SUMMARY_ROW_ID) {
+        const stored = summary_formulas[cell.col_key];
+        return stored ? toDisplayFormula(stored, row_number_offset + filtered_rows.length, column_mapper) : null;
+      }
+      const row_idx = row_index_by_id.get(cell.row_id);
+      if (row_idx === undefined) return null;
+      const stored = formula_column_by_key.get(cell.col_key)?.formula ?? getCellFormula(filtered_rows[row_idx], cell.col_key);
+      return stored ? toDisplayFormula(stored, row_number_offset + row_idx, column_mapper) : null;
+    },
+    [summary_formulas, row_number_offset, filtered_rows, column_mapper, row_index_by_id, formula_column_by_key]
+  );
+  const get_cell_formula_text_ref = useRef(getCellFormulaText);
+  get_cell_formula_text_ref.current = getCellFormulaText;
+
+  /** Text Ctrl+C copies from a cell: what it shows, computed values and names included. */
+  const getCellCopyText = useCallback(
+    (cell: CellRef): string | null => {
+      if (cell.row_id === SUMMARY_ROW_ID) return getSummaryDisplay(cell.col_key)?.text ?? "";
+      const row_idx = row_index_by_id.get(cell.row_id);
+      if (row_idx === undefined) return null;
+      const row = filtered_rows[row_idx];
+      const formula_column = formula_column_by_key.get(cell.col_key);
+      if (formula_column) return getFormulaColumnDisplay(row_idx, formula_column).text;
+      const formula_display = getDataCellFormulaDisplay(row_idx, cell.col_key);
+      if (formula_display) return formula_display.text;
+      return getAssignmentText(row, cell.col_key) ?? String(row[cell.col_key as keyof LinkBuildingOrderRow] ?? "");
+    },
+    [getSummaryDisplay, row_index_by_id, filtered_rows, formula_column_by_key, getFormulaColumnDisplay, getDataCellFormulaDisplay, getAssignmentText]
+  );
+  const get_cell_copy_text_ref = useRef(getCellCopyText);
+  get_cell_copy_text_ref.current = getCellCopyText;
+  const formula_column_by_key_ref = useRef(formula_column_by_key);
+  formula_column_by_key_ref.current = formula_column_by_key;
+
+  const row_number_offset_ref = useRef(row_number_offset);
+  row_number_offset_ref.current = row_number_offset;
+  const column_mapper_ref = useRef(column_mapper);
+  column_mapper_ref.current = column_mapper;
 
   /** Exact table width for the fixed layout, so columns never stretch past their set widths. */
   const table_width = useMemo(
@@ -1669,6 +2139,17 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   const applyCellChanges = useCallback(async (changes: CellHistoryChange[], use: "old_value" | "new_value") => {
     const touched_row_ids = new Set(changes.map((c) => c.row_id));
 
+    // Formula maps after the change, for the rows whose formulas it touches.
+    const formulas_by_row_id = new Map<string, LinkBuildingOrderRow["cell_formulas"]>();
+    for (const change of changes) {
+      if ((change.old_formula ?? null) === (change.new_formula ?? null)) continue;
+      const base = formulas_by_row_id.has(change.row_id)
+        ? formulas_by_row_id.get(change.row_id)
+        : rows_ref.current.find((r) => r.id === change.row_id)?.cell_formulas;
+      const formula = (use === "old_value" ? change.old_formula : change.new_formula) ?? null;
+      formulas_by_row_id.set(change.row_id, withCellFormula(base, change.col_key, formula));
+    }
+
     setRows((prev) =>
       prev.map((row) => {
         if (!touched_row_ids.has(row.id)) return row;
@@ -1677,6 +2158,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
           if (change.row_id !== row.id) continue;
           next_row = { ...next_row, [change.col_key]: use === "old_value" ? change.old_value : change.new_value };
         }
+        if (formulas_by_row_id.has(row.id)) next_row = { ...next_row, cell_formulas: formulas_by_row_id.get(row.id) ?? null };
         return next_row;
       })
     );
@@ -1698,7 +2180,11 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     setSaveError(null);
     try {
       const res = await batchUpdateLinkBuildingOrderCells(
-        persisted_row_ids.map((id) => ({ id, fields: fields_by_row_id[id] }))
+        persisted_row_ids.map((id) => ({
+          id,
+          fields: fields_by_row_id[id],
+          ...(formulas_by_row_id.has(id) ? { cell_formulas: formulas_by_row_id.get(id) ?? null } : {}),
+        }))
       );
       const updated_by_id = new Map(res.data.map((r) => [r.id, r]));
       setRows((prev) => prev.map((r) => updated_by_id.get(r.id) ?? r));
@@ -1737,10 +2223,27 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   // ── Editing ─────────────────────────────────────────────────────────────────
 
   const startEditing = useCallback((row_id: string, col_key: string, entry: CellEditEntry = "edit") => {
-    const row = rows_ref.current.find((r) => r.id === row_id);
-    edit_start_value_ref.current = row
-      ? { row_id, col_key, old_value: String(row[col_key as keyof LinkBuildingOrderRow] ?? "") }
-      : null;
+    const formula_text = get_cell_formula_text_ref.current({ row_id, col_key });
+
+    if (row_id === SUMMARY_ROW_ID || isFormulaColumnKey(col_key)) {
+      // Formula column and totals cells edit their formula in a draft of their own.
+      edit_start_value_ref.current = null;
+      setComputedCellDraft(entry === "type" ? "" : (formula_text ?? ""));
+    } else {
+      const row = rows_ref.current.find((r) => r.id === row_id);
+      edit_start_value_ref.current = row
+        ? {
+            row_id,
+            col_key,
+            old_value: String(row[col_key as keyof LinkBuildingOrderRow] ?? ""),
+            old_formula: getCellFormula(row, col_key),
+          }
+        : null;
+      // A formula cell opens on its formula (as seen from its row), not on its result.
+      if (row && formula_text !== null && entry === "edit") {
+        setRows((prev) => prev.map((r) => (r.id === row_id ? { ...r, [col_key]: formula_text } : r)));
+      }
+    }
     // Set eagerly so a second key press landing before the next render is not
     // treated as another "start editing" from the grid.
     editing_cell_ref.current = { row_id, col_key };
@@ -1803,9 +2306,17 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         );
         return admin ? `${admin.name} ${admin.email}` : "";
       }
+      // Formula cells are found by the value they show.
+      const row_idx = row_index_by_id.get(row.id);
+      if (row_idx !== undefined) {
+        const formula_column = formula_column_by_key.get(col_key);
+        if (formula_column) return getFormulaColumnDisplay(row_idx, formula_column).text;
+        const formula_display = getDataCellFormulaDisplay(row_idx, col_key);
+        if (formula_display) return formula_display.text;
+      }
       return String(row[col_key as keyof LinkBuildingOrderRow] ?? "");
     },
-    [client_users, admin_users]
+    [client_users, admin_users, row_index_by_id, formula_column_by_key, getFormulaColumnDisplay, getDataCellFormulaDisplay]
   );
 
   const getFindRowId = useCallback((row: LinkBuildingOrderRow) => row.id, []);
@@ -1820,6 +2331,12 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     [scrollToCell]
   );
 
+  // Formula columns only exist in the browser, the server looks through the stored columns.
+  const server_find_column_keys = useMemo(
+    () => grid_column_keys.filter((col_key) => !isFormulaColumnKey(col_key)),
+    [grid_column_keys]
+  );
+
   // The terms come from useTableFind below, but the pages holding matches are
   // needed by it too, so the API lookup reads them back through this state.
   const [find_lookup_terms, setFindLookupTerms] = useState<string[]>([]);
@@ -1832,7 +2349,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     has_error: has_find_pages_error,
   } = useLinkBuildingOrderFindPages({
     find_terms: find_lookup_terms,
-    find_columns: grid_column_keys,
+    find_columns: server_find_column_keys,
     search_body,
     per_page,
     refresh_key: rows_version,
@@ -1885,7 +2402,122 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   // editing. Moving the pointer to a different cell while the button is held turns
   // the gesture into a rectangular range selection anchored at the clicked cell.
 
-  const handleCellMouseDown = useCallback((row_id: string, col_key: string, shift_key: boolean) => {
+  // ── Point mode: clicking cells while typing a formula ───────────────────────
+  // While a formula editor has focus and its caret sits where a reference can go
+  // (after "=", an operator, "(" or ","), clicking a cell inserts its address
+  // instead of leaving the editor, and dragging turns it into a range, like Sheets.
+
+  const active_formula_editor_ref = useRef<ActiveFormulaEditor | null>(null);
+  /** True while a formula editor has focus, the grid then shows a crosshair cursor. */
+  const [is_formula_pointing, setIsFormulaPointing] = useState(false);
+  const formula_editing_context = useMemo<FormulaEditingContextValue>(
+    () => ({
+      setActiveEditor: (editor) => {
+        active_formula_editor_ref.current = editor;
+        setIsFormulaPointing(editor !== null);
+      },
+    }),
+    []
+  );
+  /** The reference inserted by the last click, replaced while dragging or by the next click. */
+  const point_insert_ref = useRef<{
+    element: HTMLInputElement;
+    start: number;
+    end: number;
+    text: string;
+    anchor: { col_idx: number; row_number: number };
+  } | null>(null);
+  const point_drag_ref = useRef(false);
+
+  /** Row number of a cell as shown in the gutter, null when its row is not loaded. */
+  const getCellRowNumber = useCallback(
+    (row_id: string) => {
+      const row_idx = row_index_by_id.get(row_id);
+      return row_idx === undefined ? null : row_number_offset + row_idx;
+    },
+    [row_index_by_id, row_number_offset]
+  );
+
+  /**
+   * Inserts the clicked cell's reference into the formula being typed, when the
+   * caret allows it. Returns true when the click was used that way.
+   */
+  const insertPointedReference = useCallback(
+    (row_id: string, col_key: string, e: React.MouseEvent): boolean => {
+      const editor = active_formula_editor_ref.current;
+      if (!editor || document.activeElement !== editor.element) return false;
+      const editing = editing_cell_ref.current;
+      if (editing && editing.row_id === row_id && editing.col_key === col_key) return false;
+
+      const col_idx = column_mapper.getColumnIndex(col_key);
+      const row_number = getCellRowNumber(row_id);
+      if (col_idx === null || row_number === null) return false;
+
+      const text = editor.element.value;
+      const caret = editor.element.selectionStart ?? text.length;
+      const previous = point_insert_ref.current;
+      const replaces_previous =
+        !!previous &&
+        previous.element === editor.element &&
+        caret === previous.end &&
+        text.slice(previous.start, previous.end) === previous.text;
+      if (!replaces_previous && !canInsertReferenceAt(text, caret)) return false;
+
+      // Keeps focus (and the caret) in the formula editor.
+      e.preventDefault();
+      const anchor = { col_idx, row_number };
+      const reference = toA1Range(anchor, null);
+      const start = replaces_previous ? previous!.start : caret;
+      const end = replaces_previous ? previous!.end : caret;
+      editor.setText(text.slice(0, start) + reference + text.slice(end), start + reference.length);
+      point_insert_ref.current = { element: editor.element, start, end: start + reference.length, text: reference, anchor };
+      point_drag_ref.current = true;
+      return true;
+    },
+    [column_mapper, getCellRowNumber]
+  );
+
+  /** Dragging after a pointed click grows the inserted reference into a range. */
+  const extendPointedReference = useCallback(
+    (row_id: string, col_key: string): boolean => {
+      const point = point_insert_ref.current;
+      const editor = active_formula_editor_ref.current;
+      if (!point_drag_ref.current || !point || !editor || editor.element !== point.element) return false;
+      const col_idx = column_mapper.getColumnIndex(col_key);
+      const row_number = getCellRowNumber(row_id);
+      if (col_idx === null || row_number === null) return true;
+
+      const reference = toA1Range(point.anchor, { col_idx, row_number });
+      const text = editor.element.value;
+      editor.setText(text.slice(0, point.start) + reference + text.slice(point.end), point.start + reference.length);
+      point_insert_ref.current = { ...point, end: point.start + reference.length, text: reference };
+      return true;
+    },
+    [column_mapper, getCellRowNumber]
+  );
+
+  /** Clicking a column letter while typing a formula inserts the whole column, e.g. "S:S". */
+  const skip_letter_click_ref = useRef(false);
+  const insertPointedColumn = useCallback(
+    (col_key: string, e: React.MouseEvent): boolean => {
+      const editor = active_formula_editor_ref.current;
+      if (!editor || document.activeElement !== editor.element) return false;
+      const text = editor.element.value;
+      const caret = editor.element.selectionStart ?? text.length;
+      if (!canInsertReferenceAt(text, caret)) return false;
+      e.preventDefault();
+      const letter = getColumnLetter(col_key);
+      const reference = `${letter}:${letter}`;
+      editor.setText(text.slice(0, caret) + reference + text.slice(caret), caret + reference.length);
+      point_insert_ref.current = null;
+      return true;
+    },
+    [getColumnLetter]
+  );
+
+  const handleCellMouseDown = useCallback((row_id: string, col_key: string, e: React.MouseEvent) => {
+    if (insertPointedReference(row_id, col_key, e)) return;
+    const shift_key = e.shiftKey;
     // Shift+Click extends the range from an existing anchor (an already active
     // range, the cell being edited, or the active cell), falling back to a fresh
     // one-cell range only when none exists yet. A discrete action, not a drag.
@@ -1904,9 +2536,10 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     selectCell({ row_id, col_key });
     range_mouse_down_ref.current = { row_id, col_key };
     range_dragged_ref.current = false;
-  }, [selectCell]);
+  }, [selectCell, insertPointedReference]);
 
   const handleCellMouseEnter = useCallback((row_id: string, col_key: string) => {
+    if (extendPointedReference(row_id, col_key)) return;
     const start = range_mouse_down_ref.current;
     if (!start) return;
     const is_origin_cell = start.row_id === row_id && start.col_key === col_key;
@@ -1917,7 +2550,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     range_dragged_ref.current = true;
     setCellRange({ anchor: start, focus: { row_id, col_key } });
     if (editing_cell_ref.current) setEditingCell(null);
-  }, []);
+  }, [extendPointedReference]);
 
   const handleCellMouseUp = useCallback(() => {
     const start = range_mouse_down_ref.current;
@@ -1928,9 +2561,114 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     range_dragged_ref.current = false;
   }, []);
 
+  /**
+   * Turns the text entered into a data cell into the row to save. Text starting
+   * with "=" becomes the cell's formula (stored by column key and row offset) and
+   * the column gets its result. Plain text replaces the value and drops a formula
+   * the cell had. The row's other formula cells are recalculated, so a formula
+   * reading the edited cell is saved with its new result in the same request.
+   */
+  const resolveCellInput = useCallback(
+    (row: LinkBuildingOrderRow, col_key: string, text: string): { row: LinkBuildingOrderRow } | { error: string } => {
+      const label = COLUMN_LABELS[col_key] ?? col_key;
+      const is_formula = isFormulaText(text);
+      if (is_formula && !FORMULA_CELL_COLUMN_KEYS.has(col_key)) {
+        return {
+          error: `${label} cannot hold a formula. Formulas work in text, number and date columns, or add a formula column with the fx button.`,
+        };
+      }
+
+      const rows_now = rows_ref.current;
+      const row_idx = rows_now.findIndex((r) => r.id === row.id);
+      let next_row: LinkBuildingOrderRow;
+      if (is_formula) {
+        const stored = toStoredFormula(text.trim(), row_number_offset_ref.current + row_idx, column_mapper_ref.current);
+        next_row = { ...row, cell_formulas: withCellFormula(row.cell_formulas, col_key, stored) };
+      } else {
+        next_row = {
+          ...row,
+          [col_key]: text,
+          cell_formulas: getCellFormula(row, col_key) ? withCellFormula(row.cell_formulas, col_key, null) : row.cell_formulas,
+        };
+      }
+
+      const next_rows = rows_now.map((r) => (r.id === row.id ? next_row : r));
+      const recalculated = buildOrdersSheet(next_rows, sheet_config_ref.current);
+      const stale_cells = collectStaleFormulaCells(next_rows, recalculated, SHEET_KIND_BY_KEY, (r) => r.id === row.id);
+      stale_cells.forEach((stale) => {
+        next_row = { ...next_row, [stale.col_key]: stale.value };
+      });
+      return { row: next_row };
+    },
+    []
+  );
+
+  /**
+   * Commits text entered into a data cell (inline or in the formula bar): resolves
+   * a formula, records the undo entry and saves the row. `start` is the cell as it
+   * was before the edit.
+   */
+  const applyDataCellInput = useCallback(
+    (row: LinkBuildingOrderRow, col_key: string, text: string, start: CellEditSnapshot | null) => {
+      const is_draft_row = new_row_ids_ref.current.has(row.id);
+      const restore = () => {
+        if (!start) return;
+        setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, [col_key]: start.old_value } : r)));
+      };
+
+      const resolved = resolveCellInput(row, col_key, text);
+      if ("error" in resolved) {
+        setSaveError(resolved.error);
+        restore();
+        return;
+      }
+
+      const next_row = resolved.row;
+      if (col_key === "order_id" && !is_draft_row) {
+        const trimmed = next_row.order_id.trim();
+        if (trimmed !== "" && !ORDER_ID_PATTERN.test(trimmed)) {
+          setSaveError(`Invalid Order ID "${trimmed}" — must follow the format BL-<number> (e.g. BL-25143).`);
+          return;
+        }
+      }
+
+      setRows((prev) => {
+        const updated = prev.map((r) => (r.id === row.id ? next_row : r));
+        if (is_draft_row) saveDraftsToStorage(updated.filter((r) => new_row_ids_ref.current.has(r.id)));
+        return updated;
+      });
+
+      if (is_draft_row) {
+        persistNewRow(next_row);
+        return;
+      }
+
+      const new_value = String(next_row[col_key as keyof LinkBuildingOrderRow] ?? "");
+      const new_formula = getCellFormula(next_row, col_key);
+      const is_same_cell = !!start && start.row_id === row.id && start.col_key === col_key;
+      const value_changed = is_same_cell && (start!.old_value !== new_value || start!.old_formula !== new_formula);
+      if (value_changed) {
+        pushHistoryEntry(
+          [
+            {
+              row_id: row.id,
+              col_key: col_key as keyof LinkBuildingOrderRow,
+              old_value: start!.old_value,
+              new_value,
+              ...(start!.old_formula !== new_formula ? { old_formula: start!.old_formula, new_formula } : {}),
+            },
+          ],
+          new_formula ? "formula" : "cell edit"
+        );
+      }
+      persistRowUpdate(next_row, col_key, value_changed);
+    },
+    [resolveCellInput, persistNewRow, persistRowUpdate, pushHistoryEntry]
+  );
+
   const stopEditing = useCallback(() => {
     const cell = editing_cell_ref.current;
-    if (!cell) return;
+    if (!cell || cell.row_id === SUMMARY_ROW_ID || isFormulaColumnKey(cell.col_key)) return;
     // Cleared eagerly so the input's blur, which can fire while the grid takes
     // focus back in this same tick, does not persist the row a second time.
     editing_cell_ref.current = null;
@@ -1939,34 +2677,10 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     const row = rows_ref.current.find((r) => r.id === cell.row_id);
     if (!row) return;
 
-    const is_draft_row = new_row_ids_ref.current.has(row.id);
-
-    if (cell.col_key === "order_id" && !is_draft_row) {
-      const trimmed = row.order_id.trim();
-      if (trimmed !== "" && !ORDER_ID_PATTERN.test(trimmed)) {
-        setSaveError(`Invalid Order ID "${trimmed}" — must follow the format BL-<number> (e.g. BL-25143).`);
-        return;
-      }
-    }
-
     const edit_start = edit_start_value_ref.current;
     edit_start_value_ref.current = null;
-
-    if (is_draft_row) {
-      persistNewRow(row);
-    } else {
-      const new_value = String(row[cell.col_key as keyof LinkBuildingOrderRow] ?? "");
-      const value_changed =
-        !!edit_start && edit_start.row_id === row.id && edit_start.col_key === cell.col_key && edit_start.old_value !== new_value;
-      if (value_changed) {
-        pushHistoryEntry(
-          [{ row_id: row.id, col_key: cell.col_key as keyof LinkBuildingOrderRow, old_value: edit_start!.old_value, new_value }],
-          "cell edit"
-        );
-      }
-      persistRowUpdate(row, cell.col_key, value_changed);
-    }
-  }, [persistNewRow, persistRowUpdate, pushHistoryEntry]);
+    applyDataCellInput(row, cell.col_key, String(row[cell.col_key as keyof LinkBuildingOrderRow] ?? ""), edit_start);
+  }, [applyDataCellInput]);
 
   const updateCell = useCallback(
     (row_id: string, col_key: keyof LinkBuildingOrderRow, value: string) => {
@@ -2018,11 +2732,43 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   );
 
   /** Moves the active cell after an edit is committed with Enter, Tab or an arrow key. */
+  const show_summary_row = is_summary_row_visible && filtered_rows.length > 0;
+
+  /** Selects a cell of the totals row under the table. */
+  const selectSummaryCell = useCallback(
+    (col_key: string) => {
+      const cell = { row_id: SUMMARY_ROW_ID, col_key };
+      setActiveCell(cell);
+      setCellRange(null);
+      scrollToCell(cell);
+    },
+    [scrollToCell]
+  );
+
   const navigateCell = useCallback(
     (row_id: string, col_key: string, direction: CellNavDirection) => {
+      if (row_id === SUMMARY_ROW_ID) {
+        // The totals row is a row of its own: up goes back to the last row, left and right move along it.
+        const col_idx = grid_column_keys.indexOf(col_key);
+        if (direction === "up" && filtered_rows.length > 0) {
+          selectCell(toCellRef({ row_idx: filtered_rows.length - 1, col_idx: Math.max(0, col_idx) }), { scroll: true });
+        } else if (direction !== "down") {
+          const step = direction === "left" || direction === "prev" ? -1 : 1;
+          const next_key = grid_column_keys[Math.min(Math.max(col_idx + step, 0), grid_column_keys.length - 1)];
+          if (next_key) selectSummaryCell(next_key);
+        }
+        focusGrid();
+        return;
+      }
+
       const position = toGridPosition({ row_id, col_key });
       if (!position) return;
       const size = { row_count: filtered_rows.length, col_count: grid_column_keys.length };
+      if (direction === "down" && show_summary_row && position.row_idx === size.row_count - 1) {
+        selectSummaryCell(col_key);
+        focusGrid();
+        return;
+      }
       const next_position =
         direction === "next" || direction === "prev"
           ? getTabPosition(position, direction === "prev", size)
@@ -2031,7 +2777,66 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       selectCell(toCellRef(next_position), { scroll: true });
       focusGrid();
     },
-    [filtered_rows.length, grid_column_keys.length, toGridPosition, toCellRef, selectCell, focusGrid]
+    [filtered_rows.length, grid_column_keys, toGridPosition, toCellRef, selectCell, focusGrid, show_summary_row, selectSummaryCell]
+  );
+
+  /**
+   * Saves a formula typed into a formula column cell (it becomes the column's
+   * formula on every row) or a totals cell (an empty text clears it).
+   */
+  const saveComputedCellText = useCallback(
+    async (cell: CellRef, raw_text: string) => {
+      const text = raw_text.trim();
+      const current_text = (getCellFormulaText(cell) ?? "").trim();
+      if (text === current_text) return;
+
+      if (cell.row_id === SUMMARY_ROW_ID) {
+        if (text !== "" && !isFormulaText(text)) {
+          setSaveError('A totals cell holds a formula, for example =SUM(AA:AA). Start it with "=".');
+          return;
+        }
+        const stored = text === "" ? null : toStoredFormula(text, row_number_offset + filtered_rows.length, column_mapper);
+        const label = COLUMN_LABELS[cell.col_key] ?? ASSIGNMENT_COLUMN_LABELS[cell.col_key] ?? formula_column_by_key.get(cell.col_key)?.name ?? cell.col_key;
+        try {
+          await saveSummaryFormula(cell.col_key, stored);
+          setNotificationBanner(stored ? `Totals cell under "${label}" saved for the whole team.` : `Totals cell under "${label}" cleared.`);
+        } catch (err) {
+          setSaveError(`The totals cell could not be saved: ${parseApiErrorMessage(err)}`);
+        }
+        return;
+      }
+
+      const column = formula_column_by_key.get(cell.col_key);
+      const row_idx = row_index_by_id.get(cell.row_id);
+      if (!column || row_idx === undefined) return;
+      if (!isFormulaText(text)) {
+        setSaveError(
+          `"${column.name}" is a formula column, every cell shows the result of the same formula. Type a formula that starts with "=", or delete the column from its header.`
+        );
+        return;
+      }
+      const stored = toStoredFormula(text, row_number_offset + row_idx, column_mapper);
+      try {
+        await updateFormulaColumn(column.id, { formula: stored });
+        setNotificationBanner(`"${column.name}" now uses the new formula on every row.`);
+      } catch (err) {
+        setSaveError(`The formula of "${column.name}" could not be saved: ${parseApiErrorMessage(err)}`);
+      }
+    },
+    [getCellFormulaText, row_number_offset, filtered_rows.length, column_mapper, formula_column_by_key, row_index_by_id, saveSummaryFormula, updateFormulaColumn]
+  );
+
+  /** Enter, Tab or a click away on a formula column cell or totals cell being edited. */
+  const commitComputedCell = useCallback(
+    (direction: CellNavDirection | null) => {
+      const cell = editing_cell_ref.current;
+      if (!cell || !(cell.row_id === SUMMARY_ROW_ID || isFormulaColumnKey(cell.col_key))) return;
+      editing_cell_ref.current = null;
+      setEditingCell(null);
+      saveComputedCellText(cell, computed_cell_draft_ref.current);
+      if (direction) navigateCell(cell.row_id, cell.col_key, direction);
+    },
+    [saveComputedCellText, navigateCell]
   );
 
   // ── Add / Delete ────────────────────────────────────────────────────────────
@@ -2230,7 +3035,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   /** Replaces the whole view with a saved filter, the same way "Clear All" resets it. */
   const applySavedFilter = useCallback(
     (state: LinkBuildingOrderFilterState) => {
-      const next = normalizeFilterState(state, KNOWN_COLUMN_KEYS);
+      const next = normalizeFilterState(state, VIEW_COLUMN_KEYS);
       setSearch(next.search);
       // "Needs LB TL Approval" already implies status = Live, see toggleNeedsApprovalFilter.
       setStatusFilter(next.needs_lb_tl_approval ? "" : next.status);
@@ -2261,7 +3066,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       .then((preference) => {
         if (is_cancelled) return;
         if (preference.filters) {
-          const restored = normalizeFilterState(preference.filters, KNOWN_COLUMN_KEYS);
+          const restored = normalizeFilterState(preference.filters, VIEW_COLUMN_KEYS);
           awaiting_restored_text_ref.current =
             restored.search !== "" ||
             restored.client !== "" ||
@@ -2782,7 +3587,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       return trimmed as LinkBuildingOrderRow[keyof LinkBuildingOrderRow];
     };
 
-    const { rows: next_rows, overflow_row_count } = applyPastedGridToRows(
+    const { rows: pasted_rows, overflow_row_count } = applyPastedGridToRows(
       filtered_rows,
       start_row_index,
       start_col_index,
@@ -2791,9 +3596,44 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       parseCellForPaste
     );
 
+    // Pasted text starting with "=" becomes the cell's formula, as if it was typed
+    // in, while a pasted value (or a cleared cell) replaces a formula the cell had.
+    const next_rows = [...pasted_rows];
+    const target_row_ids = new Set<string>();
+    const formula_change_keys = new Set<string>();
+    grid.forEach((grid_row, row_offset) => {
+      const target_row_index = start_row_index + row_offset;
+      if (target_row_index >= filtered_rows.length) return;
+      target_row_ids.add(filtered_rows[target_row_index].id);
+      grid_row.forEach((_raw_value, col_offset) => {
+        const field = field_order[start_col_index + col_offset];
+        if (!field || !FORMULA_CELL_COLUMN_KEYS.has(field)) return;
+        const pasted_text = String(next_rows[target_row_index][field] ?? "");
+        const old_formula = getCellFormula(filtered_rows[target_row_index], field);
+        const new_formula = isFormulaText(pasted_text)
+          ? toStoredFormula(pasted_text.trim(), row_number_offset + target_row_index, column_mapper)
+          : null;
+        if (old_formula === new_formula) return;
+        const target_row = next_rows[target_row_index];
+        next_rows[target_row_index] = { ...target_row, cell_formulas: withCellFormula(target_row.cell_formulas, field, new_formula) };
+        formula_change_keys.add(`${target_row.id}:${field}`);
+      });
+    });
+
+    // Results of the pasted formulas, and of the formulas reading the pasted cells.
+    const recalculated = buildOrdersSheet(next_rows, sheet_config);
+    const recalculated_cells = collectStaleFormulaCells(next_rows, recalculated, SHEET_KIND_BY_KEY, (row) =>
+      target_row_ids.has(row.id)
+    );
+    recalculated_cells.forEach((stale) => {
+      const row_idx = next_rows.findIndex((r) => r.id === stale.row_id);
+      next_rows[row_idx] = { ...next_rows[row_idx], [stale.col_key]: stale.value };
+    });
+
     // Diff against the previous rows to find exactly which cells changed, so only
     // the affected fields are sent to the server instead of the whole row.
     const changed_fields_by_row_id: Record<string, Partial<Record<keyof LinkBuildingOrderRow, string>>> = {};
+    const formula_row_ids = new Set<string>();
     const history_changes: CellHistoryChange[] = [];
     let changed_cell_count = 0;
 
@@ -2807,10 +3647,23 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         if (!field) return;
         const old_value = String(filtered_rows[target_row_index][field] ?? "");
         const new_value = String(next_rows[target_row_index][field] ?? "");
-        if (old_value === new_value) return;
+        const is_formula_change = formula_change_keys.has(`${row_id}:${field}`);
+        if (old_value === new_value && !is_formula_change) return;
         changed_fields_by_row_id[row_id] = { ...(changed_fields_by_row_id[row_id] ?? {}), [field]: new_value };
+        if (is_formula_change) formula_row_ids.add(row_id);
         if (!new_row_ids_ref.current.has(row_id)) {
-          history_changes.push({ row_id, col_key: field, old_value, new_value });
+          history_changes.push({
+            row_id,
+            col_key: field,
+            old_value,
+            new_value,
+            ...(is_formula_change
+              ? {
+                  old_formula: getCellFormula(filtered_rows[target_row_index], field),
+                  new_formula: getCellFormula(next_rows[target_row_index], field),
+                }
+              : {}),
+          });
         }
         changed_cell_count += 1;
       });
@@ -2822,6 +3675,15 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       }
       return;
     }
+
+    // Formula cells recalculated because a cell they read was pasted over are saved too.
+    recalculated_cells.forEach((stale) => {
+      if (!changed_fields_by_row_id[stale.row_id]) return;
+      changed_fields_by_row_id[stale.row_id] = {
+        ...changed_fields_by_row_id[stale.row_id],
+        [stale.col_key]: stale.value,
+      };
+    });
 
     setRows(next_rows);
     const drafts_after_paste = next_rows.filter((r) => new_row_ids_ref.current.has(r.id));
@@ -2842,7 +3704,13 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       setIsBatchSaving(true);
       try {
         const res = await batchUpdateLinkBuildingOrderCells(
-          persisted_row_ids.map((id) => ({ id, fields: changed_fields_by_row_id[id] }))
+          persisted_row_ids.map((id) => ({
+            id,
+            fields: changed_fields_by_row_id[id],
+            ...(formula_row_ids.has(id)
+              ? { cell_formulas: next_rows.find((r) => r.id === id)?.cell_formulas ?? null }
+              : {}),
+          }))
         );
         const updated_by_id = new Map(res.data.map((r) => [r.id, r]));
         setRows((prev) => prev.map((r) => updated_by_id.get(r.id) ?? r));
@@ -2872,7 +3740,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       `Pasted ${changed_cell_count} cell${changed_cell_count !== 1 ? "s" : ""} across ${row_count} row${row_count !== 1 ? "s" : ""}.` +
       (overflow_row_count > 0 ? ` ${overflow_row_count} row(s) beyond the visible table were skipped.` : "")
     );
-  }, [filtered_rows, visible_columns, persistNewRow, refreshFilterCounts, pushHistoryEntry]);
+  }, [filtered_rows, visible_columns, persistNewRow, refreshFilterCounts, pushHistoryEntry, row_number_offset, column_mapper, sheet_config]);
 
   // ── Range copy/paste: Ctrl+C / Ctrl+V on an active multi-cell selection ──────
 
@@ -3004,8 +3872,43 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     focusGrid();
   }, [filtered_rows, visible_columns, focusGrid]);
 
+  /** Formulas the given rows hold in a column, by row id. */
+  const getFieldFormulas = useCallback((row_ids: string[], field: string): Map<string, string> => {
+    const formulas = new Map<string, string>();
+    if (!FORMULA_CELL_COLUMN_KEYS.has(field)) return formulas;
+    rows_ref.current.forEach((row) => {
+      const formula = row_ids.includes(row.id) ? getCellFormula(row, field) : null;
+      if (formula) formulas.set(row.id, formula);
+    });
+    return formulas;
+  }, []);
+
+  /**
+   * A value filled into many rows replaces the formulas those cells had, like
+   * pasting values over formulas in Sheets, so a recalculation never brings the
+   * old result back.
+   */
+  const removeFieldFormulas = useCallback(async (formulas: Map<string, string>, field: string) => {
+    if (formulas.size === 0) return;
+    const next_maps = new Map(
+      rows_ref.current
+        .filter((row) => formulas.has(row.id))
+        .map((row) => [row.id, withCellFormula(row.cell_formulas, field, null)] as const)
+    );
+    setRows((prev) => prev.map((r) => (next_maps.has(r.id) ? { ...r, cell_formulas: next_maps.get(r.id) ?? null } : r)));
+    await batchUpdateLinkBuildingOrderCells(
+      Array.from(next_maps, ([id, cell_formulas]) => ({ id, fields: {}, cell_formulas }))
+    );
+  }, []);
+
   const handleBatchApply = useCallback(async () => {
     if (!batch_field || !batch_value || selected_row_ids.size === 0) return;
+    if (isFormulaText(batch_value)) {
+      setSaveError(
+        "Fill field sets the same plain value on every row. To use a formula, type it in a cell, or add a formula column with the fx button."
+      );
+      return;
+    }
 
     const is_user_field = batch_field === "user_id" || batch_field === "assigned_admin_user_id";
     // "__unassign__" is a sentinel meaning explicitly clear the field (null)
@@ -3024,13 +3927,15 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       const old_values_by_row_id = new Map(
         rows_ref.current
           .filter((r) => persisted_ids.includes(r.id))
-          .map((r) => [r.id, r[batch_field as keyof LinkBuildingOrderRow] ?? null] as const)
+          .map((r) => [r.id, (r[batch_field as keyof LinkBuildingOrderRow] ?? null) as CellHistoryValue] as const)
       );
+      const replaced_formulas = getFieldFormulas(persisted_ids, batch_field);
 
       if (persisted_ids.length > 0) {
         await batchUpdateLinkBuildingOrders(persisted_ids, {
           [batch_field]: api_value,
         });
+        await removeFieldFormulas(replaced_formulas, batch_field);
       }
 
       setRows((prev) =>
@@ -3045,8 +3950,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
           col_key: batch_field as keyof LinkBuildingOrderRow,
           old_value: old_values_by_row_id.get(id) ?? null,
           new_value: api_value,
+          ...(replaced_formulas.has(id) ? { old_formula: replaced_formulas.get(id), new_formula: null } : {}),
         }))
-        .filter((c) => String(c.old_value ?? "") !== String(c.new_value ?? ""));
+        .filter((c) => String(c.old_value ?? "") !== String(c.new_value ?? "") || c.old_formula !== undefined);
       pushHistoryEntry(history_changes, "batch fill");
 
       let display_value: string;
@@ -3082,7 +3988,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     } finally {
       setIsBatchSaving(false);
     }
-  }, [batch_field, batch_value, selected_row_ids, clearSelection, client_users, admin_users, refreshFilterCounts, pushHistoryEntry]);
+  }, [batch_field, batch_value, selected_row_ids, clearSelection, client_users, admin_users, refreshFilterCounts, pushHistoryEntry, getFieldFormulas, removeFieldFormulas]);
 
   const handlePasteClipboard = useCallback(async () => {
     if (!clipboard_cell || selected_row_ids.size === 0) return;
@@ -3097,13 +4003,15 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       const old_values_by_row_id = new Map(
         rows_ref.current
           .filter((r) => persisted_ids.includes(r.id))
-          .map((r) => [r.id, r[clipboard_cell.col_key as keyof LinkBuildingOrderRow] ?? null] as const)
+          .map((r) => [r.id, (r[clipboard_cell.col_key as keyof LinkBuildingOrderRow] ?? null) as CellHistoryValue] as const)
       );
+      const replaced_formulas = getFieldFormulas(persisted_ids, clipboard_cell.col_key);
 
       if (persisted_ids.length > 0) {
         await batchUpdateLinkBuildingOrders(persisted_ids, {
           [clipboard_cell.col_key]: clipboard_cell.value,
         });
+        await removeFieldFormulas(replaced_formulas, clipboard_cell.col_key);
       }
 
       setRows((prev) =>
@@ -3120,8 +4028,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
           col_key: clipboard_cell.col_key as keyof LinkBuildingOrderRow,
           old_value: old_values_by_row_id.get(id) ?? null,
           new_value: clipboard_cell.value,
+          ...(replaced_formulas.has(id) ? { old_formula: replaced_formulas.get(id), new_formula: null } : {}),
         }))
-        .filter((c) => String(c.old_value ?? "") !== String(c.new_value ?? ""));
+        .filter((c) => String(c.old_value ?? "") !== String(c.new_value ?? "") || c.old_formula !== undefined);
       pushHistoryEntry(history_changes, "paste to selection");
 
       const col_label = COLUMNS.find((c) => c.key === clipboard_cell.col_key)?.label ?? clipboard_cell.col_key;
@@ -3140,7 +4049,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     } finally {
       setIsBatchSaving(false);
     }
-  }, [clipboard_cell, selected_row_ids, clearSelection, refreshFilterCounts, pushHistoryEntry]);
+  }, [clipboard_cell, selected_row_ids, clearSelection, refreshFilterCounts, pushHistoryEntry, getFieldFormulas, removeFieldFormulas]);
 
   // ── Global keyboard shortcuts: Ctrl+C = copy, Ctrl+V = paste, Ctrl+Z = undo, Ctrl+Y / Ctrl+Shift+Z = redo ──
 
@@ -3182,10 +4091,13 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
           if (sel_len > 0) return;
         }
 
-        const row = rows_ref.current.find((r) => r.id === copy_cell.row_id);
-        if (!row) return;
-        const value = String(row[copy_cell.col_key as keyof LinkBuildingOrderRow] ?? "");
-        const col_label = COLUMNS.find((c) => c.key === copy_cell.col_key)?.label ?? copy_cell.col_key;
+        const value = get_cell_copy_text_ref.current(copy_cell);
+        if (value === null) return;
+        const col_label =
+          COLUMN_LABELS[copy_cell.col_key] ??
+          ASSIGNMENT_COLUMN_LABELS[copy_cell.col_key] ??
+          formula_column_by_key_ref.current.get(copy_cell.col_key)?.name ??
+          copy_cell.col_key;
 
         e.preventDefault();
         setClipboardCell({ value, col_key: copy_cell.col_key });
@@ -3280,6 +4192,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     const handleGlobalMouseUp = () => {
       range_mouse_down_ref.current = null;
       range_dragged_ref.current = false;
+      point_drag_ref.current = false;
     };
     document.addEventListener("mouseup", handleGlobalMouseUp);
     return () => document.removeEventListener("mouseup", handleGlobalMouseUp);
@@ -3392,6 +4305,25 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     const is_ctrl = e.ctrlKey || e.metaKey;
     const arrow_direction = ARROW_KEY_DIRECTIONS[e.key];
 
+    // The totals row under the table: move along it, Enter or typing edits its formula.
+    if (active_cell?.row_id === SUMMARY_ROW_ID) {
+      if (arrow_direction || e.key === "Tab") {
+        e.preventDefault();
+        navigateCell(SUMMARY_ROW_ID, active_cell.col_key, arrow_direction ?? (e.shiftKey ? "prev" : "next"));
+      } else if (e.key === "Enter" || e.key === "F2") {
+        e.preventDefault();
+        startEditing(SUMMARY_ROW_ID, active_cell.col_key);
+      } else if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        saveComputedCellText(active_cell, "");
+      } else if (isPrintableKey(e)) {
+        e.preventDefault();
+        startEditing(SUMMARY_ROW_ID, active_cell.col_key, "type");
+        setComputedCellDraft(e.key);
+      }
+      return;
+    }
+
     // Nothing selected yet (or the active row left the page): the first
     // navigation key just lands on the top left cell.
     if (!active_cell || !position) {
@@ -3423,6 +4355,11 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         const focus_cell = toCellRef(next_focus);
         setCellRange({ anchor: active_cell, focus: focus_cell });
         scrollToCell(focus_cell);
+        return;
+      }
+      if (arrow_direction === "down" && !is_ctrl && show_summary_row && position.row_idx === size.row_count - 1) {
+        e.preventDefault();
+        selectSummaryCell(active_cell.col_key);
         return;
       }
       moveTo(moveGridPosition(position, arrow_direction, size, { jump_to_edge: is_ctrl }));
@@ -3471,15 +4408,21 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         return;
       }
       startEditing(active_cell.row_id, active_cell.col_key, "type");
-      updateCell(active_cell.row_id, active_cell.col_key as keyof LinkBuildingOrderRow, e.key);
+      if (isFormulaColumnKey(active_cell.col_key)) {
+        setComputedCellDraft(e.key);
+      } else {
+        updateCell(active_cell.row_id, active_cell.col_key as keyof LinkBuildingOrderRow, e.key);
+      }
     }
   };
 
   /** Spreadsheet address of a cell, e.g. "C14". Row numbers follow the server's row offset. */
-  const row_number_offset = from_row ?? 1;
   const getCellAddress = (cell: CellRef): string | null => {
-    const position = toGridPosition(cell);
-    return position ? toCellAddress(position.col_idx, row_number_offset + position.row_idx) : null;
+    const col_idx = column_mapper.getColumnIndex(cell.col_key);
+    if (col_idx === null) return null;
+    if (cell.row_id === SUMMARY_ROW_ID) return toCellAddress(col_idx, row_number_offset + filtered_rows.length);
+    const row_idx = row_index_by_id.get(cell.row_id);
+    return row_idx === undefined ? null : toCellAddress(col_idx, row_number_offset + row_idx);
   };
 
   const active_cell_address = active_cell ? getCellAddress(active_cell) : null;
@@ -3508,7 +4451,10 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   }, [active_cell, filtered_rows, client_users, admin_users]);
 
   const active_column_label = active_cell
-    ? (COLUMN_LABELS[active_cell.col_key] ?? ASSIGNMENT_COLUMN_LABELS[active_cell.col_key] ?? "")
+    ? (COLUMN_LABELS[active_cell.col_key] ??
+      ASSIGNMENT_COLUMN_LABELS[active_cell.col_key] ??
+      formula_column_by_key.get(active_cell.col_key)?.name ??
+      "")
     : "";
 
   /** Count / Sum / Average for a multi-cell selection, like the Sheets status bar. */
@@ -3549,6 +4495,377 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       ? row_idx >= range_bounds.min_row && row_idx <= range_bounds.max_row
       : active_position?.row_idx === row_idx;
 
+  // ── Recalculation sync ──────────────────────────────────────────────────────
+  // A formula cell's result is stored in its column, so sorting, filtering, exports
+  // and the client portal read it. When a cell it reads changes (an edit by anyone,
+  // an import, a new day for TODAY()), the result shown here is recomputed at once
+  // and saved a moment later. Only formulas reading their own row are saved this
+  // way: their result is the same whatever page, sort or filter is shown, so two
+  // admins looking at different views never overwrite each other.
+
+  /** "row_id:col_key:value" already sent, so a value the server rejects is not retried in a loop. */
+  const synced_formula_values_ref = useRef(new Set<string>());
+
+  useEffect(() => {
+    if (!has_loaded_once || is_loading) return;
+    const stale_cells = collectStaleFormulaCells(
+      filtered_rows,
+      sheet,
+      SHEET_KIND_BY_KEY,
+      (row, _col_key, formula) =>
+        !new_row_ids_ref.current.has(row.id) &&
+        editing_cell?.row_id !== row.id &&
+        !saving_row_ids.has(row.id) &&
+        analyzeFormula(formula).is_row_local
+    ).filter((cell) => !synced_formula_values_ref.current.has(`${cell.row_id}:${cell.col_key}:${cell.value}`));
+    if (stale_cells.length === 0) return;
+
+    const timer = setTimeout(async () => {
+      const fields_by_row_id = new Map<string, Partial<Record<keyof LinkBuildingOrderRow, string>>>();
+      for (const cell of stale_cells) {
+        if (!fields_by_row_id.has(cell.row_id) && fields_by_row_id.size >= FORMULA_SYNC_MAX_ROWS) continue;
+        fields_by_row_id.set(cell.row_id, { ...(fields_by_row_id.get(cell.row_id) ?? {}), [cell.col_key]: cell.value });
+        synced_formula_values_ref.current.add(`${cell.row_id}:${cell.col_key}:${cell.value}`);
+      }
+      try {
+        const res = await batchUpdateLinkBuildingOrderCells(
+          Array.from(fields_by_row_id, ([id, fields]) => ({ id, fields }))
+        );
+        const updated_by_id = new Map(res.data.map((r) => [r.id, r]));
+        setRows((prev) =>
+          prev.map((r) => {
+            const updated = updated_by_id.get(r.id);
+            if (!updated) return r;
+            // A cell opened for editing in the meantime keeps what is being typed.
+            const editing = editing_cell_ref.current;
+            return editing?.row_id === r.id
+              ? { ...updated, [editing.col_key]: r[editing.col_key as keyof LinkBuildingOrderRow] }
+              : updated;
+          })
+        );
+        on_order_mutated_ref.current?.();
+      } catch (err) {
+        setSaveError(`Recalculated formula results could not be saved: ${parseApiErrorMessage(err, COLUMN_LABELS)}`);
+      }
+    }, FORMULA_SYNC_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [has_loaded_once, is_loading, filtered_rows, sheet, editing_cell, saving_row_ids]);
+
+  // ── Formula editing helpers ─────────────────────────────────────────────────
+
+  /** The formula being typed right now, in the formula bar, a computed cell or a data cell. */
+  const editing_formula_text = useMemo(() => {
+    let text: string | null = null;
+    if (formula_bar_draft !== null) {
+      text = formula_bar_draft;
+    } else if (editing_cell) {
+      if (editing_cell.row_id === SUMMARY_ROW_ID || isFormulaColumnKey(editing_cell.col_key)) {
+        text = computed_cell_draft;
+      } else if (FORMULA_CELL_COLUMN_KEYS.has(editing_cell.col_key)) {
+        const row = filtered_rows.find((r) => r.id === editing_cell.row_id);
+        text = String(row?.[editing_cell.col_key as keyof LinkBuildingOrderRow] ?? "");
+      }
+    }
+    return text !== null && text.trimStart().startsWith("=") ? text : null;
+  }, [formula_bar_draft, editing_cell, computed_cell_draft, filtered_rows]);
+
+  /**
+   * Colors of the cells (and whole columns) the formula being typed refers to,
+   * one color per reference like Google Sheets, so it is easy to check what a
+   * formula reads.
+   */
+  const formula_highlights = useMemo(() => {
+    const cells = new Map<string, number>();
+    const columns = new Map<string, number>();
+    if (!editing_formula_text) return { cells, columns };
+
+    findReferences(editing_formula_text).forEach((match, ref_idx) => {
+      const color = ref_idx % FORMULA_REFERENCE_COLOR_COUNT;
+      const { start } = match.spec;
+      const end = match.spec.end ?? start;
+      if (start.col?.index === undefined || end.col?.index === undefined) return;
+      const min_col = Math.min(start.col.index, end.col.index);
+      const max_col = Math.max(start.col.index, end.col.index);
+      const col_keys: string[] = [];
+      for (let c = min_col; c <= max_col; c++) {
+        const col_key = column_mapper.getColumnKey(c);
+        if (col_key) col_keys.push(col_key);
+      }
+
+      if (!start.row) {
+        col_keys.forEach((col_key) => columns.set(col_key, color));
+        return;
+      }
+      const row_a = start.row.kind === "number" ? start.row.number - row_number_offset : 0;
+      const row_b = end.row ? (end.row.kind === "number" ? end.row.number - row_number_offset : row_a) : filtered_rows.length - 1;
+      const min_row = Math.max(0, Math.min(row_a, row_b));
+      const max_row = Math.min(filtered_rows.length - 1, Math.max(row_a, row_b));
+      for (let r = min_row; r <= max_row && cells.size < MAX_HIGHLIGHTED_REFERENCE_CELLS; r++) {
+        col_keys.forEach((col_key) => cells.set(toCellKey(filtered_rows[r].id, col_key), color));
+      }
+    });
+    return { cells, columns };
+  }, [editing_formula_text, column_mapper, row_number_offset, filtered_rows]);
+
+  // ── Formula bar ─────────────────────────────────────────────────────────────
+
+  const is_active_cell_computed = !!active_cell && (active_cell.row_id === SUMMARY_ROW_ID || isFormulaColumnKey(active_cell.col_key));
+  const is_active_cell_editable =
+    !!active_cell && !(ASSIGNMENT_COLUMN_KEYS as readonly string[]).includes(active_cell.col_key);
+  const is_active_cell_formula_enabled =
+    !!active_cell && (is_active_cell_computed || FORMULA_CELL_COLUMN_KEYS.has(active_cell.col_key));
+  const active_cell_formula_text = active_cell ? getCellFormulaText(active_cell) : null;
+
+  /** What the formula bar shows: the text being typed in the cell, else the cell's formula, else its value. */
+  const formula_bar_cell_text = (() => {
+    if (!active_cell) return "";
+    const is_editing_active =
+      editing_cell?.row_id === active_cell.row_id && editing_cell?.col_key === active_cell.col_key;
+    if (is_editing_active) {
+      if (is_active_cell_computed) return computed_cell_draft;
+      const row = filtered_rows.find((r) => r.id === active_cell.row_id);
+      return String(row?.[active_cell.col_key as keyof LinkBuildingOrderRow] ?? "");
+    }
+    return active_cell_formula_text ?? (is_active_cell_computed ? "" : active_cell_value);
+  })();
+
+  /** The error a formula in the active cell evaluates to, explained in the formula bar. */
+  const active_cell_error = (() => {
+    if (!active_cell) return null;
+    let error: FormulaError | null = null;
+    if (active_cell.row_id === SUMMARY_ROW_ID) {
+      error = getSummaryDisplay(active_cell.col_key)?.error ?? null;
+    } else {
+      const row_idx = row_index_by_id.get(active_cell.row_id);
+      const formula_column = formula_column_by_key.get(active_cell.col_key);
+      if (row_idx !== undefined) {
+        error = formula_column
+          ? getFormulaColumnDisplay(row_idx, formula_column).error
+          : (getDataCellFormulaDisplay(row_idx, active_cell.col_key)?.error ?? null);
+      }
+    }
+    return error ? { code: error.code, detail: error.detail } : null;
+  })();
+
+  const formula_bar_scope_label = !active_cell
+    ? null
+    : active_cell.row_id === SUMMARY_ROW_ID
+      ? "Totals row"
+      : isFormulaColumnKey(active_cell.col_key)
+        ? "Fills every row"
+        : null;
+
+  /**
+   * The cell the formula bar is editing, captured when the edit starts. Clicking
+   * another cell selects it before the bar's blur commits, so the commit must not
+   * read the active cell at that point.
+   */
+  const formula_bar_target_ref = useRef<CellRef | null>(null);
+
+  const startFormulaBarEdit = (text: string) => {
+    formula_bar_target_ref.current = active_cell;
+    setFormulaBarDraft(text);
+  };
+
+  const commitFormulaBar = (direction: FormulaBarCommitDirection) => {
+    const text = formula_bar_draft;
+    const cell = formula_bar_target_ref.current;
+    formula_bar_target_ref.current = null;
+    setFormulaBarDraft(null);
+    if (text === null || !cell) return;
+
+    if (cell.row_id === SUMMARY_ROW_ID || isFormulaColumnKey(cell.col_key)) {
+      saveComputedCellText(cell, text);
+    } else {
+      const row = rows_ref.current.find((r) => r.id === cell.row_id);
+      if (row) {
+        const old_value = String(row[cell.col_key as keyof LinkBuildingOrderRow] ?? "");
+        const current_text = getCellFormulaText(cell) ?? old_value;
+        if (text !== current_text) {
+          applyDataCellInput(row, cell.col_key, text, {
+            row_id: cell.row_id,
+            col_key: cell.col_key,
+            old_value,
+            old_formula: getCellFormula(row, cell.col_key),
+          });
+        }
+      }
+    }
+    if (direction) navigateCell(cell.row_id, cell.col_key, direction === "down" ? "down" : "next");
+  };
+
+  const cancelFormulaBar = () => {
+    formula_bar_target_ref.current = null;
+    setFormulaBarDraft(null);
+    focusGrid();
+  };
+
+  /** Name box: jumps to an address such as "S14", selects a range ("B2:D9") or a column ("S:S"). */
+  const handleNameBoxSubmit = (address: string): boolean => {
+    const tokens = tokenizeFormula(address).filter((token) => token.type !== "whitespace");
+    const spec = tokens.length === 1 && tokens[0].type === "ref" ? tokens[0].ref : undefined;
+    if (!spec || spec.start.col?.index === undefined) return false;
+    const col_key = column_mapper.getColumnKey(spec.start.col.index);
+    if (!col_key || !grid_column_keys.includes(col_key)) return false;
+
+    if (!spec.start.row) {
+      selectEntireColumn(col_key);
+      return true;
+    }
+    if (spec.start.row.kind !== "number") return false;
+    const row_idx = spec.start.row.number - row_number_offset;
+    if (row_idx === filtered_rows.length && show_summary_row) {
+      selectSummaryCell(col_key);
+      focusGrid();
+      return true;
+    }
+    const row = filtered_rows[row_idx];
+    if (!row) return false;
+    const anchor = { row_id: row.id, col_key };
+    selectCell(anchor, { scroll: true });
+
+    const end = spec.end;
+    if (end?.col?.index !== undefined && end.row?.kind === "number") {
+      const end_col_key = column_mapper.getColumnKey(end.col.index);
+      const end_row = filtered_rows[end.row.number - row_number_offset];
+      const is_data_range =
+        !!end_col_key &&
+        !!end_row &&
+        visible_columns.some((col) => col.key === col_key) &&
+        visible_columns.some((col) => col.key === end_col_key);
+      if (is_data_range) setCellRange({ anchor, focus: { row_id: end_row.id, col_key: end_col_key } });
+    }
+    focusGrid();
+    return true;
+  };
+
+  // ── Functions reference ─────────────────────────────────────────────────────
+
+  /** Inserts a function into the formula being typed, or starts a formula in the active cell. */
+  const insertFunction = (function_name: string) => {
+    setFunctionsAnchorEl(null);
+    const insert = `${function_name}(`;
+    const editor = active_formula_editor_ref.current;
+    if (editor && document.activeElement === editor.element) {
+      const text = editor.element.value;
+      const caret = editor.element.selectionStart ?? text.length;
+      editor.setText(text.slice(0, caret) + insert + text.slice(caret), caret + insert.length);
+      return;
+    }
+    if (!is_active_cell_editable || !is_active_cell_formula_enabled) {
+      setNotificationBanner(
+        `Select a cell in a text, number or date column (or a formula column), then pick ${function_name} to start a formula.`
+      );
+      return;
+    }
+    const base = formula_bar_cell_text.trimStart().startsWith("=") ? formula_bar_cell_text : "=";
+    const draft = `${base}${insert}`;
+    startFormulaBarEdit(draft);
+    requestAnimationFrame(() => {
+      const input = formula_bar_input_ref.current;
+      input?.focus();
+      input?.setSelectionRange(draft.length, draft.length);
+    });
+  };
+
+  // ── Formula columns ─────────────────────────────────────────────────────────
+
+  /** Every referenceable column with its letter, for the "Insert column" picker of the dialog. */
+  const formula_reference_columns = useMemo(
+    () =>
+      sheet_columns
+        .map((column, idx) => ({
+          key: column.key,
+          letter: toColumnLetter(idx),
+          label:
+            COLUMN_LABELS[column.key] ?? ASSIGNMENT_COLUMN_LABELS[column.key] ?? formula_column_by_key.get(column.key)?.name ?? column.key,
+        }))
+        .filter((column) => formula_dialog?.mode !== "edit" || column.key !== formula_dialog.column.key),
+    [sheet_columns, formula_column_by_key, formula_dialog]
+  );
+
+  /** Result of a formula column formula on the first rows, for the dialog's live preview. */
+  const getFormulaPreview = useCallback(
+    (formula: string, format: FormulaColumnFormat): FormulaPreviewRow[] => {
+      const stored = toStoredFormula(formula, row_number_offset, column_mapper);
+      return filtered_rows.slice(0, 5).map((row, idx) => {
+        const result = sheet.evaluate(stored, idx);
+        const is_error = result.value instanceof FormulaError;
+        return {
+          row_number: row_number_offset + idx,
+          label: `${row.order_id} · ${row.client || "No company"}`,
+          text: formatComputedResult(result, format, "text"),
+          is_error,
+          title: result.value instanceof FormulaError ? result.value.detail : undefined,
+        };
+      });
+    },
+    [row_number_offset, column_mapper, filtered_rows, sheet]
+  );
+
+  const submitFormulaColumn = async (draft: FormulaColumnDraft) => {
+    if (!formula_dialog) return;
+    const formula = toStoredFormula(draft.formula, row_number_offset, column_mapper);
+    try {
+      if (formula_dialog.mode === "create") {
+        const column = await createFormulaColumn({ name: draft.name, formula, format: draft.format });
+        setNotificationBanner(
+          `Formula column "${column.name}" added as column ${toColumnLetter(sheet_columns.length)}, the whole team sees it.`
+        );
+      } else {
+        await updateFormulaColumn(formula_dialog.column.id, { name: draft.name, formula, format: draft.format });
+        setNotificationBanner(`Formula column "${draft.name}" updated on every row.`);
+      }
+      setFormulaDialog(null);
+    } catch (err) {
+      throw new Error(parseApiErrorMessage(err));
+    }
+  };
+
+  const removeFormulaColumn = async () => {
+    if (formula_dialog?.mode !== "edit") return;
+    const { column } = formula_dialog;
+    await deleteFormulaColumn(column.id);
+    if (active_cell?.col_key === column.key) setActiveCell(null);
+    setHiddenColumns((prev) => {
+      if (!prev.has(column.key)) return prev;
+      const next = new Set(prev);
+      next.delete(column.key);
+      return next;
+    });
+    setNotificationBanner(`Formula column "${column.name}" deleted.`);
+    setFormulaDialog(null);
+  };
+
+  const toggleSummaryRow = () => {
+    setIsSummaryRowVisible((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SUMMARY_ROW_STORAGE_KEY, next ? "visible" : "hidden");
+      } catch {
+        // Storage unavailable, the choice just won't survive a reload.
+      }
+      return next;
+    });
+  };
+
+  /** The column chooser lists the formula columns in a group of their own. */
+  const column_visibility_groups = useMemo<ColumnVisibilityGroup[]>(
+    () =>
+      formula_columns.length === 0
+        ? COLUMN_VISIBILITY_GROUPS
+        : [
+            ...COLUMN_VISIBILITY_GROUPS,
+            {
+              key: "formula_columns",
+              label: "Formula columns",
+              swatch_class: "bg-emerald-600",
+              columns: formula_columns.map((column) => ({ key: column.key, label: column.name ?? column.key })),
+            },
+          ],
+    [formula_columns]
+  );
+
   // ── Full screen ─────────────────────────────────────────────────────────────
 
   const table_root_ref = useRef<HTMLDivElement>(null);
@@ -3577,6 +4894,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
+    <FormulaEditingContext.Provider value={formula_editing_context}>
     <div
       ref={table_root_ref}
       className={`${styles.table_root} ${
@@ -4080,6 +5398,24 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
               </span>
             )}
           </button>
+          {/* Spreadsheet formulas: add a formula column, show or hide the totals row */}
+          <button
+            onClick={() => setFormulaDialog({ mode: "create" })}
+            title="Add a formula column, computed from the other columns on every row"
+            aria-label="Add formula column"
+            className={`${styles.icon_button} ${styles.icon_button_formula}`}
+          >
+            <span className={styles.fx_glyph} aria-hidden="true">fx</span>
+          </button>
+          <button
+            onClick={toggleSummaryRow}
+            title={is_summary_row_visible ? "Hide the totals row under the table" : "Show the totals row under the table, e.g. =SUM(AA:AA)"}
+            aria-label="Totals row"
+            aria-pressed={is_summary_row_visible}
+            className={`${styles.icon_button}${is_summary_row_visible ? ` ${styles.icon_button_summary_active}` : ""}`}
+          >
+            <span className={styles.sigma_glyph} aria-hidden="true">Σ</span>
+          </button>
           <span className={styles.toolbar_divider} aria-hidden="true" />
           {/* Find in table, highlights matches without filtering (Ctrl/Cmd+F) */}
           <button
@@ -4435,7 +5771,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       {/* Column chooser, grouped the same way as the colored column headers */}
       {show_filter_panel && (
         <ColumnVisibilityPanel
-          groups={COLUMN_VISIBILITY_GROUPS}
+          groups={column_visibility_groups}
           hidden_columns={hidden_columns}
           has_custom_widths={has_custom_widths}
           onToggleColumn={toggleColumn}
@@ -4445,26 +5781,33 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         />
       )}
 
-      {/* Formula bar: address of the active cell (or range), its full value, and range totals */}
+      {/* Formula bar: the active cell's address (type one to jump to it), the fx
+          function reference, and its formula or full value, editable in place */}
       {has_loaded_once && (
-        <div className={styles.formula_bar} aria-live="polite">
-          <div className={styles.name_box} title="Active cell">
-            {name_box_label ?? ""}
-          </div>
-          <div className={styles.formula_icon} aria-hidden="true">fx</div>
-          <div className={styles.formula_value} title={active_cell_value || undefined}>
-            {active_cell ? (
-              active_cell_value ? (
-                active_cell_value
-              ) : (
-                <span className={styles.formula_placeholder}>{active_column_label} is empty</span>
-              )
-            ) : (
-              <span className={styles.formula_placeholder}>
-                Select a cell to see its full value. Use the arrow keys to move, Enter or F2 to edit.
-              </span>
-            )}
-          </div>
+        <FormulaBar
+          name_box_label={name_box_label}
+          onNameBoxSubmit={handleNameBoxSubmit}
+          cell_text={formula_bar_cell_text}
+          draft={formula_bar_draft}
+          onDraftChange={setFormulaBarDraft}
+          onStartEdit={() => startFormulaBarEdit(formula_bar_cell_text)}
+          onCommit={commitFormulaBar}
+          onCancel={cancelFormulaBar}
+          is_editable={is_active_cell_editable && !editing_cell}
+          is_formula={active_cell_formula_text !== null}
+          formula_enabled={is_active_cell_formula_enabled}
+          placeholder={
+            !active_cell
+              ? "Select a cell to see its full value. Type = in a cell to start a formula."
+              : is_active_cell_editable
+                ? `${active_column_label} is empty. Type a value, or = to start a formula.`
+                : `${active_column_label} is empty`
+          }
+          error={active_cell_error}
+          scope_label={formula_bar_scope_label}
+          onOpenFunctions={(anchor_el) => setFunctionsAnchorEl((current) => (current ? null : anchor_el))}
+          input_ref={formula_bar_input_ref}
+        >
           {range_stats && (
             <div className={styles.range_stats}>
               <span>Count: <strong>{range_stats.count}</strong></span>
@@ -4527,7 +5870,17 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
               )}
             </div>
           )}
-        </div>
+        </FormulaBar>
+      )}
+
+      {/* Function reference, opened from the fx button of the formula bar */}
+      {functions_anchor_el && (
+        <FunctionsReferencePanel
+          anchor_el={functions_anchor_el}
+          autofocus_search={!is_formula_pointing}
+          onInsert={insertFunction}
+          onClose={() => setFunctionsAnchorEl(null)}
+        />
       )}
 
       {/* Find bar (Ctrl/Cmd+F) */}
@@ -4569,7 +5922,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
           aria-rowcount={filtered_rows.length}
           aria-busy={is_refreshing}
           onKeyDown={handleGridKeyDown}
-          className={`w-full min-w-0 overflow-auto ${is_fullscreen ? "min-h-0 flex-1" : "max-h-[calc(100vh-200px)]"} ${styles.grid_container}`}
+          className={`w-full min-w-0 overflow-auto ${is_fullscreen ? "min-h-0 flex-1" : "max-h-[calc(100vh-200px)]"} ${styles.grid_container}${is_formula_pointing ? ` ${styles.grid_pointing}` : ""}`}
         >
           <table className={`text-xs ${styles.grid_table}`} style={{ width: table_width }}>
             {/* Exact column widths for the fixed table layout. The frozen columns'
@@ -4599,16 +5952,29 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                   const col_def = visible_columns[col_idx];
                   const is_sticky_col = !!col_def?.sticky;
                   const is_filtered_col = filtered_columns[col_key] !== undefined;
+                  const column_letter = getColumnLetter(col_key);
+                  const ref_color = formula_highlights.columns.get(col_key);
                   return (
                     <th
                       key={col_key}
-                      onClick={() => selectEntireColumn(col_key)}
-                      title={`Select column ${toColumnLetter(col_idx)}${is_filtered_col ? ", filtered" : ""}`}
-                      className={`${is_sticky_col ? "sticky z-[30]" : ""}${is_filtered_col ? ` ${styles.letter_filtered}` : ""}${isColumnHighlighted(col_idx) ? ` ${styles.header_highlighted}` : ""}`}
+                      onMouseDown={(e) => {
+                        skip_letter_click_ref.current = insertPointedColumn(col_key, e);
+                      }}
+                      onClick={() => {
+                        if (skip_letter_click_ref.current) {
+                          skip_letter_click_ref.current = false;
+                          return;
+                        }
+                        selectEntireColumn(col_key);
+                      }}
+                      title={`Select column ${column_letter}${is_filtered_col ? ", filtered" : ""}`}
+                      className={`${is_sticky_col ? "sticky z-[30]" : ""}${is_filtered_col ? ` ${styles.letter_filtered}` : ""}${isColumnHighlighted(col_idx) ? ` ${styles.header_highlighted}` : ""}${
+                        ref_color !== undefined ? ` ${styles[`formula_ref_letter_${ref_color}`]}` : ""
+                      }${isFormulaColumnKey(col_key) ? ` ${styles.letter_formula_column}` : ""}`}
                       style={is_sticky_col ? { left: sticky_left_offsets[col_key] } : undefined}
                     >
                       <div className={styles.letter_cell}>
-                        {toColumnLetter(col_idx)}
+                        {column_letter}
                         {is_filtered_col && (
                           <svg className={styles.letter_filter_icon} fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
@@ -4618,7 +5984,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                         <span
                           role="separator"
                           aria-orientation="vertical"
-                          aria-label={`Resize column ${toColumnLetter(col_idx)}`}
+                          aria-label={`Resize column ${column_letter}`}
                           title="Drag to resize · Double click to reset"
                           className={`${styles.resize_handle}${resizing_col_key === col_key ? ` ${styles.resize_handle_active}` : ""}`}
                           onMouseDown={(e) => startColumnResize(col_key, e)}
@@ -4803,13 +6169,47 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                     />
                   </div>
                 </th>
+                {/* Formula columns: computed in the browser from the other columns, shared by the team */}
+                {visible_formula_columns.map((column) => (
+                  <th key={column.key} className={`${styles.column_header} ${styles.formula_column_header}`}>
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <span className={styles.formula_column_badge} aria-hidden="true">fx</span>
+                      <button
+                        type="button"
+                        onClick={() => setFormulaDialog({ mode: "edit", column })}
+                        title={`${column.name}: ${getCellFormulaText({ row_id: filtered_rows[0]?.id ?? "", col_key: column.key }) ?? ""}\nClick to edit the formula, the name or the format`}
+                        className="min-w-0 flex-1 truncate text-left hover:opacity-80"
+                      >
+                        {column.name}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormulaDialog({ mode: "edit", column })}
+                        aria-label={`Edit formula column ${column.name}`}
+                        className={styles.formula_column_edit}
+                      >
+                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                        </svg>
+                      </button>
+                    </div>
+                  </th>
+                ))}
                 <th
                   aria-label="Row actions"
                   className={`${styles.column_header} bg-gray-800 text-center text-xs font-semibold text-white`}
                 >
-                  <svg className="mx-auto h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                  </svg>
+                  <button
+                    type="button"
+                    onClick={() => setFormulaDialog({ mode: "create" })}
+                    title="Add a formula column to the right of the table"
+                    className={styles.add_formula_column}
+                  >
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span>fx</span>
+                  </button>
                 </th>
               </tr>
             </thead>
@@ -4817,7 +6217,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
               {filtered_rows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={visible_columns.length + 5}
+                    colSpan={grid_column_keys.length + 3}
                     className="px-6 py-14 text-center text-sm text-gray-400 dark:text-gray-500"
                   >
                     {search || status_filter || link_type_filter || client_filter
@@ -4908,11 +6308,16 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                         const is_active =
                           active_cell?.row_id === row.id && active_cell?.col_key === col.key;
                         const find_match_state = getCellMatchState(row.id, col.key);
+                        const formula_display = is_editing ? null : getDataCellFormulaDisplay(row_idx, col.key);
                         return (
                           <EditableCell
                             key={col.key}
                             col={col}
                             value={(row[col.key] as string) ?? ""}
+                            formula_display={formula_display?.text}
+                            formula_error={formula_display?.error}
+                            formula_enabled={FORMULA_CELL_COLUMN_KEYS.has(col.key)}
+                            formula_ref_color={formula_highlights.cells.get(toCellKey(row.id, col.key))}
                             is_editing={is_editing}
                             edit_entry={is_editing ? edit_entry : "edit"}
                             is_active={is_active}
@@ -4930,7 +6335,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                             onKeyNav={(dir) => navigateCell(row.id, col.key, dir)}
                             onCopy={(val) => copyCellValue(val, col.key)}
                             onBulkPaste={(grid) => handleBulkPaste(row.id, col.key, grid)}
-                            onCellMouseDown={(shift_key) => handleCellMouseDown(row.id, col.key, shift_key)}
+                            onCellMouseDown={(e) => handleCellMouseDown(row.id, col.key, e)}
                             onCellMouseEnter={() => handleCellMouseEnter(row.id, col.key)}
                             onCellMouseUp={handleCellMouseUp}
                             is_range_selected={is_range_selected}
@@ -4970,6 +6375,37 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                         find_match_state={getCellMatchState(row.id, "assigned_admin_user_id")}
                         find_terms={getCellMatchState(row.id, "assigned_admin_user_id") ? find_terms : undefined}
                       />
+                      {/* Formula column cells: the column's formula evaluated on this row */}
+                      {visible_formula_columns.map((column) => {
+                        const cell_key = toCellKey(row.id, column.key);
+                        const display = getFormulaColumnDisplay(row_idx, column);
+                        const find_match_state = getCellMatchState(row.id, column.key);
+                        return (
+                          <ComputedCell
+                            key={column.key}
+                            text={display.text}
+                            error={display.error}
+                            is_numeric={display.is_numeric}
+                            is_active={active_cell?.row_id === row.id && active_cell?.col_key === column.key}
+                            is_editing={editing_cell?.row_id === row.id && editing_cell?.col_key === column.key}
+                            draft={computed_cell_draft}
+                            onDraftChange={setComputedCellDraft}
+                            onCommit={commitComputedCell}
+                            onCancel={cancelEditing}
+                            onCellMouseDown={(e) => {
+                              if (!insertPointedReference(row.id, column.key, e)) selectCell({ row_id: row.id, col_key: column.key });
+                            }}
+                            onCellMouseEnter={() => extendPointedReference(row.id, column.key)}
+                            onDoubleClick={() => startEditing(row.id, column.key)}
+                            cell_key={cell_key}
+                            title={`${column.name} · Double click or Enter to edit the column formula, it applies to every row`}
+                            class_name={styles.formula_column_cell}
+                            find_match_state={find_match_state}
+                            find_terms={find_match_state ? find_terms : undefined}
+                            formula_ref_color={formula_highlights.cells.get(cell_key)}
+                          />
+                        );
+                      })}
 
                       {/* Actions cell */}
                       <td className="w-px whitespace-nowrap px-2">
@@ -5051,6 +6487,53 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                 })
               )}
             </tbody>
+            {/* Totals row: one formula per column over the rows loaded on this page, e.g.
+                =SUM(AA:AA) under Final Price. Shared by the whole team. */}
+            {show_summary_row && (
+              <tfoot className={styles.summary_footer}>
+                <tr className={styles.summary_row}>
+                  <td
+                    className={`sticky left-0 z-[3] ${styles.row_header} ${styles.summary_row_header}`}
+                    title="Totals row: double click a cell (or select it and type =) to add a formula such as =SUM(AA:AA)"
+                  >
+                    Σ
+                  </td>
+                  <td className={`sticky z-[3] ${styles.summary_spacer}`} style={{ left: ROW_HEADER_WIDTH }} />
+                  {grid_column_keys.map((col_key) => {
+                    const display = getSummaryDisplay(col_key);
+                    const cell = { row_id: SUMMARY_ROW_ID, col_key };
+                    const is_sticky_col = !!visible_columns.find((col) => col.key === col_key)?.sticky;
+                    return (
+                      <ComputedCell
+                        key={col_key}
+                        text={display?.text ?? ""}
+                        error={display?.error ?? null}
+                        is_numeric={display?.is_numeric ?? false}
+                        is_active={active_cell?.row_id === SUMMARY_ROW_ID && active_cell?.col_key === col_key}
+                        is_editing={editing_cell?.row_id === SUMMARY_ROW_ID && editing_cell?.col_key === col_key}
+                        draft={computed_cell_draft}
+                        onDraftChange={setComputedCellDraft}
+                        onCommit={commitComputedCell}
+                        onCancel={cancelEditing}
+                        onCellMouseDown={() => selectSummaryCell(col_key)}
+                        onDoubleClick={() => startEditing(SUMMARY_ROW_ID, col_key)}
+                        cell_key={toCellKey(cell.row_id, col_key)}
+                        title={
+                          display
+                            ? `${getCellFormulaText(cell) ?? ""} · Double click to edit`
+                            : "Double click to add a formula, e.g. =SUM, =AVERAGE or =COUNTIF over this column"
+                        }
+                        placeholder="fx"
+                        class_name={styles.summary_cell}
+                        sticky_left={is_sticky_col ? sticky_left_offsets[col_key] : undefined}
+                        sticky_bg_class={styles.summary_sticky_bg}
+                      />
+                    );
+                  })}
+                  <td className={styles.summary_spacer} />
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
         </div>
@@ -5069,6 +6552,29 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         onClose={() => setShowMetricsModal(false)}
         onImportComplete={handleImportComplete}
       />
+
+      {/* Add or edit a formula column. Keyed so its fields reset for each column. */}
+      {formula_dialog && (
+        <FormulaColumnDialog
+          key={formula_dialog.mode === "edit" ? formula_dialog.column.key : "create"}
+          mode={formula_dialog.mode}
+          initial={
+            formula_dialog.mode === "edit"
+              ? {
+                  name: formula_dialog.column.name ?? "",
+                  formula: toDisplayFormula(formula_dialog.column.formula, row_number_offset, column_mapper),
+                  format: formula_dialog.column.format,
+                }
+              : { name: "", formula: "=", format: "auto" }
+          }
+          first_row_number={row_number_offset}
+          reference_columns={formula_reference_columns}
+          getPreview={getFormulaPreview}
+          onSubmit={submitFormulaColumn}
+          onDelete={formula_dialog.mode === "edit" ? removeFormulaColumn : undefined}
+          onClose={() => setFormulaDialog(null)}
+        />
+      )}
 
       {/* Per-column spreadsheet style sort and filter menu. Keyed by column so its
           staged selections reset when another column's menu is opened. */}
@@ -5139,5 +6645,6 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         onPerPageChange={(option) => handlePerPageChange(option as PerPageOption)}
       />
     </div>
+    </FormulaEditingContext.Provider>
   );
 }

@@ -1097,6 +1097,14 @@
     "@eslint/core" "^0.17.0"
     levn "^0.4.1"
 
+"@formulajs/formulajs@^4.6.1":
+  version "4.6.1"
+  resolved "https://registry.npmjs.org/@formulajs/formulajs/-/formulajs-4.6.1.tgz"
+  integrity sha512-QkHPCaHljG4SRT5TNOIBx4ClgQYyLlblwthF4tJP5GsWEJ7uD8eu+yN9RyCl3NCQdpWIEdtJb+pnQpuceywrLA==
+  dependencies:
+    bessel "^1.0.2"
+    jstat "^1.9.6"
+
 "@fullcalendar/core@^6.1.19", "@fullcalendar/core@~6.1.19":
   version "6.1.19"
   resolved "https://registry.npmjs.org/@fullcalendar/core/-/core-6.1.19.tgz"
@@ -1529,6 +1537,11 @@
   version "2.6.0"
   resolved "https://registry.npmjs.org/@parcel/watcher-linux-x64-glibc/-/watcher-linux-x64-glibc-2.6.0.tgz"
   integrity sha512-ulGE6x6Oz6iAwg75T8YQSoguBWasniIbX+QWpaYPcCnDOpdWX3k+4xbEYPZVLxOuoJI+svJJPD3sEj8G7lrQ3A==
+
+"@parcel/watcher-linux-x64-musl@2.6.0":
+  version "2.6.0"
+  resolved "https://registry.npmjs.org/@parcel/watcher-linux-x64-musl/-/watcher-linux-x64-musl-2.6.0.tgz"
+  integrity sha512-tkBYKt7YQrjIJWYDnto2YgO8MRkjlMTSNoRHzsXinBqbLdeOM3L32wPZJvIZxqaLMfSlS/4sUjH/6STVP/XDLw==
 
 "@parcel/watcher@^2.4.1":
   version "2.6.0"
@@ -2495,6 +2508,11 @@ baseline-browser-mapping@^2.10.0, baseline-browser-mapping@^2.8.3, baseline-brow
   version "2.10.0"
   resolved "https://registry.npmjs.org/baseline-browser-mapping/-/baseline-browser-mapping-2.10.0.tgz"
   integrity sha512-lIyg0szRfYbiy67j9KN8IyeD7q7hcmqnJ1ddWmNt19ItGpNN64mnllmxUNFIOdOm6by97jlL6wfpTTJrmnjWAA==
+
+bessel@^1.0.2:
+  version "1.0.2"
+  resolved "https://registry.npmjs.org/bessel/-/bessel-1.0.2.tgz"
+  integrity sha512-Al3nHGQGqDYqqinXhQzmwmcRToe/3WyBv4N8aZc5Pef8xw2neZlR9VPi84Sa23JtgWcucu18HxVZrnI0fn2etw==
 
 boolbase@^1.0.0:
   version "1.0.0"
@@ -4712,6 +4730,11 @@ jspdf@^4.2.0:
     core-js "^3.6.0"
     dompurify "^3.3.1"
     html2canvas "^1.0.0-rc.5"
+
+jstat@^1.9.6:
+  version "1.9.6"
+  resolved "https://registry.npmjs.org/jstat/-/jstat-1.9.6.tgz"
+  integrity sha512-rPBkJbK2TnA8pzs93QcDDPlKcrtZWuuCo2dVR0TFLOJSxhqfWOVCSp8aV3/oSbn+4uY4yw1URtLpHQedtmXfug==
 
 "jsx-ast-utils@^2.4.1 || ^3.0.0", jsx-ast-utils@^3.3.5:
   version "3.3.5"
