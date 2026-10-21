@@ -109,6 +109,7 @@ import {
   DEFAULT_STATUS_BADGE_CLASS,
   STATUS_DOT_CLASSES,
   DEFAULT_STATUS_DOT_CLASS,
+  isSiteRemovedAlert,
 } from "@/lib/link-building-order-statuses";
 import FindHighlightedText from "./FindHighlightedText";
 import {
@@ -5042,8 +5043,8 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                   <div className="min-w-0">
                     <p className="text-xs font-semibold text-gray-800 dark:text-gray-100">Update Metrics</p>
                     <p className="mt-0.5 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
-                      Bulk update Current Traffic, DR Formula, Current POC, Current Price and
-                      other metric columns only, matched by Order ID
+                      Bulk update DR Formula, Current Traffic, Current POC and Current Price,
+                      matched by Partnership or Order ID
                     </p>
                   </div>
                 </button>
@@ -6235,6 +6236,8 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                   const primary_editor = has_collaborators ? row_collaborators[0] : null;
                   const is_locally_selected =
                     !is_new && selected_row_id === row.id && !has_collaborators;
+                  // In progress order whose partnership left the partner list (SITE REMOVED).
+                  const is_site_removed = !is_new && isSiteRemovedAlert(row);
 
                   // Frozen cells sit on top of the columns scrolling underneath them,
                   // so their background must be fully opaque (no /opacity modifiers).
@@ -6244,6 +6247,8 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                     ? "bg-indigo-50 dark:bg-indigo-950"
                     : is_locally_selected
                     ? "bg-brand-50 dark:bg-brand-950"
+                    : is_site_removed
+                    ? "bg-red-50 dark:bg-red-950"
                     : "bg-white dark:bg-gray-900";
 
                   return (
@@ -6260,7 +6265,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                             ? "border-l-2 border-l-indigo-400 bg-indigo-50/50 dark:border-l-indigo-500 dark:bg-indigo-950/20"
                             : is_locally_selected
                               ? "border-l-2 border-l-brand-400 bg-brand-50/30 dark:border-l-brand-500 dark:bg-brand-900/10"
-                              : "bg-white dark:bg-gray-900"
+                              : is_site_removed
+                                ? "border-l-2 border-l-red-500 bg-red-50 dark:border-l-red-500 dark:bg-red-950/40"
+                                : "bg-white dark:bg-gray-900"
                         } ${is_saving ? "opacity-60" : ""}`}
                       style={
                         primary_editor
@@ -6279,7 +6286,11 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                           e.stopPropagation();
                           selectEntireRow(row.id);
                         }}
-                        title={`Select row ${row_number_offset + row_idx}`}
+                        title={
+                          is_site_removed
+                            ? `Select row ${row_number_offset + row_idx}. Site removed, this partnership is no longer in the partner list, choose a different site.`
+                            : `Select row ${row_number_offset + row_idx}`
+                        }
                       >
                         {is_new ? "new" : row_number_offset + row_idx}
                       </td>

@@ -56,3 +56,25 @@ export const STATUS_DOT_CLASSES: Record<string, string> = {
 
 export const DEFAULT_STATUS_BADGE_CLASS = "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300";
 export const DEFAULT_STATUS_DOT_CLASS = "bg-gray-400";
+
+/**
+ * Statuses of orders still in progress. When the partnership of one of these rows
+ * shows SITE REMOVED (it left the partner list), the row is highlighted in red so
+ * the writer picks a different site, like the conditional format of the BASE
+ * Google Sheet.
+ */
+export const SITE_REMOVED_ALERT_STATUSES = new Set([
+  "New Request",
+  "Reviewing",
+  "Ordered",
+  "Pending",
+  "Partnership Check",
+  "Approved",
+  "Ready",
+]);
+
+/** True when the row is in progress and its partnership is no longer available. */
+export function isSiteRemovedAlert(row: { status: string; current_poc: string; current_price: string }): boolean {
+  if (!SITE_REMOVED_ALERT_STATUSES.has(row.status)) return false;
+  return [row.current_poc, row.current_price].some((value) => /removed/i.test(value ?? ""));
+}

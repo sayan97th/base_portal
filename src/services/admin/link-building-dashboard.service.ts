@@ -358,68 +358,22 @@ export function buildLboPayload(row: LinkBuildingOrderRow): LinkBuildingOrderPay
 
 // ── Import ─────────────────────────────────────────────────────────────────────
 
-export interface ImportStatus {
-  status: "queued" | "processing" | "completed" | "failed";
-  total: number;
-  processed: number;
-  created: number;
-  updated: number;
-  skipped: number;
-  /** Number of rows whose "Link Builder" column matched an admin user and were auto-assigned. */
-  assigned?: number;
-  errors: Array<{ order_id: string; message: string }>;
-  /** Per-row skip details (up to 100 entries). Explains exactly why each record was not imported. */
-  skipped_records?: Array<{ order_id: string; reason: string }>;
-}
-
-export interface ImportStartResponse {
-  message: string;
-  import_id: string;
-  total: number;
-}
-
-export interface ImportOptions {
-  /** When false, no date filtering is applied. Defaults to true. */
-  apply_date_filter: boolean;
-  /** Lower bound in MM/DD/YYYY format. Only used when apply_date_filter is true. */
-  date_from?: string;
-  /** Upper bound in MM/DD/YYYY format. Only used when apply_date_filter is true. */
-  date_to?: string;
-  /** Controls which link types are imported. Defaults to 'external_only'. */
-  link_type_filter: "external_only" | "internal_only" | "all";
-  /** When true, rows whose order_id already exists are left untouched and counted as skipped instead of being updated. Defaults to false. */
-  only_new_records: boolean;
-}
-
 /**
- * POST /api/admin/link-building-orders/import
- * Uploads a CSV file and starts a background batch-import job.
- * Calls onUploadProgress(0-100) during the file transfer phase.
- * Returns an import_id that can be polled via getLinkBuildingImportStatus().
+ * Posts a multipart import form with XMLHttpRequest instead of fetch, so the
+ * file transfer can report its progress (0-100) through onUploadProgress.
+ * Rejects with the parsed API error body when the server answers with an error.
  */
-export function importLinkBuildingOrders(
-  file: File,
-  options: ImportOptions,
+function uploadImportFile(
+  path: string,
+  form_data: FormData,
   onUploadProgress?: (percent: number) => void
 ): Promise<ImportStartResponse> {
   return new Promise((resolve, reject) => {
     const base  = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
     const token = getToken();
 
-    const form_data = new FormData();
-    form_data.append("file", file);
-    form_data.append("apply_date_filter", options.apply_date_filter ? "1" : "0");
-    if (options.apply_date_filter && options.date_from) {
-      form_data.append("date_from", options.date_from);
-    }
-    if (options.apply_date_filter && options.date_to) {
-      form_data.append("date_to", options.date_to);
-    }
-    form_data.append("link_type_filter", options.link_type_filter);
-    form_data.append("only_new_records", options.only_new_records ? "1" : "0");
-
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", `${base}/api/admin/link-building-orders/import`);
+    xhr.open("POST", `${base}${path}`);
 
     if (token) {
       xhr.setRequestHeader("Authorization", `Bearer ${token}`);
@@ -455,6 +409,75 @@ export function importLinkBuildingOrders(
 
     xhr.send(form_data);
   });
+}
+
+export interface ImportStatus {
+  status: "queued" | "processing" | "completed" | "failed";
+  total: number;
+  processed: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  /** Number of rows whose "Link Builder" column matched an admin user and were auto-assigned. */
+  assigned?: number;
+  errors: Array<{ order_id: string; message: string }>;
+  /** Per-row skip details (up to 100 entries). Explains exactly why each record was not imported. */
+  skipped_records?: Array<{ order_id: string; reason: string }>;
+  /** Partnership metrics update only: matched rows whose values were already up to date. */
+  unchanged?: number;
+  /** Partnership metrics update only: rows whose partnership is no longer in the partner list. */
+  site_removed?: number;
+  /** Partnership metrics update only: rows left untouched because their Request Date is outside the range. */
+  out_of_range?: number;
+  /** Partnership metrics update only: domains read from the uploaded file. */
+  reference_rows?: number;
+  /** Partnership metrics update only: reference columns found in the uploaded file. */
+  reference_columns?: PartnershipReferenceColumn[];
+}
+
+export interface ImportStartResponse {
+  message: string;
+  import_id: string;
+  total: number;
+}
+
+export interface ImportOptions {
+  /** When false, no date filtering is applied. Defaults to true. */
+  apply_date_filter: boolean;
+  /** Lower bound in MM/DD/YYYY format. Only used when apply_date_filter is true. */
+  date_from?: string;
+  /** Upper bound in MM/DD/YYYY format. Only used when apply_date_filter is true. */
+  date_to?: string;
+  /** Controls which link types are imported. Defaults to 'external_only'. */
+  link_type_filter: "external_only" | "internal_only" | "all";
+  /** When true, rows whose order_id already exists are left untouched and counted as skipped instead of being updated. Defaults to false. */
+  only_new_records: boolean;
+}
+
+/**
+ * POST /api/admin/link-building-orders/import
+ * Uploads a CSV file and starts a background batch-import job.
+ * Calls onUploadProgress(0-100) during the file transfer phase.
+ * Returns an import_id that can be polled via getLinkBuildingImportStatus().
+ */
+export function importLinkBuildingOrders(
+  file: File,
+  options: ImportOptions,
+  onUploadProgress?: (percent: number) => void
+): Promise<ImportStartResponse> {
+  const form_data = new FormData();
+  form_data.append("file", file);
+  form_data.append("apply_date_filter", options.apply_date_filter ? "1" : "0");
+  if (options.apply_date_filter && options.date_from) {
+    form_data.append("date_from", options.date_from);
+  }
+  if (options.apply_date_filter && options.date_to) {
+    form_data.append("date_to", options.date_to);
+  }
+  form_data.append("link_type_filter", options.link_type_filter);
+  form_data.append("only_new_records", options.only_new_records ? "1" : "0");
+
+  return uploadImportFile("/api/admin/link-building-orders/import", form_data, onUploadProgress);
 }
 
 /**
@@ -513,53 +536,90 @@ export function metricsImportLinkBuildingOrders(
   date_range?: MetricsImportDateRange,
   onUploadProgress?: (percent: number) => void
 ): Promise<ImportStartResponse> {
-  return new Promise((resolve, reject) => {
-    const base  = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-    const token = getToken();
+  const form_data = new FormData();
+  form_data.append("file", file);
+  target_columns.forEach((col) => form_data.append("target_columns[]", col));
+  if (date_range?.date_from) form_data.append("date_from", date_range.date_from);
+  if (date_range?.date_to) form_data.append("date_to", date_range.date_to);
 
-    const form_data = new FormData();
-    form_data.append("file", file);
-    target_columns.forEach((col) => form_data.append("target_columns[]", col));
-    if (date_range?.date_from) form_data.append("date_from", date_range.date_from);
-    if (date_range?.date_to) form_data.append("date_to", date_range.date_to);
+  return uploadImportFile("/api/admin/link-building-orders/metrics-import", form_data, onUploadProgress);
+}
 
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", `${base}/api/admin/link-building-orders/metrics-import`);
+// ── Partnership metrics (VLOOKUP by Partnership) ───────────────────────────────
 
-    if (token) {
-      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-    }
-    xhr.setRequestHeader("Accept", "application/json");
+/**
+ * Link Table columns filled from the partner metrics list, matched by the
+ * Partnership column. Kept in sync with
+ * LinkBuildingPartnerMetricsService::PLACEMENT_COLUMNS on the backend.
+ */
+export const PARTNERSHIP_METRIC_COLUMN_OPTIONS = [
+  { key: "dr_formula",      label: "DR Formula",      source: "DR" },
+  { key: "current_traffic", label: "Current Traffic", source: "Traffic" },
+  { key: "current_poc",     label: "Current POC",     source: "POC" },
+  { key: "current_price",   label: "Current Price",   source: "Price" },
+] as const;
 
-    if (onUploadProgress) {
-      xhr.upload.addEventListener("progress", (e) => {
-        if (e.lengthComputable) {
-          onUploadProgress(Math.round((e.loaded / e.total) * 100));
-        }
-      });
-    }
+export type PartnershipMetricColumnKey = (typeof PARTNERSHIP_METRIC_COLUMN_OPTIONS)[number]["key"];
 
-    xhr.addEventListener("load", () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          resolve(JSON.parse(xhr.responseText) as ImportStartResponse);
-        } catch {
-          reject(new Error("Invalid response from server."));
-        }
-      } else {
-        try {
-          reject(JSON.parse(xhr.responseText));
-        } catch {
-          reject(new Error(`Upload failed with status ${xhr.status}.`));
-        }
-      }
-    });
+/** Reference list fields the backend recognised in an uploaded partnership metrics file. */
+export type PartnershipReferenceColumn = "dr" | "traffic" | "current_poc" | "current_price";
 
-    xhr.addEventListener("error", () => reject(new Error("Network error during upload.")));
-    xhr.addEventListener("abort", () => reject(new Error("Upload was cancelled.")));
+/** Value the backend writes to Current POC and Current Price when a partnership left the partner list. */
+export const SITE_REMOVED_VALUE = "SITE REMOVED";
 
-    xhr.send(form_data);
-  });
+export interface PartnershipMetricsImportOptions {
+  /** Lower bound of Request Date in MM/DD/YYYY format. Defaults to two months ago on the backend. */
+  date_from?: string;
+  /** Upper bound of Request Date in MM/DD/YYYY format. */
+  date_to?: string;
+  /** When the file has POC or price columns, partnerships missing from it are marked SITE REMOVED. */
+  mark_missing_as_removed: boolean;
+}
+
+export interface PartnershipMetricsSummary {
+  total_domains: number;
+  metrics_domains: number;
+  listed_partners: number;
+  /** ISO 8601 date of the last upload with DR or traffic values, null when none yet. */
+  last_metrics_sync: string | null;
+  /** ISO 8601 date of the last upload with POC or price values, null when none yet. */
+  last_partner_sync: string | null;
+}
+
+/**
+ * POST /api/admin/link-building-orders/partnership-metrics-import
+ *
+ * Uploads the latest domain metrics and/or partner list (Partnership, DR, Traffic,
+ * Current POC, Current Price) and starts a background job that saves them as the
+ * reference list and updates the selected columns of every row whose Partnership
+ * matches, like the VLOOKUPs of the BASE Google Sheet. Pollable via
+ * getLinkBuildingImportStatus().
+ */
+export function importPartnershipMetrics(
+  file: File,
+  target_columns: PartnershipMetricColumnKey[],
+  options: PartnershipMetricsImportOptions,
+  onUploadProgress?: (percent: number) => void
+): Promise<ImportStartResponse> {
+  const form_data = new FormData();
+  form_data.append("file", file);
+  target_columns.forEach((col) => form_data.append("target_columns[]", col));
+  if (options.date_from) form_data.append("date_from", options.date_from);
+  if (options.date_to) form_data.append("date_to", options.date_to);
+  form_data.append("mark_missing_as_removed", options.mark_missing_as_removed ? "1" : "0");
+
+  return uploadImportFile("/api/admin/link-building-orders/partnership-metrics-import", form_data, onUploadProgress);
+}
+
+/**
+ * GET /api/admin/link-building-orders/partnership-metrics/summary
+ * Size and freshness of the partner metrics reference list.
+ */
+export async function getPartnershipMetricsSummary(): Promise<PartnershipMetricsSummary> {
+  const res = await apiClient.get<{ data: PartnershipMetricsSummary }>(
+    "/api/admin/link-building-orders/partnership-metrics/summary"
+  );
+  return res.data;
 }
 
 export interface ResolveAssignmentsResult {
