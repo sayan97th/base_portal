@@ -74,6 +74,16 @@ export function isMatrix(value: FormulaValue | undefined): value is Matrix {
   return Array.isArray(value);
 }
 
+/**
+ * True for the error a JavaScript engine throws when recursion runs out of stack
+ * (RangeError in Chrome and Safari, InternalError in Firefox). The sheet handles it
+ * itself, so code that turns exceptions into error values lets it through.
+ */
+export function isStackOverflow(error: unknown): boolean {
+  if (error instanceof RangeError) return /call stack/i.test(error.message);
+  return error instanceof Error && error.name === "InternalError" && /recursion/i.test(error.message);
+}
+
 /** Converts any Error (for example one returned by the function library) to a FormulaError. */
 export function toFormulaError(error: unknown): FormulaError {
   if (error instanceof FormulaError) return error;

@@ -20,6 +20,7 @@ import {
   dateToSerial,
   flattenValues,
   isMatrix,
+  isStackOverflow,
   parseDateText,
   parseNumberText,
   toBoolean,
@@ -42,9 +43,27 @@ export type FormulaFunction = (args: FormulaValue[], context: FunctionContext) =
 
 const registry = new Map<string, FormulaFunction>();
 
+/**
+ * Registers a function. An exception it throws on unexpected input (a string too
+ * long to build, a library bug) becomes an error value, so one bad formula can
+ * never break the rendering of the table.
+ */
 function register(name: string, fn: FormulaFunction): void {
-  registry.set(name.toUpperCase(), fn);
+  registry.set(name.toUpperCase(), (args, context) => {
+    try {
+      return fn(args, context);
+    } catch (error) {
+      if (isStackOverflow(error)) throw error;
+      return toFormulaError(error);
+    }
+  });
 }
+
+/** Largest array a function may build, so a typo such as =MUNIT(100000) cannot freeze the page. */
+const MAX_ARRAY_CELLS = 10_000;
+
+/** Longest text a function may build, the limit Google Sheets applies to REPT. */
+const MAX_TEXT_LENGTH = 32_000;
 
 /** The function registered under a name, accepting dotted and legacy spellings (STDEV.S, STDEV). */
 export function getFormulaFunction(name: string): FormulaFunction | undefined {
@@ -211,7 +230,9 @@ const SCALAR_LIBRARY_FUNCTIONS = new Set([
 
 function toLibraryArgument(value: FormulaValue, numeric_ranges: boolean): unknown {
   if (!isMatrix(value)) return value;
-  if (!numeric_ranges) return value;
+  // Some library functions (AVERAGEA, GCD, NPV ...) flatten their arrays in place.
+  // Ranges are cached and shared by every formula of the sheet, so they get a copy.
+  if (!numeric_ranges) return value.map((row) => [...row]);
   const numbers: unknown[] = [];
   for (const row of value) {
     for (const cell of row) if (typeof cell === "number" || cell instanceof FormulaError) numbers.push(cell);
@@ -225,6 +246,7 @@ function wrapLibraryFunction(name: string, fn: (...args: unknown[]) => unknown):
     try {
       return fromLibraryResult(fn(...args.map((arg) => toLibraryArgument(arg, numeric_ranges))));
     } catch (error) {
+      if (isStackOverflow(error)) throw error;
       return toFormulaError(error);
     }
   };
@@ -236,7 +258,8 @@ function wrapLibraryFunction(name: string, fn: (...args: unknown[]) => unknown):
 /** Registers every library function, including namespaced ones such as NORM.DIST or STDEV.S. */
 function registerLibrary(source: Record<string, unknown>, prefix = ""): void {
   for (const [key, value] of Object.entries(source)) {
-    if (key === "utils") continue;
+    // "default" is the CommonJS interop copy of the whole library, not a namespace of functions.
+    if (key === "utils" || key === "default") continue;
     const name = prefix ? `${prefix}.${key}` : key;
     if (typeof value === "function") {
       register(name, wrapLibraryFunction(name, value as (...args: unknown[]) => unknown));
@@ -379,8 +402,9 @@ function wildcardToRegExp(pattern: string): RegExp {
   return new RegExp(`^${source}$`, "i");
 }
 
+/** True when the text needs pattern matching: a wildcard, or one escaped with "~" ("BL-~*" is the literal "BL-*"). */
 function hasWildcard(text: string): boolean {
-  return /(^|[^~])[*?]/.test(text);
+  return /[*?]/.test(text);
 }
 
 /** Builds the test for a criterion such as 5, "Live", ">10", "<>", "=", "BL-*" or ">=01/01/2026". */
@@ -533,6 +557,52 @@ function createEqualityMatcher(key: Scalar, allow_wildcards: boolean): (value: S
   };
 }
 
+type LookupAxis = "first_column" | "first_row" | "all";
+
+const lookup_values_cache = new WeakMap<Matrix, Partial<Record<LookupAxis, Scalar[]>>>();
+
+/**
+ * The values a lookup searches: the first column (VLOOKUP), the first row
+ * (HLOOKUP) or every cell (MATCH). Kept per range, so a formula column looking up
+ * the same range on every row reuses one list and its exact match index.
+ */
+function lookupValues(table: Matrix, axis: LookupAxis): Scalar[] {
+  let by_axis = lookup_values_cache.get(table);
+  if (!by_axis) {
+    by_axis = {};
+    lookup_values_cache.set(table, by_axis);
+  }
+  by_axis[axis] ??=
+    axis === "first_column" ? table.map((row) => row[0] ?? null) : axis === "first_row" ? [...(table[0] ?? [])] : table.flat();
+  return by_axis[axis];
+}
+
+/** Key of a value in the exact match index: same type, text without regard to case. */
+function exactMatchKey(value: Scalar): string | null {
+  if (typeof value === "string") return `s:${value.toLowerCase()}`;
+  if (typeof value === "number") return `n:${value}`;
+  if (typeof value === "boolean") return `b:${value}`;
+  return null;
+}
+
+const exact_index_cache = new WeakMap<Scalar[], Map<string, number>>();
+
+/** Position of the first value equal to the key, through an index built once per list. */
+function exactIndexOf(values: Scalar[], key: Scalar): number {
+  let index = exact_index_cache.get(values);
+  if (!index) {
+    const built = new Map<string, number>();
+    values.forEach((value, i) => {
+      const value_key = exactMatchKey(value);
+      if (value_key !== null && !built.has(value_key)) built.set(value_key, i);
+    });
+    exact_index_cache.set(values, built);
+    index = built;
+  }
+  const key_text = exactMatchKey(key);
+  return key_text === null ? -1 : (index.get(key_text) ?? -1);
+}
+
 /**
  * Position of a key in a list. Mode 0 is an exact match, 1 the largest value
  * less than or equal to the key (sorted ascending), -1 the smallest value greater
@@ -540,6 +610,7 @@ function createEqualityMatcher(key: Scalar, allow_wildcards: boolean): (value: S
  */
 function lookupIndex(values: Scalar[], key: Scalar, mode: 0 | 1 | -1, reverse = false): number {
   if (mode === 0) {
+    if (!reverse && !(typeof key === "string" && hasWildcard(key))) return exactIndexOf(values, key);
     const matches = createEqualityMatcher(key, true);
     if (reverse) {
       for (let i = values.length - 1; i >= 0; i--) if (matches(values[i])) return i;
@@ -565,7 +636,21 @@ function lookupKey(args: FormulaValue[]): Scalar {
   return scalarOf(args[0]);
 }
 
-register("VLOOKUP", (args) => {
+/**
+ * Registers a lookup that looks each key of a range up on its own, so
+ * ARRAYFORMULA(VLOOKUP(A2:A, ...)) returns one result per key and a whole column
+ * key in a formula column reads the formula's own row, like Google Sheets.
+ */
+function registerLookup(name: string, lookup: FormulaFunction): void {
+  register(name, (args, context) => {
+    const keys = args[0];
+    if (!isMatrix(keys) || (keys.length === 1 && keys[0].length === 1)) return lookup(args, context);
+    const rest = args.slice(1);
+    return keys.map((row) => row.map((key) => scalarOf(lookup([key, ...rest], context))));
+  });
+}
+
+registerLookup("VLOOKUP", (args) => {
   const key = lookupKey(args);
   if (key instanceof FormulaError) return key;
   const table = toMatrix(args[1] ?? null);
@@ -577,12 +662,12 @@ register("VLOOKUP", (args) => {
   if (col_idx < 0) return value_error("VLOOKUP index must be at least 1.");
   if (col_idx >= (table[0]?.length ?? 0)) return new FormulaError("#REF!", "VLOOKUP index is outside the range.");
 
-  const row_idx = lookupIndex(table.map((row) => row[0]), key, is_sorted ? 1 : 0);
+  const row_idx = lookupIndex(lookupValues(table, "first_column"), key, is_sorted ? 1 : 0);
   if (row_idx === -1) return na_error(`Did not find value "${formatScalar(key)}" in VLOOKUP evaluation.`);
   return table[row_idx][col_idx];
 });
 
-register("HLOOKUP", (args) => {
+registerLookup("HLOOKUP", (args) => {
   const key = lookupKey(args);
   if (key instanceof FormulaError) return key;
   const table = toMatrix(args[1] ?? null);
@@ -594,15 +679,15 @@ register("HLOOKUP", (args) => {
   if (row_idx < 0) return value_error("HLOOKUP index must be at least 1.");
   if (row_idx >= table.length) return new FormulaError("#REF!", "HLOOKUP index is outside the range.");
 
-  const col_idx = lookupIndex(table[0] ?? [], key, is_sorted ? 1 : 0);
+  const col_idx = lookupIndex(lookupValues(table, "first_row"), key, is_sorted ? 1 : 0);
   if (col_idx === -1) return na_error(`Did not find value "${formatScalar(key)}" in HLOOKUP evaluation.`);
   return table[row_idx][col_idx];
 });
 
-register("MATCH", (args) => {
+registerLookup("MATCH", (args) => {
   const key = lookupKey(args);
   if (key instanceof FormulaError) return key;
-  const values = toMatrix(args[1] ?? null).flat();
+  const values = lookupValues(toMatrix(args[1] ?? null), "all");
   const type = numberArg(args[2], 1);
   if (type instanceof FormulaError) return type;
   const mode = (type > 0 ? 1 : type < 0 ? -1 : 0) as 0 | 1 | -1;
@@ -610,7 +695,7 @@ register("MATCH", (args) => {
   return index === -1 ? na_error(`Did not find value "${formatScalar(key)}" in MATCH evaluation.`) : index + 1;
 });
 
-register("XLOOKUP", (args) => {
+registerLookup("XLOOKUP", (args) => {
   const key = lookupKey(args);
   if (key instanceof FormulaError) return key;
   const lookup = toMatrix(args[1] ?? null);
@@ -621,7 +706,7 @@ register("XLOOKUP", (args) => {
   if (error) return error;
 
   const is_vertical = lookup[0]?.length === 1;
-  const values = is_vertical ? lookup.map((row) => row[0]) : (lookup[0] ?? []);
+  const values = lookupValues(lookup, is_vertical ? "first_column" : "first_row");
   const reverse = (search_mode as number) < 0;
 
   let index: number;
@@ -797,13 +882,51 @@ register("SEQUENCE", (args) => {
   if (error) return error;
   const row_count = Math.trunc(rows as number);
   const col_count = Math.trunc(columns as number);
-  if (row_count < 1 || col_count < 1 || row_count * col_count > 10_000) {
-    return new FormulaError("#NUM!", "SEQUENCE size must be between 1 and 10000 cells.");
+  if (row_count < 1 || col_count < 1 || row_count * col_count > MAX_ARRAY_CELLS) {
+    return new FormulaError("#NUM!", `SEQUENCE size must be between 1 and ${MAX_ARRAY_CELLS} cells.`);
   }
   return Array.from({ length: row_count }, (_, r) =>
     Array.from({ length: col_count }, (_, c) => (start as number) + (r * col_count + c) * (step as number))
   );
 });
+
+register("RANDARRAY", (args) => {
+  const rows = numberArg(args[0], 1);
+  const columns = numberArg(args[1], 1);
+  const error = firstError(rows, columns);
+  if (error) return error;
+  const row_count = Math.trunc(rows as number);
+  const col_count = Math.trunc(columns as number);
+  if (row_count < 1 || col_count < 1 || row_count * col_count > MAX_ARRAY_CELLS) {
+    return new FormulaError("#NUM!", `RANDARRAY size must be between 1 and ${MAX_ARRAY_CELLS} cells.`);
+  }
+  return Array.from({ length: row_count }, () => Array.from({ length: col_count }, () => Math.random()));
+});
+
+register("MUNIT", (args) => {
+  const size = numberArg(args[0]);
+  if (size instanceof FormulaError) return size;
+  const dimension = Math.trunc(size);
+  if (dimension < 1 || dimension * dimension > MAX_ARRAY_CELLS) {
+    return new FormulaError("#NUM!", `MUNIT size must be between 1 and ${Math.floor(Math.sqrt(MAX_ARRAY_CELLS))}.`);
+  }
+  return Array.from({ length: dimension }, (_, r) => Array.from({ length: dimension }, (_, c) => (r === c ? 1 : 0)));
+});
+
+const library_expand = registry.get("EXPAND");
+if (library_expand) {
+  register("EXPAND", (args, context) => {
+    const range = toMatrix(args[0] ?? null);
+    const rows = numberArg(args[1], range.length);
+    const columns = numberArg(args[2], range[0]?.length ?? 0);
+    const error = firstError(rows, columns);
+    if (error) return error;
+    if ((rows as number) * (columns as number) > MAX_ARRAY_CELLS) {
+      return new FormulaError("#NUM!", `EXPAND size must be at most ${MAX_ARRAY_CELLS} cells.`);
+    }
+    return library_expand(args, context);
+  });
+}
 
 register("ARRAY_CONSTRAIN", (args) => {
   const range = toMatrix(args[0] ?? null);
@@ -858,7 +981,11 @@ registerText("MID", (text, args) => {
 registerText("REPT", (text, args) => {
   const count = toNumber(args[1] ?? null);
   if (count instanceof FormulaError) return count;
-  return count < 0 ? value_error() : text.repeat(Math.trunc(count));
+  if (count < 0) return value_error("REPT count must be 0 or more.");
+  if (text.length * Math.trunc(count) > MAX_TEXT_LENGTH) {
+    return value_error(`REPT result is longer than ${MAX_TEXT_LENGTH} characters.`);
+  }
+  return text.repeat(Math.trunc(count));
 });
 registerText("SUBSTITUTE", (text, args) => {
   const search = toText(args[1] ?? null);
@@ -994,8 +1121,12 @@ registerScalar("TO_DOLLARS", ([value]) => {
 function compileRegExp(source: Scalar, flags = ""): RegExp | FormulaError {
   const text = toText(source);
   if (text instanceof FormulaError) return text;
+  // Google Sheets (RE2) sets flags with a leading group such as "(?i)", JavaScript with RegExp flags.
+  const flag_group = /^\(\?([ims]+)\)/.exec(text);
+  const pattern = flag_group ? text.slice(flag_group[0].length) : text;
+  const all_flags = flag_group ? [...new Set(flags + flag_group[1])].join("") : flags;
   try {
-    return new RegExp(text, flags);
+    return new RegExp(pattern, all_flags);
   } catch {
     return value_error(`"${text}" is not a valid regular expression.`);
   }

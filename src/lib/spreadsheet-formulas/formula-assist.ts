@@ -53,12 +53,15 @@ export function getFormulaAssistContext(text: string, caret: number): FormulaAss
 
   const stack: FunctionCallContext[] = [];
   tokens.forEach((token, index) => {
-    if (token.type === "lparen") {
+    if (token.type === "lparen" || token.type === "lbrace") {
+      // Plain parentheses and array literals get a nameless entry, so their commas
+      // do not move the argument of the function around them.
       const previous = tokens[index - 1];
-      stack.push({ name: previous?.type === "ident" ? previous.text.toUpperCase() : "", arg_index: 0 });
+      const is_call = token.type === "lparen" && previous?.type === "ident";
+      stack.push({ name: is_call ? previous.text.toUpperCase() : "", arg_index: 0 });
     } else if ((token.type === "comma" || token.type === "semicolon") && stack.length > 0) {
       stack[stack.length - 1].arg_index += 1;
-    } else if (token.type === "rparen") {
+    } else if (token.type === "rparen" || token.type === "rbrace") {
       stack.pop();
     }
   });

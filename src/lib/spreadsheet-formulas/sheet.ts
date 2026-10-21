@@ -22,7 +22,7 @@ import type { InferredFormat } from "./format";
 import { VOLATILE_FUNCTION_NAMES } from "./functions";
 import { collectFunctionNames, collectReferenceSpecs, parseFormula, type FormulaNode } from "./parser";
 import type { ColumnPart, ReferenceSpec } from "./references";
-import { FormulaError, parseDateText, parseNumberText, type Matrix, type Scalar } from "./values";
+import { FormulaError, isStackOverflow, parseDateText, parseNumberText, type Matrix, type Scalar } from "./values";
 
 /** How a column's raw text is read: "1,250" is a number in a number column, "10/21/2026" a date in a date column. */
 export type SheetColumnKind = "text" | "number" | "date";
@@ -80,6 +80,8 @@ export function parseFormulaCached(formula: string): ParsedFormula {
   try {
     parsed = { node: parseFormula(formula) };
   } catch (error) {
+    // Running out of stack says nothing about the formula, it must not be cached as invalid.
+    if (isStackOverflow(error)) throw error;
     parsed = { error: new FormulaError("#ERROR!", error instanceof Error ? error.message : "Formula parse error.") };
   }
   if (parse_cache.size >= MAX_PARSE_CACHE_ENTRIES) parse_cache.delete(parse_cache.keys().next().value!);
@@ -151,6 +153,7 @@ export function coerceRawValue(raw: string | null | undefined, kind: SheetColumn
 }
 
 const CIRCULAR_ERROR_DETAIL = "Circular dependency detected: the formula refers to its own result.";
+const TOO_DEEP_ERROR_DETAIL = "The formula depends on a chain of other formulas too long to evaluate.";
 
 export function createFormulaSheet(options: FormulaSheetOptions): FormulaSheet {
   const { columns, row_count, row_number_offset } = options;
@@ -170,9 +173,9 @@ export function createFormulaSheet(options: FormulaSheetOptions): FormulaSheet {
     return null;
   };
 
-  const getColumnFormat = (col: ColumnPart): InferredFormat | null => {
+  const getColumnFormat = (col: ColumnPart, offset = 0): InferredFormat | null => {
     const index = resolveColumnIndex(col);
-    return index !== null && columns[index].kind === "date" ? "date" : null;
+    return index !== null && columns[index + offset]?.kind === "date" ? "date" : null;
   };
 
   const makeContext = (current_row_idx: number): EvaluationContext => ({
@@ -247,17 +250,60 @@ export function createFormulaSheet(options: FormulaSheetOptions): FormulaSheet {
     return values;
   }
 
+  let is_warmed_up = false;
+
+  /** Evaluates every cell in row order, so each formula of a long chain only reads cells already known. */
+  function warmUp(): void {
+    is_warmed_up = true;
+    for (let row_idx = 0; row_idx < row_count; row_idx++) {
+      for (let col_idx = 0; col_idx < column_count; col_idx++) {
+        try {
+          getCellValue(row_idx, col_idx);
+        } catch (error) {
+          if (!isStackOverflow(error)) throw error;
+        }
+      }
+    }
+  }
+
+  /**
+   * Runs a read from outside the sheet. Evaluation is recursive, so a chain of
+   * formulas deeper than the JavaScript stack (a running total read from its last
+   * row) throws. Nothing is cached while the stack unwinds, so the sheet then
+   * evaluates every cell in row order and reads again. A chain still too deep
+   * reads as an error instead of breaking the page.
+   */
+  function readSafely<T>(read: () => T, onTooDeep: (error: FormulaError) => T): T {
+    try {
+      return read();
+    } catch (error) {
+      if (!isStackOverflow(error)) throw error;
+    }
+    if (!is_warmed_up) {
+      warmUp();
+      try {
+        return read();
+      } catch (error) {
+        if (!isStackOverflow(error)) throw error;
+      }
+    }
+    return onTooDeep(new FormulaError("#REF!", TOO_DEEP_ERROR_DETAIL));
+  }
+
+  const toErrorResult = (error: FormulaError): FormulaResult => ({ value: error, format: null });
+
   return {
     row_count,
     getValue(row_idx, col_key) {
       const col_idx = column_index_by_key.get(col_key);
-      return col_idx === undefined ? null : getCellValue(row_idx, col_idx);
+      if (col_idx === undefined) return null;
+      return readSafely<Scalar>(() => getCellValue(row_idx, col_idx), (error) => error);
     },
     getFormulaResult(row_idx, col_key) {
       const col_idx = column_index_by_key.get(col_key);
       if (col_idx === undefined || row_idx < 0 || row_idx >= row_count) return null;
-      return getResultAt(row_idx, col_idx);
+      return readSafely(() => getResultAt(row_idx, col_idx), toErrorResult);
     },
-    evaluate: evaluateStored,
+    evaluate: (formula, row_idx) => readSafely(() => evaluateStored(formula, row_idx), toErrorResult),
   };
 }

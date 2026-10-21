@@ -37,7 +37,8 @@ interface FormulaColumnDialogProps {
 }
 
 function getSyntaxError(formula: string): string | null {
-  if (formula.trim() === "") return null;
+  // The dialog opens with "=" typed, which is a formula not written yet, not a mistake.
+  if (formula.trim() === "" || formula.trim() === "=") return null;
   if (!isFormulaText(formula)) return 'A formula starts with "=", for example =S5*2.';
   try {
     parseFormula(formula);

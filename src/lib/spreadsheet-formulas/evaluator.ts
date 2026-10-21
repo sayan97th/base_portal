@@ -401,8 +401,65 @@ export function evaluateFormulaText(formula: string, context: EvaluationContext)
 // ── Format inference ───────────────────────────────────────────────────────────
 
 export interface FormatInferenceContext {
-  /** Number format of a referenced column, so =A2+30 on a date column is a date too. */
-  getColumnFormat(col: ColumnPart): InferredFormat | null;
+  /**
+   * Number format of a referenced column, so =A2+30 on a date column is a date too.
+   * `offset` moves to a column on its right, the one a VLOOKUP index points at.
+   */
+  getColumnFormat(col: ColumnPart, offset?: number): InferredFormat | null;
+}
+
+type CallNode = Extract<FormulaNode, { type: "call" }>;
+
+/** Arguments a passthrough function may return. Conditions, lookup keys and criteria never are. */
+function getResultArguments({ name, args }: CallNode): FormulaNode[] {
+  switch (name) {
+    case "IF":
+      return args.slice(1, 3);
+    case "IFS":
+      return args.filter((_, idx) => idx % 2 === 1);
+    case "SWITCH": {
+      // expression, case1, value1, case2, value2, ..., [default]
+      const rest = args.slice(1);
+      return rest.filter((_, idx) => idx % 2 === 1 || (rest.length % 2 === 1 && idx === rest.length - 1));
+    }
+    case "CHOOSE":
+      return args.slice(1);
+    case "XLOOKUP":
+      return args.slice(2, 4);
+    case "LOOKUP":
+      return args.slice(args.length >= 3 ? 2 : 1, 3);
+    case "HLOOKUP":
+      return args.slice(1, 2);
+    case "MINIFS":
+    case "MAXIFS":
+    case "LARGE":
+    case "SMALL":
+    case "ARRAYFORMULA":
+    case "FILTER":
+    case "SORT":
+    case "UNIQUE":
+      return args.slice(0, 1);
+    default:
+      return args;
+  }
+}
+
+/**
+ * Format of the column VLOOKUP or INDEX returns from: the range's first column,
+ * moved right by a literal column index. Unknown when the index is computed.
+ */
+function inferColumnPickFormat(
+  range: FormulaNode | undefined,
+  column: FormulaNode | undefined,
+  context: FormatInferenceContext
+): InferredFormat | null {
+  if (!range) return null;
+  if (range.type !== "ref") return inferResultFormat(range, context);
+  const start_col = range.ref.start.col;
+  if (!start_col) return null;
+  if (column === undefined) return context.getColumnFormat(start_col, 0);
+  if (column.type !== "number") return null;
+  return context.getColumnFormat(start_col, Math.max(0, Math.trunc(column.value) - 1));
 }
 
 /**
@@ -427,9 +484,9 @@ export function inferResultFormat(node: FormulaNode, context: FormatInferenceCon
       if (node.name === "NOW") return "datetime";
       if (DATE_RESULT_FUNCTION_NAMES.has(node.name)) return "date";
       if (!PASSTHROUGH_FORMAT_FUNCTION_NAMES.has(node.name)) return null;
-      // IF and friends: the first argument is the condition, not a possible result.
-      const value_args = ["IF", "IFS", "SWITCH", "CHOOSE"].includes(node.name) ? node.args.slice(1) : node.args;
-      for (const arg of value_args) {
+      if (node.name === "VLOOKUP") return inferColumnPickFormat(node.args[1], node.args[2], context);
+      if (node.name === "INDEX") return inferColumnPickFormat(node.args[0], node.args[2], context);
+      for (const arg of getResultArguments(node)) {
         const format = inferResultFormat(arg, context);
         if (format) return format;
       }

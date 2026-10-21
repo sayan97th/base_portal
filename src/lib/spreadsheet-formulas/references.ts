@@ -63,6 +63,8 @@ function endpointToStored(endpoint: RefEndpoint, row_number: number, mapper: Col
 
   if (!endpoint.row) return `[${col_text}]`;
   if (endpoint.row.kind === "offset") return `[${col_text}:~${endpoint.row.offset}]`;
+  // There is no row 0 (A0), so it cannot become an offset that looks valid.
+  if (endpoint.row.number < 1) return null;
   if (endpoint.row.absolute) return `[${col_text}:$${endpoint.row.number}]`;
   return `[${col_text}:~${endpoint.row.number - row_number}]`;
 }
