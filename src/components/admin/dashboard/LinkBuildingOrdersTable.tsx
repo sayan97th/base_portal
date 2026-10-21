@@ -102,6 +102,9 @@ import { useResizableColumnWidths } from "@/hooks/useResizableColumnWidths";
 import { useTableFind, type TableFindMatch, type TableFindMatchState } from "@/hooks/useTableFind";
 import { useLinkBuildingOrderFindPages } from "@/hooks/useLinkBuildingOrderFindPages";
 import TableFindBar from "./TableFindBar";
+import KeyboardShortcutsDialog from "./KeyboardShortcutsDialog";
+import { formatShortcut } from "@/lib/keyboard-shortcuts";
+import { useIsMacPlatform } from "@/hooks/useIsMacPlatform";
 import NeedsApprovalToggle from "./NeedsApprovalToggle";
 import ActiveFiltersBar, { type ActiveFilterChip } from "./ActiveFiltersBar";
 import ColumnVisibilityPanel, { type ColumnVisibilityGroup } from "./ColumnVisibilityPanel";
@@ -502,6 +505,21 @@ function generateOrderId(): string {
 // UpdateLinkBuildingOrderRequest.
 const ORDER_ID_PATTERN = /^BL-\d+$/i;
 
+/** What a bulk cell write is for: a paste, Delete clearing cells, or Cmd/Ctrl+D and R filling them. */
+type BulkPasteOperation = "paste" | "clear" | "fill";
+
+const BULK_PASTE_HISTORY_LABELS: Record<BulkPasteOperation, string> = {
+  paste: "bulk paste",
+  clear: "clear cells",
+  fill: "fill cells",
+};
+
+const BULK_PASTE_FAILURE_PREFIXES: Record<BulkPasteOperation, string> = {
+  paste: "Bulk paste",
+  clear: "Clearing cells",
+  fill: "Filling cells",
+};
+
 const REQUIRED_FIELDS: (keyof LinkBuildingOrderRow)[] = [
   "link_type",
   "client",
@@ -791,6 +809,7 @@ function EditableCell({
   formula_ref_color,
 }: EditableCellProps) {
   const input_ref = useRef<HTMLInputElement>(null);
+  const is_mac = useIsMacPlatform();
   const [just_copied, setJustCopied] = useState(false);
   /** Index into the options dropdown's [custom-value row?, ...filtered options] list. */
   const [highlighted_idx, setHighlightedIdx] = useState(-1);
@@ -1151,7 +1170,7 @@ function EditableCell({
             ? `${formula_error.code}: ${formula_error.detail}`
             : is_formula_cell
               ? "Formula cell, its formula shows in the formula bar · Double click or Enter to edit it"
-              : "Double click, Enter or start typing to edit · Type = to start a formula · Arrow keys to move · Shift+Arrow or drag to select · Ctrl+C / Ctrl+V to copy and paste"
+              : `Double click, Enter or start typing to edit · Type = to start a formula · ${formatShortcut(["Mod", ";"], is_mac)} inserts today's date · Arrow keys to move · Shift+Arrow or drag to select · ${formatShortcut(["Mod", "C"], is_mac)} / ${formatShortcut(["Mod", "V"], is_mac)} to copy and paste · ${formatShortcut(["Mod", "/"], is_mac)} for all shortcuts`
       }
     >
       {show_row_floater && <RowPresenceFloater editors={row_editors} />}
@@ -1534,6 +1553,13 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   const select_all_ref = useRef<HTMLInputElement>(null);
 
   // Refs for keyboard shortcut handler (avoids stale closures)
+  // Shortcut labels follow the viewer's platform: ⌘C on Mac, Ctrl+C elsewhere.
+  const is_mac = useIsMacPlatform();
+  const is_mac_ref = useRef(is_mac);
+  is_mac_ref.current = is_mac;
+  const [is_shortcuts_dialog_open, setIsShortcutsDialogOpen] = useState(false);
+  const closeShortcutsDialog = useCallback(() => setIsShortcutsDialogOpen(false), []);
+
   const clipboard_cell_kbd_ref = useRef(clipboard_cell);
   clipboard_cell_kbd_ref.current = clipboard_cell;
 
@@ -3567,7 +3593,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     start_row_id: string,
     start_col_key: string,
     grid: PastedGrid,
-    operation: "paste" | "clear" = "paste"
+    operation: BulkPasteOperation = "paste"
   ) => {
     const start_row_index = filtered_rows.findIndex((r) => r.id === start_row_id);
     const start_col_index = visible_columns.findIndex((c) => c.key === start_col_key);
@@ -3733,13 +3759,11 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         setRows((prev) => prev.map((r) => updated_by_id.get(r.id) ?? r));
         on_order_mutated_ref.current?.();
         refreshFilterCounts();
-        pushHistoryEntry(history_changes, operation === "clear" ? "clear cells" : "bulk paste");
+        pushHistoryEntry(history_changes, BULK_PASTE_HISTORY_LABELS[operation]);
       } catch (err) {
         const api_message = parseApiErrorMessage(err, COLUMN_LABELS);
         setSaveError(
-          operation === "clear"
-            ? `Clearing cells failed to save: ${api_message}`
-            : `Bulk paste failed to save: ${api_message}`
+          `${BULK_PASTE_FAILURE_PREFIXES[operation]} failed to save: ${api_message}`
         );
       } finally {
         setIsBatchSaving(false);
@@ -3747,6 +3771,12 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     }
 
     const row_count = changed_row_ids.length;
+    if (operation === "fill") {
+      setNotificationBanner(
+        `Filled ${changed_cell_count} cell${changed_cell_count !== 1 ? "s" : ""} across ${row_count} row${row_count !== 1 ? "s" : ""}.`
+      );
+      return;
+    }
     if (operation === "clear") {
       setNotificationBanner(
         `Cleared ${changed_cell_count} cell${changed_cell_count !== 1 ? "s" : ""} across ${row_count} row${row_count !== 1 ? "s" : ""}.`
@@ -3785,7 +3815,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     const n_cols = bounds.max_col - bounds.min_col + 1;
     const n_cells = n_rows * n_cols;
     setNotificationBanner(
-      `Copied ${n_cells} cell${n_cells !== 1 ? "s" : ""} (${n_rows}×${n_cols}) — press Ctrl+V on a cell to paste here, or paste into Excel/Sheets`
+      `Copied ${n_cells} cell${n_cells !== 1 ? "s" : ""} (${n_rows}×${n_cols}), press ${formatShortcut(["Mod", "V"], is_mac_ref.current)} on a cell to paste here, or paste into Excel/Sheets`
     );
   }, [filtered_rows, visible_columns]);
 
@@ -3858,6 +3888,65 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     if (!cell || !visible_columns.some((col) => col.key === cell.col_key)) return;
     handleBulkPaste(cell.row_id, cell.col_key, [[""]], "clear");
   }, [filtered_rows, visible_columns, handleBulkPaste]);
+
+  /**
+   * Cmd/Ctrl+D (down) and Cmd/Ctrl+R (right), like Google Sheets: the first row (or
+   * column) of the selected range is copied into the rest of it. With a single cell
+   * selected, the cell above (or to the left) is copied into it. Formulas keep their
+   * relative row references, so =B5*2 filled down becomes =B6*2, =B7*2 and so on.
+   */
+  const fillSelection = useCallback((direction: "down" | "right") => {
+    let bounds = range_bounds_kbd_ref.current;
+    if (!bounds) {
+      const cell = active_cell_kbd_ref.current;
+      if (!cell) return;
+      const row_idx = row_index_by_id.get(cell.row_id);
+      const col_idx = visible_columns.findIndex((col) => col.key === cell.col_key);
+      if (row_idx === undefined || col_idx === -1) return;
+      bounds =
+        direction === "down"
+          ? { min_row: row_idx - 1, max_row: row_idx, min_col: col_idx, max_col: col_idx }
+          : { min_row: row_idx, max_row: row_idx, min_col: col_idx - 1, max_col: col_idx };
+    }
+    const { min_row, max_row, min_col, max_col } = bounds;
+    if (min_row < 0 || min_col < 0) return;
+    if (direction === "down" ? max_row === min_row : max_col === min_col) return;
+
+    const fill_grid: PastedGrid = [];
+    for (let r = min_row; r <= max_row; r++) {
+      const source_row = filtered_rows[direction === "down" ? min_row : r];
+      if (!source_row) return;
+      const grid_row: string[] = [];
+      for (let c = min_col; c <= max_col; c++) {
+        const source_col = visible_columns[direction === "right" ? min_col : c];
+        if (!source_col) return;
+        const stored_formula = getCellFormula(source_row, source_col.key);
+        grid_row.push(
+          stored_formula
+            ? toDisplayFormula(stored_formula, row_number_offset + r, column_mapper)
+            : String(source_row[source_col.key] ?? "")
+        );
+      }
+      fill_grid.push(grid_row);
+    }
+
+    const start_row = filtered_rows[min_row];
+    const start_col = visible_columns[min_col];
+    if (start_row && start_col) handleBulkPaste(start_row.id, start_col.key, fill_grid, "fill");
+  }, [filtered_rows, visible_columns, row_index_by_id, row_number_offset, column_mapper, handleBulkPaste]);
+
+  /** Cmd/Ctrl+A: selects every data cell on the current page. */
+  const selectAllCells = useCallback(() => {
+    const first_row = filtered_rows[0];
+    const last_row = filtered_rows[filtered_rows.length - 1];
+    const first_col = visible_columns[0];
+    const last_col = visible_columns[visible_columns.length - 1];
+    if (!first_row || !last_row || !first_col || !last_col) return;
+    const anchor = { row_id: first_row.id, col_key: first_col.key as string };
+    setEditingCell(null);
+    setActiveCell(anchor);
+    setCellRange({ anchor, focus: { row_id: last_row.id, col_key: last_col.key } });
+  }, [filtered_rows, visible_columns]);
 
   /** Row number click: selects every data cell of that row, like clicking a row header in Sheets. */
   const selectEntireRow = useCallback((row_id: string) => {
@@ -4068,11 +4157,58 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     }
   }, [clipboard_cell, selected_row_ids, clearSelection, refreshFilterCounts, pushHistoryEntry, getFieldFormulas, removeFieldFormulas]);
 
-  // ── Global keyboard shortcuts: Ctrl+C = copy, Ctrl+V = paste, Ctrl+Z = undo, Ctrl+Y / Ctrl+Shift+Z = redo ──
+  // ── Global keyboard shortcuts (Cmd on Mac, Ctrl elsewhere): C copy, X cut, V paste, D / R fill, Z undo, Y / Shift+Z redo, / help ──
 
   useEffect(() => {
     const isGridFocused = () =>
       !!table_scroll_ref.current && table_scroll_ref.current.contains(document.activeElement);
+
+    /** Copies the selected range, the cell being edited or the active cell. True when something was copied. */
+    const copySelection = (e: KeyboardEvent): boolean => {
+      const range = cell_range_kbd_ref.current;
+      const cell = editing_cell_ref.current;
+
+      // A drag/shift-click range selection takes priority over the single-cell
+      // clipboard when one is active and no cell is currently being edited.
+      if (range && !cell) {
+        copyRangeToClipboard();
+        return true;
+      }
+
+      // Without an open editor, the active cell is copied, but only while the grid
+      // has focus so copying text elsewhere on the page is never hijacked.
+      const copy_cell = cell ?? (isGridFocused() ? active_cell_kbd_ref.current : null);
+      if (!copy_cell) return false;
+
+      // If the user has text selected inside an input, let the browser handle it
+      const active_el = document.activeElement;
+      if (active_el instanceof HTMLInputElement || active_el instanceof HTMLTextAreaElement) {
+        const sel_len = (active_el.selectionEnd ?? 0) - (active_el.selectionStart ?? 0);
+        if (sel_len > 0) return false;
+      }
+
+      const value = get_cell_copy_text_ref.current(copy_cell);
+      if (value === null) return false;
+      const col_label =
+        COLUMN_LABELS[copy_cell.col_key] ??
+        ASSIGNMENT_COLUMN_LABELS[copy_cell.col_key] ??
+        formula_column_by_key_ref.current.get(copy_cell.col_key)?.name ??
+        copy_cell.col_key;
+
+      e.preventDefault();
+      setClipboardCell({ value, col_key: copy_cell.col_key });
+      navigator.clipboard.writeText(value).catch(() => {});
+
+      const short = value.length > 28 ? value.slice(0, 28) + "…" : value;
+      const n_selected = selected_row_ids_kbd_ref.current.size;
+      const paste_label = formatShortcut(["Mod", "V"], is_mac_ref.current);
+      setNotificationBanner(
+        n_selected > 0
+          ? `Copied "${short}", press ${paste_label} to paste into "${col_label}" for ${n_selected} row${n_selected > 1 ? "s" : ""}`
+          : `Copied "${short}" from "${col_label}", select rows, then press ${paste_label} to paste`
+      );
+      return true;
+    };
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // Escape drops the active multi-cell range selection (mirrors editing's own
@@ -4085,48 +4221,32 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       if (!e.ctrlKey && !e.metaKey) return;
       const key = e.key.toLowerCase();
 
-      if (key === "c") {
-        const range = cell_range_kbd_ref.current;
-        const cell = editing_cell_ref.current;
-
-        // A drag/shift-click range selection takes priority over the single-cell
-        // clipboard when one is active and no cell is currently being edited.
-        if (range && !cell) {
-          copyRangeToClipboard();
-          return;
-        }
-
-        // Without an open editor, the active cell is copied, but only while the grid
-        // has focus so copying text elsewhere on the page is never hijacked.
-        const copy_cell = cell ?? (isGridFocused() ? active_cell_kbd_ref.current : null);
-        if (!copy_cell) return;
-
-        // If the user has text selected inside an input, let the browser handle it
-        const active_el = document.activeElement;
-        if (active_el instanceof HTMLInputElement || active_el instanceof HTMLTextAreaElement) {
-          const sel_len = (active_el.selectionEnd ?? 0) - (active_el.selectionStart ?? 0);
-          if (sel_len > 0) return;
-        }
-
-        const value = get_cell_copy_text_ref.current(copy_cell);
-        if (value === null) return;
-        const col_label =
-          COLUMN_LABELS[copy_cell.col_key] ??
-          ASSIGNMENT_COLUMN_LABELS[copy_cell.col_key] ??
-          formula_column_by_key_ref.current.get(copy_cell.col_key)?.name ??
-          copy_cell.col_key;
-
+      // Cmd/Ctrl+/ shows the keyboard shortcuts cheat sheet, like Google Sheets.
+      if (e.key === "/" && !e.altKey) {
         e.preventDefault();
-        setClipboardCell({ value, col_key: copy_cell.col_key });
-        navigator.clipboard.writeText(value).catch(() => {});
+        setIsShortcutsDialogOpen((is_open) => !is_open);
+        return;
+      }
 
-        const short = value.length > 28 ? value.slice(0, 28) + "…" : value;
-        const n_selected = selected_row_ids_kbd_ref.current.size;
-        setNotificationBanner(
-          n_selected > 0
-            ? `Copied "${short}" — press Ctrl+V to paste into "${col_label}" for ${n_selected} row${n_selected > 1 ? "s" : ""}`
-            : `Copied "${short}" from "${col_label}" — select rows, then press Ctrl+V to paste`
-        );
+      if (key === "c") {
+        copySelection(e);
+        return;
+      }
+
+      // Cmd/Ctrl+X copies the selection, then clears it. While a cell is being
+      // edited, the input keeps the browser's own cut of the selected text.
+      if (key === "x") {
+        if (editing_cell_ref.current || !isGridFocused()) return;
+        if (copySelection(e)) clearSelectedCells();
+        return;
+      }
+
+      // Cmd/Ctrl+D fills down and Cmd/Ctrl+R fills right, only while the grid has
+      // focus, so the browser's bookmark and reload shortcuts work everywhere else.
+      if ((key === "d" || key === "r") && !e.shiftKey && !e.altKey) {
+        if (editing_cell_ref.current || !isGridFocused()) return;
+        e.preventDefault();
+        fillSelection(key === "d" ? "down" : "right");
         return;
       }
 
@@ -4193,7 +4313,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [handlePasteClipboard, copyRangeToClipboard, pasteIntoRange, pasteIntoActiveCell, undo, redo]);
+  }, [handlePasteClipboard, copyRangeToClipboard, pasteIntoRange, pasteIntoActiveCell, undo, redo, clearSelectedCells, fillSelection]);
 
   // Opening a cell for editing through any path (Client Account / Assigned To cells,
   // Tab/Enter navigation, etc. — not only the drag handlers above) always drops a
@@ -4380,6 +4500,25 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         return;
       }
       moveTo(moveGridPosition(position, arrow_direction, size, { jump_to_edge: is_ctrl }));
+      return;
+    }
+
+    // Google Sheets selection shortcuts: Cmd/Ctrl+A selects every cell on the page,
+    // Shift+Space the active row and Ctrl+Space the active column (Ctrl on Mac too,
+    // since Cmd+Space opens Spotlight).
+    if (is_ctrl && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "a") {
+      e.preventDefault();
+      selectAllCells();
+      return;
+    }
+    if (e.key === " " && e.shiftKey && !is_ctrl && !e.altKey) {
+      e.preventDefault();
+      selectEntireRow(active_cell.row_id);
+      return;
+    }
+    if (e.key === " " && e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+      e.preventDefault();
+      selectEntireColumn(active_cell.col_key);
       return;
     }
 
@@ -4963,14 +5102,14 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Undo / redo, Ctrl+Z / Ctrl+Y, reverts or replays the last cell edit, bulk paste, or batch fill */}
+          {/* Undo / redo, Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z, reverts or replays the last cell edit, bulk paste, or batch fill */}
           <div className="flex h-9 items-center overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
             <button
               onClick={undo}
               disabled={undo_stack.length === 0 || is_undo_redo_saving}
               title={
                 undo_stack.length > 0
-                  ? `Undo: ${undo_stack[undo_stack.length - 1].label} (Ctrl+Z)`
+                  ? `Undo: ${undo_stack[undo_stack.length - 1].label} (${formatShortcut(["Mod", "Z"], is_mac)})`
                   : "Nothing to undo"
               }
               className="flex h-9 items-center gap-1 border-r border-gray-200 px-2.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
@@ -4989,7 +5128,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
               disabled={redo_stack.length === 0 || is_undo_redo_saving}
               title={
                 redo_stack.length > 0
-                  ? `Redo: ${redo_stack[redo_stack.length - 1].label} (Ctrl+Y)`
+                  ? `Redo: ${redo_stack[redo_stack.length - 1].label} (${formatShortcut(["Mod", "Shift", "Z"], is_mac)})`
                   : "Nothing to redo"
               }
               className="flex h-9 items-center gap-1 px-2.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-300 dark:hover:bg-gray-700"
@@ -5448,13 +5587,24 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
           {/* Find in table, highlights matches without filtering (Ctrl/Cmd+F) */}
           <button
             onClick={is_find_open ? handleCloseFind : openFind}
-            title="Find in table (Ctrl+F / Cmd+F), highlights matches without hiding other rows"
+            title={`Find in table (${formatShortcut(["Mod", "F"], is_mac)}), highlights matches without hiding other rows`}
             aria-label="Find"
             aria-pressed={is_find_open}
             className={`${styles.icon_button}${is_find_open ? ` ${styles.icon_button_find_active}` : ""}`}
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0zM8 10.5h5" />
+            </svg>
+          </button>
+          {/* Keyboard shortcuts cheat sheet (Cmd/Ctrl+/) */}
+          <button
+            onClick={() => setIsShortcutsDialogOpen(true)}
+            title={`Keyboard shortcuts (${formatShortcut(["Mod", "/"], is_mac)})`}
+            aria-label="Keyboard shortcuts"
+            className={styles.icon_button}
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 7.5A1.5 1.5 0 014.5 6h15A1.5 1.5 0 0121 7.5v9a1.5 1.5 0 01-1.5 1.5h-15A1.5 1.5 0 013 16.5v-9zM7 10h.01M11 10h.01M15 10h.01M7 14h10" />
             </svg>
           </button>
           {/* Reset filters, sort and hidden columns in one go */}
@@ -5563,13 +5713,13 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                   onClick={handlePasteClipboard}
                   disabled={is_batch_saving}
                   className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
-                  title={`Paste "${clipboard_cell.value}" into "${paste_col_label}" for all selected rows (Ctrl+V)`}
+                  title={`Paste "${clipboard_cell.value}" into "${paste_col_label}" for all selected rows (${formatShortcut(["Mod", "V"], is_mac)})`}
                 >
                   <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                   </svg>
                   Paste &ldquo;{short_val}&rdquo; → {paste_col_label}
-                  <kbd className="ml-1 rounded bg-indigo-500 px-1 py-0.5 font-mono text-[9px] opacity-75">Ctrl+V</kbd>
+                  <kbd className="ml-1 rounded bg-indigo-500 px-1 py-0.5 font-mono text-[9px] opacity-75">{formatShortcut(["Mod", "V"], is_mac)}</kbd>
                 </button>
                 <div className="h-4 w-px shrink-0 bg-indigo-200 dark:bg-indigo-800" />
               </>
@@ -5580,7 +5730,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
           {!clipboard_cell && (
             <span className="text-[11px] text-indigo-400 dark:text-indigo-500">
               Click a cell to edit, then press{" "}
-              <kbd className="rounded bg-indigo-100 px-1 font-mono text-[9px] text-indigo-500 dark:bg-indigo-800 dark:text-indigo-400">Ctrl+C</kbd>{" "}
+              <kbd className="rounded bg-indigo-100 px-1 font-mono text-[9px] text-indigo-500 dark:bg-indigo-800 dark:text-indigo-400">{formatShortcut(["Mod", "C"], is_mac)}</kbd>{" "}
               to copy its value here.
             </span>
           )}
@@ -5853,7 +6003,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
               {range_badge && (
                 <div
                   className="flex items-center gap-1.5 rounded-md border border-teal-200 bg-teal-50 px-2 py-0.5 text-xs text-teal-700 dark:border-teal-800 dark:bg-teal-900/20 dark:text-teal-300"
-                  title="Click and drag across cells (or Shift+Click) to select a range, then Ctrl+C to copy or Ctrl+V to paste"
+                  title={`Click and drag across cells (or Shift+Click) to select a range, then ${formatShortcut(["Mod", "C"], is_mac)} to copy or ${formatShortcut(["Mod", "V"], is_mac)} to paste`}
                 >
                   <span className="font-semibold">
                     {range_badge.n_cells} cell{range_badge.n_cells !== 1 ? "s" : ""} selected
@@ -5875,7 +6025,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
               {clipboard_cell && (
                 <div
                   className="flex items-center gap-1.5 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700 dark:border-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-300"
-                  title={`Clipboard: "${clipboard_cell.value}" (${COLUMN_LABELS[clipboard_cell.col_key] ?? clipboard_cell.col_key}). Select rows then press Ctrl+V to paste`}
+                  title={`Clipboard: "${clipboard_cell.value}" (${COLUMN_LABELS[clipboard_cell.col_key] ?? clipboard_cell.col_key}). Select rows then press ${formatShortcut(["Mod", "V"], is_mac)} to paste`}
                 >
                   <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -5910,6 +6060,12 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
           onClose={() => setFunctionsAnchorEl(null)}
         />
       )}
+
+      <KeyboardShortcutsDialog
+        is_open={is_shortcuts_dialog_open}
+        is_mac={is_mac}
+        onClose={closeShortcutsDialog}
+      />
 
       {/* Find bar (Ctrl/Cmd+F) */}
       {is_find_open && (

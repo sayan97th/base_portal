@@ -97,9 +97,14 @@ export interface KeyPressLike {
   altKey: boolean;
 }
 
-/** True for a single printable character typed without Ctrl/Cmd/Alt (letters, digits, symbols, space). */
+/**
+ * True for a single printable character (letters, digits, symbols, space) that is not a
+ * Ctrl/Cmd shortcut. Option on Mac and AltGr on Windows (reported as Ctrl+Alt) type
+ * characters such as "@", "#" or "[" on many keyboard layouts, so they still count.
+ */
 export function isPrintableKey(event: KeyPressLike): boolean {
-  return event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey;
+  if (event.key.length !== 1 || event.metaKey) return false;
+  return !event.ctrlKey || event.altKey;
 }
 
 /**

@@ -97,6 +97,15 @@ describe("isPrintableKey", () => {
     expect(isPrintableKey({ ...base, key: "c", ctrlKey: true })).toBe(false);
     expect(isPrintableKey({ ...base, key: "v", metaKey: true })).toBe(false);
   });
+
+  it("accepts characters typed with Option on Mac or AltGr on Windows", () => {
+    expect(isPrintableKey({ ...base, key: "@", altKey: true })).toBe(true);
+    expect(isPrintableKey({ ...base, key: "#", ctrlKey: true, altKey: true })).toBe(true);
+  });
+
+  it("rejects Cmd combinations even with Option held", () => {
+    expect(isPrintableKey({ ...base, key: "a", metaKey: true, altKey: true })).toBe(false);
+  });
 });
 
 describe("parseNumericCell / computeRangeStats", () => {
