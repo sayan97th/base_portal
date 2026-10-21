@@ -13,3 +13,16 @@ if (typeof Blob !== "undefined" && typeof Blob.prototype.arrayBuffer !== "functi
     });
   };
 }
+
+// jsdom does not implement Blob/File.prototype.text() either. Tests read the
+// CSV template the metrics dialog downloads (LinkBuildingMetricsUpdateModal).
+if (typeof Blob !== "undefined" && typeof Blob.prototype.text !== "function") {
+  Blob.prototype.text = function text(): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(this);
+    });
+  };
+}

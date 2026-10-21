@@ -81,6 +81,9 @@ function csvFile(name = "metrics.csv"): File {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // clearAllMocks keeps queued mockResolvedValueOnce values, so a status a test
+  // did not poll would leak into the next one. Reset the queue explicitly.
+  mockGetImportStatus.mockReset();
   jest.useFakeTimers({ now: new Date(2026, 9, 21, 10, 0, 0) });
   mockGetSummary.mockResolvedValue(SUMMARY);
   mockImportPartnershipMetrics.mockResolvedValue(START_RESPONSE);
@@ -559,6 +562,7 @@ describe("LinkBuildingMetricsUpdateModal, closing", () => {
     await startUpdate();
 
     expect(screen.queryByRole("button", { name: "Close" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Close dialog" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Processing…" })).toBeDisabled();
     expect(on_close).not.toHaveBeenCalled();
   });

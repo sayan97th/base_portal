@@ -1292,7 +1292,7 @@ describe("LinkBuildingOrdersTable, saved filters", () => {
     fireEvent.click(screen.getByRole("button", { name: /Saved Filters/ }));
     await screen.findByText(/No saved filters yet/);
 
-    fireEvent.change(screen.getByRole("textbox", { name: "New saved filter name" }), {
+    fireEvent.change(screen.getByRole("textbox", { name: "Save the current view" }), {
       target: { value: "DR 50 orders" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -1617,18 +1617,21 @@ describe("LinkBuildingOrdersTable, Needs LB TL Approval switch", () => {
     );
   });
 
-  it("is mirrored at the top of the Filter menu, bound to the same state", async () => {
+  it("lives only on the toolbar, not repeated inside the Filter menu", async () => {
     await renderTableWithRow(makeRow());
 
     fireEvent.click(screen.getByRole("button", { name: "Filter" }));
     const dialog = await screen.findByRole("dialog", { name: "Quick filters" });
-    fireEvent.click(within(dialog).getByRole("switch", { name: /^Needs LB TL Approval/ }));
+
+    expect(within(dialog).queryByRole("switch", { name: /^Needs LB TL Approval/ })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("switch", { name: /^Needs LB TL Approval/ })).toHaveLength(1);
+
+    fireEvent.click(approvalSwitch());
 
     await waitFor(() =>
       expect(lastSearchBody()).toEqual(expect.objectContaining({ needs_lb_tl_approval: true }))
     );
     expect(approvalSwitch()).toBeChecked();
-    expect(within(dialog).getByRole("switch", { name: /^Needs LB TL Approval/ })).toBeChecked();
   });
 });
 

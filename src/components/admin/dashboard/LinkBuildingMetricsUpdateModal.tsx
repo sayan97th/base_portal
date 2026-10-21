@@ -544,7 +544,7 @@ export default function LinkBuildingMetricsUpdateModal({ is_open, onClose, onImp
             <button
               onClick={handleClose}
               className="ml-4 shrink-0 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-              aria-label="Close"
+              aria-label="Close dialog"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />

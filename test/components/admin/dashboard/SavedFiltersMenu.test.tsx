@@ -131,7 +131,7 @@ describe("SavedFiltersMenu", () => {
     renderMenu({ current_state: EMPTY_FILTER_STATE, has_active_filters: false });
     await openMenu();
 
-    expect(screen.getByRole("textbox", { name: "New saved filter name" })).toBeDisabled();
+    expect(screen.getByRole("textbox", { name: "Save the current view" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
   });
 
@@ -141,7 +141,7 @@ describe("SavedFiltersMenu", () => {
     renderMenu();
     await openMenu();
 
-    fireEvent.change(screen.getByRole("textbox", { name: "New saved filter name" }), {
+    fireEvent.change(screen.getByRole("textbox", { name: "Save the current view" }), {
       target: { value: "  Weekly check " },
     });
     fireEvent.click(screen.getByRole("checkbox", { name: "Share with the team" }));
@@ -167,7 +167,7 @@ describe("SavedFiltersMenu", () => {
     renderMenu();
     await openMenu();
 
-    fireEvent.change(screen.getByRole("textbox", { name: "New saved filter name" }), {
+    fireEvent.change(screen.getByRole("textbox", { name: "Save the current view" }), {
       target: { value: "Live links" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -233,7 +233,10 @@ describe("SavedFiltersMenu", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
     expect(mockDeleteSavedFilter).not.toHaveBeenCalled();
-    expect(screen.getByText(/Delete .Live links.\?/)).toBeInTheDocument();
+    // The name is wrapped in <strong>, so match the whole confirmation paragraph.
+    expect(
+      screen.getByText((_, element) => element?.tagName === "P" && /^Delete .Live links.\?$/.test(element.textContent ?? ""))
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
 
