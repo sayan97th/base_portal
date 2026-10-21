@@ -86,7 +86,10 @@ import RowPresenceIndicator, {
 import type { CollaboratorPresence } from "@/types/admin/presence";
 import {
   computeRangeStats,
+  formatDateMMDDYYYY,
   getTabPosition,
+  insertTextAtSelection,
+  isInsertDateShortcut,
   isPrintableKey,
   moveGridPosition,
   scrollCellIntoView,
@@ -499,13 +502,6 @@ function generateOrderId(): string {
 // UpdateLinkBuildingOrderRequest.
 const ORDER_ID_PATTERN = /^BL-\d+$/i;
 
-function formatDateMMDDYYYY(date: Date): string {
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  const y = date.getFullYear();
-  return `${m}/${d}/${y}`;
-}
-
 const REQUIRED_FIELDS: (keyof LinkBuildingOrderRow)[] = [
   "link_type",
   "client",
@@ -878,8 +874,24 @@ function EditableCell({
     return true;
   };
 
+  /** Ctrl+; / Cmd+; puts today's date at the caret (replacing any selected text), like Google Sheets. */
+  const handleInsertDateShortcut = (e: React.KeyboardEvent): boolean => {
+    if (col.type === "number" || !isInsertDateShortcut(e)) return false;
+    e.preventDefault();
+    const input_el = input_ref.current;
+    const selection_start = input_el?.selectionStart ?? value.length;
+    const selection_end = input_el?.selectionEnd ?? value.length;
+    const next = insertTextAtSelection(value, selection_start, selection_end, formatDateMMDDYYYY(new Date()));
+    setHasTyped(true);
+    onUpdate(next.text);
+    // The controlled input re-renders with the new text first, then the caret is placed after the date.
+    requestAnimationFrame(() => input_ref.current?.setSelectionRange(next.caret, next.caret));
+    return true;
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (handleArrowCommit(e, ["up", "down", "left", "right"])) return;
+    if (handleInsertDateShortcut(e)) return;
     if (e.key === "Escape") {
       e.preventDefault();
       onCancelEdit();
@@ -924,6 +936,10 @@ function EditableCell({
       const handleComboboxKeyDown = (e: React.KeyboardEvent) => {
         // Up/Down always drive the options list, Left/Right can still commit and move.
         if (handleArrowCommit(e, ["left", "right"])) return;
+        if (handleInsertDateShortcut(e)) {
+          setHighlightedIdx(-1);
+          return;
+        }
         if (e.key === "ArrowDown") {
           e.preventDefault();
           setHighlightedIdx((prev) => Math.min(prev + 1, dropdown_items.length - 1));
@@ -4397,6 +4413,17 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         e.preventDefault();
         clearSelectedCells();
         return;
+    }
+
+    // Ctrl+; / Cmd+; opens the active cell holding today's date, like Google Sheets,
+    // so Enter commits it. Only table columns that accept text take it.
+    if (isInsertDateShortcut(e)) {
+      const col_def = visible_columns.find((col) => col.key === active_cell.col_key);
+      if (!col_def || col_def.type === "number") return;
+      e.preventDefault();
+      startEditing(active_cell.row_id, active_cell.col_key, "type");
+      updateCell(active_cell.row_id, col_def.key, formatDateMMDDYYYY(new Date()));
+      return;
     }
 
     // Typing a character starts editing and replaces the cell's content with it,

@@ -6,7 +6,10 @@
 
 import {
   computeRangeStats,
+  formatDateMMDDYYYY,
   getTabPosition,
+  insertTextAtSelection,
+  isInsertDateShortcut,
   isPrintableKey,
   moveGridPosition,
   parseNumericCell,
@@ -116,5 +119,42 @@ describe("parseNumericCell / computeRangeStats", () => {
 
   it("returns a null average when nothing is numeric", () => {
     expect(computeRangeStats(["Live", " "]).average).toBeNull();
+  });
+});
+
+describe("isInsertDateShortcut", () => {
+  const base = { ctrlKey: false, metaKey: false, altKey: false };
+
+  it("accepts Ctrl+; and Cmd+;, with or without Shift", () => {
+    expect(isInsertDateShortcut({ ...base, key: ";", ctrlKey: true })).toBe(true);
+    expect(isInsertDateShortcut({ ...base, key: ";", metaKey: true })).toBe(true);
+    expect(isInsertDateShortcut({ ...base, key: ":", metaKey: true })).toBe(true);
+  });
+
+  it("rejects the plain key and other combinations", () => {
+    expect(isInsertDateShortcut({ ...base, key: ";" })).toBe(false);
+    expect(isInsertDateShortcut({ ...base, key: ";", ctrlKey: true, altKey: true })).toBe(false);
+    expect(isInsertDateShortcut({ ...base, key: "c", ctrlKey: true })).toBe(false);
+  });
+});
+
+describe("formatDateMMDDYYYY", () => {
+  it("pads month and day", () => {
+    expect(formatDateMMDDYYYY(new Date(2026, 0, 5))).toBe("01/05/2026");
+    expect(formatDateMMDDYYYY(new Date(2026, 11, 31))).toBe("12/31/2026");
+  });
+});
+
+describe("insertTextAtSelection", () => {
+  it("inserts at the caret", () => {
+    expect(insertTextAtSelection("Live ", 5, 5, "10/21/2026")).toEqual({ text: "Live 10/21/2026", caret: 15 });
+  });
+
+  it("replaces the selected text", () => {
+    expect(insertTextAtSelection("01/01/2020", 0, 10, "10/21/2026")).toEqual({ text: "10/21/2026", caret: 10 });
+  });
+
+  it("clamps positions outside the text", () => {
+    expect(insertTextAtSelection("ab", 9, 9, "x")).toEqual({ text: "abx", caret: 3 });
   });
 });

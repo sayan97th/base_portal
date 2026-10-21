@@ -102,6 +102,37 @@ export function isPrintableKey(event: KeyPressLike): boolean {
   return event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey;
 }
 
+/**
+ * Ctrl+; (Cmd+; on Mac) inserts today's date, like Google Sheets. The ":" variant
+ * (Shift held) is accepted too, since it is the same physical key.
+ */
+export function isInsertDateShortcut(event: KeyPressLike): boolean {
+  return (event.ctrlKey || event.metaKey) && !event.altKey && (event.key === ";" || event.key === ":");
+}
+
+/** Formats a date the way the table's date columns store it: MM/DD/YYYY. */
+export function formatDateMMDDYYYY(date: Date): string {
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  const y = date.getFullYear();
+  return `${m}/${d}/${y}`;
+}
+
+/** Replaces the selected part of a text (or inserts at the caret) and returns where the caret ends. */
+export function insertTextAtSelection(
+  value: string,
+  selection_start: number,
+  selection_end: number,
+  inserted_text: string
+): { text: string; caret: number } {
+  const start = clamp(Math.min(selection_start, selection_end), 0, value.length);
+  const end = clamp(Math.max(selection_start, selection_end), 0, value.length);
+  return {
+    text: value.slice(0, start) + inserted_text + value.slice(end),
+    caret: start + inserted_text.length,
+  };
+}
+
 export interface RangeStats {
   /** Non-empty cells in the range. */
   count: number;
