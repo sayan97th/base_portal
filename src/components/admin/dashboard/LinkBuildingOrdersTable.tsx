@@ -144,10 +144,11 @@ import {
   getCellFormula,
   isFormulaColumnKey,
   SUMMARY_ROW_ID,
-  toFieldValue,
+  toCellFieldValue,
   withCellFormula,
   type OrdersSheetConfig,
 } from "@/lib/link-building-sheet";
+import { PRICE_COLUMN_KEYS, withFormattedPrices } from "@/lib/link-building-prices";
 import { useLinkBuildingSheetFormulas } from "@/hooks/useLinkBuildingSheetFormulas";
 import type { LinkBuildingOrderSheetFormula } from "@/types/admin/link-building-order";
 import FormulaInput from "./FormulaInput";
@@ -390,9 +391,6 @@ const COLUMN_VISIBILITY_GROUPS: ColumnVisibilityGroup[] = COLUMNS.reduce<ColumnV
   group.columns.push({ key: col.key as string, label: col.label });
   return groups;
 }, []);
-
-/** Text columns that hold prices, filtered as numbers like the API's NUMERIC_COLUMNS. */
-const PRICE_COLUMN_KEYS: ReadonlySet<string> = new Set(["posting_fee_lbs", "current_price", "final_price"]);
 
 // ── Spreadsheet formulas ───────────────────────────────────────────────────────
 
@@ -1963,7 +1961,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       const result = sheet.getFormulaResult(row_idx, col_key);
       if (!result) return null;
       return {
-        text: toFieldValue(result, SHEET_KIND_BY_KEY.get(col_key) ?? "text"),
+        text: toCellFieldValue(row, col_key, result, SHEET_KIND_BY_KEY.get(col_key) ?? "text"),
         error: result.value instanceof FormulaError ? result.value : null,
       };
     },
@@ -2645,7 +2643,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       stale_cells.forEach((stale) => {
         next_row = { ...next_row, [stale.col_key]: stale.value };
       });
-      return { row: next_row };
+      // A typed price gets the currency symbol ("150" is saved as "$150.00"), and a
+      // new currency updates the symbol of the row's prices.
+      return { row: withFormattedPrices(next_row) };
     },
     []
   );
@@ -3677,6 +3677,11 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       next_rows[row_idx] = { ...next_rows[row_idx], [stale.col_key]: stale.value };
     });
 
+    // Pasted prices get the currency symbol of their row, like typed ones.
+    next_rows.forEach((row, row_idx) => {
+      if (target_row_ids.has(row.id)) next_rows[row_idx] = withFormattedPrices(row);
+    });
+
     // Diff against the previous rows to find exactly which cells changed, so only
     // the affected fields are sent to the server instead of the whole row.
     const changed_fields_by_row_id: Record<string, Partial<Record<keyof LinkBuildingOrderRow, string>>> = {};
@@ -4050,7 +4055,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
       setRows((prev) =>
         prev.map((r) =>
-          selected_row_ids.has(r.id) ? { ...r, [batch_field]: api_value } : r
+          selected_row_ids.has(r.id) ? withFormattedPrices({ ...r, [batch_field]: api_value }) : r
         )
       );
 
@@ -4127,7 +4132,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       setRows((prev) =>
         prev.map((r) =>
           selected_row_ids.has(r.id)
-            ? { ...r, [clipboard_cell.col_key]: clipboard_cell.value }
+            ? withFormattedPrices({ ...r, [clipboard_cell.col_key]: clipboard_cell.value })
             : r
         )
       );

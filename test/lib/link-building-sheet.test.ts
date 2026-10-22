@@ -219,12 +219,20 @@ describe("buildOrdersSheet", () => {
 describe("collectStaleFormulaCells", () => {
   it("lists formula cells whose saved value differs from the computed one", () => {
     const rows = [
-      makeRow({ final_price: "115", cell_formulas: { final_price: stored("=X1*1.15") } }),
-      makeRow({ id: "uuid-2", current_price: "200", final_price: "115", cell_formulas: { final_price: stored("=X2*1.15", 2) } }),
+      makeRow({ final_price: "$115.00", cell_formulas: { final_price: stored("=X1*1.15") } }),
+      makeRow({ id: "uuid-2", current_price: "200", final_price: "$115.00", cell_formulas: { final_price: stored("=X2*1.15", 2) } }),
     ];
     const sheet = buildOrdersSheet(rows, config());
     expect(collectStaleFormulaCells(rows, sheet, KIND_BY_KEY)).toEqual([
-      { row_id: "uuid-2", col_key: "final_price", value: "230" },
+      { row_id: "uuid-2", col_key: "final_price", value: "$230.00" },
+    ]);
+  });
+
+  it("saves prices with the currency symbol of their row", () => {
+    const rows = [makeRow({ currency: "EUR", final_price: "", cell_formulas: { final_price: stored("=X1*1.5") } })];
+    const sheet = buildOrdersSheet(rows, config());
+    expect(collectStaleFormulaCells(rows, sheet, KIND_BY_KEY)).toEqual([
+      { row_id: "uuid-1", col_key: "final_price", value: "€150.00" },
     ]);
   });
 
@@ -263,7 +271,7 @@ describe("collectStaleFormulaCells", () => {
     ];
     const sheet = buildOrdersSheet(rows, config());
     expect(collectStaleFormulaCells(rows, sheet, KIND_BY_KEY)).toEqual([
-      { row_id: "uuid-1", col_key: "final_price", value: "200" },
+      { row_id: "uuid-1", col_key: "final_price", value: "$200.00" },
     ]);
     expect(collectStaleFormulaCells(rows, sheet, KIND_BY_KEY, () => false)).toEqual([]);
   });
@@ -276,7 +284,7 @@ describe("collectStaleFormulaCells", () => {
     ];
     const sheet = buildOrdersSheet(rows, config());
     expect(collectStaleFormulaCells(rows, sheet, KIND_BY_KEY)).toEqual([
-      { row_id: "uuid-2", col_key: "current_price", value: "175" },
+      { row_id: "uuid-2", col_key: "current_price", value: "$175.00" },
     ]);
   });
 });

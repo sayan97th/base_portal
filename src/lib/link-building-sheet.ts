@@ -17,6 +17,7 @@ import {
   type SheetColumn,
   type SheetColumnKind,
 } from "@/lib/spreadsheet-formulas";
+import { formatPriceValue, PRICE_COLUMN_KEYS } from "@/lib/link-building-prices";
 import type { LinkBuildingOrderRow } from "@/types/admin/link-building-order";
 
 /**
@@ -74,6 +75,20 @@ export function toFieldValue(result: FormulaResult, kind: SheetColumnKind): stri
   }
   if (kind === "number" && typeof value === "number") return formatGeneralNumber(value);
   return formatScalar(value, format);
+}
+
+/**
+ * Text a formula result is saved as in a data cell: toFieldValue(), with a price
+ * formatted for the row's currency ("$115.00"), the same as a typed price.
+ */
+export function toCellFieldValue(
+  row: LinkBuildingOrderRow,
+  col_key: string,
+  result: FormulaResult,
+  kind: SheetColumnKind
+): string {
+  const value = toFieldValue(result, kind);
+  return PRICE_COLUMN_KEYS.has(col_key) ? formatPriceValue(value, row.currency) : value;
 }
 
 /** Maps column letters to column keys and back, for the A1 / stored formula notations. */
@@ -147,7 +162,7 @@ export function collectStaleFormulaCells(
       if (!FORMULA_CELL_COLUMN_KEYS.has(col_key) || !shouldInclude(row, col_key, formula)) continue;
       const result = sheet.getFormulaResult(row_idx, col_key);
       if (!result) continue;
-      const value = toFieldValue(result, kind_by_key.get(col_key) ?? "text");
+      const value = toCellFieldValue(row, col_key, result, kind_by_key.get(col_key) ?? "text");
       if (value !== String(row[col_key as keyof LinkBuildingOrderRow] ?? "")) {
         stale.push({ row_id: row.id, col_key, value });
       }
