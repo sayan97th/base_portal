@@ -286,6 +286,7 @@ const COLUMNS: ColumnDef[] = [
   { key: "internal_notes", label: "Internal Notes", group: "internal", min_width: 200, type: "text" },
   { key: "request_date", label: "Request Date", group: "dates", min_width: 120, type: "date", locked: true },
   { key: "estimated_delivery_date", label: "Delivery Date", group: "dates", min_width: 175, type: "date", locked: true },
+  { key: "estimated_turnaround_days", label: "Est. Turnaround (Days)", group: "dates", min_width: 130, type: "number", locked: true },
   { key: "pen_name", label: "Pen Name", group: "writer", min_width: 120, type: "select", options: [], dynamic_options: true },
   { key: "partnership", label: "Partnership", group: "writer", min_width: 180, type: "url" },
   { key: "article_title", label: "Article Title", group: "writer", min_width: 220, type: "text" },
@@ -570,10 +571,13 @@ function saveDraftsToStorage(draft_rows: LinkBuildingOrderRow[]): void {
   }
 }
 
+/** Turnaround of a new row, matching LINK_BUILDING_TURNAROUND_DAYS on the backend (OrderDetailsService). */
+const DEFAULT_TURNAROUND_DAYS = 30;
+
 function createEmptyRow(): LinkBuildingOrderRow {
   const today = new Date();
   const delivery_date = new Date(today);
-  delivery_date.setDate(delivery_date.getDate() + 30);
+  delivery_date.setDate(delivery_date.getDate() + DEFAULT_TURNAROUND_DAYS);
 
   return {
     id: createTempId(),
@@ -588,7 +592,7 @@ function createEmptyRow(): LinkBuildingOrderRow {
     internal_notes: "",
     request_date: formatDateMMDDYYYY(today),
     estimated_delivery_date: formatDateMMDDYYYY(delivery_date),
-    estimated_turnaround_days: "30",
+    estimated_turnaround_days: String(DEFAULT_TURNAROUND_DAYS),
     link_builder: "",
     pen_name: "",
     partnership: "",
