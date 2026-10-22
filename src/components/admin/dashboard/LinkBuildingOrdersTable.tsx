@@ -2315,11 +2315,15 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       );
       if (!cell_el) return;
       const header_height = container.querySelector("thead")?.getBoundingClientRect().height ?? 0;
+      // The totals row is pinned to the bottom, so data rows must stop above it.
+      // The totals row itself is always visible and needs no inset.
+      const footer_height =
+        cell.row_id === SUMMARY_ROW_ID ? 0 : container.querySelector("tfoot")?.getBoundingClientRect().height ?? 0;
       const is_frozen_column = COLUMNS.some((col) => col.key === cell.col_key && col.sticky);
       scrollCellIntoView(
         container,
         cell_el,
-        { top: header_height, left: frozen_columns_width },
+        { top: header_height, left: frozen_columns_width, bottom: footer_height },
         is_frozen_column
       );
     },

@@ -181,11 +181,15 @@ export function computeRangeStats(values: ReadonlyArray<string>): RangeStats {
 export interface StickyInsets {
   top: number;
   left: number;
+  /** Height of sticky UI pinned to the bottom edge, such as a totals row. */
+  bottom?: number;
 }
 
 /**
  * Scrolls `container` just enough for `cell_el` to be fully visible, keeping it
- * clear of the sticky header (top inset) and the frozen columns (left inset).
+ * clear of the sticky header (top inset), the sticky footer (bottom inset) and the
+ * frozen columns (left inset). clientHeight and clientWidth already leave out the
+ * scrollbars, so a cell never ends up underneath one.
  * Frozen cells only need vertical scrolling, since they never leave the view sideways.
  */
 export function scrollCellIntoView(
@@ -198,7 +202,7 @@ export function scrollCellIntoView(
   const cell_rect = cell_el.getBoundingClientRect();
 
   const visible_top = container_rect.top + insets.top;
-  const visible_bottom = container_rect.top + container.clientHeight;
+  const visible_bottom = container_rect.top + container.clientHeight - (insets.bottom ?? 0);
   if (cell_rect.top < visible_top) {
     container.scrollTop -= visible_top - cell_rect.top;
   } else if (cell_rect.bottom > visible_bottom) {

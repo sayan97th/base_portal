@@ -41,6 +41,11 @@ $filter_letter_bg_dark: rgba(251, 191, 36, 0.18);
 $filter_letter_bg_hover_dark: rgba(251, 191, 36, 0.28);
 $filter_letter_text: #92400e;
 $filter_letter_text_dark: #fcd34d;
+$scrollbar_size: 14px;
+$scrollbar_thumb: #c4c7c5;
+$scrollbar_thumb_hover: #9aa0a6;
+$scrollbar_thumb_dark: #4b5563;
+$scrollbar_thumb_hover_dark: #6b7280;
 $row_height: 34px;
 $letter_row_height: 22px;
 $header_row_height: 36px;
@@ -419,6 +424,62 @@ $toolbar_focus_ring: rgba(236, 60, 137, 0.12);
   // Keyboard users see a thin ring when the grid itself has focus.
   &:focus-visible {
     box-shadow: inset 0 0 0 2px rgba(26, 115, 232, 0.35);
+  }
+
+  // Classic scrollbars that take up their own space, like Google Sheets. With the
+  // default overlay scrollbars (macOS), the horizontal bar floats on top of the grid
+  // and hides part of the last visible row and the totals row. Styling the
+  // ::-webkit-scrollbar parts makes Chrome, Edge and Safari reserve a lane for it.
+  &::-webkit-scrollbar {
+    width: $scrollbar_size;
+    height: $scrollbar_size;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: $header_bg;
+
+    @include dark {
+      background: $header_bg_dark;
+    }
+  }
+
+  &::-webkit-scrollbar-thumb {
+    border: 3px solid $header_bg;
+    border-radius: 999px;
+    background: $scrollbar_thumb;
+
+    &:hover {
+      background: $scrollbar_thumb_hover;
+    }
+
+    @include dark {
+      border-color: $header_bg_dark;
+      background: $scrollbar_thumb_dark;
+
+      &:hover {
+        background: $scrollbar_thumb_hover_dark;
+      }
+    }
+  }
+
+  // The corner where both scrollbars meet.
+  &::-webkit-scrollbar-corner {
+    background: $header_bg;
+
+    @include dark {
+      background: $header_bg_dark;
+    }
+  }
+
+  // Firefox has no ::-webkit-scrollbar. The standard properties are kept out of
+  // Chromium on purpose: setting them there disables the rules above.
+  @supports not selector(::-webkit-scrollbar) {
+    scrollbar-width: auto;
+    scrollbar-color: $scrollbar_thumb $header_bg;
+
+    @include dark {
+      scrollbar-color: $scrollbar_thumb_dark $header_bg_dark;
+    }
   }
 }
 

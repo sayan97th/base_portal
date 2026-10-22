@@ -1,7 +1,8 @@
 /**
  * Unit tests for the spreadsheet style navigation helpers used by the admin
  * Link Building Orders table (arrow key movement, Tab wrapping, column
- * letters, cell addresses and the range Count / Sum / Average summary).
+ * letters, cell addresses, the range Count / Sum / Average summary and
+ * scrolling a cell clear of the sticky header, totals row and scrollbars).
  */
 
 import {
@@ -13,6 +14,7 @@ import {
   isPrintableKey,
   moveGridPosition,
   parseNumericCell,
+  scrollCellIntoView,
   toCellAddress,
   toColumnLetter,
 } from "@/lib/spreadsheet-navigation";
@@ -165,5 +167,47 @@ describe("insertTextAtSelection", () => {
 
   it("clamps positions outside the text", () => {
     expect(insertTextAtSelection("ab", 9, 9, "x")).toEqual({ text: "abx", caret: 3 });
+  });
+});
+
+describe("scrollCellIntoView", () => {
+  /** A 300px tall scroll container whose horizontal scrollbar takes 14px (client_height 286). */
+  function buildContainer(): HTMLElement {
+    const container = document.createElement("div");
+    container.getBoundingClientRect = () => ({ top: 0, left: 0, bottom: 300, right: 500 }) as DOMRect;
+    Object.defineProperty(container, "clientHeight", { value: 286 });
+    Object.defineProperty(container, "clientWidth", { value: 486 });
+    return container;
+  }
+
+  function buildCell(top: number, bottom: number): HTMLElement {
+    const cell_el = document.createElement("td");
+    cell_el.getBoundingClientRect = () => ({ top, bottom, left: 200, right: 300 }) as DOMRect;
+    return cell_el;
+  }
+
+  it("keeps the last row above the horizontal scrollbar", () => {
+    const container = buildContainer();
+    scrollCellIntoView(container, buildCell(260, 294), { top: 58, left: 0 });
+    expect(container.scrollTop).toBe(8);
+  });
+
+  it("keeps a row above a sticky totals row", () => {
+    const container = buildContainer();
+    scrollCellIntoView(container, buildCell(230, 264), { top: 58, left: 0, bottom: 34 });
+    expect(container.scrollTop).toBe(12);
+  });
+
+  it("does not scroll a row that is already fully visible", () => {
+    const container = buildContainer();
+    scrollCellIntoView(container, buildCell(100, 134), { top: 58, left: 0, bottom: 34 });
+    expect(container.scrollTop).toBe(0);
+  });
+
+  it("scrolls up for a row hidden behind the sticky header", () => {
+    const container = buildContainer();
+    container.scrollTop = 100;
+    scrollCellIntoView(container, buildCell(40, 74), { top: 58, left: 0, bottom: 34 });
+    expect(container.scrollTop).toBe(82);
   });
 });
