@@ -4,8 +4,14 @@
  * sheet. The same cases run against LinkBuildingOrderPlacement::formatPrice().
  */
 
-import { formatPriceValue, getCurrencySymbol, withFormattedPrices } from "@/lib/link-building-prices";
+import { formatPriceValue, getCurrencySymbol, PRICE_COLUMN_KEYS, withFormattedPrices } from "@/lib/link-building-prices";
 import type { LinkBuildingOrderRow } from "@/types/admin/link-building-order";
+
+describe("PRICE_COLUMN_KEYS", () => {
+  it("lists the three money columns of the table, the same as PRICE_COLUMNS on the backend", () => {
+    expect(Array.from(PRICE_COLUMN_KEYS).sort()).toEqual(["current_price", "final_price", "posting_fee_lbs"]);
+  });
+});
 
 describe("getCurrencySymbol", () => {
   it("maps the dashboard currencies to their symbols", () => {
@@ -35,11 +41,20 @@ describe("formatPriceValue", () => {
     ["99", "EUR", "€99.00"],
     ["$99", "EUR", "€99.00"],
     ["0", "USD", "$0.00"],
+    ["1000000", "USD", "$1,000,000.00"],
+    ["1,250", "USD", "$1,250.00"],
+    ["1250.567", "USD", "$1,250.57"],
+    ["+50", "USD", "$50.00"],
+    ["€ 40", "USD", "$40.00"],
+    ["£40", "EUR", "€40.00"],
+    ["40", "GBP", "$40.00"],
+    ["-0", "USD", "$0.00"],
+    ["-0.001", "USD", "$0.00"],
   ])("formats %p in %s as %p", (value, currency, expected) => {
     expect(formatPriceValue(value, currency)).toBe(expected);
   });
 
-  it.each(["", "   ", "TBD", "$50 to $100", "10%", "1,25", "1.2.3"])("keeps %p as typed", (value) => {
+  it.each(["", "   ", "TBD", "$50 to $100", "10%", "1,25", "1.2.3", "1e3", "$", "-", "50 USD", "12,34.5"])("keeps %p as typed", (value) => {
     expect(formatPriceValue(value, "USD")).toBe(value);
   });
 });

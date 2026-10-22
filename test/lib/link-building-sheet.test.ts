@@ -14,6 +14,7 @@ import {
   createColumnKeyMapper,
   getCellFormula,
   isFormulaColumnKey,
+  toCellFieldValue,
   toFieldValue,
   withCellFormula,
   type OrdersSheetConfig,
@@ -154,6 +155,25 @@ describe("toFieldValue", () => {
   });
 });
 
+describe("toCellFieldValue", () => {
+  it("saves a numeric result in a price column with the symbol of the row's currency", () => {
+    expect(toCellFieldValue(makeRow(), "final_price", { value: 115.00000000000001, format: null }, "number")).toBe("$115.00");
+    expect(toCellFieldValue(makeRow(), "posting_fee_lbs", { value: 1250.5, format: null }, "number")).toBe("$1,250.50");
+    expect(toCellFieldValue(makeRow({ currency: "EUR" }), "current_price", { value: 99, format: null }, "number")).toBe("€99.00");
+  });
+
+  it("keeps an error or a text result in a price column as the cell shows it", () => {
+    expect(toCellFieldValue(makeRow(), "final_price", { value: new FormulaError("#N/A"), format: null }, "number")).toBe("#N/A");
+    expect(toCellFieldValue(makeRow(), "final_price", { value: "TBD", format: null }, "number")).toBe("TBD");
+    expect(toCellFieldValue(makeRow(), "final_price", { value: null, format: null }, "number")).toBe("");
+  });
+
+  it("never formats a column that is not a price", () => {
+    expect(toCellFieldValue(makeRow(), "dr_lbs", { value: 80, format: null }, "number")).toBe("80");
+    expect(toCellFieldValue(makeRow(), "notes", { value: "150", format: null }, "text")).toBe("150");
+  });
+});
+
 describe("createColumnKeyMapper", () => {
   it("maps letters to keys and back", () => {
     expect(mapper.getColumnKey(18)).toBe("dr_lbs");
@@ -226,6 +246,11 @@ describe("collectStaleFormulaCells", () => {
     expect(collectStaleFormulaCells(rows, sheet, KIND_BY_KEY)).toEqual([
       { row_id: "uuid-2", col_key: "final_price", value: "$230.00" },
     ]);
+  });
+
+  it("leaves a formula price alone when it is already saved formatted", () => {
+    const rows = [makeRow({ final_price: "$200.00", cell_formulas: { final_price: stored("=X1*2") } })];
+    expect(collectStaleFormulaCells(rows, buildOrdersSheet(rows, config()), KIND_BY_KEY)).toEqual([]);
   });
 
   it("saves prices with the currency symbol of their row", () => {
