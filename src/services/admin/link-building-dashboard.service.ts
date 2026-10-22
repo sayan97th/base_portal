@@ -136,18 +136,20 @@ export async function getNeedsLbTlApprovalCount(): Promise<number> {
 /**
  * POST /api/admin/link-building-orders/quick-filter-values
  * Distinct values and row counts of several columns in one request, for the
- * Quick filters panel. Each column's list ignores its own filter only.
+ * Quick filters panel. Each column's list ignores its own filter only, and
+ * `value_search` narrows the value columns to values containing it.
  */
 export async function getLinkBuildingOrderQuickFilterValues(
   columns: string[],
   body: LinkBuildingOrderSearchBody = {},
-  limit?: number
+  limit?: number,
+  value_search?: string
 ): Promise<LinkBuildingOrderQuickFilterValuesResponse> {
   const { page: _page, per_page: _per_page, sort_rules: _sort_rules, ...filters } = body;
 
   return apiClient.post<LinkBuildingOrderQuickFilterValuesResponse>(
     "/api/admin/link-building-orders/quick-filter-values",
-    { ...filters, columns, limit }
+    { ...filters, columns, limit, value_search: value_search || undefined }
   );
 }
 

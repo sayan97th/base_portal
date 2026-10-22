@@ -8,6 +8,8 @@ export interface UserFilterOption {
   name: string;
   email: string;
   avatar_url: string | null;
+  /** Client accounts are listed by company, like the Client Account cells show them. */
+  company?: string;
 }
 
 interface UserSelectFilterDropdownProps {
@@ -89,9 +91,13 @@ export default function UserSelectFilterDropdown({
     ? users.filter(
         (u) =>
           u.name.toLowerCase().includes(search.toLowerCase()) ||
-          u.email.toLowerCase().includes(search.toLowerCase())
+          u.email.toLowerCase().includes(search.toLowerCase()) ||
+          (u.company ?? "").toLowerCase().includes(search.toLowerCase())
       )
     : users;
+
+  const getDisplayName = (user: UserFilterOption) => user.company || user.name;
+  const selected_user = users.find((u) => u.id === selected_user_id);
 
   const content = (
     <div
@@ -106,7 +112,7 @@ export default function UserSelectFilterDropdown({
         </p>
         {selected_user_id !== null && (
           <p className="mt-0.5 text-[10px] text-brand-500 dark:text-brand-400">
-            {users.find((u) => u.id === selected_user_id)?.name ?? "1 selected"}
+            {selected_user ? getDisplayName(selected_user) : "1 selected"}
           </p>
         )}
       </div>
@@ -173,18 +179,18 @@ export default function UserSelectFilterDropdown({
             {user.avatar_url ? (
               <img
                 src={user.avatar_url}
-                alt={user.name}
+                alt={getDisplayName(user)}
                 className="h-5 w-5 shrink-0 rounded-full object-cover"
               />
             ) : (
               <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[9px] font-bold text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400">
-                {user.name.charAt(0).toUpperCase()}
+                {getDisplayName(user).charAt(0).toUpperCase()}
               </span>
             )}
             <div className="min-w-0 flex-1">
-              <p className="truncate">{user.name}</p>
+              <p className="truncate">{getDisplayName(user)}</p>
               <p className="truncate text-[10px] text-gray-400 dark:text-gray-500">
-                {user.email}
+                {user.company ? `${user.name}, ${user.email}` : user.email}
               </p>
             </div>
             {selected_user_id === user.id && (

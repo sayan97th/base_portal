@@ -20,7 +20,9 @@ import QuickFilterPanel from "./QuickFilterPanel";
 import { useQuickFilterValues } from "@/hooks/useQuickFilterValues";
 import {
   ASSIGNED_USER_QUICK_FILTER_KEY,
+  CLIENT_ACCOUNT_QUICK_FILTER_KEY,
   buildQuickFilterFacets,
+  getServerSearchColumnKeys,
   toggleQuickFilterValue,
   type QuickFilterColumn,
 } from "@/lib/link-building-quick-filters";
@@ -464,6 +466,7 @@ const QUICK_FILTER_COLUMNS: QuickFilterColumn[] = [
   { key: ASSIGNED_USER_QUICK_FILTER_KEY, label: "Assigned To" },
   { key: "link_type", label: "Link Type", options: LINK_TYPE_OPTIONS },
   { key: "client", label: "Company" },
+  { key: CLIENT_ACCOUNT_QUICK_FILTER_KEY, label: "Client Account" },
   { key: "pen_name", label: "Pen Name" },
   { key: "current_poc", label: "Current POC" },
   { key: "lb_tl_approval", label: "LB TL Approval" },
@@ -3311,6 +3314,24 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
   const quick_filter_values = useQuickFilterValues(QUICK_FILTER_COLUMN_KEYS, search_body, is_filter_panel_open);
 
+  // The panel's search filters the loaded values right away. Columns that only list
+  // their top values (Company, with every client name) are also searched on the
+  // server, so a client past the top ones can still be found and picked.
+  const [quick_filter_query, setQuickFilterQuery] = useState("");
+  const debounced_quick_filter_query = useDebounce(quick_filter_query.trim(), 300);
+  const server_search_column_keys = useMemo(
+    () => getServerSearchColumnKeys(QUICK_FILTER_COLUMNS, quick_filter_values.values_by_column, debounced_quick_filter_query),
+    [quick_filter_values.values_by_column, debounced_quick_filter_query]
+  );
+  const quick_filter_search_values = useQuickFilterValues(
+    server_search_column_keys,
+    search_body,
+    is_filter_panel_open && !is_advanced_filter_mode && server_search_column_keys.length > 0,
+    debounced_quick_filter_query
+  );
+  // Checks the live text too, so clearing the search shows every value again without waiting for the debounce.
+  const is_quick_filter_search_active = server_search_column_keys.length > 0 && quick_filter_query.trim() !== "";
+
   /** Values picked in the Quick filters panel, per column. */
   const quick_filter_selections = useMemo(() => {
     const selections: Partial<Record<string, string[]>> = {};
@@ -3319,34 +3340,60 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         selections[column.key] = assigned_user_id_filter === null ? [] : [String(assigned_user_id_filter)];
         return;
       }
+      if (column.key === CLIENT_ACCOUNT_QUICK_FILTER_KEY) {
+        selections[column.key] = client_account_filter === null ? [] : [String(client_account_filter)];
+        return;
+      }
       const values = sheet_filters[column.key]?.values;
       selections[column.key] = values?.mode === "include" ? values.values : [];
     });
     return selections;
-  }, [sheet_filters, assigned_user_id_filter]);
+  }, [sheet_filters, assigned_user_id_filter, client_account_filter]);
+
+  /** Client accounts as the Client Account column shows them: by company, else by contact name. */
+  const quick_filter_client_users = useMemo(
+    () => client_users.map((client) => ({ id: client.id, name: client.company || client.name, avatar_url: client.avatar_url })),
+    [client_users]
+  );
 
   const quick_filter_facets = useMemo(
     () =>
       buildQuickFilterFacets({
         columns: QUICK_FILTER_COLUMNS,
-        values_by_column: quick_filter_values.values_by_column,
+        values_by_column: is_quick_filter_search_active
+          ? { ...quick_filter_values.values_by_column, ...quick_filter_search_values.values_by_column }
+          : quick_filter_values.values_by_column,
         selections: quick_filter_selections,
         users: admin_users,
+        client_users: quick_filter_client_users,
         current_user_id: typeof user?.id === "number" ? user.id : null,
       }),
-    [quick_filter_values.values_by_column, quick_filter_selections, admin_users, user]
+    [
+      quick_filter_values.values_by_column,
+      quick_filter_search_values.values_by_column,
+      is_quick_filter_search_active,
+      quick_filter_selections,
+      admin_users,
+      quick_filter_client_users,
+      user,
+    ]
   );
 
   /**
    * Picks or unpicks a value. Regular columns store the picks as their "Filter by
    * values" selection (keeping any condition already set on the column), and
-   * Assigned To uses its own single person filter.
+   * Assigned To and Client Account use their own single person filters.
    */
   const toggleQuickFilterOption = useCallback(
     (key: string, value: string) => {
       if (key === ASSIGNED_USER_QUICK_FILTER_KEY) {
         const user_id = Number(value);
         setAssignedUserIdFilter((prev) => (prev === user_id ? null : user_id));
+        return;
+      }
+      if (key === CLIENT_ACCOUNT_QUICK_FILTER_KEY) {
+        const user_id = Number(value);
+        setClientAccountFilter((prev) => (prev === user_id ? null : user_id));
         return;
       }
       const current = sheet_filters[key];
@@ -3366,14 +3413,19 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         setAssignedUserIdFilter(null);
         return;
       }
+      if (key === CLIENT_ACCOUNT_QUICK_FILTER_KEY) {
+        setClientAccountFilter(null);
+        return;
+      }
       const current = sheet_filters[key];
       setSheetFilter(key, { condition: current?.condition ?? null, values: null });
     },
     [sheet_filters, setSheetFilter]
   );
 
-  // Filters set from the panel, shown on its button: column filters, Assigned To and active advanced rules.
-  const quick_pick_count = active_sheet_filter_count + (assigned_user_id_filter !== null ? 1 : 0);
+  // Filters set from the panel, shown on its button: column filters, Assigned To, Client Account and active advanced rules.
+  const quick_pick_count =
+    active_sheet_filter_count + (assigned_user_id_filter !== null ? 1 : 0) + (client_account_filter !== null ? 1 : 0);
   const advanced_rule_count = countActiveAdvancedRules(advanced_filters);
   const panel_filter_count = quick_pick_count + advanced_rule_count;
   const filter_panel_footer_note = is_advanced_filter_mode
@@ -5538,8 +5590,10 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
             ) : (
               <QuickFilterPanel
                 facets={quick_filter_facets}
-                is_loading={quick_filter_values.is_loading}
-                has_error={quick_filter_values.has_error}
+                is_loading={quick_filter_values.is_loading || (is_quick_filter_search_active && quick_filter_search_values.is_loading)}
+                has_error={quick_filter_values.has_error || (is_quick_filter_search_active && quick_filter_search_values.has_error)}
+                query={quick_filter_query}
+                onQueryChange={setQuickFilterQuery}
                 onToggle={toggleQuickFilterOption}
                 onClearFacet={clearQuickFilterColumn}
               />

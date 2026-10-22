@@ -7,6 +7,9 @@ interface QuickFilterPanelProps {
   facets: QuickFilterFacet[];
   is_loading: boolean;
   has_error: boolean;
+  /** Search text, kept by the table so columns with many values are searched on the server too. */
+  query: string;
+  onQueryChange: (query: string) => void;
   onToggle: (key: string, value: string) => void;
   onClearFacet: (key: string) => void;
 }
@@ -107,8 +110,15 @@ function ScrollArrow({ side, onClick }: { side: "start" | "end"; onClick: () => 
  * them, and picks across columns all apply together. Counts follow every other
  * active filter, and values without matching rows are faded but still pickable.
  */
-export default function QuickFilterPanel({ facets, is_loading, has_error, onToggle, onClearFacet }: QuickFilterPanelProps) {
-  const [query, setQuery] = useState("");
+export default function QuickFilterPanel({
+  facets,
+  is_loading,
+  has_error,
+  query,
+  onQueryChange,
+  onToggle,
+  onClearFacet,
+}: QuickFilterPanelProps) {
   const trimmed_query = query.trim().toLowerCase();
   const scroller_ref = useRef<HTMLDivElement>(null);
 
@@ -140,7 +150,7 @@ export default function QuickFilterPanel({ facets, is_loading, has_error, onTogg
           <input
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => onQueryChange(e.target.value)}
             placeholder="Search values"
             aria-label="Search quick filter values"
             className="h-8 w-full rounded-lg border border-gray-200 bg-white pl-8 pr-2.5 text-xs text-gray-800 outline-none transition placeholder:text-gray-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
@@ -156,7 +166,11 @@ export default function QuickFilterPanel({ facets, is_loading, has_error, onTogg
 
       {visible_facets.length === 0 ? (
         <p className="py-8 text-center text-xs text-gray-400 dark:text-gray-500">
-          {trimmed_query ? `No values match "${query.trim()}".` : "No values to filter by yet."}
+          {trimmed_query
+            ? is_loading
+              ? `Searching values for "${query.trim()}"...`
+              : `No values match "${query.trim()}".`
+            : "No values to filter by yet."}
         </p>
       ) : (
         <div className="relative">

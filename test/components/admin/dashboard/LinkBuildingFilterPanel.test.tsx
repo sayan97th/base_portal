@@ -3,7 +3,7 @@
  * Orders table, and its Quick filters view: the monday style value pills.
  */
 
-import React from "react";
+import React, { useState } from "react";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import LinkBuildingFilterPanel from "@/components/admin/dashboard/LinkBuildingFilterPanel";
 import QuickFilterPanel from "@/components/admin/dashboard/QuickFilterPanel";
@@ -121,11 +121,30 @@ const FACETS: QuickFilterFacet[] = [
 ];
 
 describe("QuickFilterPanel", () => {
-  function renderQuick() {
+  function renderQuick({ is_loading = false }: { is_loading?: boolean } = {}) {
     const onToggle = jest.fn();
     const onClearFacet = jest.fn();
-    render(<QuickFilterPanel facets={FACETS} is_loading={false} has_error={false} onToggle={onToggle} onClearFacet={onClearFacet} />);
-    return { onToggle, onClearFacet };
+    const onQueryChange = jest.fn();
+    // The table keeps the search text, this stands in for it.
+    function QuickFilterPanelHost() {
+      const [query, setQuery] = useState("");
+      return (
+        <QuickFilterPanel
+          facets={FACETS}
+          is_loading={is_loading}
+          has_error={false}
+          query={query}
+          onQueryChange={(next_query) => {
+            onQueryChange(next_query);
+            setQuery(next_query);
+          }}
+          onToggle={onToggle}
+          onClearFacet={onClearFacet}
+        />
+      );
+    }
+    render(<QuickFilterPanelHost />);
+    return { onToggle, onClearFacet, onQueryChange };
   }
 
   it("lists every column with its values, counts and picked state", () => {
@@ -158,5 +177,12 @@ describe("QuickFilterPanel", () => {
 
     fireEvent.change(screen.getByLabelText("Search quick filter values"), { target: { value: "zzz" } });
     expect(screen.getByText('No values match "zzz".')).toBeInTheDocument();
+  });
+
+  it("reports the search text, and says it is searching while server values load", () => {
+    const { onQueryChange } = renderQuick({ is_loading: true });
+    fireEvent.change(screen.getByLabelText("Search quick filter values"), { target: { value: "zzz" } });
+    expect(onQueryChange).toHaveBeenCalledWith("zzz");
+    expect(screen.getByText('Searching values for "zzz"...')).toBeInTheDocument();
   });
 });

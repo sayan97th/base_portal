@@ -1391,9 +1391,10 @@ describe("LinkBuildingOrdersTable, saved filters", () => {
     expect(screen.getByRole("button", { name: "New filter" })).toBeInTheDocument();
     // The quick values are reloaded with the current filters, so their counts match the table.
     expect(mockGetLinkBuildingOrderQuickFilterValues).toHaveBeenLastCalledWith(
-      expect.arrayContaining(["status", "assigned_admin_user_id"]),
+      expect.arrayContaining(["status", "assigned_admin_user_id", "user_id"]),
       expect.objectContaining({ column_filters: expect.any(Array) }),
-      50
+      200,
+      ""
     );
   });
 

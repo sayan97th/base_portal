@@ -5,7 +5,9 @@
 
 import {
   ASSIGNED_USER_QUICK_FILTER_KEY,
+  CLIENT_ACCOUNT_QUICK_FILTER_KEY,
   buildQuickFilterFacets,
+  getServerSearchColumnKeys,
   toggleQuickFilterValue,
   type QuickFilterColumn,
 } from "@/lib/link-building-quick-filters";
@@ -61,6 +63,63 @@ describe("buildQuickFilterFacets", () => {
   it("passes has_more through for columns with more values than listed", () => {
     expect(facets[2]).toMatchObject({ has_more: true, selected_values: ["Acme"] });
     expect(facets[2].options[0].dot_class).toBeUndefined();
+  });
+});
+
+describe("buildQuickFilterFacets for Client Account", () => {
+  const [facet] = buildQuickFilterFacets({
+    columns: [{ key: CLIENT_ACCOUNT_QUICK_FILTER_KEY, label: "Client Account" }],
+    values_by_column: {
+      [CLIENT_ACCOUNT_QUICK_FILTER_KEY]: {
+        values: [{ value: "12", count: 3 }, { value: "", count: 8 }, { value: "4", count: 1 }, { value: "99", count: 2 }],
+        has_more: false,
+      },
+    },
+    selections: { [CLIENT_ACCOUNT_QUICK_FILTER_KEY]: ["12"] },
+    users: USERS,
+    client_users: [
+      { id: 12, name: "Wayne Enterprises", avatar_url: null },
+      { id: 4, name: "Acme Corp", avatar_url: null },
+    ],
+    // Never shown as "Me", the current admin is not a client account.
+    current_user_id: 12,
+  });
+
+  it("lists client accounts by name, unknown ids by number, and rows without an account last", () => {
+    expect(facet.options.map((option) => [option.value, option.label, option.count])).toEqual([
+      ["4", "Acme Corp", 1],
+      ["99", "Client #99", 2],
+      ["12", "Wayne Enterprises", 3],
+      ["0", "No client account", 8],
+    ]);
+    expect(facet.selected_values).toEqual(["12"]);
+  });
+});
+
+describe("getServerSearchColumnKeys", () => {
+  const values_by_column = {
+    status: { values: [], has_more: false },
+    client: { values: [], has_more: true },
+    pen_name: { values: [], has_more: true },
+    [ASSIGNED_USER_QUICK_FILTER_KEY]: { values: [], has_more: true },
+  };
+  const columns: QuickFilterColumn[] = [
+    { key: "status", label: "Status" },
+    { key: "client", label: "Company" },
+    { key: "pen_name", label: "Pen Name" },
+    { key: ASSIGNED_USER_QUICK_FILTER_KEY, label: "Assigned To" },
+  ];
+
+  it("searches only value columns that list their top values", () => {
+    expect(getServerSearchColumnKeys(columns, values_by_column, " wayne ")).toEqual(["client", "pen_name"]);
+  });
+
+  it("skips columns whose name matches, since they keep every value", () => {
+    expect(getServerSearchColumnKeys(columns, values_by_column, "comp")).toEqual(["pen_name"]);
+  });
+
+  it("searches nothing without search text", () => {
+    expect(getServerSearchColumnKeys(columns, values_by_column, "  ")).toEqual([]);
   });
 });
 
