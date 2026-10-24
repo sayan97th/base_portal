@@ -1,5 +1,21 @@
 // ── Link Building Order Row ────────────────────────────────────────────────────
 
+/**
+ * Earlier orders that used the row's Partnership domain for the same Landing Page
+ * within the window before the row's Request Date. The dashboard highlights the
+ * Partnership cell in red while it is set.
+ */
+export interface LinkBuildingRecentDomainUsage {
+  /** Number of earlier orders of the same domain and landing page within the window. */
+  count: number;
+  /** Order ID of the most recent of them. */
+  last_order_id: string;
+  /** Request date (MM/DD/YYYY) of the most recent of them. */
+  last_request_date: string;
+  /** Length of the window, in months. */
+  window_months: number;
+}
+
 export interface LinkBuildingOrderRow {
   id: string;
   order_id: string;
@@ -42,6 +58,8 @@ export interface LinkBuildingOrderRow {
    * The column itself holds the computed value. Null when the row has none.
    */
   cell_formulas?: Record<string, string> | null;
+  /** Derived: recent use of this domain for this landing page, null when there is none. */
+  recent_domain_usage?: LinkBuildingRecentDomainUsage | null;
   /** Optional: links this standalone admin row to a specific client user account. */
   user_id?: number | null;
   /** Admin team responsible for this placement (UUID of admin_teams record). */
@@ -70,6 +88,7 @@ export type LinkBuildingOrderPayload = Omit<
   | "admin_team_color"
   | "assigned_admin_user_name"
   | "assigned_admin_user_avatar"
+  | "recent_domain_usage"
   | "created_at"
   | "updated_at"
 >;

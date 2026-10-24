@@ -237,7 +237,7 @@ export async function updateLinkBuildingOrder(
 export async function batchUpdateLinkBuildingOrders(
   row_ids: string[],
   updates: Partial<Record<keyof LinkBuildingOrderRow, string | null>>
-): Promise<{ message: string; updated_count: number }> {
+): Promise<{ message: string; updated_count: number; data: LinkBuildingOrderRow[] }> {
   return apiClient.post("/api/admin/link-building-orders/batch-update", {
     row_ids,
     updates,
@@ -349,6 +349,7 @@ export function buildLboPayload(row: LinkBuildingOrderRow): LinkBuildingOrderPay
     admin_team_color: _atc,
     assigned_admin_user_name: _aaun,
     assigned_admin_user_avatar: _aaav,
+    recent_domain_usage: _rdu,
     created_at: _ca,
     updated_at: _ua,
     ...payload

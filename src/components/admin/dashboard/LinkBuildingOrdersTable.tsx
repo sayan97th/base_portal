@@ -124,6 +124,11 @@ import {
 } from "@/lib/link-building-order-statuses";
 import FindHighlightedText from "./FindHighlightedText";
 import {
+  getRecentDomainUsageAlert,
+  recentDomainUsageByRowId,
+  withRecentDomainUsage,
+} from "@/lib/link-building-domain-usage";
+import {
   analyzeFormula,
   canInsertReferenceAt,
   findReferences,
@@ -794,6 +799,12 @@ interface EditableCellProps {
    * linked doc's title on hover or when selected, falling back to this value.
    */
   article_fallback_title?: string;
+  /**
+   * Set, the cell is highlighted in red with this explanation as its tooltip.
+   * Used by the Partnership cell when the domain was already used for the row's
+   * landing page in the last months.
+   */
+  alert_message?: string | null;
 }
 
 function EditableCell({
@@ -828,6 +839,7 @@ function EditableCell({
   formula_enabled = false,
   formula_ref_color,
   article_fallback_title,
+  alert_message = null,
 }: EditableCellProps) {
   const input_ref = useRef<HTMLInputElement>(null);
   const is_mac = useIsMacPlatform();
@@ -1113,10 +1125,10 @@ function EditableCell({
           href={value}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-blue-500 hover:underline"
+          className={alert_message ? "font-semibold text-red-700 hover:underline dark:text-red-300" : "text-blue-500 hover:underline"}
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
-          title={value}
+          title={alert_message ? `${value}\n${alert_message}` : value}
         >
           <FindHighlightedText text={label} find_terms={find_terms} />
           {value.replace(/^https?:\/\//, "").length > 28 ? "…" : ""}
@@ -1124,7 +1136,7 @@ function EditableCell({
       );
     } else {
       display = (
-        <span title={value}>
+        <span title={alert_message ? `${value}\n${alert_message}` : value}>
           <FindHighlightedText text={value} find_terms={find_terms} />
         </span>
       );
@@ -1169,6 +1181,7 @@ function EditableCell({
   }
 
   const is_required_error = is_draft && (col.required ?? false) && !shown_value;
+  const has_alert = !!alert_message && !is_required_error;
   const has_cell_editors = cell_editors.length > 0;
   const show_row_floater = is_first_col && row_editors.length > 0;
 
@@ -1183,7 +1196,9 @@ function EditableCell({
       }${getFindCellClass(find_match_state)}${is_range_selected ? ` ${styles.cell_in_range}` : ""}${is_active ? ` ${styles.cell_active}` : ""} ${
         is_required_error
           ? "bg-red-50 ring-1 ring-inset ring-red-300 dark:bg-red-950 dark:ring-red-700"
-          : is_sticky
+          : has_alert
+            ? "bg-red-100 text-red-700 ring-1 ring-inset ring-red-300 dark:bg-red-950 dark:text-red-300 dark:ring-red-800"
+            : is_sticky
             ? sticky_bg_class
             : ""
       }`}
@@ -1209,7 +1224,9 @@ function EditableCell({
           ? undefined
           : is_required_error
             ? `Required: ${col.label} must be filled to save this row`
-            : formula_error
+            : has_alert
+              ? `${alert_message} · Double click, Enter or start typing to edit`
+              : formula_error
               ? `${formula_error.code}: ${formula_error.detail}`
               : is_formula_cell
                 ? "Formula cell, its formula shows in the formula bar · Double click or Enter to edit it"
@@ -1223,6 +1240,14 @@ function EditableCell({
           <span className="flex items-center gap-1 text-red-400 dark:text-red-500">
             <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-red-400 dark:bg-red-500" />
             <span className="italic">Required</span>
+          </span>
+        ) : has_alert ? (
+          <span className="flex min-w-0 items-center gap-1">
+            <svg className="h-3 w-3 shrink-0 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            </svg>
+            <span className="sr-only">Recently used domain.</span>
+            <span className="min-w-0 truncate">{display}</span>
           </span>
         ) : (
           display
@@ -4140,16 +4165,21 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       );
       const replaced_formulas = getFieldFormulas(persisted_ids, batch_field);
 
+      // The server recalculates the recent domain usage flag of every updated row.
+      let usage_by_row_id = new Map<string, LinkBuildingOrderRow["recent_domain_usage"]>();
       if (persisted_ids.length > 0) {
-        await batchUpdateLinkBuildingOrders(persisted_ids, {
+        const res = await batchUpdateLinkBuildingOrders(persisted_ids, {
           [batch_field]: api_value,
         });
+        usage_by_row_id = recentDomainUsageByRowId(res.data);
         await removeFieldFormulas(replaced_formulas, batch_field);
       }
 
       setRows((prev) =>
         prev.map((r) =>
-          selected_row_ids.has(r.id) ? withFormattedPrices({ ...r, [batch_field]: api_value }) : r
+          selected_row_ids.has(r.id)
+            ? withFormattedPrices({ ...r, [batch_field]: api_value, ...withRecentDomainUsage(usage_by_row_id, r.id) })
+            : r
         )
       );
 
@@ -4216,17 +4246,20 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       );
       const replaced_formulas = getFieldFormulas(persisted_ids, clipboard_cell.col_key);
 
+      // The server recalculates the recent domain usage flag of every updated row.
+      let usage_by_row_id = new Map<string, LinkBuildingOrderRow["recent_domain_usage"]>();
       if (persisted_ids.length > 0) {
-        await batchUpdateLinkBuildingOrders(persisted_ids, {
+        const res = await batchUpdateLinkBuildingOrders(persisted_ids, {
           [clipboard_cell.col_key]: clipboard_cell.value,
         });
+        usage_by_row_id = recentDomainUsageByRowId(res.data);
         await removeFieldFormulas(replaced_formulas, clipboard_cell.col_key);
       }
 
       setRows((prev) =>
         prev.map((r) =>
           selected_row_ids.has(r.id)
-            ? withFormattedPrices({ ...r, [clipboard_cell.col_key]: clipboard_cell.value })
+            ? withFormattedPrices({ ...r, [clipboard_cell.col_key]: clipboard_cell.value, ...withRecentDomainUsage(usage_by_row_id, r.id) })
             : r
         )
       );
@@ -6637,6 +6670,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                             find_match_state={find_match_state}
                             find_terms={find_match_state ? find_terms : undefined}
                             article_fallback_title={col.key === "article" ? row.article_title ?? "" : undefined}
+                            alert_message={col.key === "partnership" && !is_new ? getRecentDomainUsageAlert(row) : null}
                           />
                         );
                       })}
