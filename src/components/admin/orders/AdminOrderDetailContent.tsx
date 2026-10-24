@@ -825,6 +825,18 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
                   View Keywords
                 </Link>
               )}
+              {!is_session_view && order.product_type === "link_building" && (
+                <Link
+                  href={`/admin/orders/${order.id}/original`}
+                  title="Read only copy of the order exactly as the client submitted it"
+                  className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 dark:border-gray-700 dark:bg-white/4 dark:text-gray-300 dark:hover:bg-white/[0.07]"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                  </svg>
+                  Original Order
+                </Link>
+              )}
               <Link
                 href={`/admin/orders/${order.id}/report`}
                 className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 dark:border-gray-700 dark:bg-white/4 dark:text-gray-300 dark:hover:bg-white/[0.07]"

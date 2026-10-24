@@ -8,6 +8,7 @@ import type {
   LaravelPaginatedResponse,
   OrderStatus,
 } from "@/types/admin";
+import type { OriginalOrderDetails } from "@/types/admin/original-order";
 
 /**
  * List all orders — staff portal view (paginated).
@@ -51,6 +52,15 @@ export async function listAdminOrders(
  */
 export async function getAdminOrder(order_id: string): Promise<AdminOrder> {
   return apiClient.get<AdminOrder>(`/api/admin/orders/${order_id}`);
+}
+
+/**
+ * Read only copy of a Link Building order as the client submitted it, next to
+ * the values its placements have now. Roles allowed: super_admin, admin, staff.
+ */
+export async function getAdminOriginalOrder(order_id: string): Promise<OriginalOrderDetails> {
+  const res = await apiClient.get<{ data: OriginalOrderDetails }>(`/api/admin/orders/${order_id}/original`);
+  return res.data;
 }
 
 /**

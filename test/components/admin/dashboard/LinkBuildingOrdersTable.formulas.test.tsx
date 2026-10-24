@@ -280,7 +280,7 @@ describe("LinkBuildingOrdersTable — cell formulas", () => {
     await renderTable([row]);
 
     await waitFor(() => expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalled(), { timeout: 4000 });
-    expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledWith([{ id: "uuid-1", fields: { final_price: "$90.00" } }]);
+    expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledWith([{ id: "uuid-1", fields: { final_price: "$90.00" } }], "formula");
   });
 
   it("inserts the reference of a cell clicked while a formula is typed", async () => {

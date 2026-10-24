@@ -107,6 +107,8 @@ import { useVirtualRows, VIRTUAL_ROW_ATTRIBUTE } from "@/hooks/useVirtualRows";
 import { createOrderRowCache, loadAllLinkBuildingOrderRows } from "@/lib/link-building-order-rows-loader";
 import TableFindBar from "./TableFindBar";
 import KeyboardShortcutsDialog from "./KeyboardShortcutsDialog";
+import LinkBuildingOrderHistoryPanel from "./LinkBuildingOrderHistoryPanel";
+import type { LinkBuildingRestoreResult } from "@/services/admin/link-building-order-history.service";
 import { formatShortcut } from "@/lib/keyboard-shortcuts";
 import { useIsMacPlatform } from "@/hooks/useIsMacPlatform";
 import NeedsApprovalToggle from "./NeedsApprovalToggle";
@@ -1610,6 +1612,12 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   const [redo_stack, setRedoStack] = useState<HistoryEntry[]>([]);
   const [is_undo_redo_saving, setIsUndoRedoSaving] = useState(false);
 
+  // ── Version history panel ────────────────────────────────────────────────────
+  // Unlike the undo stack above, which only lives in this tab until a reload, the
+  // version history is kept by the server for every change made by anyone, so a
+  // mistaken paste can still be restored later. row_id null shows the whole table.
+  const [history_panel, setHistoryPanel] = useState<{ row_id: string | null } | null>(null);
+
   const { sort_rules, toggleSort, setSort, clearSort, replaceSort } = useTableSort(DEFAULT_SORT_RULES);
   const {
     sheet_filters,
@@ -2390,7 +2398,8 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
           id,
           fields: fields_by_row_id[id],
           ...(formulas_by_row_id.has(id) ? { cell_formulas: formulas_by_row_id.get(id) ?? null } : {}),
-        }))
+        })),
+        use === "old_value" ? "undo" : "redo"
       );
       const updated_by_id = new Map(res.data.map((r) => [r.id, r]));
       setRows((prev) => prev.map((r) => updated_by_id.get(r.id) ?? r));
@@ -2425,6 +2434,29 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     const n = entry.changes.length;
     setNotificationBanner(`Redid ${n} cell change${n !== 1 ? "s" : ""} (${entry.label}).`);
   }, [applyCellChanges]);
+
+  const openHistoryPanel = useCallback((row_id: string | null = null) => setHistoryPanel({ row_id }), []);
+  const closeHistoryPanel = useCallback(() => setHistoryPanel(null), []);
+  const showAllHistory = useCallback(() => setHistoryPanel({ row_id: null }), []);
+
+  /** Puts rows restored from the version history into the grid, recreated ones on top. */
+  const handleHistoryRestored = useCallback((result: LinkBuildingRestoreResult) => {
+    const restored_by_id = new Map(result.data.map((r) => [r.id, r]));
+    const known_ids = new Set(rows_ref.current.map((r) => r.id));
+    const recreated_rows = result.data.filter((r) => result.recreated_ids.includes(r.id) && !known_ids.has(r.id));
+
+    setRows((prev) => [...recreated_rows, ...prev.map((r) => restored_by_id.get(r.id) ?? r)]);
+    if (recreated_rows.length > 0) setTotal((prev) => prev + recreated_rows.length);
+
+    // The undo entries were recorded against the values before the restore, so
+    // replaying one now could silently undo the restore. The history keeps them.
+    setUndoStack([]);
+    setRedoStack([]);
+
+    on_order_mutated_ref.current?.();
+    refreshFilterCounts();
+    setNotificationBanner(result.message);
+  }, [refreshFilterCounts]);
 
   // ── Editing ─────────────────────────────────────────────────────────────────
 
@@ -3999,7 +4031,8 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
             ...(formula_row_ids.has(id)
               ? { cell_formulas: next_rows.find((r) => r.id === id)?.cell_formulas ?? null }
               : {}),
-          }))
+          })),
+          operation
         );
         const updated_by_id = new Map(res.data.map((r) => [r.id, r]));
         setRows((prev) => prev.map((r) => updated_by_id.get(r.id) ?? r));
@@ -4249,7 +4282,8 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     );
     setRows((prev) => prev.map((r) => (next_maps.has(r.id) ? { ...r, cell_formulas: next_maps.get(r.id) ?? null } : r)));
     await batchUpdateLinkBuildingOrderCells(
-      Array.from(next_maps, ([id, cell_formulas]) => ({ id, fields: {}, cell_formulas }))
+      Array.from(next_maps, ([id, cell_formulas]) => ({ id, fields: {}, cell_formulas })),
+      "fill"
     );
   }, []);
 
@@ -4288,7 +4322,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       if (persisted_ids.length > 0) {
         const res = await batchUpdateLinkBuildingOrders(persisted_ids, {
           [batch_field]: api_value,
-        });
+        }, "fill");
         usage_by_row_id = recentDomainUsageByRowId(res.data);
         await removeFieldFormulas(replaced_formulas, batch_field);
       }
@@ -4369,7 +4403,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       if (persisted_ids.length > 0) {
         const res = await batchUpdateLinkBuildingOrders(persisted_ids, {
           [clipboard_cell.col_key]: clipboard_cell.value,
-        });
+        }, "paste");
         usage_by_row_id = recentDomainUsageByRowId(res.data);
         await removeFieldFormulas(replaced_formulas, clipboard_cell.col_key);
       }
@@ -4955,7 +4989,8 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       }
       try {
         const res = await batchUpdateLinkBuildingOrderCells(
-          Array.from(fields_by_row_id, ([id, fields]) => ({ id, fields }))
+          Array.from(fields_by_row_id, ([id, fields]) => ({ id, fields })),
+          "formula"
         );
         const updated_by_id = new Map(res.data.map((r) => [r.id, r]));
         setRows((prev) =>
@@ -5402,6 +5437,18 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
               )}
             </button>
           </div>
+
+          {/* Version history: every change kept by the server, restorable after a reload or by another admin */}
+          <button
+            onClick={() => openHistoryPanel(null)}
+            className={toolbar_button_class}
+            title="Version history: see who changed what and restore any change"
+          >
+            <svg className="h-4 w-4 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            History
+          </button>
 
           <span className="hidden h-6 w-px bg-gray-200 sm:block dark:bg-gray-700" aria-hidden="true" />
 
@@ -6317,6 +6364,15 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         onClose={closeShortcutsDialog}
       />
 
+      <LinkBuildingOrderHistoryPanel
+        is_open={history_panel !== null}
+        row_id={history_panel?.row_id ?? null}
+        column_labels={COLUMN_LABELS}
+        onClose={closeHistoryPanel}
+        onShowAllChanges={showAllHistory}
+        onRestored={handleHistoryRestored}
+      />
+
       {/* Find bar (Ctrl/Cmd+F) */}
       {is_find_open && (
         <TableFindBar
@@ -6913,6 +6969,21 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                                 </span>
                               );
                             })()}
+                            {!is_new && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openHistoryPanel(row.id);
+                                }}
+                                className="rounded p-1 text-gray-300 opacity-0 transition-all hover:bg-brand-50 hover:text-brand-600 group-hover:opacity-100 dark:text-gray-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
+                                title="Edit history of this row"
+                                aria-label={`Edit history of ${row.order_id || "this row"}`}
+                              >
+                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                              </button>
+                            )}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();

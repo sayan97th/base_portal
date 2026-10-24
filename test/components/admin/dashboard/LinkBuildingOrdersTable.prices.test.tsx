@@ -372,7 +372,8 @@ describe("LinkBuildingOrdersTable — pasting and filling prices", () => {
       expect.arrayContaining([
         { id: "uuid-1", fields: { final_price: "$50.00" } },
         { id: "uuid-2", fields: { final_price: "$1,200.00" } },
-      ])
+      ]),
+      "paste"
     );
   });
 
@@ -389,7 +390,7 @@ describe("LinkBuildingOrdersTable — pasting and filling prices", () => {
     fireEvent.click(screen.getByRole("button", { name: /apply to 1 row/i }));
 
     await waitFor(() => expect(mockBatchUpdateLinkBuildingOrders).toHaveBeenCalledTimes(1));
-    expect(mockBatchUpdateLinkBuildingOrders).toHaveBeenCalledWith(["uuid-1"], { final_price: "75" });
+    expect(mockBatchUpdateLinkBuildingOrders).toHaveBeenCalledWith(["uuid-1"], { final_price: "75" }, "fill");
     expect(await within(grid).findByText("$75.00")).toBeInTheDocument();
   });
 });

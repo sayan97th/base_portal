@@ -320,7 +320,7 @@ describe("LinkBuildingOrdersTable: cut (Cmd+X)", () => {
 
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith("seo tools");
     await waitFor(() =>
-      expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledWith([{ id: "uuid-1", fields: { keyword: "" } }])
+      expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledWith([{ id: "uuid-1", fields: { keyword: "" } }], "clear")
     );
   });
 
@@ -370,7 +370,7 @@ describe("LinkBuildingOrdersTable: fill down (Cmd+D) and fill right (Cmd+R)", ()
     // The browser's own Cmd+D (bookmark this page) is blocked while the grid has focus.
     expect(event_allowed).toBe(false);
     await waitFor(() =>
-      expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledWith([{ id: "uuid-2", fields: { keyword: "seo tools" } }])
+      expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledWith([{ id: "uuid-2", fields: { keyword: "seo tools" } }], "fill")
     );
     expect(await screen.findByText(/Filled 1 cell across 1 row/i)).toBeInTheDocument();
   });
@@ -383,7 +383,7 @@ describe("LinkBuildingOrdersTable: fill down (Cmd+D) and fill right (Cmd+R)", ()
     fireEvent.keyDown(document, { key: "d", metaKey: true });
 
     await waitFor(() =>
-      expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledWith([{ id: "uuid-2", fields: { keyword: "seo tools" } }])
+      expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledWith([{ id: "uuid-2", fields: { keyword: "seo tools" } }], "fill")
     );
   });
 
@@ -408,7 +408,7 @@ describe("LinkBuildingOrdersTable: fill down (Cmd+D) and fill right (Cmd+R)", ()
     // The browser's own Cmd+R (reload) is blocked while the grid has focus.
     expect(event_allowed).toBe(false);
     await waitFor(() =>
-      expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledWith([{ id: "uuid-1", fields: { keyword: "Acme Corp" } }])
+      expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledWith([{ id: "uuid-1", fields: { keyword: "Acme Corp" } }], "fill")
     );
   });
 
@@ -435,7 +435,7 @@ describe("LinkBuildingOrdersTable: fill down (Cmd+D) and fill right (Cmd+R)", ()
     await waitFor(() =>
       expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledWith([
         { id: "uuid-2", fields: { notes: "30" }, cell_formulas: { notes: "=[dr_lbs:~0]*2" } },
-      ])
+      ], "fill")
     );
   });
 

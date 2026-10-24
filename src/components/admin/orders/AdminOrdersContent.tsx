@@ -401,6 +401,25 @@ interface OrderRowProps {
   compact?: boolean;
 }
 
+/**
+ * Opens the read only copy of a Link Building order as the client submitted it,
+ * kept even after the order is edited on the Link Building Orders table.
+ */
+function OriginalOrderLink({ order_id }: { order_id: string }) {
+  return (
+    <Link
+      href={`/admin/orders/${order_id}/original`}
+      title="Read only copy of the order exactly as the client submitted it"
+      className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-white/3 dark:text-gray-400 dark:hover:bg-white/6"
+    >
+      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+      </svg>
+      Original Order
+    </Link>
+  );
+}
+
 function OrderRow({ order, is_last, compact = false }: OrderRowProps) {
   const type_config = order.product_type ? PRODUCT_TYPE_CONFIG[order.product_type] : null;
   const items_count = getOrderItemsCount(order);
@@ -507,6 +526,7 @@ function OrderRow({ order, is_last, compact = false }: OrderRowProps) {
               Keywords
             </Link>
           )}
+          {order.product_type === "link_building" && <OriginalOrderLink order_id={order.id} />}
           <Link
             href={`/admin/orders/${order.id}`}
             className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
@@ -647,6 +667,7 @@ function SingleOrderCard({ group }: { group: AdminOrderGroup }) {
               Keywords
             </Link>
           )}
+          {order.product_type === "link_building" && <OriginalOrderLink order_id={order.id} />}
           <Link
             href={`/admin/orders/${order.id}`}
             className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${

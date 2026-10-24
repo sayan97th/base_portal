@@ -384,7 +384,7 @@ describe("LinkBuildingOrdersTable — undo / redo", () => {
     await waitFor(() => expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledTimes(1));
     expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenNthCalledWith(1, [
       { id: "uuid-1", fields: { keyword: "seo tools" } },
-    ]);
+    ], "undo");
     await within(screen.getByRole("grid")).findByText("seo tools");
 
     // Redo: value should move forward again to "local seo".
@@ -399,7 +399,7 @@ describe("LinkBuildingOrdersTable — undo / redo", () => {
     await waitFor(() => expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledTimes(2));
     expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenNthCalledWith(2, [
       { id: "uuid-1", fields: { keyword: "local seo" } },
-    ]);
+    ], "redo");
     await within(screen.getByRole("grid")).findByText("local seo");
   });
 
@@ -575,7 +575,8 @@ describe("LinkBuildingOrdersTable — multi-cell range copy & paste", () => {
       expect.arrayContaining([
         { id: "uuid-1", fields: { client: "New Client A", keyword: "New Kw A" } },
         { id: "uuid-2", fields: { client: "New Client B", keyword: "New Kw B" } },
-      ])
+      ]),
+      "paste"
     );
     await within(screen.getByRole("grid")).findByText("New Client A");
     await screen.findByText("New Kw B");
@@ -653,7 +654,8 @@ describe("LinkBuildingOrdersTable — multi-cell range copy & paste", () => {
       expect.arrayContaining([
         { id: "uuid-1", fields: { client: "Reviewing", keyword: "Reviewing" } },
         { id: "uuid-2", fields: { client: "Reviewing", keyword: "Reviewing" } },
-      ])
+      ]),
+      "paste"
     );
   });
 
@@ -697,7 +699,8 @@ describe("LinkBuildingOrdersTable — multi-cell range copy & paste", () => {
       expect.arrayContaining([
         { id: "uuid-1", fields: { status: "Needs Client Approval" } },
         { id: "uuid-2", fields: { status: "Done" } },
-      ])
+      ]),
+      "paste"
     );
     await within(screen.getByRole("grid")).findByText("Needs Client Approval");
     await screen.findByText("Done");
@@ -729,7 +732,7 @@ describe("LinkBuildingOrdersTable — multi-cell range copy & paste", () => {
     await waitFor(() => expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledTimes(1));
     expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledWith([
       { id: "uuid-1", fields: { status: "Reviewing" } },
-    ]);
+    ], "paste");
   });
 });
 
@@ -776,7 +779,8 @@ describe("LinkBuildingOrdersTable — bulk paste value handling per column type"
       expect.arrayContaining([
         { id: "uuid-1", fields: { dr_lbs: "45 (Ahrefs)" } },
         { id: "uuid-2", fields: { dr_lbs: "52 (Moz)" } },
-      ])
+      ]),
+      "paste"
     );
     await screen.findByText("52 (Moz)");
   });
@@ -809,7 +813,7 @@ describe("LinkBuildingOrdersTable — bulk paste value handling per column type"
     await waitFor(() => expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledTimes(1));
     expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledWith([
       { id: "uuid-1", fields: { status: "" } },
-    ]);
+    ], "paste");
   });
 
   it("pastes a Link Type value that isn't in the preset dropdown list instead of silently dropping it", async () => {
@@ -838,7 +842,7 @@ describe("LinkBuildingOrdersTable — bulk paste value handling per column type"
     await waitFor(() => expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledTimes(1));
     expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledWith([
       { id: "uuid-1", fields: { link_type: "DR 80+ External" } },
-    ]);
+    ], "paste");
   });
 });
 
@@ -1560,7 +1564,7 @@ describe("LinkBuildingOrdersTable — spreadsheet keyboard navigation", () => {
     await waitFor(() =>
       expect(mockBatchUpdateLinkBuildingOrderCells).toHaveBeenCalledWith([
         { id: "uuid-1", fields: { keyword: "" } },
-      ])
+      ], "clear")
     );
     expect(await screen.findByText(/Cleared 1 cell across 1 row/i)).toBeInTheDocument();
   });

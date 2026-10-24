@@ -11,6 +11,7 @@ import type {
   LinkBuildingOrderRowsResponse,
   ArticleDocTitle,
 } from "@/types/admin/link-building-order";
+import type { LinkBuildingChangeSource } from "@/types/admin/link-building-order-history";
 
 // ── Validation ─────────────────────────────────────────────────────────────────
 
@@ -225,15 +226,18 @@ export async function updateLinkBuildingOrder(
 
 /**
  * POST /api/admin/link-building-orders/batch-update
- * Updates one or more fields across multiple rows atomically.
+ * Updates one or more fields across multiple rows atomically. change_source is
+ * what the edit history calls the change (the API defaults to "fill").
  */
 export async function batchUpdateLinkBuildingOrders(
   row_ids: string[],
-  updates: Partial<Record<keyof LinkBuildingOrderRow, string | null>>
+  updates: Partial<Record<keyof LinkBuildingOrderRow, string | null>>,
+  change_source?: LinkBuildingChangeSource
 ): Promise<{ message: string; updated_count: number; data: LinkBuildingOrderRow[] }> {
   return apiClient.post("/api/admin/link-building-orders/batch-update", {
     row_ids,
     updates,
+    change_source,
   });
 }
 
@@ -243,6 +247,8 @@ export async function batchUpdateLinkBuildingOrders(
  * pasting a multi-row/multi-column block of clipboard data (e.g. copied from
  * Excel or Google Sheets) into the dashboard grid, where each row may end up
  * with different values instead of one shared value applied to every row.
+ * change_source is what the edit history calls the change (the API defaults to
+ * "paste"), so undo, fill and formula updates show up as such.
  */
 export async function batchUpdateLinkBuildingOrderCells(
   updates: {
@@ -250,10 +256,12 @@ export async function batchUpdateLinkBuildingOrderCells(
     fields: Partial<Record<keyof LinkBuildingOrderRow, string | null>>;
     /** When present, replaces the row's whole formulas map (null removes them all). */
     cell_formulas?: Record<string, string> | null;
-  }[]
+  }[],
+  change_source?: LinkBuildingChangeSource
 ): Promise<{ message: string; updated_count: number; data: LinkBuildingOrderRow[] }> {
   return apiClient.post("/api/admin/link-building-orders/batch-update-cells", {
     updates,
+    change_source,
   });
 }
 
