@@ -17,6 +17,8 @@ import SavedFiltersMenu from "./SavedFiltersMenu";
 import AdvancedFilterPanel from "./AdvancedFilterPanel";
 import LinkBuildingFilterPanel from "./LinkBuildingFilterPanel";
 import QuickFilterPanel from "./QuickFilterPanel";
+import ArticleDocPreview from "./ArticleDocPreview";
+import { isGoogleDocLink } from "@/lib/article-doc-title";
 import { useQuickFilterValues } from "@/hooks/useQuickFilterValues";
 import {
   ASSIGNED_USER_QUICK_FILTER_KEY,
@@ -786,6 +788,11 @@ interface EditableCellProps {
   formula_enabled?: boolean;
   /** Color index when the formula being edited references this cell. */
   formula_ref_color?: number;
+  /**
+   * Article cells only: the row's Article Title. Set, the cell previews the
+   * linked doc's title on hover or when selected, falling back to this value.
+   */
+  article_fallback_title?: string;
 }
 
 function EditableCell({
@@ -819,6 +826,7 @@ function EditableCell({
   formula_error = null,
   formula_enabled = false,
   formula_ref_color,
+  article_fallback_title,
 }: EditableCellProps) {
   const input_ref = useRef<HTMLInputElement>(null);
   const is_mac = useIsMacPlatform();
@@ -830,6 +838,8 @@ function EditableCell({
   // render would still be null, since refs only attach during the commit that just
   // happened, one render behind.
   const [combobox_anchor_el, setComboboxAnchorEl] = useState<HTMLTableCellElement | null>(null);
+  // Display <td> of an Article cell, the doc preview card opens on hover over it and is placed under it.
+  const [display_cell_el, setDisplayCellEl] = useState<HTMLTableCellElement | null>(null);
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -1074,12 +1084,29 @@ function EditableCell({
   // but it is recomputed live, so it is already up to date before the sync saves it.
   const shown_value = formula_display ?? value;
   const is_formula_cell = formula_display !== undefined;
+  // The Article cell previews its doc's title in a card, which replaces the cell's tooltip.
+  const has_article_preview =
+    article_fallback_title !== undefined &&
+    /^https?:\/\//i.test(value) &&
+    (isGoogleDocLink(value) || article_fallback_title.trim() !== "");
   let display: React.ReactNode;
 
   if (col.type === "url" && value) {
     const is_url = /^https?:\/\//i.test(value);
-    if (is_url) {
-      const label = value.replace(/^https?:\/\//, "").slice(0, 28);
+    const label = value.replace(/^https?:\/\//, "").slice(0, 28);
+    if (is_url && has_article_preview) {
+      display = (
+        <ArticleDocPreview
+          url={value}
+          fallback_title={article_fallback_title ?? ""}
+          anchor_el={display_cell_el}
+          is_active={is_active && !is_range_selected}
+        >
+          <FindHighlightedText text={label} find_terms={find_terms} />
+          {value.replace(/^https?:\/\//, "").length > 28 ? "…" : ""}
+        </ArticleDocPreview>
+      );
+    } else if (is_url) {
       display = (
         <a
           href={value}
@@ -1146,6 +1173,7 @@ function EditableCell({
 
   return (
     <td
+      ref={has_article_preview ? setDisplayCellEl : undefined}
       data-cell-key={cell_key}
       className={`group/cell relative select-none whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 ${styles.cell}${
         col.type === "number" ? ` ${styles.cell_numeric}` : ""
@@ -1176,13 +1204,15 @@ function EditableCell({
       onMouseUp={onCellMouseUp}
       onDoubleClick={onCellDoubleClick}
       title={
-        is_required_error
-          ? `Required: ${col.label} must be filled to save this row`
-          : formula_error
-            ? `${formula_error.code}: ${formula_error.detail}`
-            : is_formula_cell
-              ? "Formula cell, its formula shows in the formula bar · Double click or Enter to edit it"
-              : `Double click, Enter or start typing to edit · Type = to start a formula · ${formatShortcut(["Mod", ";"], is_mac)} inserts today's date · Arrow keys to move · Shift+Arrow or drag to select · ${formatShortcut(["Mod", "C"], is_mac)} / ${formatShortcut(["Mod", "V"], is_mac)} to copy and paste · ${formatShortcut(["Mod", "/"], is_mac)} for all shortcuts`
+        has_article_preview
+          ? undefined
+          : is_required_error
+            ? `Required: ${col.label} must be filled to save this row`
+            : formula_error
+              ? `${formula_error.code}: ${formula_error.detail}`
+              : is_formula_cell
+                ? "Formula cell, its formula shows in the formula bar · Double click or Enter to edit it"
+                : `Double click, Enter or start typing to edit · Type = to start a formula · ${formatShortcut(["Mod", ";"], is_mac)} inserts today's date · Arrow keys to move · Shift+Arrow or drag to select · ${formatShortcut(["Mod", "C"], is_mac)} / ${formatShortcut(["Mod", "V"], is_mac)} to copy and paste · ${formatShortcut(["Mod", "/"], is_mac)} for all shortcuts`
       }
     >
       {show_row_floater && <RowPresenceFloater editors={row_editors} />}
@@ -6612,6 +6642,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                             sticky_bg_class={col.sticky ? sticky_row_bg_class : undefined}
                             find_match_state={find_match_state}
                             find_terms={find_match_state ? find_terms : undefined}
+                            article_fallback_title={col.key === "article" ? row.article_title ?? "" : undefined}
                           />
                         );
                       })}

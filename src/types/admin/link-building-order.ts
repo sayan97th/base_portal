@@ -387,3 +387,19 @@ export interface LinkBuildingOrderFormulaColumnPayload {
   format?: LinkBuildingOrderFormulaFormat;
   position?: number;
 }
+
+/**
+ * ok: the title was read from the file. private: the file is not shared with
+ * "Anyone with the link" or was deleted. unavailable: Google did not answer.
+ * unsupported: the link is not a Google Docs or Drive file.
+ */
+export type ArticleDocTitleStatus = "ok" | "private" | "unavailable" | "unsupported";
+
+/** Title of the Google Doc linked in a row's Article cell. */
+export interface ArticleDocTitle {
+  url: string;
+  document_id: string | null;
+  kind: "document" | "spreadsheets" | "presentation" | "forms" | "file" | null;
+  title: string | null;
+  status: ArticleDocTitleStatus;
+}

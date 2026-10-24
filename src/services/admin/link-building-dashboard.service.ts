@@ -10,6 +10,7 @@ import type {
   LinkBuildingOrderQuickFilterValuesResponse,
   LinkBuildingOrderFindPagesBody,
   LinkBuildingOrderFindPagesResponse,
+  ArticleDocTitle,
 } from "@/types/admin/link-building-order";
 
 // ── Validation ─────────────────────────────────────────────────────────────────
@@ -101,6 +102,18 @@ export async function listAdminUsersForSelect(): Promise<AdminUserOption[]> {
  */
 export async function listPenNamesForSelect(): Promise<string[]> {
   const res = await apiClient.get<{ data: string[] }>("/api/admin/link-building-orders/pen-names");
+  return res.data;
+}
+
+/**
+ * GET /api/admin/link-building-orders/article-doc-title
+ * Returns the title of the Google Doc linked in an Article cell, read on the
+ * server from the doc's public page and cached there.
+ */
+export async function getArticleDocTitle(url: string): Promise<ArticleDocTitle> {
+  const res = await apiClient.get<{ data: ArticleDocTitle }>(
+    `/api/admin/link-building-orders/article-doc-title?url=${encodeURIComponent(url)}`
+  );
   return res.data;
 }
 
