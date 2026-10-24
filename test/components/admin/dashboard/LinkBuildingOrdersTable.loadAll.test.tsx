@@ -4,11 +4,14 @@
  *    rest in batches by id, so spreadsheet features work on the whole set;
  *  - only the rows around the viewport are rendered, the rest are spacers;
  *  - the totals row waits for the last batch instead of showing a partial total;
- *  - the footer shows the loading progress.
+ *  - the footer shows the loading progress;
+ *  - a newer filter wins over the batches of an older load, and unchanged rows are reused;
+ *  - drafts kept in the browser stay on top, and drafts already saved are dropped;
+ *  - select all, find and keyboard navigation reach rows outside the rendered window.
  */
 
 import React from "react";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within, fireEvent } from "@testing-library/react";
 import LinkBuildingOrdersTable from "@/components/admin/dashboard/LinkBuildingOrdersTable";
 import {
   listLinkBuildingOrders,
@@ -299,5 +302,183 @@ describe("LinkBuildingOrdersTable, loading every row", () => {
 
     expect(await screen.findByText(/Some link building orders could not be loaded/)).toBeInTheDocument();
     expect(screen.getByText("BL-1")).toBeInTheDocument();
+  });
+});
+
+// ─── Integration helpers ─────────────────────────────────────────────────────
+
+/** Renders the table and waits until every row (plus `draft_count` restored drafts) is in. */
+async function renderFullyLoaded(rows: LinkBuildingOrderRow[], draft_count = 0): Promise<HTMLElement> {
+  mockListLinkBuildingOrders.mockResolvedValue(firstResponse(rows));
+  const by_id = new Map(rows.map((row) => [row.id, row]));
+  mockGetRowsByIds.mockImplementation(async (ids) => ids.map((id) => by_id.get(id)!).filter(Boolean));
+  render(<LinkBuildingOrdersTable />);
+  await screen.findByText("BL-1");
+  const grid = screen.getByRole("grid");
+  await waitFor(() => expect(grid).toHaveAttribute("aria-rowcount", String(rows.length + draft_count)));
+  await waitFor(() => expect(screen.queryByRole("progressbar")).not.toBeInTheDocument());
+  return grid;
+}
+
+function pickLinkType(link_type: string) {
+  fireEvent.change(screen.getByRole("combobox", { name: "Filter by link type" }), {
+    target: { value: link_type },
+  });
+}
+
+/** Stored the way the table keeps unsaved drafts in this browser. */
+function storeDrafts(drafts: Partial<LinkBuildingOrderRow>[]) {
+  localStorage.setItem(
+    "lbo_row_drafts_v1",
+    JSON.stringify(drafts.map((draft) => {
+      const { id: _id, ...rest } = makeRow(draft);
+      return rest;
+    }))
+  );
+}
+
+describe("LinkBuildingOrdersTable, reloading every row", () => {
+  it("ignores the batches of a load replaced by a newer filter", async () => {
+    const old_rows = makeRows(FIRST_ROWS_COUNT + 5);
+    const old_rest = deferred<LinkBuildingOrderRow[]>();
+    mockListLinkBuildingOrders.mockResolvedValueOnce(firstResponse(old_rows));
+    mockGetRowsByIds.mockReturnValueOnce(old_rest.promise);
+    render(<LinkBuildingOrdersTable />);
+    await screen.findByText("BL-1");
+
+    const new_row = makeRow({ id: "uuid-900", order_id: "BL-900" });
+    mockListLinkBuildingOrders.mockResolvedValueOnce(firstResponse([new_row]));
+    pickLinkType("DR 50+ External");
+    expect(await screen.findByText("BL-900")).toBeInTheDocument();
+
+    // The old load's last batch arrives late, it must not be appended.
+    old_rest.resolve(old_rows.slice(FIRST_ROWS_COUNT));
+
+    const grid = screen.getByRole("grid");
+    await waitFor(() => expect(grid).toHaveAttribute("aria-busy", "false"));
+    expect(grid).toHaveAttribute("aria-rowcount", "1");
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  });
+
+  it("sends the new filters with the reload and starts again from the first rows", async () => {
+    await renderFullyLoaded(makeRows(3));
+
+    mockListLinkBuildingOrders.mockResolvedValueOnce(firstResponse([makeRow({ id: "uuid-9", order_id: "BL-9" })]));
+    pickLinkType("DR 50+ External");
+
+    expect(await screen.findByText("BL-9")).toBeInTheDocument();
+    expect(mockListLinkBuildingOrders).toHaveBeenLastCalledWith(
+      expect.objectContaining({ link_type: "DR 50+ External", page: 1, include_row_index: true })
+    );
+    expect(screen.queryByText("BL-1")).not.toBeInTheDocument();
+  });
+
+  it("reuses the rows it already holds when the same orders come back after a filter change", async () => {
+    const rows = makeRows(FIRST_ROWS_COUNT + 5);
+    await renderFullyLoaded(rows);
+    expect(mockGetRowsByIds).toHaveBeenCalledTimes(1);
+
+    mockListLinkBuildingOrders.mockResolvedValueOnce(firstResponse(rows));
+    pickLinkType("DR 50+ External");
+
+    const grid = screen.getByRole("grid");
+    await waitFor(() => expect(mockListLinkBuildingOrders).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(grid).toHaveAttribute("aria-rowcount", String(rows.length)));
+    // The 5 rows after the first ones were already loaded at the same version.
+    expect(mockGetRowsByIds).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows an error when the first request fails", async () => {
+    mockListLinkBuildingOrders.mockRejectedValue(new Error("network"));
+
+    render(<LinkBuildingOrdersTable />);
+
+    expect(await screen.findByText("Failed to load link building orders. Please refresh.")).toBeInTheDocument();
+  });
+});
+
+describe("LinkBuildingOrdersTable, drafts while loading every row", () => {
+  it("restores the drafts kept in this browser on top of the loaded rows", async () => {
+    storeDrafts([{ order_id: "", keyword: "draft keyword" }]);
+
+    await renderFullyLoaded(makeRows(3), 1);
+
+    expect(screen.getByText("draft keyword")).toBeInTheDocument();
+    // The draft has no row number, the first saved order is still row 1.
+    expect(screen.getByText("new")).toBeInTheDocument();
+  });
+
+  it("keeps the drafts on top when the filters change", async () => {
+    storeDrafts([{ order_id: "", keyword: "draft keyword" }]);
+    await renderFullyLoaded(makeRows(3), 1);
+
+    mockListLinkBuildingOrders.mockResolvedValueOnce(firstResponse([makeRow({ id: "uuid-9", order_id: "BL-9" })]));
+    pickLinkType("DR 50+ External");
+
+    expect(await screen.findByText("BL-9")).toBeInTheDocument();
+    expect(screen.getByText("draft keyword")).toBeInTheDocument();
+  });
+
+  it("drops a restored draft whose order is already on the server", async () => {
+    storeDrafts([{ order_id: `BL-${FIRST_ROWS_COUNT + 3}`, keyword: "already saved draft" }]);
+
+    // The saved order only arrives with a later batch, after the first rows.
+    await renderFullyLoaded(makeRows(FIRST_ROWS_COUNT + 5));
+
+    await waitFor(() => expect(screen.queryByText("already saved draft")).not.toBeInTheDocument());
+    expect(localStorage.getItem("lbo_row_drafts_v1")).toBeNull();
+  });
+});
+
+describe("LinkBuildingOrdersTable, spreadsheet features over every row", () => {
+  const original_scroll_to = Element.prototype.scrollTo;
+
+  beforeEach(() => {
+    // jsdom has no layout, scrolling just moves scrollTop and fires the event.
+    Element.prototype.scrollTo = function scrollTo(this: Element, options?: ScrollToOptions | number) {
+      if (typeof options === "object" && options?.top !== undefined) this.scrollTop = options.top;
+      this.dispatchEvent(new Event("scroll"));
+    } as typeof Element.prototype.scrollTo;
+  });
+
+  afterEach(() => {
+    Element.prototype.scrollTo = original_scroll_to;
+  });
+
+  it("select all checks every row, also those outside the rendered window", async () => {
+    const rows = makeRows(FIRST_ROWS_COUNT + 5);
+    await renderFullyLoaded(rows);
+
+    fireEvent.click(screen.getByTitle("Select / deselect all visible rows"));
+
+    expect(await screen.findByText(`${rows.length} rows selected`)).toBeInTheDocument();
+  });
+
+  it("find counts the matches of rows that are not rendered", async () => {
+    const rows = makeRows(FIRST_ROWS_COUNT + 5).map((row, idx) =>
+      idx === 0 || idx === FIRST_ROWS_COUNT + 2 ? { ...row, keyword: "needle keyword" } : row
+    );
+    await renderFullyLoaded(rows);
+
+    fireEvent.click(screen.getByRole("button", { name: "Find" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Find in table" }), { target: { value: "needle" } });
+
+    expect(await screen.findByText(/of 2$/)).toBeInTheDocument();
+    expect(screen.getByText("2 matching orders")).toBeInTheDocument();
+  });
+
+  it("jumps to the last row with Ctrl+ArrowDown and renders it", async () => {
+    const rows = makeRows(FIRST_ROWS_COUNT + 5);
+    const grid = await renderFullyLoaded(rows);
+    expect(within(grid).queryByText(`BL-${rows.length}`)).not.toBeInTheDocument();
+
+    const first_cell = within(grid).getByText("BL-1").closest("td") as HTMLElement;
+    fireEvent.mouseDown(first_cell);
+    fireEvent.mouseUp(first_cell);
+    fireEvent.keyDown(grid, { key: "ArrowDown", ctrlKey: true });
+
+    expect(screen.getByTitle("Active cell")).toHaveTextContent(`A${rows.length}`);
+    expect(await within(grid).findByText(`BL-${rows.length}`)).toBeInTheDocument();
+    expect(screen.getByTitle(`Select row ${rows.length}`)).toBeInTheDocument();
   });
 });

@@ -20,6 +20,7 @@ import {
   listAdminUsersForSelect,
   listClientUsersForSelect,
   listLinkBuildingOrders,
+  getLinkBuildingOrderRowsByIds,
   createLinkBuildingOrder,
   updateLinkBuildingOrder,
   deleteLinkBuildingOrder,
@@ -154,6 +155,44 @@ describe("listLinkBuildingOrders", () => {
 
     const [, body] = mocked.post.mock.calls[0];
     expect(body).toMatchObject({ status: "Live", client_user_id: 42, per_page: 100 });
+  });
+
+  it("asks for the row index when the caller sets include_row_index", async () => {
+    mocked.post.mockResolvedValueOnce({
+      data: [], current_page: 1, last_page: 1, per_page: 200, total: 0, from: null, to: null,
+      row_index: { ids: [], versions: [] },
+    } as never);
+
+    const res = await listLinkBuildingOrders({ include_row_index: true, page: 1, per_page: 200 });
+
+    const [, body] = mocked.post.mock.calls[0];
+    expect(body).toMatchObject({ include_row_index: true, page: 1, per_page: 200 });
+    expect(res.row_index).toEqual({ ids: [], versions: [] });
+  });
+});
+
+// ─── getLinkBuildingOrderRowsByIds ────────────────────────────────────────────
+
+describe("getLinkBuildingOrderRowsByIds", () => {
+  it("POSTs the ids to the rows endpoint", async () => {
+    mocked.post.mockResolvedValueOnce({ data: [] } as never);
+
+    await getLinkBuildingOrderRowsByIds(["uuid-2", "uuid-1"]);
+
+    expect(mocked.post).toHaveBeenCalledWith("/api/admin/link-building-orders/rows", { ids: ["uuid-2", "uuid-1"] });
+  });
+
+  it("returns the rows of the response", async () => {
+    const rows = [makeRow({ id: "uuid-2" }), makeRow({ id: "uuid-1" })];
+    mocked.post.mockResolvedValueOnce({ data: rows } as never);
+
+    await expect(getLinkBuildingOrderRowsByIds(["uuid-2", "uuid-1"])).resolves.toEqual(rows);
+  });
+
+  it("lets a failed request reject, so the loader can retry it", async () => {
+    mocked.post.mockRejectedValueOnce({ message: "Server Error", status_code: 500 });
+
+    await expect(getLinkBuildingOrderRowsByIds(["uuid-1"])).rejects.toMatchObject({ status_code: 500 });
   });
 });
 

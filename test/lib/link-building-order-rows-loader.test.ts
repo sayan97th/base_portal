@@ -1,5 +1,6 @@
 import {
   FIRST_ROWS_COUNT,
+  ROWS_BATCH_CONCURRENCY,
   ROWS_BATCH_SIZE,
   ROW_CACHE_TTL_MS,
   createOrderRowCache,
@@ -232,5 +233,112 @@ describe("loadAllLinkBuildingOrderRows", () => {
 
     expect(handed_over).toEqual(rows);
     expect(total).toBe(2);
+  });
+
+  it("hands over an empty result set without any follow up request", async () => {
+    mockListLinkBuildingOrders.mockResolvedValue(searchResponse([]));
+
+    const { handed_over, total } = await loadRows();
+
+    expect(handed_over).toEqual([]);
+    expect(total).toBe(0);
+    expect(mockGetRowsByIds).not.toHaveBeenCalled();
+  });
+
+  it("never has more batches in flight than the concurrency limit", async () => {
+    const rows = makeRows(FIRST_ROWS_COUNT + ROWS_BATCH_SIZE * (ROWS_BATCH_CONCURRENCY + 3));
+    mockListLinkBuildingOrders.mockResolvedValue(searchResponse(rows));
+    const by_id = new Map(rows.map((row) => [row.id, row]));
+    let in_flight = 0;
+    let max_in_flight = 0;
+    mockGetRowsByIds.mockImplementation(async (ids) => {
+      in_flight++;
+      max_in_flight = Math.max(max_in_flight, in_flight);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      in_flight--;
+      return ids.map((id) => by_id.get(id)!);
+    });
+
+    const { handed_over } = await loadRows();
+
+    expect(max_in_flight).toBe(ROWS_BATCH_CONCURRENCY);
+    expect(handed_over).toHaveLength(rows.length);
+  });
+
+  it("stops asking for batches once it is cancelled half way", async () => {
+    const rows = makeRows(FIRST_ROWS_COUNT + ROWS_BATCH_SIZE * (ROWS_BATCH_CONCURRENCY * 2));
+    mockListLinkBuildingOrders.mockResolvedValue(searchResponse(rows));
+    const by_id = new Map(rows.map((row) => [row.id, row]));
+    let is_cancelled = false;
+    mockGetRowsByIds.mockImplementation(async (ids) => {
+      await Promise.resolve();
+      // A newer filter arrives while the first round of batches is in flight.
+      is_cancelled = true;
+      return ids.map((id) => by_id.get(id)!);
+    });
+    const onMoreRows = jest.fn();
+
+    await loadAllLinkBuildingOrderRows({
+      body: {},
+      cache: createOrderRowCache(),
+      isCancelled: () => is_cancelled,
+      onFirstRows: jest.fn(),
+      onMoreRows,
+    });
+
+    expect(mockGetRowsByIds).toHaveBeenCalledTimes(ROWS_BATCH_CONCURRENCY);
+    expect(onMoreRows).not.toHaveBeenCalled();
+  });
+
+  it("does not wait for a row deleted among the first rows", async () => {
+    const rows = makeRows(FIRST_ROWS_COUNT + 3);
+    const response = searchResponse(rows);
+    // The second row was deleted between the index query and the first rows query.
+    response.data = response.data.filter((row) => row.id !== rows[1].id);
+    mockListLinkBuildingOrders.mockResolvedValue(response);
+    serveRowsFrom(rows);
+
+    const { handed_over } = await loadRows();
+
+    expect(handed_over.map((row) => row.id)).toEqual(rows.filter((row) => row.id !== rows[1].id).map((row) => row.id));
+    // The deleted row is not asked for again.
+    expect(mockGetRowsByIds.mock.calls.flatMap(([ids]) => ids)).not.toContain(rows[1].id);
+  });
+
+  it("caches the rows it loads under their index version", async () => {
+    const rows = makeRows(FIRST_ROWS_COUNT + 2);
+    const cache = createOrderRowCache();
+    mockListLinkBuildingOrders.mockResolvedValue(searchResponse(rows, rows.map((_, idx) => 100 + idx)));
+    serveRowsFrom(rows);
+
+    await loadRows(cache, () => 5_000);
+
+    expect(cache.size).toBe(rows.length);
+    expect(cache.get(rows[FIRST_ROWS_COUNT + 1].id)).toEqual({
+      row: rows[FIRST_ROWS_COUNT + 1],
+      version: 100 + FIRST_ROWS_COUNT + 1,
+      cached_at: 5_000,
+    });
+  });
+
+  it("drops expired rows from the cache when a new load starts", async () => {
+    const cache = createOrderRowCache();
+    cache.set("stale-id", { row: makeRow(999), version: 1, cached_at: 0 });
+    mockListLinkBuildingOrders.mockResolvedValue(searchResponse(makeRows(1)));
+
+    await loadRows(cache, () => ROW_CACHE_TTL_MS + 10);
+
+    expect(cache.has("stale-id")).toBe(false);
+  });
+
+  it("always takes the first rows from the server, even when cached", async () => {
+    const rows = makeRows(2);
+    const cache = createOrderRowCache();
+    cache.set(rows[0].id, { row: { ...rows[0], keyword: "old cached keyword" }, version: 1, cached_at: 1_000 });
+    mockListLinkBuildingOrders.mockResolvedValue(searchResponse(rows));
+
+    const { handed_over } = await loadRows(cache, () => 1_000);
+
+    expect(handed_over[0].keyword).toBe(rows[0].keyword);
   });
 });

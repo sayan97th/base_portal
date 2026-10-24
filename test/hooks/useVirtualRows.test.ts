@@ -117,4 +117,83 @@ describe("useVirtualRows", () => {
 
     expect(element.scrollTop).toBe(0);
   });
+
+  it("stops listening to the scroll container once unmounted", () => {
+    const element = makeScrollElement(340);
+    const remove_listener = jest.spyOn(element, "removeEventListener");
+    const { unmount } = renderHook(() =>
+      useVirtualRows({ scroll_element: element, row_count: 1_000, row_height: ROW_HEIGHT })
+    );
+
+    unmount();
+
+    expect(remove_listener).toHaveBeenCalledWith("scroll", expect.any(Function));
+  });
+
+  it("subscribes to the scroll container once it mounts", () => {
+    const element = makeScrollElement(340);
+    const { result, rerender } = renderHook(
+      ({ scroll_element }) => useVirtualRows({ scroll_element, row_count: 30_000, row_height: ROW_HEIGHT }),
+      { initialProps: { scroll_element: null as HTMLElement | null } }
+    );
+
+    rerender({ scroll_element: element });
+    scrollTo(element, 10_000 * ROW_HEIGHT);
+
+    expect(result.current.start_index).toBeGreaterThan(9_000);
+  });
+
+  it("renders more rows when the viewport grows", () => {
+    const observers: Array<() => void> = [];
+    const original_resize_observer = global.ResizeObserver;
+    global.ResizeObserver = class {
+      constructor(callback: () => void) {
+        observers.push(callback);
+      }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    } as unknown as typeof ResizeObserver;
+
+    try {
+      const element = makeScrollElement(340);
+      const { result } = renderHook(() =>
+        useVirtualRows({ scroll_element: element, row_count: 30_000, row_height: ROW_HEIGHT })
+      );
+      const end_before = result.current.end_index;
+
+      act(() => {
+        Object.defineProperty(element, "clientHeight", { configurable: true, value: 3_400 });
+        observers.forEach((notify) => notify());
+      });
+
+      expect(result.current.end_index).toBeGreaterThan(end_before);
+    } finally {
+      global.ResizeObserver = original_resize_observer;
+    }
+  });
+
+  it("brings a row above the viewport back into view", () => {
+    const element = makeScrollElement(340);
+    const { result } = renderHook(() =>
+      useVirtualRows({ scroll_element: element, row_count: 30_000, row_height: ROW_HEIGHT })
+    );
+    scrollTo(element, 20_000 * ROW_HEIGHT);
+
+    act(() => result.current.scrollRowIntoView(100));
+
+    expect(element.scrollTop).toBeLessThanOrEqual(100 * ROW_HEIGHT);
+    expect(result.current.start_index).toBeLessThanOrEqual(100);
+    expect(result.current.end_index).toBeGreaterThan(100);
+  });
+
+  it("returns an empty window for an empty table", () => {
+    const element = makeScrollElement(340);
+    const { result } = renderHook(() =>
+      useVirtualRows({ scroll_element: element, row_count: 0, row_height: ROW_HEIGHT })
+    );
+
+    expect(result.current).toMatchObject({ start_index: 0, end_index: 0, padding_top: 0, padding_bottom: 0 });
+  });
 });
+
