@@ -172,6 +172,7 @@ type ColumnGroup =
   | "status_col"
   | "live"
   | "metrics"
+  | "site_pricing"
   | "pricing";
 
 interface ColumnDef {
@@ -298,10 +299,10 @@ const COLUMNS: ColumnDef[] = [
   { key: "live_link_date", label: "Live Link Date", group: "live", min_width: 120, type: "date" },
   { key: "dr_lbs", label: "DR", group: "metrics", min_width: 80, type: "number" },
   { key: "posting_fee_lbs", label: "Posting Fee", group: "metrics", min_width: 135, type: "text" },
-  { key: "current_traffic", label: "Current Traffic", group: "metrics", min_width: 120, type: "number" },
-  { key: "dr_formula", label: "DR Formula", group: "pricing", min_width: 100, type: "number" },
-  { key: "current_poc", label: "Current POC", group: "pricing", min_width: 130, type: "text" },
-  { key: "current_price", label: "Current Price", group: "pricing", min_width: 120, type: "text" },
+  { key: "current_traffic", label: "Current Traffic", group: "site_pricing", min_width: 120, type: "number" },
+  { key: "dr_formula", label: "DR Formula", group: "site_pricing", min_width: 100, type: "number" },
+  { key: "current_poc", label: "Current POC", group: "site_pricing", min_width: 130, type: "text" },
+  { key: "current_price", label: "Current Price", group: "site_pricing", min_width: 120, type: "text" },
   { key: "lb_tl_approval", label: "LB TL Approval", group: "pricing", min_width: 130, type: "text" },
   { key: "approval_date", label: "Approval Date", group: "pricing", min_width: 120, type: "date" },
   { key: "final_price", label: "Final Price", group: "pricing", min_width: 110, type: "text" },
@@ -357,6 +358,10 @@ const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
 
 // ── Group header styles ────────────────────────────────────────────────────────
 
+// The colors follow the BASE links Google Sheet: DR and Posting Fee, which Link
+// Builders enter themselves, share one color, and Current Traffic, DR Formula,
+// Current POC and Current Price share another.
+
 const GROUP_HEADER_STYLES: Record<ColumnGroup, string> = {
   order: "bg-gray-950 text-white border-gray-800",
   team_link: "bg-pink-600 text-white border-pink-700",
@@ -367,6 +372,7 @@ const GROUP_HEADER_STYLES: Record<ColumnGroup, string> = {
   status_col: "bg-purple-700 text-white border-purple-800",
   live: "bg-rose-400 text-white border-rose-500",
   metrics: "bg-emerald-700 text-white border-emerald-800",
+  site_pricing: "bg-fuchsia-800 text-white border-fuchsia-900",
   pricing: "bg-gray-200 text-gray-800 border-gray-300 dark:bg-gray-600 dark:text-gray-100 dark:border-gray-500",
 };
 
@@ -380,7 +386,8 @@ const COLUMN_GROUP_META: Record<ColumnGroup, { label: string; swatch_class: stri
   dates: { label: "Dates", swatch_class: "bg-amber-700" },
   writer: { label: "Writer and Content", swatch_class: "bg-gray-300 dark:bg-gray-600" },
   live: { label: "Live Link", swatch_class: "bg-rose-400" },
-  metrics: { label: "Metrics", swatch_class: "bg-emerald-700" },
+  metrics: { label: "Link Builder Metrics", swatch_class: "bg-emerald-700" },
+  site_pricing: { label: "Traffic and Pricing", swatch_class: "bg-fuchsia-800" },
   pricing: { label: "Pricing and Approval", swatch_class: "bg-gray-300 dark:bg-gray-600" },
 };
 
