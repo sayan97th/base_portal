@@ -1,16 +1,12 @@
 "use client";
 
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useArticleDocTitle } from "@/hooks/useArticleDocTitle";
+import { useCellHoverCard } from "@/hooks/useCellHoverCard";
 import { getGoogleDocKindLabel, isGoogleDocLink } from "@/lib/article-doc-title";
 
-/** Wait before a hover opens the card, so moving the mouse across the table does not flash it. */
-const HOVER_OPEN_DELAY_MS = 350;
-/** Grace period to move the mouse from the cell into the card without it closing. */
-const HOVER_CLOSE_DELAY_MS = 150;
 const CARD_WIDTH = 320;
-const VIEWPORT_MARGIN = 8;
 
 interface ArticleDocPreviewProps {
   /** The Article link. */
@@ -38,78 +34,21 @@ export default function ArticleDocPreview({ url, fallback_title, anchor_el, is_a
   // Links outside Google still preview the Article Title, when there is one.
   const has_preview = is_google_doc || trimmed_fallback_title !== "";
 
-  const [is_hover_open, setIsHoverOpen] = useState(false);
-  const is_open = has_preview && (is_hover_open || is_active);
-
-  const card_ref = useRef<HTMLDivElement>(null);
-  const open_timer_ref = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const close_timer_ref = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [just_copied, setJustCopied] = useState(false);
+
+  const { is_open, card_ref, keepOpen, scheduleClose, updatePosition } = useCellHoverCard({
+    anchor_el,
+    enabled: has_preview,
+    is_active,
+    width: CARD_WIDTH,
+  });
 
   const { result, is_loading, has_error } = useArticleDocTitle(url, is_open && is_google_doc);
 
-  const clearTimers = useCallback(() => {
-    if (open_timer_ref.current) clearTimeout(open_timer_ref.current);
-    if (close_timer_ref.current) clearTimeout(close_timer_ref.current);
-    open_timer_ref.current = null;
-    close_timer_ref.current = null;
-  }, []);
-
-  const scheduleOpen = useCallback(() => {
-    clearTimers();
-    open_timer_ref.current = setTimeout(() => setIsHoverOpen(true), HOVER_OPEN_DELAY_MS);
-  }, [clearTimers]);
-
-  const scheduleClose = useCallback(() => {
-    clearTimers();
-    close_timer_ref.current = setTimeout(() => setIsHoverOpen(false), HOVER_CLOSE_DELAY_MS);
-  }, [clearTimers]);
-
-  // Listens on the cell itself, so the whole cell opens the card, not only the link text.
-  useEffect(() => {
-    if (!anchor_el || !has_preview) return;
-    anchor_el.addEventListener("mouseenter", scheduleOpen);
-    anchor_el.addEventListener("mouseleave", scheduleClose);
-    return () => {
-      anchor_el.removeEventListener("mouseenter", scheduleOpen);
-      anchor_el.removeEventListener("mouseleave", scheduleClose);
-    };
-  }, [anchor_el, has_preview, scheduleOpen, scheduleClose]);
-
-  useEffect(() => clearTimers, [clearTimers]);
-
-  // Places the card under the cell, or above it when there is no room below, and
-  // follows the cell while the table or the page scrolls. Written straight to the
-  // card's style, so scrolling does not re-render the cell.
-  const updatePosition = useCallback(() => {
-    const card = card_ref.current;
-    if (!anchor_el || !card) return;
-    const anchor_rect = anchor_el.getBoundingClientRect();
-    const card_height = card.offsetHeight;
-    const viewport_width = document.documentElement.clientWidth;
-
-    let top = anchor_rect.bottom + 4;
-    if (top + card_height > window.innerHeight - VIEWPORT_MARGIN) top = anchor_rect.top - card_height - 4;
-    top = Math.max(VIEWPORT_MARGIN, top);
-
-    let left = anchor_rect.left;
-    if (left + CARD_WIDTH > viewport_width - VIEWPORT_MARGIN) left = viewport_width - CARD_WIDTH - VIEWPORT_MARGIN;
-    left = Math.max(VIEWPORT_MARGIN, left);
-
-    card.style.top = `${top}px`;
-    card.style.left = `${left}px`;
-  }, [anchor_el]);
-
+  // The card grows once the title loads, so it is placed again to stay inside the viewport.
   useLayoutEffect(() => {
-    if (!is_open) return;
-    updatePosition();
-    window.addEventListener("scroll", updatePosition, true);
-    window.addEventListener("resize", updatePosition);
-    return () => {
-      window.removeEventListener("scroll", updatePosition, true);
-      window.removeEventListener("resize", updatePosition);
-    };
-  }, [is_open, updatePosition, is_loading, result]);
+    if (is_open) updatePosition();
+  }, [is_open, is_loading, result, updatePosition]);
 
   const doc_title = result?.status === "ok" ? result.title : null;
   const shown_title = doc_title ?? (trimmed_fallback_title || null);
@@ -148,7 +87,7 @@ export default function ArticleDocPreview({ url, fallback_title, anchor_el, is_a
             role="tooltip"
             className="fixed z-[60] rounded-lg border border-gray-200 bg-white p-3 text-xs shadow-lg dark:border-gray-700 dark:bg-gray-800"
             style={{ top: -9999, left: -9999, width: CARD_WIDTH }}
-            onMouseEnter={clearTimers}
+            onMouseEnter={keepOpen}
             onMouseLeave={scheduleClose}
             onMouseDown={stopCellEvent}
             onMouseUp={stopCellEvent}

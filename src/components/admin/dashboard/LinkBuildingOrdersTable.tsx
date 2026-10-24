@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { flushSync } from "react-dom";
-import type { LinkBuildingOrderRow } from "@/types/admin/link-building-order";
+import type { LinkBuildingOrderRow, LinkBuildingRecentDomainUsage } from "@/types/admin/link-building-order";
 import { useTableSort } from "@/hooks/useTableSort";
 import {
   useSheetColumnFilters,
@@ -123,6 +123,7 @@ import {
   isSiteRemovedAlert,
 } from "@/lib/link-building-order-statuses";
 import FindHighlightedText from "./FindHighlightedText";
+import RecentDomainUsageCard from "./RecentDomainUsageCard";
 import {
   getRecentDomainUsageAlert,
   recentDomainUsageByRowId,
@@ -800,11 +801,13 @@ interface EditableCellProps {
    */
   article_fallback_title?: string;
   /**
-   * Set, the cell is highlighted in red with this explanation as its tooltip.
-   * Used by the Partnership cell when the domain was already used for the row's
-   * landing page in the last months.
+   * Partnership cells only: earlier use of the domain for the row's landing page.
+   * Set, the cell is highlighted in red and a warning card explains why on hover
+   * or while the cell is selected.
    */
-  alert_message?: string | null;
+  recent_domain_usage?: LinkBuildingRecentDomainUsage | null;
+  /** Partnership cells only: the row's Landing Page, named in the warning card. */
+  landing_page?: string;
 }
 
 function EditableCell({
@@ -839,7 +842,8 @@ function EditableCell({
   formula_enabled = false,
   formula_ref_color,
   article_fallback_title,
-  alert_message = null,
+  recent_domain_usage = null,
+  landing_page = "",
 }: EditableCellProps) {
   const input_ref = useRef<HTMLInputElement>(null);
   const is_mac = useIsMacPlatform();
@@ -1098,6 +1102,8 @@ function EditableCell({
   const shown_value = formula_display ?? value;
   const is_formula_cell = formula_display !== undefined;
   // The Article cell previews its doc's title in a card, which replaces the cell's tooltip.
+  // Read for screen readers, the card shows the same warning to sighted users.
+  const alert_message = getRecentDomainUsageAlert({ partnership: value, recent_domain_usage });
   const has_article_preview =
     article_fallback_title !== undefined &&
     /^https?:\/\//i.test(value) &&
@@ -1128,7 +1134,7 @@ function EditableCell({
           className={alert_message ? "font-semibold text-red-700 hover:underline dark:text-red-300" : "text-blue-500 hover:underline"}
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
-          title={alert_message ? `${value}\n${alert_message}` : value}
+          title={value}
         >
           <FindHighlightedText text={label} find_terms={find_terms} />
           {value.replace(/^https?:\/\//, "").length > 28 ? "…" : ""}
@@ -1136,7 +1142,7 @@ function EditableCell({
       );
     } else {
       display = (
-        <span title={alert_message ? `${value}\n${alert_message}` : value}>
+        <span title={value}>
           <FindHighlightedText text={value} find_terms={find_terms} />
         </span>
       );
@@ -1187,7 +1193,7 @@ function EditableCell({
 
   return (
     <td
-      ref={has_article_preview ? setDisplayCellEl : undefined}
+      ref={has_article_preview || has_alert ? setDisplayCellEl : undefined}
       data-cell-key={cell_key}
       className={`group/cell relative select-none whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 ${styles.cell}${
         col.type === "number" ? ` ${styles.cell_numeric}` : ""
@@ -1220,13 +1226,11 @@ function EditableCell({
       onMouseUp={onCellMouseUp}
       onDoubleClick={onCellDoubleClick}
       title={
-        has_article_preview
+        has_article_preview || has_alert
           ? undefined
           : is_required_error
             ? `Required: ${col.label} must be filled to save this row`
-            : has_alert
-              ? `${alert_message} · Double click, Enter or start typing to edit`
-              : formula_error
+            : formula_error
               ? `${formula_error.code}: ${formula_error.detail}`
               : is_formula_cell
                 ? "Formula cell, its formula shows in the formula bar · Double click or Enter to edit it"
@@ -1246,13 +1250,21 @@ function EditableCell({
             <svg className="h-3 w-3 shrink-0 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
             </svg>
-            <span className="sr-only">Recently used domain.</span>
+            <span className="sr-only">{alert_message}</span>
             <span className="min-w-0 truncate">{display}</span>
           </span>
         ) : (
           display
         )}
       </div>
+      {has_alert && recent_domain_usage && (
+        <RecentDomainUsageCard
+          usage={recent_domain_usage}
+          landing_page={landing_page}
+          anchor_el={display_cell_el}
+          is_active={is_active && !is_range_selected}
+        />
+      )}
       {onCopy && shown_value && !is_required_error && (
         <button
           className={`absolute right-0.5 top-1/2 -translate-y-1/2 rounded p-0.5 opacity-0 transition-all group-hover:opacity-20 group-hover/cell:opacity-70 hover:!opacity-100 hover:bg-white dark:hover:bg-gray-700 ${just_copied ? "!opacity-100 text-green-500" : "text-gray-400"
@@ -6670,7 +6682,8 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                             find_match_state={find_match_state}
                             find_terms={find_match_state ? find_terms : undefined}
                             article_fallback_title={col.key === "article" ? row.article_title ?? "" : undefined}
-                            alert_message={col.key === "partnership" && !is_new ? getRecentDomainUsageAlert(row) : null}
+                            recent_domain_usage={col.key === "partnership" && !is_new ? row.recent_domain_usage : null}
+                            landing_page={col.key === "partnership" ? row.landing_page : undefined}
                           />
                         );
                       })}

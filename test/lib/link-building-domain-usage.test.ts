@@ -5,6 +5,7 @@
  */
 
 import {
+  describeRecentDomainUsageRule,
   getRecentDomainUsageAlert,
   recentDomainUsageByRowId,
   withRecentDomainUsage,
@@ -68,5 +69,17 @@ describe("recentDomainUsageByRowId and withRecentDomainUsage", () => {
 
   it("handles a response without rows", () => {
     expect(withRecentDomainUsage(recentDomainUsageByRowId(undefined), "any")).toEqual({});
+  });
+});
+
+describe("describeRecentDomainUsageRule", () => {
+  it("explains the window and the statuses that are not counted", () => {
+    expect(describeRecentDomainUsageRule(3)).toBe(
+      "Shown when another order used the same domain for the same landing page within 3 months before this row's Request Date. Cancelled, Rejected and Not Approved orders are not counted."
+    );
+  });
+
+  it("uses the singular for a one month window", () => {
+    expect(describeRecentDomainUsageRule(1)).toContain("within 1 month before");
   });
 });

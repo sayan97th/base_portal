@@ -41,3 +41,13 @@ export function withRecentDomainUsage(
 ): { recent_domain_usage?: LinkBuildingRecentDomainUsage | null } {
   return usage_by_row_id.has(row_id) ? { recent_domain_usage: usage_by_row_id.get(row_id) ?? null } : {};
 }
+
+/** Statuses of orders that never placed a link, mirrors IGNORED_STATUSES of LinkBuildingDomainUsageService. */
+export const RECENT_DOMAIN_USAGE_IGNORED_STATUSES = ["Cancelled", "Rejected", "Not Approved"];
+
+/** How the warning is decided, shown at the bottom of the warning card. */
+export function describeRecentDomainUsageRule(window_months: number): string {
+  const window_label = window_months === 1 ? "1 month" : `${window_months} months`;
+  const ignored = RECENT_DOMAIN_USAGE_IGNORED_STATUSES.join(", ").replace(/, ([^,]*)$/, " and $1");
+  return `Shown when another order used the same domain for the same landing page within ${window_label} before this row's Request Date. ${ignored} orders are not counted.`;
+}
