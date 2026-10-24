@@ -160,3 +160,67 @@ it("explains when the order is not a Link Building order", async () => {
 
   expect(await screen.findByText("Original order details are kept for Link Building orders only.")).toBeInTheDocument();
 });
+
+describe("order summary", () => {
+  it("shows the customer, billing, coupons and the invoice it has now", async () => {
+    const snapshot = makeSnapshot();
+    snapshot.payload.coupons = [{ code: "WEAVE10", discount_type: "percentage", discount_value: 10, discount_amount: 60 }];
+    snapshot.payload.billing = { company: "Weave", address: "1 Main St", city: "Lehi", state: "UT", country: "US", postal_code: "84043" };
+    mockGetOriginal.mockResolvedValue(makeDetails({
+      snapshots: [snapshot],
+      invoice: { invoice_number: "INV-1001", status: "paid", payment_method: "Credit Card" },
+    }));
+    render(<AdminOriginalOrderContent order_id="order-1" />);
+    await screen.findByText("other fatigue icd 10");
+
+    expect(screen.getByText("buyer@getweave.com")).toBeInTheDocument();
+    expect(screen.getByText("Coupon WEAVE10")).toBeInTheDocument();
+    expect(screen.getByText("-$60.00")).toBeInTheDocument();
+    expect(screen.getByText("Lehi, UT, 84043")).toBeInTheDocument();
+    expect(screen.getByText("INV-1001 paid")).toBeInTheDocument();
+    expect(screen.getByText("Please prioritize")).toBeInTheDocument();
+  });
+
+  it("says when nothing changed since the copy", async () => {
+    const snapshot = makeSnapshot();
+    const [first, second] = snapshot.payload.items[0].placements;
+    mockGetOriginal.mockResolvedValue(makeDetails({
+      snapshots: [snapshot],
+      current_placements: { p1: { ...first }, p2: { ...second } },
+    }));
+    render(<AdminOriginalOrderContent order_id="order-1" />);
+
+    expect(await screen.findByText("No placement was changed since this copy.")).toBeInTheDocument();
+    expect(screen.queryByText(/^Now:/)).not.toBeInTheDocument();
+  });
+
+  it("names who submitted later details", async () => {
+    mockGetOriginal.mockResolvedValue(makeDetails({
+      snapshots: [makeSnapshot({ type: "details_submitted", captured_by: { id: 3, name: "Weave Buyer" } })],
+    }));
+    render(<AdminOriginalOrderContent order_id="order-1" />);
+
+    expect(await screen.findByText(/by Weave Buyer, after checkout/)).toBeInTheDocument();
+  });
+
+  it("explains when the order has no original copy", async () => {
+    mockGetOriginal.mockResolvedValue(makeDetails({ snapshots: [] }));
+    render(<AdminOriginalOrderContent order_id="order-1" />);
+
+    expect(await screen.findByText(/No original copy is available for this order/)).toBeInTheDocument();
+  });
+
+  it("shows a general error when the copy cannot be loaded", async () => {
+    mockGetOriginal.mockRejectedValue({ status_code: 500 });
+    render(<AdminOriginalOrderContent order_id="order-1" />);
+
+    expect(await screen.findByText("We couldn't load the original order. Please try again.")).toBeInTheDocument();
+  });
+
+  it("links back to the order", async () => {
+    mockGetOriginal.mockResolvedValue(makeDetails());
+    render(<AdminOriginalOrderContent order_id="order-1" />);
+
+    expect(await screen.findByRole("link", { name: /Back to Order/ })).toHaveAttribute("href", "/admin/orders/order-1");
+  });
+});

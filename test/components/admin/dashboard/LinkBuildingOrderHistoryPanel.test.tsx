@@ -253,3 +253,122 @@ it("closes on Escape", async () => {
 
   expect(onClose).toHaveBeenCalled();
 });
+
+describe("edge states", () => {
+  it("describes rows that an action added or deleted", async () => {
+    mockBatch.mockResolvedValue({
+      data: [
+        { ...paste_revision, id: 21, event: "deleted", changes: [], snapshot: { client: "Weave", keyword: "other fatigue icd 10" } },
+        { ...paste_revision, id: 22, event: "created", order_id: "BL-9", changes: [], snapshot: { client: "Mather", keyword: "senior living" } },
+      ],
+      meta: { per_page: 100, has_more: false, next_after_id: null },
+    });
+    renderPanel();
+    await screen.findByText("2 cells");
+
+    fireEvent.click(screen.getByRole("button", { name: "Details" }));
+
+    expect(await screen.findByText("Row deleted")).toBeInTheDocument();
+    expect(screen.getByText("Weave · other fatigue icd 10")).toBeInTheDocument();
+    expect(screen.getByText("Row added")).toBeInTheDocument();
+    expect(screen.getByText("Mather · senior living")).toBeInTheDocument();
+  });
+
+  it("says when and by whom an action was restored", async () => {
+    mockList.mockResolvedValue({
+      data: [{ ...paste_batch, restored: { restored_at: new Date().toISOString(), user: { id: 9, name: "Abby Allan" } } }],
+      meta: list_meta,
+    });
+    renderPanel();
+
+    expect(await screen.findByText(/^Restored at .* by Abby Allan$/)).toBeInTheDocument();
+  });
+
+  it("offers to retry when the history cannot be loaded", async () => {
+    mockList.mockRejectedValueOnce(new Error("offline"));
+    renderPanel();
+
+    expect(await screen.findByText(/The history could not be loaded/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    expect(await screen.findByText("2 cells")).toBeInTheDocument();
+  });
+
+  it("lists the rows a restore had to leave out", async () => {
+    mockRestore.mockResolvedValue({
+      ...restored_result,
+      skipped: [{ placement_id: "p9", order_id: "BL-25687", field: "order_id", reason: "order_id_in_use" }],
+      skipped_count: 3,
+    });
+    renderPanel();
+    await screen.findByText("2 cells");
+
+    fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+    confirmRestore(/to how they were before this paste/);
+
+    expect(await screen.findByText("BL-25687: its Order ID is now used by another row, so it was not restored.")).toBeInTheDocument();
+    expect(screen.getByText("and 2 more rows that could not be restored.")).toBeInTheDocument();
+  });
+
+  it("shows why a restore failed and leaves the table alone", async () => {
+    mockRestore.mockRejectedValue({ message: "Change not found in the history." });
+    const { onRestored } = renderPanel();
+    await screen.findByText("2 cells");
+
+    fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+    confirmRestore(/to how they were before this paste/);
+
+    expect(await screen.findByText("Change not found in the history.")).toBeInTheDocument();
+    expect(onRestored).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when the restore is cancelled", async () => {
+    renderPanel();
+    await screen.findByText("2 cells");
+
+    fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByText(/to how they were before this paste/)).not.toBeInTheDocument();
+    expect(mockRestore).not.toHaveBeenCalled();
+  });
+
+  it("searches the history by Order ID", async () => {
+    renderPanel();
+    await screen.findByText("2 cells");
+
+    fireEvent.change(screen.getByLabelText("Order ID"), { target: { value: "BL-25730" } });
+
+    await waitFor(() => expect(mockList).toHaveBeenLastCalledWith(expect.objectContaining({ order_id: "BL-25730" })));
+  });
+
+  it("explains how to bring back a deleted row from its history", async () => {
+    mockRowHistory.mockResolvedValue({
+      data: [{ ...paste_revision, order_id: "BL-25687", event: "deleted", changes: [], snapshot: { client: "Weave" } }],
+      meta: list_meta,
+      order_id: "BL-25687",
+      is_deleted: true,
+    });
+    renderPanel({ row_id: "p1" });
+
+    expect(await screen.findByText("This row was deleted. Restore its deletion to bring it back.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+    expect(screen.getByText("Bring BL-25687 back to the table with the values it had when it was deleted?")).toBeInTheDocument();
+  });
+
+  it("says when there is nothing to show", async () => {
+    mockList.mockResolvedValue({ data: [], meta: list_meta });
+    renderPanel();
+
+    expect(await screen.findByText("No changes match these filters.")).toBeInTheDocument();
+  });
+
+  it("renders nothing while closed", () => {
+    renderPanel({ is_open: false });
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(mockList).not.toHaveBeenCalled();
+  });
+});
