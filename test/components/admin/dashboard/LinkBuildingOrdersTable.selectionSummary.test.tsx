@@ -245,12 +245,12 @@ describe("LinkBuildingOrdersTable: selection summary visibility", () => {
     expect(querySummaryButton()).not.toBeInTheDocument();
   });
 
-  it("appears for a dragged range, in the footer next to the page controls", async () => {
+  it("appears for a dragged range, in the status footer under the grid", async () => {
     const grid = await renderTable([row1, row2, row3]);
 
     dragSelect(cellWithText(grid, "47"), cellWithText(grid, "13"));
 
-    const footer = screen.getByText("Rows per page").closest("label")!.parentElement!;
+    const footer = screen.getByRole("group", { name: "Table status" });
     expect(within(footer).getByRole("button", { name: /^Sum:\s*60$/ })).toBeInTheDocument();
   });
 

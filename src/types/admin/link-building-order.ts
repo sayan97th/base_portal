@@ -103,6 +103,22 @@ export interface LinkBuildingOrdersResponse {
   total: number;
   from: number | null;
   to: number | null;
+  /** Every matching row in display order, sent when the request sets include_row_index. */
+  row_index?: LinkBuildingOrderRowIndex;
+}
+
+/**
+ * Ids of every row matching the filters, in display order, with each row's version
+ * (its updated_at as a unix timestamp) at the same position. Lets the dashboard load
+ * the whole result set in batches and reuse rows it already holds unchanged.
+ */
+export interface LinkBuildingOrderRowIndex {
+  ids: string[];
+  versions: number[];
+}
+
+export interface LinkBuildingOrderRowsResponse {
+  data: LinkBuildingOrderRow[];
 }
 
 export interface LinkBuildingOrderMutationResponse {
@@ -225,6 +241,8 @@ export interface LinkBuildingOrderQuickFilterValuesResponse {
 export interface LinkBuildingOrderSearchBody {
   page?: number;
   per_page?: number;
+  /** Also return the ids and versions of every matching row, see LinkBuildingOrderRowIndex. */
+  include_row_index?: boolean;
   search?: string;
   status?: string;
   link_type?: string;
@@ -239,28 +257,6 @@ export interface LinkBuildingOrderSearchBody {
   sort_rules?: SortRulePayload[];
   column_filters?: ColumnFilterPayload[];
   advanced_filters?: AdvancedFiltersPayload;
-}
-
-// ── In-table find (Ctrl/Cmd+F) ─────────────────────────────────────────────────
-
-export interface LinkBuildingOrderFindPagesBody extends LinkBuildingOrderSearchBody {
-  /** Normalized find terms, a row matches when any of its cells contains any term. */
-  find_terms: string[];
-  /** Visible columns to look through, computed only columns are ignored by the API. */
-  find_columns?: string[];
-}
-
-/** One page of the current result set holding rows that match the find terms. */
-export interface LinkBuildingOrderFindPage {
-  page: number;
-  row_count: number;
-}
-
-export interface LinkBuildingOrderFindPagesResponse {
-  /** Only pages with matches, ascending. */
-  pages: LinkBuildingOrderFindPage[];
-  matched_row_count: number;
-  total_rows: number;
 }
 
 // ── Saved filters ──────────────────────────────────────────────────────────────

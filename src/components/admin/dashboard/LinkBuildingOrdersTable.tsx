@@ -47,7 +47,6 @@ import {
   saveFilterPreference,
 } from "@/services/admin/link-building-saved-filters.service";
 import {
-  listLinkBuildingOrders,
   createLinkBuildingOrder,
   updateLinkBuildingOrder,
   deleteLinkBuildingOrder,
@@ -104,7 +103,8 @@ import {
 } from "@/lib/spreadsheet-navigation";
 import { useResizableColumnWidths } from "@/hooks/useResizableColumnWidths";
 import { useTableFind, type TableFindMatch, type TableFindMatchState } from "@/hooks/useTableFind";
-import { useLinkBuildingOrderFindPages } from "@/hooks/useLinkBuildingOrderFindPages";
+import { useVirtualRows, VIRTUAL_ROW_ATTRIBUTE } from "@/hooks/useVirtualRows";
+import { createOrderRowCache, loadAllLinkBuildingOrderRows } from "@/lib/link-building-order-rows-loader";
 import TableFindBar from "./TableFindBar";
 import KeyboardShortcutsDialog from "./KeyboardShortcutsDialog";
 import { formatShortcut } from "@/lib/keyboard-shortcuts";
@@ -113,7 +113,7 @@ import NeedsApprovalToggle from "./NeedsApprovalToggle";
 import ActiveFiltersBar, { type ActiveFilterChip } from "./ActiveFiltersBar";
 import ColumnVisibilityPanel, { type ColumnVisibilityGroup } from "./ColumnVisibilityPanel";
 import SelectionStatsBar from "./SelectionStatsBar";
-import TablePagination from "./TablePagination";
+import TableStatusFooter from "./TableStatusFooter";
 import {
   LINK_BUILDING_ORDER_STATUSES,
   STATUS_BADGE_CLASSES,
@@ -554,11 +554,12 @@ function getRowMissingRequired(row: LinkBuildingOrderRow): string[] {
 // ── Draft persistence (localStorage) ──────────────────────────────────────────
 
 const DRAFT_STORAGE_KEY = "lbo_row_drafts_v1";
-const PER_PAGE_STORAGE_KEY = "lbo_per_page_v1";
 /** How long the view must stay unchanged before it is saved to the user's account. */
 const VIEW_AUTOSAVE_DELAY_MS = 800;
-const PER_PAGE_OPTIONS = [10, 25, 50, 100, 150, 200, 250, 500] as const;
-type PerPageOption = (typeof PER_PAGE_OPTIONS)[number];
+/** Height of a grid row, kept in sync with $row_height in LinkBuildingOrdersTable.module.scss. */
+const GRID_ROW_HEIGHT = 34;
+/** How long the rows of a new result set play their enter animation. */
+const BODY_ENTER_ANIMATION_MS = 700;
 
 type DraftRowData = Omit<LinkBuildingOrderRow, "id">;
 
@@ -1478,6 +1479,17 @@ const KNOWN_COLUMN_KEYS: ReadonlySet<string> = new Set(COLUMNS.map((col) => col.
 /** Column keys a saved view may hide: the table columns and the formula columns ("formula_{id}"). */
 const VIEW_COLUMN_KEYS = { has: (key: string) => KNOWN_COLUMN_KEYS.has(key) || isFormulaColumnKey(key) };
 
+// ── Row windowing spacer ───────────────────────────────────────────────────────
+
+/** Empty row standing in for the rows above or below the rendered window. */
+function VirtualRowsSpacer({ height, col_span }: { height: number; col_span: number }) {
+  return (
+    <tr aria-hidden="true" className={styles.virtual_rows_spacer}>
+      <td colSpan={col_span} style={{ height }} />
+    </tr>
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMutated?: () => void }) {
@@ -1515,20 +1527,16 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   const [applied_saved_filter_id, setAppliedSavedFilterId] = useState<string | null>(null);
   /** False until the user's auto saved view is loaded, rows are not fetched before that. */
   const [is_view_restored, setIsViewRestored] = useState(false);
-  const [current_page, setCurrentPage] = useState(1);
-  const [last_page, setLastPage] = useState(1);
+  /** Rows matching the filters on the server, drafts not included. */
   const [total, setTotal] = useState(0);
-  const [from_row, setFromRow] = useState<number | null>(null);
-  const [to_row, setToRow] = useState<number | null>(null);
-  const [per_page, setPerPage] = useState<PerPageOption>(() => {
-    if (typeof window === "undefined") return 50;
-    const saved = localStorage.getItem(PER_PAGE_STORAGE_KEY);
-    if (saved) {
-      const parsed = parseInt(saved, 10) as PerPageOption;
-      if ((PER_PAGE_OPTIONS as readonly number[]).includes(parsed)) return parsed;
-    }
-    return 50;
-  });
+  /**
+   * True while the rest of the result set is still arriving after the first rows.
+   * The grid can already be used, but totals and formulas that read other rows wait
+   * for the whole set so they never show a partial result.
+   */
+  const [is_loading_more_rows, setIsLoadingMoreRows] = useState(false);
+  /** Rows reused across loads when their version did not change, see link-building-order-rows-loader. */
+  const row_cache_ref = useRef(createOrderRowCache());
 
   // ── Batch editing ───────────────────────────────────────────────────────────
   const [selected_row_ids, setSelectedRowIds] = useState<Set<string>>(new Set());
@@ -1622,14 +1630,13 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   const rows_ref = useRef<LinkBuildingOrderRow[]>([]);
   rows_ref.current = rows;
 
-  const per_page_ref = useRef<PerPageOption>(per_page);
-  per_page_ref.current = per_page;
-
   const editing_cell_ref = useRef<{ row_id: string; col_key: string } | null>(null);
   editing_cell_ref.current = editing_cell;
 
   const new_row_ids_ref = useRef<Set<string>>(new Set());
   const drafts_restored_ref = useRef(false);
+  /** Drafts restored from this browser on the first load, until checked against the server rows. */
+  const restored_draft_ids_ref = useRef<Set<string>>(new Set());
   const select_all_ref = useRef<HTMLInputElement>(null);
 
   // Refs for keyboard shortcut handler (avoids stale closures)
@@ -1823,44 +1830,103 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
   // ── Fetch ───────────────────────────────────────────────────────────────────
 
-  const fetchRows = useCallback(async (page: number, body: LinkBuildingOrderSearchBody) => {
+  /**
+   * A draft restored from this browser whose order is already on the server (it was
+   * saved, but the browser was closed before its draft was cleared) is dropped once
+   * the whole result set is known, instead of showing the same order twice.
+   */
+  const dropAlreadySavedDrafts = useCallback(() => {
+    const restored_ids = restored_draft_ids_ref.current;
+    if (restored_ids.size === 0) return;
+    restored_draft_ids_ref.current = new Set();
+
+    // Read through the updater, the last appended rows may not have rendered yet.
+    setRows((current_rows) => {
+      const server_order_ids = new Set(
+        current_rows.filter((row) => !restored_ids.has(row.id)).map((row) => row.order_id)
+      );
+      const saved_draft_ids = new Set(
+        current_rows
+          .filter((row) => restored_ids.has(row.id) && server_order_ids.has(row.order_id))
+          .map((row) => row.id)
+      );
+      if (saved_draft_ids.size === 0) return current_rows;
+
+      saved_draft_ids.forEach((id) => new_row_ids_ref.current.delete(id));
+      const remaining_rows = current_rows.filter((row) => !saved_draft_ids.has(row.id));
+      saveDraftsToStorage(remaining_rows.filter((row) => new_row_ids_ref.current.has(row.id)));
+      return remaining_rows;
+    });
+  }, []);
+
+  /**
+   * Loads every row matching the filters into the grid. The first rows replace the
+   * current result set as soon as they arrive, the rest are appended in display
+   * order while the grid is already usable. Drafts not saved yet stay on top.
+   */
+  const fetchRows = useCallback(async (body: LinkBuildingOrderSearchBody) => {
     const request_id = ++fetch_request_id_ref.current;
     const isStale = () => request_id !== fetch_request_id_ref.current;
+    let has_first_rows = false;
 
     setIsLoading(true);
+    setIsLoadingMoreRows(false);
     setSaveError(null);
     try {
-      const res = await listLinkBuildingOrders({ ...body, page, per_page: per_page_ref.current });
-      if (isStale()) return;
-      setCurrentPage(res.current_page);
-      setLastPage(res.last_page);
-      setTotal(res.total);
-      setFromRow(res.from);
-      setToRow(res.to);
+      await loadAllLinkBuildingOrderRows({
+        body,
+        cache: row_cache_ref.current,
+        isCancelled: isStale,
+        onFirstRows: (first_rows, server_total) => {
+          has_first_rows = true;
+          setTotal(server_total);
+          setIsLoadingMoreRows(first_rows.length < server_total);
 
-      if (!drafts_restored_ref.current) {
-        drafts_restored_ref.current = true;
-        const saved_drafts = loadDrafts();
-        const server_order_ids = new Set(res.data.map((r) => r.order_id));
-        const restored = saved_drafts.filter((d) => !server_order_ids.has(d.order_id));
-        restored.forEach((d) => new_row_ids_ref.current.add(d.id));
-        setRows([...restored, ...res.data]);
-      } else {
-        setRows(res.data);
-      }
-      setRowsVersion((version) => version + 1);
-      // A new result set starts from its first row, not from wherever the previous one was scrolled.
-      table_scroll_ref.current?.scrollTo({ top: 0 });
+          // Drafts kept in this browser come back on the first load only.
+          let restored_drafts: LinkBuildingOrderRow[] = [];
+          if (!drafts_restored_ref.current) {
+            drafts_restored_ref.current = true;
+            restored_drafts = loadDrafts();
+            restored_drafts.forEach((draft) => new_row_ids_ref.current.add(draft.id));
+            restored_draft_ids_ref.current = new Set(restored_drafts.map((draft) => draft.id));
+          }
+          setRows((prev) => [
+            ...restored_drafts,
+            ...prev.filter((row) => new_row_ids_ref.current.has(row.id)),
+            ...first_rows,
+          ]);
+          setRowsVersion((version) => version + 1);
+          setIsLoading(false);
+          setHasLoadedOnce(true);
+          // A new result set starts from its first row, not from wherever the previous one was scrolled.
+          table_scroll_ref.current?.scrollTo({ top: 0 });
+        },
+        onMoreRows: (more_rows) => {
+          setRows((prev) => {
+            // A row created by another admin meanwhile may already be on top.
+            const known_ids = new Set(prev.map((row) => row.id));
+            const new_rows = more_rows.filter((row) => !known_ids.has(row.id));
+            return new_rows.length > 0 ? [...prev, ...new_rows] : prev;
+          });
+        },
+      });
+      if (isStale()) return;
+      dropAlreadySavedDrafts();
     } catch {
       if (isStale()) return;
-      setSaveError("Failed to load link building orders. Please refresh.");
+      setSaveError(
+        has_first_rows
+          ? "Some link building orders could not be loaded, the table is incomplete. Please refresh."
+          : "Failed to load link building orders. Please refresh."
+      );
     } finally {
       if (!isStale()) {
         setIsLoading(false);
+        setIsLoadingMoreRows(false);
         setHasLoadedOnce(true);
       }
     }
-  }, []);
+  }, [dropAlreadySavedDrafts]);
 
   // Set when a restored view has text filters, so the first fetch waits for their
   // debounced copies to catch up instead of loading the unfiltered table first.
@@ -1908,9 +1974,9 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     }
 
     current_body_ref.current = search_body;
-    fetchRows(1, search_body);
+    fetchRows(search_body);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [is_view_restored, search_body, per_page]);
+  }, [is_view_restored, search_body]);
 
   // ── Derived state ───────────────────────────────────────────────────────────
 
@@ -1979,8 +2045,8 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   // The loaded rows as a recalculating spreadsheet. Column letters are fixed per
   // column (hiding one does not shift the others), row numbers follow the gutter.
 
-  /** Row number shown in the gutter for the first loaded row. */
-  const row_number_offset = from_row ?? 1;
+  /** Row number shown in the gutter for the first row, every matching row is loaded so it is always 1. */
+  const row_number_offset = 1;
 
   const sheet_columns = useMemo<SheetColumn[]>(
     () => [...BASE_SHEET_COLUMNS, ...formula_columns.map((column) => ({ key: column.key, kind: "text" as const }))],
@@ -1998,20 +2064,25 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     [column_mapper]
   );
 
+  // Looked up once per cell by formulas and find, a map keeps that fast over every row.
+  const client_user_by_id = useMemo(() => new Map(client_users.map((user) => [user.id, user])), [client_users]);
+  const admin_user_by_id = useMemo(() => new Map(admin_users.map((user) => [user.id, user])), [admin_users]);
+
   /** Text an assignment cell shows, so formulas read the client or team member name, not the id. */
   const getAssignmentText = useCallback(
     (row: LinkBuildingOrderRow, col_key: string): string | null => {
       if (col_key === "user_id") {
-        const client = client_users.find((u) => row.user_id != null && u.id === Number(row.user_id));
+        const client = row.user_id != null ? client_user_by_id.get(Number(row.user_id)) : undefined;
         return client ? client.company || client.name : "";
       }
       if (col_key === "assigned_admin_user_id") {
-        const admin = admin_users.find((u) => row.assigned_admin_user_id != null && u.id === Number(row.assigned_admin_user_id));
+        const admin =
+          row.assigned_admin_user_id != null ? admin_user_by_id.get(Number(row.assigned_admin_user_id)) : undefined;
         return admin ? admin.name : "";
       }
       return null;
     },
-    [client_users, admin_users]
+    [client_user_by_id, admin_user_by_id]
   );
 
   const sheet_config = useMemo<OrdersSheetConfig>(
@@ -2061,19 +2132,31 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   );
 
   /** Totals cell under a column: the result of its formula over the loaded rows. */
-  const getSummaryDisplay = useCallback(
-    (col_key: string): { text: string; error: FormulaError | null; is_numeric: boolean } | null => {
-      const formula = summary_formulas[col_key];
-      if (!formula) return null;
+  // Evaluated once per sheet rather than on every render, a total reads the whole column.
+  const summary_displays = useMemo(() => {
+    const displays = new Map<string, { text: string; error: FormulaError | null; is_numeric: boolean }>();
+    for (const [col_key, formula] of Object.entries(summary_formulas)) {
+      if (!formula) continue;
+      // A total over part of the rows would look final, so it waits for the rest.
+      if (is_loading_more_rows) {
+        displays.set(col_key, { text: "Loading...", error: null, is_numeric: false });
+        continue;
+      }
       const result = sheet.evaluate(formula, filtered_rows.length);
       const format = formula_column_by_key.get(col_key)?.format ?? "auto";
-      return {
+      displays.set(col_key, {
         text: formatComputedResult(result, format, SHEET_KIND_BY_KEY.get(col_key) ?? "text"),
         error: result.value instanceof FormulaError ? result.value : null,
         is_numeric: typeof result.value === "number",
-      };
-    },
-    [summary_formulas, sheet, filtered_rows.length, formula_column_by_key]
+      });
+    }
+    return displays;
+  }, [summary_formulas, sheet, filtered_rows.length, formula_column_by_key, is_loading_more_rows]);
+
+  const getSummaryDisplay = useCallback(
+    (col_key: string): { text: string; error: FormulaError | null; is_numeric: boolean } | null =>
+      summary_displays.get(col_key) ?? null,
+    [summary_displays]
   );
 
   /**
@@ -2380,29 +2463,85 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     table_scroll_ref.current?.focus({ preventScroll: true });
   }, []);
 
-  /** Scrolls a cell into view, clear of the sticky header and the frozen columns. */
+  // ── Row windowing ───────────────────────────────────────────────────────────
+  // Every matching row is loaded, but only the rows around the viewport are in the
+  // DOM. Spacers stand in for the others, so scrolling feels like one long sheet.
+
+  const table_scroll_ref = useRef<HTMLDivElement | null>(null);
+  /** The scroll container as state too, so the row window subscribes once it mounts. */
+  const [grid_scroll_element, setGridScrollElement] = useState<HTMLDivElement | null>(null);
+  const setTableScrollNode = useCallback((node: HTMLDivElement | null) => {
+    table_scroll_ref.current = node;
+    setGridScrollElement(node);
+  }, []);
+
+  const {
+    start_index: rendered_start_index,
+    end_index: rendered_end_index,
+    padding_top: rows_padding_top,
+    padding_bottom: rows_padding_bottom,
+    scrollRowIntoView,
+  } = useVirtualRows({
+    scroll_element: grid_scroll_element,
+    row_count: filtered_rows.length,
+    row_height: GRID_ROW_HEIGHT,
+  });
+  const rendered_rows = useMemo(
+    () => filtered_rows.slice(rendered_start_index, rendered_end_index),
+    [filtered_rows, rendered_start_index, rendered_end_index]
+  );
+
+  /** Rows that came from the server, unsaved drafts left out, for the loading progress. */
+  const loaded_server_row_count = useMemo(
+    () => filtered_rows.reduce((count, row) => (new_row_ids_ref.current.has(row.id) ? count : count + 1), 0),
+    [filtered_rows]
+  );
+
+  // A new result set fades in, but rows scrolled into the window later must not,
+  // so the enter animation is only applied for a moment after each new result set.
+  const [settled_rows_version, setSettledRowsVersion] = useState(-1);
+  useEffect(() => {
+    const timer = setTimeout(() => setSettledRowsVersion(rows_version), BODY_ENTER_ANIMATION_MS);
+    return () => clearTimeout(timer);
+  }, [rows_version]);
+  const is_body_entering = settled_rows_version !== rows_version;
+
+  /**
+   * Scrolls a cell into view, clear of the sticky header and the frozen columns.
+   * A cell of a row outside the rendered window is not in the DOM yet: its row is
+   * scrolled to first, and the cell is aligned once it has rendered.
+   */
   const scrollToCell = useCallback(
     (cell: CellRef) => {
-      const container = table_scroll_ref.current;
-      if (!container) return;
-      const cell_el = container.querySelector<HTMLElement>(
-        `[data-cell-key="${CSS.escape(toCellKey(cell.row_id, cell.col_key))}"]`
-      );
-      if (!cell_el) return;
-      const header_height = container.querySelector("thead")?.getBoundingClientRect().height ?? 0;
-      // The totals row is pinned to the bottom, so data rows must stop above it.
-      // The totals row itself is always visible and needs no inset.
-      const footer_height =
-        cell.row_id === SUMMARY_ROW_ID ? 0 : container.querySelector("tfoot")?.getBoundingClientRect().height ?? 0;
-      const is_frozen_column = COLUMNS.some((col) => col.key === cell.col_key && col.sticky);
-      scrollCellIntoView(
-        container,
-        cell_el,
-        { top: header_height, left: frozen_columns_width, bottom: footer_height },
-        is_frozen_column
-      );
+      const alignCell = (attempts_left: number) => {
+        const container = table_scroll_ref.current;
+        if (!container) return;
+        const cell_el = container.querySelector<HTMLElement>(
+          `[data-cell-key="${CSS.escape(toCellKey(cell.row_id, cell.col_key))}"]`
+        );
+        if (!cell_el) {
+          const row_idx = row_index_by_id.get(cell.row_id);
+          if (row_idx === undefined || attempts_left === 0) return;
+          scrollRowIntoView(row_idx);
+          requestAnimationFrame(() => alignCell(attempts_left - 1));
+          return;
+        }
+        const header_height = container.querySelector("thead")?.getBoundingClientRect().height ?? 0;
+        // The totals row is pinned to the bottom, so data rows must stop above it.
+        // The totals row itself is always visible and needs no inset.
+        const footer_height =
+          cell.row_id === SUMMARY_ROW_ID ? 0 : container.querySelector("tfoot")?.getBoundingClientRect().height ?? 0;
+        const is_frozen_column = COLUMNS.some((col) => col.key === cell.col_key && col.sticky);
+        scrollCellIntoView(
+          container,
+          cell_el,
+          { top: header_height, left: frozen_columns_width, bottom: footer_height },
+          is_frozen_column
+        );
+      };
+      alignCell(3);
     },
-    [frozen_columns_width]
+    [row_index_by_id, scrollRowIntoView, frozen_columns_width]
   );
 
   /** Makes a cell the active cell, dropping any range selection, like a plain click in Sheets. */
@@ -2417,20 +2556,19 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   );
 
   // ── Find in table (Ctrl/Cmd+F) ───────────────────────────────────────────────
-  // Highlights every matching cell on the loaded page instead of filtering rows
-  // out like the server side search does, so matches can be compared in context.
+  // Highlights every matching cell of the whole result set instead of filtering
+  // rows out like the server side search does, so matches can be compared in context.
 
   /** Text a cell shows, assignment cells resolve their ids to the displayed names. */
   const getFindCellText = useCallback(
     (row: LinkBuildingOrderRow, col_key: string): string => {
       if (col_key === "user_id") {
-        const client = client_users.find((u) => row.user_id != null && u.id === Number(row.user_id));
+        const client = row.user_id != null ? client_user_by_id.get(Number(row.user_id)) : undefined;
         return client ? [client.company, client.name].filter(Boolean).join(" ") : "";
       }
       if (col_key === "assigned_admin_user_id") {
-        const admin = admin_users.find(
-          (u) => row.assigned_admin_user_id != null && u.id === Number(row.assigned_admin_user_id)
-        );
+        const admin =
+          row.assigned_admin_user_id != null ? admin_user_by_id.get(Number(row.assigned_admin_user_id)) : undefined;
         return admin ? `${admin.name} ${admin.email}` : "";
       }
       // Formula cells are found by the value they show.
@@ -2443,7 +2581,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       }
       return String(row[col_key as keyof LinkBuildingOrderRow] ?? "");
     },
-    [client_users, admin_users, row_index_by_id, formula_column_by_key, getFormulaColumnDisplay, getDataCellFormulaDisplay]
+    [client_user_by_id, admin_user_by_id, row_index_by_id, formula_column_by_key, getFormulaColumnDisplay, getDataCellFormulaDisplay]
   );
 
   const getFindRowId = useCallback((row: LinkBuildingOrderRow) => row.id, []);
@@ -2458,32 +2596,6 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     [scrollToCell]
   );
 
-  // Formula columns only exist in the browser, the server looks through the stored columns.
-  const server_find_column_keys = useMemo(
-    () => grid_column_keys.filter((col_key) => !isFormulaColumnKey(col_key)),
-    [grid_column_keys]
-  );
-
-  // The terms come from useTableFind below, but the pages holding matches are
-  // needed by it too, so the API lookup reads them back through this state.
-  const [find_lookup_terms, setFindLookupTerms] = useState<string[]>([]);
-
-  const {
-    pages: find_match_pages,
-    pages_with_matches: find_pages_with_matches,
-    matched_row_count: find_matched_row_count,
-    is_loading: is_finding_pages,
-    has_error: has_find_pages_error,
-  } = useLinkBuildingOrderFindPages({
-    find_terms: find_lookup_terms,
-    find_columns: server_find_column_keys,
-    search_body,
-    per_page,
-    refresh_key: rows_version,
-  });
-
-  const goToFindPage = useCallback((page: number) => fetchRows(page, current_body_ref.current), [fetchRows]);
-
   const {
     is_find_open,
     find_query,
@@ -2492,13 +2604,11 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     matches: find_matches,
     matched_row_ids: find_matched_row_ids,
     current_match_idx: find_current_match_idx,
-    is_changing_page: is_find_changing_page,
     setFindQuery,
     openFind,
     closeFind,
     goToNextMatch,
     goToPreviousMatch,
-    goToMatchPage,
     getCellMatchState,
   } = useTableFind({
     rows: filtered_rows,
@@ -2506,17 +2616,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     getRowId: getFindRowId,
     getCellText: getFindCellText,
     onNavigateToMatch: navigateToFindMatch,
-    pagination: {
-      current_page,
-      pages_with_matches: find_pages_with_matches,
-      onGoToPage: goToFindPage,
-    },
   });
-
-  // find_terms keeps its identity until the query changes, so this only runs then.
-  if (find_lookup_terms !== find_terms) setFindLookupTerms(find_terms);
-
-  const handleGoToFindPage = useCallback((page: number) => goToMatchPage(page, "first"), [goToMatchPage]);
 
   const handleCloseFind = useCallback(() => {
     closeFind();
@@ -3294,13 +3394,6 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
 
   const search_input_ref = useRef<HTMLInputElement>(null);
 
-  const handlePerPageChange = useCallback((option: PerPageOption) => {
-    setPerPage(option);
-    if (typeof window !== "undefined") {
-      localStorage.setItem(PER_PAGE_STORAGE_KEY, String(option));
-    }
-  }, []);
-
   // ── Batch selection ─────────────────────────────────────────────────────────
 
   const clearSelection = useCallback(() => {
@@ -3330,11 +3423,22 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     setCopyingColumnKey(col_key);
     setSaveError(null);
     try {
-      const values = await getLinkBuildingOrderColumnValues(
-        col_key,
-        current_body_ref.current,
-        selected_row_ids.size > 0 ? Array.from(selected_row_ids) : undefined
-      );
+      // Once every matching row is in the grid the copy reads them directly, with no
+      // row limit and exactly the values on screen. While rows are still arriving the
+      // server lists them instead.
+      const values = is_loading_more_rows
+        ? await getLinkBuildingOrderColumnValues(
+            col_key,
+            current_body_ref.current,
+            selected_row_ids.size > 0 ? Array.from(selected_row_ids) : undefined
+          )
+        : rows_ref.current
+            .filter(
+              (row) =>
+                !new_row_ids_ref.current.has(row.id) && (selected_row_ids.size === 0 || selected_row_ids.has(row.id))
+            )
+            .map((row) => String(row[col_key] ?? ""))
+            .filter((value) => value.trim() !== "");
       await navigator.clipboard.writeText(values.join("\n"));
 
       const col_label = COLUMNS.find((c) => c.key === col_key)?.label ?? String(col_key);
@@ -3349,7 +3453,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     } finally {
       setCopyingColumnKey(null);
     }
-  }, [selected_row_ids]);
+  }, [selected_row_ids, is_loading_more_rows]);
 
   // ── Spreadsheet style column filter menu ───────────────────────────────────
 
@@ -3803,8 +3907,10 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     const recalculated_cells = collectStaleFormulaCells(next_rows, recalculated, SHEET_KIND_BY_KEY, (row) =>
       target_row_ids.has(row.id)
     );
+    const next_row_index_by_id = new Map(next_rows.map((row, row_idx) => [row.id, row_idx]));
     recalculated_cells.forEach((stale) => {
-      const row_idx = next_rows.findIndex((r) => r.id === stale.row_id);
+      const row_idx = next_row_index_by_id.get(stale.row_id);
+      if (row_idx === undefined) return;
       next_rows[row_idx] = { ...next_rows[row_idx], [stale.col_key]: stale.value };
     });
 
@@ -4497,7 +4603,6 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   const [show_add_menu, setShowAddMenu] = useState(false);
   const [custom_row_count, setCustomRowCount] = useState("5");
   const add_btn_ref = useRef<HTMLDivElement>(null);
-  const table_scroll_ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!show_add_menu) return;
@@ -4529,7 +4634,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   }, [show_import_menu]);
 
   const handleImportComplete = useCallback(() => {
-    fetchRows(1, current_body_ref.current);
+    fetchRows(current_body_ref.current);
     refreshFilterCounts();
   }, [fetchRows, refreshFilterCounts]);
 
@@ -4750,7 +4855,8 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   /** Full value of the active cell for the formula bar (long values are truncated in the grid). */
   const active_cell_value = useMemo(() => {
     if (!active_cell) return "";
-    const row = filtered_rows.find((r) => r.id === active_cell.row_id);
+    const row_idx = row_index_by_id.get(active_cell.row_id);
+    const row = row_idx === undefined ? undefined : filtered_rows[row_idx];
     if (!row) return "";
     if (active_cell.col_key === "user_id") {
       const client = client_users.find((u) => row.user_id != null && u.id === Number(row.user_id));
@@ -4763,7 +4869,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       return admin ? admin.name : "";
     }
     return String(row[active_cell.col_key as keyof LinkBuildingOrderRow] ?? "");
-  }, [active_cell, filtered_rows, client_users, admin_users]);
+  }, [active_cell, filtered_rows, row_index_by_id, client_users, admin_users]);
 
   const active_column_label = active_cell
     ? (COLUMN_LABELS[active_cell.col_key] ??
@@ -4826,7 +4932,8 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   const synced_formula_values_ref = useRef(new Set<string>());
 
   useEffect(() => {
-    if (!has_loaded_once || is_loading) return;
+    // Formulas reading other rows are only final once every row is in.
+    if (!has_loaded_once || is_loading || is_loading_more_rows) return;
     const stale_cells = collectStaleFormulaCells(
       filtered_rows,
       sheet,
@@ -4868,7 +4975,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       }
     }, FORMULA_SYNC_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [has_loaded_once, is_loading, filtered_rows, sheet, editing_cell, saving_row_ids]);
+  }, [has_loaded_once, is_loading, is_loading_more_rows, filtered_rows, sheet, editing_cell, saving_row_ids]);
 
   // ── Formula editing helpers ─────────────────────────────────────────────────
 
@@ -6218,16 +6325,11 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
           match_count={find_matches.length}
           current_match_idx={find_current_match_idx}
           input_ref={find_input_ref}
-          current_page={current_page}
-          match_pages={find_match_pages}
-          matched_row_count={find_matched_row_count}
-          is_searching_pages={is_finding_pages}
-          has_pages_error={has_find_pages_error}
-          is_changing_page={is_find_changing_page && is_loading}
+          matched_row_count={find_matched_row_ids.size}
+          is_loading_more_rows={is_loading_more_rows}
           onQueryChange={setFindQuery}
           onNext={goToNextMatch}
           onPrevious={goToPreviousMatch}
-          onGoToPage={handleGoToFindPage}
           onClose={handleCloseFind}
         />
       )}
@@ -6242,7 +6344,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         {/* Indeterminate bar shown over the grid while a filter, sort or page change loads */}
         <div className={styles.refresh_bar} aria-hidden="true" />
         <div
-          ref={table_scroll_ref}
+          ref={setTableScrollNode}
           tabIndex={0}
           role="grid"
           aria-label="Link building orders spreadsheet"
@@ -6540,7 +6642,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                 </th>
               </tr>
             </thead>
-            <tbody key={rows_version} className={styles.grid_body_enter}>
+            <tbody key={rows_version} className={is_body_entering ? styles.grid_body_enter : undefined}>
               {filtered_rows.length === 0 ? (
                 <tr>
                   <td
@@ -6553,7 +6655,10 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                   </td>
                 </tr>
               ) : (
-                filtered_rows.map((row, row_idx) => {
+                <>
+                {rows_padding_top > 0 && <VirtualRowsSpacer height={rows_padding_top} col_span={grid_column_keys.length + 3} />}
+                {rendered_rows.map((row, rendered_idx) => {
+                  const row_idx = rendered_start_index + rendered_idx;
                   const is_saving = saving_row_ids.has(row.id);
                   const is_new = new_row_ids_ref.current.has(row.id);
                   const is_multi_selected = selected_row_ids.has(row.id);
@@ -6580,6 +6685,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                   return (
                     <tr
                       key={row.id}
+                      {...{ [VIRTUAL_ROW_ATTRIBUTE]: row_idx }}
                       onClick={() => {
                         if (!is_new) setSelectedRowId(row.id);
                       }}
@@ -6824,10 +6930,12 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                       </td>
                     </tr>
                   );
-                })
+                })}
+                {rows_padding_bottom > 0 && <VirtualRowsSpacer height={rows_padding_bottom} col_span={grid_column_keys.length + 3} />}
+                </>
               )}
             </tbody>
-            {/* Totals row: one formula per column over the rows loaded on this page, e.g.
+            {/* Totals row: one formula per column over every row matching the filters, e.g.
                 =SUM(AA:AA) under Final Price. Shared by the whole team. */}
             {show_summary_row && (
               <tfoot className={styles.summary_footer}>
@@ -6967,22 +7075,15 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         />
       )}
 
-      {/* Footer: row range, rows per page and page numbers */}
-      <TablePagination
+      {/* Footer: rows loaded out of the matching ones, columns shown and the selection summary */}
+      <TableStatusFooter
         is_loading={is_loading}
         has_loaded_once={has_loaded_once}
         total={total}
-        from_row={from_row}
-        to_row={to_row}
-        page_row_count={filtered_rows.length}
+        loaded_row_count={loaded_server_row_count}
+        is_loading_more_rows={is_loading_more_rows}
         visible_column_count={visible_columns.length}
         total_column_count={COLUMNS.length}
-        current_page={current_page}
-        last_page={last_page}
-        per_page={per_page}
-        per_page_options={PER_PAGE_OPTIONS}
-        onPageChange={(page) => fetchRows(page, current_body_ref.current)}
-        onPerPageChange={(option) => handlePerPageChange(option as PerPageOption)}
         selection_summary={<SelectionStatsBar stats={range_stats} cell_count={range_badge?.n_cells ?? 0} />}
       />
     </div>

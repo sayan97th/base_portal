@@ -490,6 +490,14 @@ $toolbar_focus_ring: rgba(236, 60, 137, 0.12);
       border-color: $grid_line_dark;
     }
   }
+
+  // Stands in for the rows outside the rendered window (see useVirtualRows), its
+  // height is set inline to the height of the rows it replaces.
+  tbody .virtual_rows_spacer > td {
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
 }
 
 // ── Column letters (A, B, C) and row numbers ───────────────────────────────────

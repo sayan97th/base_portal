@@ -1,34 +1,23 @@
 import React from "react";
 import { getFindTermColorIdx, joinFindTerms, toSingleLineFindQuery } from "@/lib/table-find";
-import type { LinkBuildingOrderFindPage } from "@/types/admin/link-building-order";
 import styles from "./LinkBuildingOrdersTable.module.scss";
-
-/** Page buttons listed before the rest collapse into "+N more". */
-const MAX_LISTED_MATCH_PAGES = 12;
 
 interface TableFindBarProps {
   query: string;
   /** Normalized terms parsed from `query`, one colored chip each. */
   find_terms: string[];
-  /** Matching cells on the loaded page. */
+  /** Matching cells across every loaded row. */
   match_count: number;
   /** Zero based index of the current match, -1 when there are no matches. */
   current_match_idx: number;
   input_ref: React.RefObject<HTMLInputElement | null>;
-  current_page: number;
-  /** Pages of the whole result set holding matching rows, ascending. */
-  match_pages: LinkBuildingOrderFindPage[];
-  /** Rows matching across every page. */
+  /** Rows with at least one matching cell. */
   matched_row_count: number;
-  /** True while the pages holding matches are still being looked up. */
-  is_searching_pages: boolean;
-  has_pages_error: boolean;
-  /** True while find is loading another page to land on its matches. */
-  is_changing_page: boolean;
+  /** True while the rest of the result set is still arriving, so more matches may follow. */
+  is_loading_more_rows: boolean;
   onQueryChange: (value: string) => void;
   onNext: () => void;
   onPrevious: () => void;
-  onGoToPage: (page: number) => void;
   onClose: () => void;
 }
 
@@ -36,7 +25,7 @@ interface TableFindBarProps {
  * Compact "Find in page" bar for the Link Building Orders grid. It highlights the
  * matching cells and never filters rows out. Several terms (comma separated, or a
  * pasted column of order ids) are highlighted together, each with its own color,
- * and Enter keeps going through the matches on the other pages.
+ * and Enter goes through the matches of every row matching the filters.
  */
 export default function TableFindBar({
   query,
@@ -44,23 +33,15 @@ export default function TableFindBar({
   match_count,
   current_match_idx,
   input_ref,
-  current_page,
-  match_pages,
   matched_row_count,
-  is_searching_pages,
-  has_pages_error,
-  is_changing_page,
+  is_loading_more_rows,
   onQueryChange,
   onNext,
   onPrevious,
-  onGoToPage,
   onClose,
 }: TableFindBarProps) {
   const has_query = find_terms.length > 0;
-  const other_match_pages = match_pages.filter((match_page) => match_page.page !== current_page);
-  const can_navigate = match_count > 0 || other_match_pages.length > 0;
-  const listed_match_pages = match_pages.slice(0, MAX_LISTED_MATCH_PAGES);
-  const hidden_match_page_count = match_pages.length - listed_match_pages.length;
+  const can_navigate = match_count > 0;
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
@@ -107,9 +88,8 @@ export default function TableFindBar({
 
   const counter_text = (() => {
     if (!has_query) return "";
-    if (match_count > 0) return `${current_match_idx + 1} of ${match_count} on this page`;
-    if (is_searching_pages || is_changing_page) return "Searching...";
-    if (other_match_pages.length > 0) return "None on this page";
+    if (match_count > 0) return `${current_match_idx + 1} of ${match_count.toLocaleString()}`;
+    if (is_loading_more_rows) return "Searching...";
     return "No matches";
   })();
 
@@ -208,40 +188,10 @@ export default function TableFindBar({
       </div>
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-500 dark:text-gray-400">
-        {has_query && match_pages.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1">
-            <span>
-              {matched_row_count} matching {matched_row_count === 1 ? "order" : "orders"} on{" "}
-              {match_pages.length === 1 ? "page" : "pages"}
-            </span>
-            {listed_match_pages.map((match_page) => {
-              const is_current_page = match_page.page === current_page;
-              return (
-                <button
-                  key={match_page.page}
-                  type="button"
-                  onClick={() => onGoToPage(match_page.page)}
-                  disabled={is_current_page}
-                  aria-current={is_current_page ? "page" : undefined}
-                  title={`Page ${match_page.page}, ${match_page.row_count} matching ${
-                    match_page.row_count === 1 ? "order" : "orders"
-                  }`}
-                  className={`h-5 min-w-[20px] rounded px-1.5 font-medium tabular-nums transition ${
-                    is_current_page
-                      ? "cursor-default bg-amber-400 text-white dark:bg-amber-500"
-                      : "bg-white text-amber-700 ring-1 ring-inset ring-amber-300 hover:bg-amber-100 dark:bg-gray-800 dark:text-amber-400 dark:ring-amber-800 dark:hover:bg-amber-950/40"
-                  }`}
-                >
-                  {match_page.page}
-                </button>
-              );
-            })}
-            {hidden_match_page_count > 0 && <span>+{hidden_match_page_count} more</span>}
-          </div>
-        )}
-        {has_query && has_pages_error && (
-          <span className="text-red-500 dark:text-red-400">
-            Could not look through the other pages, showing matches on this page only.
+        {has_query && matched_row_count > 0 && (
+          <span>
+            {matched_row_count.toLocaleString()} matching {matched_row_count === 1 ? "order" : "orders"}
+            {is_loading_more_rows ? ", more rows are still loading" : ""}
           </span>
         )}
         <span className="text-gray-400 dark:text-gray-500">

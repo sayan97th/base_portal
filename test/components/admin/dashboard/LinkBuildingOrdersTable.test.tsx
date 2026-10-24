@@ -18,6 +18,7 @@ import { render, screen, waitFor, fireEvent, within } from "@testing-library/rea
 import LinkBuildingOrdersTable from "@/components/admin/dashboard/LinkBuildingOrdersTable";
 import {
   listLinkBuildingOrders,
+  getLinkBuildingOrderRowsByIds,
   updateLinkBuildingOrder,
   listAdminUsersForSelect,
   listClientUsersForSelect,
@@ -33,6 +34,7 @@ import {
   saveFilterPreference,
 } from "@/services/admin/link-building-saved-filters.service";
 import { EMPTY_FILTER_STATE } from "@/lib/link-building-saved-filters";
+import { FIRST_ROWS_COUNT } from "@/lib/link-building-order-rows-loader";
 import type { LinkBuildingOrderRow, LinkBuildingOrderSavedFilter } from "@/types/admin/link-building-order";
 
 // ─── Module mocks ────────────────────────────────────────────────────────────
@@ -42,6 +44,7 @@ jest.mock("@/services/admin/link-building-dashboard.service", () => {
   return {
     ...actual,
     listLinkBuildingOrders:      jest.fn(),
+    getLinkBuildingOrderRowsByIds: jest.fn(),
     createLinkBuildingOrder:     jest.fn(),
     updateLinkBuildingOrder:     jest.fn(),
     deleteLinkBuildingOrder:     jest.fn(),
@@ -125,6 +128,7 @@ const mockUpdateLinkBuildingOrder = updateLinkBuildingOrder as jest.MockedFuncti
 const mockListAdminUsersForSelect = listAdminUsersForSelect as jest.MockedFunction<typeof listAdminUsersForSelect>;
 const mockListClientUsersForSelect = listClientUsersForSelect as jest.MockedFunction<typeof listClientUsersForSelect>;
 const mockBatchUpdateLinkBuildingOrderCells = batchUpdateLinkBuildingOrderCells as jest.MockedFunction<typeof batchUpdateLinkBuildingOrderCells>;
+const mockGetLinkBuildingOrderRowsByIds = getLinkBuildingOrderRowsByIds as jest.MockedFunction<typeof getLinkBuildingOrderRowsByIds>;
 const mockGetLinkBuildingOrderColumnValues = getLinkBuildingOrderColumnValues as jest.MockedFunction<typeof getLinkBuildingOrderColumnValues>;
 const mockGetLinkBuildingOrderFilterValues = getLinkBuildingOrderFilterValues as jest.MockedFunction<typeof getLinkBuildingOrderFilterValues>;
 const mockGetLinkBuildingOrderQuickFilterValues = getLinkBuildingOrderQuickFilterValues as jest.MockedFunction<typeof getLinkBuildingOrderQuickFilterValues>;
@@ -1058,14 +1062,58 @@ describe("LinkBuildingOrdersTable — copy entire column", () => {
     });
   });
 
-  it("copies every value in the column to the clipboard, respecting the current filters", async () => {
-    const row = makeRow({ id: "uuid-1", order_id: "BL-1", landing_page: "https://acme.com" });
-    await renderTableWithRow(row);
+  it("copies every value of the column from the loaded rows, which already follow the current filters", async () => {
+    const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", landing_page: "https://acme.com" });
+    const row2 = makeRow({ id: "uuid-2", order_id: "BL-2", landing_page: "https://globex.com" });
+    const row3 = makeRow({ id: "uuid-3", order_id: "BL-3", landing_page: "" });
+    mockListLinkBuildingOrders.mockResolvedValue(mockSearchResponse([row1, row2, row3]));
+    render(<LinkBuildingOrdersTable />);
+    await screen.findByText("BL-1");
 
-    mockGetLinkBuildingOrderColumnValues.mockResolvedValue([
-      "https://acme.com",
-      "https://globex.com",
-    ]);
+    fireEvent.click(
+      screen.getByTitle(/Copy all "Landing Page" values matching the current filters/i)
+    );
+
+    await waitFor(() =>
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("https://acme.com\nhttps://globex.com")
+    );
+    await screen.findByText(/Copied 2 values from "Landing Page"/i);
+    // Every matching row is already in the grid, so no row limited server copy is needed.
+    expect(mockGetLinkBuildingOrderColumnValues).not.toHaveBeenCalled();
+  });
+
+  it("restricts the copy to the checked rows instead of the current filters when rows are selected", async () => {
+    const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", landing_page: "https://acme.com" });
+    const row2 = makeRow({ id: "uuid-2", order_id: "BL-2", landing_page: "https://globex.com" });
+    mockListLinkBuildingOrders.mockResolvedValue(mockSearchResponse([row1, row2]));
+    render(<LinkBuildingOrdersTable />);
+    await screen.findByText("BL-1");
+
+    // Checkbox index 0 is the header "select all"; index 1 is the first row's.
+    fireEvent.click(screen.getAllByRole("checkbox")[1]);
+
+    const copy_button = await screen.findByTitle(
+      /Copy all "Landing Page" values from the 1 selected row/i
+    );
+    fireEvent.click(copy_button);
+
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith("https://acme.com"));
+    expect(mockGetLinkBuildingOrderColumnValues).not.toHaveBeenCalled();
+  });
+
+  it("asks the server for the values while the rest of the rows are still loading", async () => {
+    const rows = Array.from({ length: FIRST_ROWS_COUNT + 1 }, (_, idx) =>
+      makeRow({ id: `uuid-${idx + 1}`, order_id: `BL-${idx + 1}`, landing_page: `https://site-${idx + 1}.com` })
+    );
+    mockListLinkBuildingOrders.mockResolvedValue({
+      ...mockSearchResponse(rows.slice(0, FIRST_ROWS_COUNT)),
+      total: rows.length,
+      row_index: { ids: rows.map((row) => row.id), versions: rows.map(() => 1) },
+    });
+    mockGetLinkBuildingOrderRowsByIds.mockReturnValue(new Promise(() => {}));
+    mockGetLinkBuildingOrderColumnValues.mockResolvedValue(["https://site-1.com"]);
+    render(<LinkBuildingOrdersTable />);
+    await screen.findByText("BL-1");
 
     fireEvent.click(
       screen.getByTitle(/Copy all "Landing Page" values matching the current filters/i)
@@ -1075,37 +1123,12 @@ describe("LinkBuildingOrdersTable — copy entire column", () => {
     const [column, , row_ids] = mockGetLinkBuildingOrderColumnValues.mock.calls[0];
     expect(column).toBe("landing_page");
     expect(row_ids).toBeUndefined();
-
-    await waitFor(() =>
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("https://acme.com\nhttps://globex.com")
-    );
-    await screen.findByText(/Copied 2 values from "Landing Page"/i);
-  });
-
-  it("restricts the copy to the checked rows instead of the current filters when rows are selected", async () => {
-    const row = makeRow({ id: "uuid-1", order_id: "BL-1", landing_page: "https://acme.com" });
-    await renderTableWithRow(row);
-
-    mockGetLinkBuildingOrderColumnValues.mockResolvedValue(["https://acme.com"]);
-
-    // Checkbox index 0 is the header "select all"; index 1 is this single row's.
-    fireEvent.click(screen.getAllByRole("checkbox")[1]);
-
-    const copy_button = await screen.findByTitle(
-      /Copy all "Landing Page" values from the 1 selected row/i
-    );
-    fireEvent.click(copy_button);
-
-    await waitFor(() => expect(mockGetLinkBuildingOrderColumnValues).toHaveBeenCalledTimes(1));
-    const [, , row_ids] = mockGetLinkBuildingOrderColumnValues.mock.calls[0];
-    expect(row_ids).toEqual(["uuid-1"]);
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith("https://site-1.com"));
   });
 
   it("shows a friendly message instead of a blank copy when the column has no values", async () => {
     const row = makeRow({ id: "uuid-1", order_id: "BL-1", landing_page: "" });
     await renderTableWithRow(row);
-
-    mockGetLinkBuildingOrderColumnValues.mockResolvedValue([]);
 
     fireEvent.click(
       screen.getByTitle(/Copy all "Landing Page" values matching the current filters/i)

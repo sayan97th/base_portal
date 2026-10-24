@@ -8,8 +8,7 @@ import type {
   LinkBuildingOrderSearchBody,
   LinkBuildingOrderFilterValuesResponse,
   LinkBuildingOrderQuickFilterValuesResponse,
-  LinkBuildingOrderFindPagesBody,
-  LinkBuildingOrderFindPagesResponse,
+  LinkBuildingOrderRowsResponse,
   ArticleDocTitle,
 } from "@/types/admin/link-building-order";
 
@@ -171,6 +170,7 @@ export async function getLinkBuildingOrderQuickFilterValues(
 /**
  * POST /api/admin/link-building-orders/search
  * Returns a paginated, filtered, and sorted list of link building order rows.
+ * With include_row_index it also lists every matching row id, see loadAllLinkBuildingOrderRows.
  */
 export async function listLinkBuildingOrders(
   body: LinkBuildingOrderSearchBody = {}
@@ -182,20 +182,13 @@ export async function listLinkBuildingOrders(
 }
 
 /**
- * POST /api/admin/link-building-orders/find-pages
- * Pages of the current filtered and sorted result set that hold rows matching
- * the in-table find terms. Rows are never filtered out, so find can jump to
- * matches on other pages while every other order stays visible.
+ * POST /api/admin/link-building-orders/rows
+ * Dashboard rows by id, in the order given (at most 1000 per request). Ids deleted
+ * in the meantime are left out of the response.
  */
-export async function findLinkBuildingOrderPages(
-  body: LinkBuildingOrderFindPagesBody
-): Promise<LinkBuildingOrderFindPagesResponse> {
-  const { page: _page, ...request_body } = body;
-
-  return apiClient.post<LinkBuildingOrderFindPagesResponse>(
-    "/api/admin/link-building-orders/find-pages",
-    request_body
-  );
+export async function getLinkBuildingOrderRowsByIds(ids: string[]): Promise<LinkBuildingOrderRow[]> {
+  const res = await apiClient.post<LinkBuildingOrderRowsResponse>("/api/admin/link-building-orders/rows", { ids });
+  return res.data;
 }
 
 /**
