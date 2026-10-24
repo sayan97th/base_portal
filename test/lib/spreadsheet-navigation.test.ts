@@ -8,12 +8,15 @@
 import {
   computeRangeStats,
   formatDateMMDDYYYY,
+  getAvailableRangeStats,
+  getRangeStatValue,
   getTabPosition,
   insertTextAtSelection,
   isInsertDateShortcut,
   isPrintableKey,
   moveGridPosition,
   parseNumericCell,
+  pickRangeStat,
   scrollCellIntoView,
   toCellAddress,
   toColumnLetter,
@@ -125,11 +128,53 @@ describe("parseNumericCell / computeRangeStats", () => {
       numeric_count: 2,
       sum: 30,
       average: 15,
+      min: 10,
+      max: 20,
     });
   });
 
-  it("returns a null average when nothing is numeric", () => {
-    expect(computeRangeStats(["Live", " "]).average).toBeNull();
+  it("tracks the min and max of negative numbers", () => {
+    const stats = computeRangeStats(["-5", "3", "-12.5"]);
+    expect(stats.min).toBe(-12.5);
+    expect(stats.max).toBe(3);
+  });
+
+  it("returns a null average, min and max when nothing is numeric", () => {
+    const stats = computeRangeStats(["Live", " "]);
+    expect(stats.average).toBeNull();
+    expect(stats.min).toBeNull();
+    expect(stats.max).toBeNull();
+  });
+});
+
+describe("selection summary statistics", () => {
+  const numeric_stats = computeRangeStats(["10", "$20", "Live"]);
+  const text_stats = computeRangeStats(["Live", "Pending", ""]);
+
+  it("reads each statistic of a range", () => {
+    expect(getRangeStatValue(numeric_stats, "sum")).toBe(30);
+    expect(getRangeStatValue(numeric_stats, "average")).toBe(15);
+    expect(getRangeStatValue(numeric_stats, "min")).toBe(10);
+    expect(getRangeStatValue(numeric_stats, "max")).toBe(20);
+    expect(getRangeStatValue(numeric_stats, "count")).toBe(3);
+    expect(getRangeStatValue(numeric_stats, "count_numbers")).toBe(2);
+  });
+
+  it("offers only the counts when no cell is numeric", () => {
+    expect(getRangeStatValue(text_stats, "sum")).toBeNull();
+    expect(getAvailableRangeStats(text_stats)).toEqual(["count", "count_numbers"]);
+    expect(getAvailableRangeStats(numeric_stats)).toEqual(["sum", "average", "min", "max", "count", "count_numbers"]);
+  });
+
+  it("shows Sum for numbers and Count for text by default", () => {
+    expect(pickRangeStat(numeric_stats, null)).toBe("sum");
+    expect(pickRangeStat(text_stats, null)).toBe("count");
+  });
+
+  it("keeps the picked statistic while it applies", () => {
+    expect(pickRangeStat(numeric_stats, "max")).toBe("max");
+    expect(pickRangeStat(text_stats, "count_numbers")).toBe("count_numbers");
+    expect(pickRangeStat(text_stats, "average")).toBe("count");
   });
 });
 

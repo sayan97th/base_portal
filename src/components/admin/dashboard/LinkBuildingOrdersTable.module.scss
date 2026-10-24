@@ -370,32 +370,7 @@ $toolbar_focus_ring: rgba(236, 60, 137, 0.12);
 
 // ── Formula bar extras ─────────────────────────────────────────────────────────
 // The formula bar itself lives in SpreadsheetFormulas.module.scss, these are the
-// range totals and badges the table shows on its right.
-
-.range_stats {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 14px;
-  padding: 0 12px;
-  border-left: 1px solid $grid_line;
-  color: $header_text;
-  white-space: nowrap;
-
-  strong {
-    font-weight: 600;
-    color: #1f1f1f;
-  }
-
-  @include dark {
-    border-left-color: $grid_line_dark;
-    color: $header_text_dark;
-
-    strong {
-      color: #e5e7eb;
-    }
-  }
-}
+// badges the table shows on its right.
 
 // Contextual badges (range size, copied value) on the right of the formula bar.
 .formula_badges {

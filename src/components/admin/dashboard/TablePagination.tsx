@@ -17,6 +17,8 @@ interface TablePaginationProps {
   per_page_options: readonly number[];
   onPageChange: (page: number) => void;
   onPerPageChange: (per_page: number) => void;
+  /** Summary of the selected cells (Sum, Count...), shown first on the right like the Google Sheets status bar. */
+  selection_summary?: React.ReactNode;
 }
 
 /**
@@ -38,7 +40,7 @@ export function buildPageItems(current_page: number, last_page: number): (number
   return items;
 }
 
-/** Footer of the Link Building Orders table: row range, rows per page and page numbers. */
+/** Footer of the Link Building Orders table: row range, selection summary, rows per page and page numbers. */
 export default function TablePagination({
   is_loading,
   has_loaded_once,
@@ -54,6 +56,7 @@ export default function TablePagination({
   per_page_options,
   onPageChange,
   onPerPageChange,
+  selection_summary,
 }: TablePaginationProps) {
   const nav_button_class =
     "flex h-8 min-w-8 items-center justify-center rounded-lg border border-gray-200 bg-white px-2 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700";
@@ -81,6 +84,7 @@ export default function TablePagination({
       </p>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        {selection_summary}
         <label className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
           Rows per page
           <select

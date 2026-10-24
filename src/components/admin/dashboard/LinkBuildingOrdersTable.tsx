@@ -112,6 +112,7 @@ import { useIsMacPlatform } from "@/hooks/useIsMacPlatform";
 import NeedsApprovalToggle from "./NeedsApprovalToggle";
 import ActiveFiltersBar, { type ActiveFilterChip } from "./ActiveFiltersBar";
 import ColumnVisibilityPanel, { type ColumnVisibilityGroup } from "./ColumnVisibilityPanel";
+import SelectionStatsBar from "./SelectionStatsBar";
 import TablePagination from "./TablePagination";
 import {
   LINK_BUILDING_ORDER_STATUSES,
@@ -4726,7 +4727,6 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       "")
     : "";
 
-  /** Count / Sum / Average for a multi-cell selection, like the Sheets status bar. */
   /** Size of the active multi cell range, shown as a badge in the formula bar. */
   const range_badge = useMemo(() => {
     if (!cell_range || !range_bounds) return null;
@@ -4735,6 +4735,11 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     return { n_rows, n_cols, n_cells: n_rows * n_cols };
   }, [cell_range, range_bounds]);
 
+  /**
+   * Sum / Average / Min / Max / Count of a multi cell selection, for the Sheets
+   * style status bar under the table. Reads what each cell shows, so formula
+   * results count as their value.
+   */
   const range_stats = useMemo(() => {
     if (!range_bounds) return null;
     const is_single_cell =
@@ -4746,11 +4751,11 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       if (!row) continue;
       for (let c = range_bounds.min_col; c <= range_bounds.max_col; c++) {
         const col = visible_columns[c];
-        if (col) values.push(String(row[col.key] ?? ""));
+        if (col) values.push(getCellCopyText({ row_id: row.id, col_key: col.key }) ?? "");
       }
     }
     return computeRangeStats(values);
-  }, [range_bounds, filtered_rows, visible_columns]);
+  }, [range_bounds, filtered_rows, visible_columns, getCellCopyText]);
 
   const active_position = active_cell ? toGridPosition(active_cell) : null;
 
@@ -6090,17 +6095,6 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
           onOpenFunctions={(anchor_el) => setFunctionsAnchorEl((current) => (current ? null : anchor_el))}
           input_ref={formula_bar_input_ref}
         >
-          {range_stats && (
-            <div className={styles.range_stats}>
-              <span>Count: <strong>{range_stats.count}</strong></span>
-              {range_stats.numeric_count > 0 && (
-                <>
-                  <span>Sum: <strong>{range_stats.sum.toLocaleString(undefined, { maximumFractionDigits: 2 })}</strong></span>
-                  <span>Average: <strong>{(range_stats.average ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</strong></span>
-                </>
-              )}
-            </div>
-          )}
           {(range_badge || clipboard_cell) && (
             <div className={styles.formula_badges}>
               {/* Range selection badge, shows while a drag or Shift+Click multi cell range is active */}
@@ -6942,6 +6936,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
         per_page_options={PER_PAGE_OPTIONS}
         onPageChange={(page) => fetchRows(page, current_body_ref.current)}
         onPerPageChange={(option) => handlePerPageChange(option as PerPageOption)}
+        selection_summary={<SelectionStatsBar stats={range_stats} cell_count={range_badge?.n_cells ?? 0} />}
       />
     </div>
     </FormulaEditingContext.Provider>

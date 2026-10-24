@@ -144,7 +144,56 @@ export interface RangeStats {
   /** Cells whose value parses as a number. */
   numeric_count: number;
   sum: number;
+  /** Null when nothing in the range is numeric, as are min and max. */
   average: number | null;
+  min: number | null;
+  max: number | null;
+}
+
+/** Statistics the selection summary can show, in the order of the Google Sheets status bar menu. */
+export const RANGE_STAT_KEYS = ["sum", "average", "min", "max", "count", "count_numbers"] as const;
+
+export type RangeStatKey = (typeof RANGE_STAT_KEYS)[number];
+
+export const RANGE_STAT_LABELS: Record<RangeStatKey, string> = {
+  sum: "Sum",
+  average: "Average",
+  min: "Min",
+  max: "Max",
+  count: "Count",
+  count_numbers: "Count Numbers",
+};
+
+/** Value of one statistic, null when it does not apply (a Sum over text only cells). */
+export function getRangeStatValue(stats: RangeStats, key: RangeStatKey): number | null {
+  switch (key) {
+    case "count":
+      return stats.count;
+    case "count_numbers":
+      return stats.numeric_count;
+    case "sum":
+      return stats.numeric_count > 0 ? stats.sum : null;
+    case "average":
+      return stats.average;
+    case "min":
+      return stats.min;
+    case "max":
+      return stats.max;
+  }
+}
+
+/** Statistics worth offering for a range: only the counts when nothing in it is numeric. */
+export function getAvailableRangeStats(stats: RangeStats): RangeStatKey[] {
+  return RANGE_STAT_KEYS.filter((key) => getRangeStatValue(stats, key) !== null);
+}
+
+/**
+ * Statistic shown in the selection summary. Like Google Sheets, the one the user
+ * picked last wins while it applies, otherwise Sum for numbers and Count for text.
+ */
+export function pickRangeStat(stats: RangeStats, preferred_key: RangeStatKey | null): RangeStatKey {
+  if (preferred_key && getRangeStatValue(stats, preferred_key) !== null) return preferred_key;
+  return stats.numeric_count > 0 ? "sum" : "count";
 }
 
 /**
@@ -159,11 +208,13 @@ export function parseNumericCell(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-/** Count / Sum / Average for a set of cell values, like the Google Sheets status bar. */
+/** Count / Sum / Average / Min / Max for a set of cell values, like the Google Sheets status bar. */
 export function computeRangeStats(values: ReadonlyArray<string>): RangeStats {
   let count = 0;
   let numeric_count = 0;
   let sum = 0;
+  let min: number | null = null;
+  let max: number | null = null;
 
   for (const value of values) {
     if (value.trim() === "") continue;
@@ -172,9 +223,11 @@ export function computeRangeStats(values: ReadonlyArray<string>): RangeStats {
     if (numeric_value === null) continue;
     numeric_count += 1;
     sum += numeric_value;
+    min = min === null ? numeric_value : Math.min(min, numeric_value);
+    max = max === null ? numeric_value : Math.max(max, numeric_value);
   }
 
-  return { count, numeric_count, sum, average: numeric_count > 0 ? sum / numeric_count : null };
+  return { count, numeric_count, sum, average: numeric_count > 0 ? sum / numeric_count : null, min, max };
 }
 
 /** Pixels hidden behind sticky UI on each edge of a scroll container. */

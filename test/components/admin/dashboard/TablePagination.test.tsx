@@ -72,3 +72,10 @@ describe("TablePagination", () => {
     expect(props.onPerPageChange).toHaveBeenCalledWith(100);
   });
 });
+
+describe("TablePagination selection summary", () => {
+  it("renders the selection summary slot next to the page controls", () => {
+    renderPagination({ selection_summary: <span>Sum: 1,250</span> });
+    expect(screen.getByText("Sum: 1,250")).toBeInTheDocument();
+  });
+});
