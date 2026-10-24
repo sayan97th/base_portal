@@ -109,7 +109,7 @@ function TeamCapacityWidget({ members }: { members: TeamMemberCapacity[] }) {
       </h2>
       {members.length === 0 ? (
         <p className="text-center text-xs text-gray-400 dark:text-gray-500">
-          No active teams configured.
+          No open links assigned to team members.
         </p>
       ) : (
         <div className="space-y-4">
@@ -157,7 +157,7 @@ function TeamHealthWidget({ members }: { members: TeamMemberHealth[] }) {
       </h2>
       {members.length === 0 ? (
         <p className="text-center text-xs text-gray-400 dark:text-gray-500">
-          No active teams configured.
+          No open links assigned to team members.
         </p>
       ) : (
         <div className="overflow-x-auto">
