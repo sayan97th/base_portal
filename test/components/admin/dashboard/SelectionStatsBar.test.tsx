@@ -49,6 +49,25 @@ describe("SelectionStatsBar", () => {
     expect(screen.getAllByRole("menuitemradio").map((item) => item.textContent)).toEqual(["Count2", "Count Numbers0"]);
   });
 
+  it("closes the menu on a click outside it", () => {
+    render(<SelectionStatsBar stats={computeRangeStats(["1", "2"])} cell_count={2} />);
+    fireEvent.click(screen.getByRole("button", { name: /Sum:/ }));
+    fireEvent.mouseDown(document.body);
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("ignores an unknown statistic saved in storage", () => {
+    localStorage.setItem("lbo_selection_stat_v1", "median");
+    render(<SelectionStatsBar stats={computeRangeStats(["1", "2"])} cell_count={2} />);
+    expect(screen.getByRole("button", { name: /Sum:\s*3/ })).toBeInTheDocument();
+  });
+
+  it("rounds averages to two decimals and keeps counts whole", () => {
+    localStorage.setItem("lbo_selection_stat_v1", "average");
+    render(<SelectionStatsBar stats={computeRangeStats(["1", "1", "2"])} cell_count={3} />);
+    expect(screen.getByRole("button", { name: /Average:\s*1\.33$/ })).toBeInTheDocument();
+  });
+
   it("closes the menu with Escape", () => {
     render(<SelectionStatsBar stats={computeRangeStats(["1", "2"])} cell_count={2} />);
     fireEvent.click(screen.getByRole("button", { name: /Sum:/ }));
