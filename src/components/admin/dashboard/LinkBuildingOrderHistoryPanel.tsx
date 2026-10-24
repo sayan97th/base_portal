@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useDebounce } from "@/hooks/useDebounce";
 import {
   getLinkBuildingOrderHistoryBatch,
@@ -24,7 +25,6 @@ import {
 import type {
   LinkBuildingConflictStrategy,
   LinkBuildingHistoryBatch,
-  LinkBuildingHistoryMeta,
   LinkBuildingHistorySource,
   LinkBuildingOrderRevision,
   LinkBuildingRestoreConflict,
@@ -50,6 +50,16 @@ interface PendingRestore {
   target: LinkBuildingRestoreTarget;
   question: string;
   conflicts: LinkBuildingRestoreConflict[] | null;
+  /** Every conflict, the list above only holds the first ones. */
+  conflicts_count: number;
+}
+
+/** Revisions of an opened action, loaded a page at a time. */
+interface BatchDetails {
+  revisions: LinkBuildingOrderRevision[];
+  has_more: boolean;
+  next_after_id: number | null;
+  is_loading: boolean;
 }
 
 interface PanelNotice {
@@ -72,10 +82,27 @@ const SOURCE_BADGE_CLASSES: Partial<Record<LinkBuildingHistorySource, string>> =
   client_details: "bg-brand-50 text-brand-700 ring-brand-200 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-500/30",
 };
 
+/**
+ * Above the app header (z-99999) and the table in full screen mode (z-[100000]),
+ * so the drawer is never covered whichever way the table is shown.
+ */
+const DRAWER_LAYER_CLASS = "z-[100001]";
+
 const DEFAULT_BADGE_CLASS = "bg-gray-100 text-gray-600 ring-gray-200 dark:bg-gray-700/60 dark:text-gray-300 dark:ring-gray-600";
 
 /** Conflicts listed before the rest are summarized as "and N more". */
 const MAX_CONFLICTS_SHOWN = 8;
+
+/** Order IDs named on an action's card before the rest are counted. */
+const MAX_ORDER_IDS_SHOWN = 3;
+
+/** "BL-25730, BL-25732 and 1,198 more rows", from the summary of an action. */
+function describeOrderIds(batch: LinkBuildingHistoryBatch): string {
+  const shown = batch.order_ids_preview.slice(0, MAX_ORDER_IDS_SHOWN);
+  if (shown.length === 0) return "";
+  const others = batch.rows_count - shown.length;
+  return others > 0 ? `${shown.join(", ")} and ${others.toLocaleString()} more row${others === 1 ? "" : "s"}` : shown.join(", ");
+}
 
 function SourceBadge({ source }: { source: LinkBuildingHistorySource }) {
   return (
@@ -164,10 +191,11 @@ function RestorePrompt({ pending, column_labels, is_working, onConfirm, onCancel
   }
 
   const conflicts = pending.conflicts;
+  const hidden_conflicts = pending.conflicts_count - Math.min(conflicts.length, MAX_CONFLICTS_SHOWN);
   return (
     <div className="mt-2 rounded-md border border-amber-200 bg-amber-50/70 p-2.5 dark:border-amber-500/30 dark:bg-amber-500/10" role="alert">
       <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">
-        {conflicts.length === 1 ? "1 cell was" : `${conflicts.length} cells were`} edited again after this change.
+        {pending.conflicts_count === 1 ? "1 cell was" : `${pending.conflicts_count.toLocaleString()} cells were`} edited again after this change.
       </p>
       <ul className="mt-1.5 space-y-1 text-xs text-gray-700 dark:text-gray-200">
         {conflicts.slice(0, MAX_CONFLICTS_SHOWN).map((conflict) => (
@@ -179,8 +207,8 @@ function RestorePrompt({ pending, column_labels, is_working, onConfirm, onCancel
             <span className="font-medium">&quot;{formatHistoryValue(conflict.restore_value)}&quot;</span>
           </li>
         ))}
-        {conflicts.length > MAX_CONFLICTS_SHOWN && (
-          <li className="text-gray-500 dark:text-gray-400">and {conflicts.length - MAX_CONFLICTS_SHOWN} more</li>
+        {hidden_conflicts > 0 && (
+          <li className="text-gray-500 dark:text-gray-400">and {hidden_conflicts.toLocaleString()} more</li>
         )}
       </ul>
       <div className="mt-2 flex flex-wrap justify-end gap-2">
@@ -214,6 +242,11 @@ function RestorePrompt({ pending, column_labels, is_working, onConfirm, onCancel
  * made it, who made it and when, with the old and new value of each cell. Any
  * action, or a single row change, can be restored. Cells edited again since are
  * never overwritten without asking.
+ *
+ * Built for a large table: the list shows one summary per action and pages with
+ * a cursor, and the cells of an action load only when it is opened, a hundred
+ * revisions at a time. A paste over 30,000 rows costs the same to list as a
+ * single edit.
  */
 export default function LinkBuildingOrderHistoryPanel({
   is_open,
@@ -229,7 +262,7 @@ export default function LinkBuildingOrderHistoryPanel({
   const [batches, setBatches] = useState<LinkBuildingHistoryBatch[]>([]);
   const [row_revisions, setRowRevisions] = useState<LinkBuildingOrderRevision[]>([]);
   const [row_info, setRowInfo] = useState<{ order_id: string | null; is_deleted: boolean } | null>(null);
-  const [meta, setMeta] = useState<LinkBuildingHistoryMeta | null>(null);
+  const [next_before_id, setNextBeforeId] = useState<number | null>(null);
   const [is_loading, setIsLoading] = useState(false);
   const [load_error, setLoadError] = useState<string | null>(null);
 
@@ -237,34 +270,35 @@ export default function LinkBuildingOrderHistoryPanel({
   const [order_id_search, setOrderIdSearch] = useState("");
   const debounced_order_id_search = useDebounce(order_id_search, 350);
 
+  const [batch_details, setBatchDetails] = useState<Record<string, BatchDetails>>({});
   const [expanded_batch_ids, setExpandedBatchIds] = useState<Set<string>>(new Set());
-  const [full_batch_revisions, setFullBatchRevisions] = useState<Record<string, LinkBuildingOrderRevision[]>>({});
-  const [loading_batch_id, setLoadingBatchId] = useState<string | null>(null);
 
   const [pending_restore, setPendingRestore] = useState<PendingRestore | null>(null);
   const [is_restoring, setIsRestoring] = useState(false);
+  const [restore_progress, setRestoreProgress] = useState<string | null>(null);
   const [notice, setNotice] = useState<PanelNotice | null>(null);
 
-  const loadPage = useCallback(async (page: number) => {
+  /** Loads the newest entries (before_id null) or the ones older than before_id. */
+  const loadEntries = useCallback(async (before_id: number | null) => {
     const request_id = ++request_id_ref.current;
     setIsLoading(true);
     setLoadError(null);
     try {
       if (row_id) {
-        const res = await getLinkBuildingOrderRowHistory(row_id, page);
+        const res = await getLinkBuildingOrderRowHistory(row_id, before_id);
         if (request_id !== request_id_ref.current) return;
-        setRowRevisions((prev) => (page === 1 ? res.data : [...prev, ...res.data]));
+        setRowRevisions((prev) => (before_id === null ? res.data : [...prev, ...res.data]));
         setRowInfo({ order_id: res.order_id, is_deleted: res.is_deleted });
-        setMeta(res.meta);
+        setNextBeforeId(res.meta.next_before_id);
       } else {
         const res = await listLinkBuildingOrderHistory({
-          page,
+          before_id,
           source: source_filter,
           order_id: debounced_order_id_search,
         });
         if (request_id !== request_id_ref.current) return;
-        setBatches((prev) => (page === 1 ? res.data : [...prev, ...res.data]));
-        setMeta(res.meta);
+        setBatches((prev) => (before_id === null ? res.data : [...prev, ...res.data]));
+        setNextBeforeId(res.meta.next_before_id);
       }
     } catch {
       if (request_id !== request_id_ref.current) return;
@@ -278,8 +312,8 @@ export default function LinkBuildingOrderHistoryPanel({
     if (!is_open) return;
     setPendingRestore(null);
     setExpandedBatchIds(new Set());
-    loadPage(1);
-  }, [is_open, loadPage]);
+    loadEntries(null);
+  }, [is_open, loadEntries]);
 
   // A new panel (or another row) starts without the previous result.
   useEffect(() => {
@@ -288,8 +322,8 @@ export default function LinkBuildingOrderHistoryPanel({
       setBatches([]);
       setRowRevisions([]);
       setRowInfo(null);
-      setMeta(null);
-      setFullBatchRevisions({});
+      setNextBeforeId(null);
+      setBatchDetails({});
     }
   }, [is_open, row_id]);
 
@@ -305,61 +339,72 @@ export default function LinkBuildingOrderHistoryPanel({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [is_open, onClose]);
 
-  const toggleBatch = useCallback((batch_id: string) => {
+  /** Loads the next page of revisions of an action, the first one when it is opened. */
+  const loadBatchRevisions = useCallback(async (batch_id: string) => {
+    const current = batch_details[batch_id];
+    if (current?.is_loading || (current && !current.has_more)) return;
+
+    setBatchDetails((prev) => ({
+      ...prev,
+      [batch_id]: { revisions: current?.revisions ?? [], has_more: true, next_after_id: current?.next_after_id ?? null, is_loading: true },
+    }));
+    try {
+      const res = await getLinkBuildingOrderHistoryBatch(batch_id, current?.next_after_id ?? null);
+      setBatchDetails((prev) => ({
+        ...prev,
+        [batch_id]: {
+          revisions: [...(prev[batch_id]?.revisions ?? []), ...res.data],
+          has_more: res.meta.has_more,
+          next_after_id: res.meta.next_after_id,
+          is_loading: false,
+        },
+      }));
+    } catch {
+      setBatchDetails((prev) => ({ ...prev, [batch_id]: { ...prev[batch_id], is_loading: false } }));
+      setNotice({ tone: "error", message: "The changes of this action could not be loaded. Please try again.", details: [] });
+    }
+  }, [batch_details]);
+
+  const toggleBatch = (batch_id: string) => {
+    const is_expanded = expanded_batch_ids.has(batch_id);
     setExpandedBatchIds((prev) => {
       const next = new Set(prev);
-      if (next.has(batch_id)) next.delete(batch_id);
+      if (is_expanded) next.delete(batch_id);
       else next.add(batch_id);
       return next;
     });
-  }, []);
-
-  /** Loads every revision of an action larger than its preview, page by page. */
-  const loadFullBatch = useCallback(async (batch_id: string) => {
-    setLoadingBatchId(batch_id);
-    try {
-      const revisions: LinkBuildingOrderRevision[] = [];
-      let page = 1;
-      let last_page = 1;
-      do {
-        const res = await getLinkBuildingOrderHistoryBatch(batch_id, page);
-        revisions.push(...res.data);
-        last_page = res.meta.last_page;
-        page++;
-      } while (page <= last_page);
-      setFullBatchRevisions((prev) => ({ ...prev, [batch_id]: revisions }));
-    } catch {
-      setNotice({ tone: "error", message: "The changes of this action could not be loaded. Please try again.", details: [] });
-    } finally {
-      setLoadingBatchId(null);
-    }
-  }, []);
+    if (!is_expanded && !batch_details[batch_id]) loadBatchRevisions(batch_id);
+  };
 
   const runRestore = useCallback(async (strategy: LinkBuildingConflictStrategy) => {
     if (!pending_restore) return;
     setIsRestoring(true);
     setNotice(null);
     try {
-      const result = await restoreLinkBuildingOrderHistory(pending_restore.target, strategy);
+      const result = await restoreLinkBuildingOrderHistory(pending_restore.target, strategy, () =>
+        setRestoreProgress("This change is large, it is being restored in the background. You can keep working, the table reloads when it is done.")
+      );
       if (!result.applied) {
-        setPendingRestore({ ...pending_restore, conflicts: result.conflicts });
+        setPendingRestore({ ...pending_restore, conflicts: result.conflicts, conflicts_count: result.conflicts_count });
         return;
       }
       setPendingRestore(null);
-      setNotice({
-        tone: "success",
-        message: result.message,
-        details: result.skipped.map((skip) => describeSkip(skip, column_labels)),
-      });
-      if (result.data.length > 0) onRestored(result);
-      await loadPage(1);
+      const details = result.skipped.map((skip) => describeSkip(skip, column_labels));
+      const hidden_skips = result.skipped_count - result.skipped.length;
+      if (hidden_skips > 0) details.push(`and ${hidden_skips.toLocaleString()} more rows that could not be restored.`);
+      setNotice({ tone: "success", message: result.message, details });
+      if (result.data.length > 0 || result.reload_required) onRestored(result);
+      setBatchDetails({});
+      setExpandedBatchIds(new Set());
+      await loadEntries(null);
     } catch (err) {
       const message = (err as { message?: string })?.message;
       setNotice({ tone: "error", message: message || "The change could not be restored. Please try again.", details: [] });
     } finally {
       setIsRestoring(false);
+      setRestoreProgress(null);
     }
-  }, [pending_restore, column_labels, onRestored, loadPage]);
+  }, [pending_restore, column_labels, onRestored, loadEntries]);
 
   const askBatchRestore = (batch: LinkBuildingHistoryBatch) => {
     const label = HISTORY_SOURCE_LABELS[batch.source]?.toLowerCase() ?? "change";
@@ -369,6 +414,7 @@ export default function LinkBuildingOrderHistoryPanel({
       target: { batch_id: batch.batch_id },
       question: `Restore ${describeBatch(batch)} to how they were before this ${label}?${kept_rows}`,
       conflicts: null,
+      conflicts_count: 0,
     });
   };
 
@@ -381,12 +427,13 @@ export default function LinkBuildingOrderHistoryPanel({
         ? `Bring ${row_label} back to the table with the values it had when it was deleted?`
         : `Restore ${revision.changes.length === 1 ? "this cell" : `these ${revision.changes.length} cells`} of ${row_label} to their values before this change?`,
       conflicts: null,
+      conflicts_count: 0,
     });
   };
 
   if (!is_open) return null;
 
-  const has_more = meta !== null && meta.current_page < meta.last_page;
+  const has_more = next_before_id !== null;
   const is_row_mode = row_id !== null;
   const is_empty = !is_loading && !load_error && (is_row_mode ? row_revisions.length === 0 : batches.length === 0);
 
@@ -403,11 +450,20 @@ export default function LinkBuildingOrderHistoryPanel({
     );
   };
 
+  const restoredLabel = (batch: LinkBuildingHistoryBatch) => {
+    if (!batch.restored) return "";
+    const at = batch.restored.restored_at;
+    const when = historyDayLabel(at) === "Today" ? `at ${historyTimeLabel(at)}` : `on ${historyDayLabel(at)}`;
+    return `Restored ${when}${batch.restored.user ? ` by ${batch.restored.user.name}` : ""}`;
+  };
+
   const restore_button_class = "rounded-md border border-gray-200 bg-white px-2 py-1 text-[11px] font-semibold text-gray-700 transition-colors hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-emerald-500/40 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-300";
 
-  return (
+  // Portaled to the body so no ancestor of the table (sticky header, full screen
+  // container) can clip the drawer or stack above it.
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex justify-end bg-black/30"
+      className={`fixed inset-0 ${DRAWER_LAYER_CLASS} flex justify-end bg-black/30`}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -475,6 +531,13 @@ export default function LinkBuildingOrderHistoryPanel({
           </div>
         )}
 
+        {restore_progress && (
+          <div role="status" className="mx-4 mt-3 flex items-start gap-2 rounded-md border border-blue-light-200 bg-blue-light-50 px-3 py-2 text-xs text-blue-light-800 dark:border-blue-light-500/30 dark:bg-blue-light-500/10 dark:text-blue-light-300">
+            <span className="mt-0.5 h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true" />
+            {restore_progress}
+          </div>
+        )}
+
         {notice && (
           <div
             role="status"
@@ -497,7 +560,7 @@ export default function LinkBuildingOrderHistoryPanel({
           {load_error && (
             <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
               {load_error}{" "}
-              <button onClick={() => loadPage(1)} className="font-semibold underline">Retry</button>
+              <button onClick={() => loadEntries(null)} className="font-semibold underline">Retry</button>
             </div>
           )}
 
@@ -546,8 +609,9 @@ export default function LinkBuildingOrderHistoryPanel({
             <ul className="space-y-2">
               {batches.map((batch) => {
                 const is_expanded = expanded_batch_ids.has(batch.batch_id);
-                const revisions = full_batch_revisions[batch.batch_id] ?? batch.revisions;
-                const has_unloaded = batch.has_more_revisions && !full_batch_revisions[batch.batch_id];
+                const details = batch_details[batch.batch_id];
+                const order_ids = describeOrderIds(batch);
+                const loaded_count = details?.revisions.length ?? 0;
                 return (
                   <React.Fragment key={batch.batch_id}>
                     {dayHeading(batch.started_at)}
@@ -558,11 +622,16 @@ export default function LinkBuildingOrderHistoryPanel({
                             <SourceBadge source={batch.source} />
                             {batch.restored && (
                               <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-[11px] font-medium text-gray-600 dark:bg-gray-700/60 dark:text-gray-300">
-                                Restored {historyDayLabel(batch.restored.restored_at).toLowerCase() === "today" ? `at ${historyTimeLabel(batch.restored.restored_at)}` : `on ${historyDayLabel(batch.restored.restored_at)}`}
+                                {restoredLabel(batch)}
                               </span>
                             )}
                           </div>
                           <p className="mt-1 text-sm font-medium text-gray-800 dark:text-gray-100">{describeBatch(batch)}</p>
+                          {order_ids && (
+                            <p className="mt-0.5 truncate font-mono text-[11px] text-gray-500 dark:text-gray-400" title={order_ids}>
+                              {order_ids}
+                            </p>
+                          )}
                           <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                             {batch.user?.name ?? "System"} · {historyTimeLabel(batch.started_at)}
                           </p>
@@ -599,18 +668,18 @@ export default function LinkBuildingOrderHistoryPanel({
 
                       {is_expanded && (
                         <div className="mt-2 space-y-2 border-t border-gray-100 pt-2 dark:border-gray-800">
-                          {revisions.map((revision) => (
+                          {details?.revisions.map((revision) => (
                             <RevisionChanges key={revision.id} revision={revision} column_labels={column_labels} show_order_id />
                           ))}
-                          {has_unloaded && (
+                          {details?.is_loading && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Loading changes...</p>
+                          )}
+                          {details && details.has_more && !details.is_loading && (
                             <button
-                              onClick={() => loadFullBatch(batch.batch_id)}
-                              disabled={loading_batch_id === batch.batch_id}
-                              className="text-xs font-semibold text-brand-600 hover:text-brand-700 disabled:opacity-50 dark:text-brand-400"
+                              onClick={() => loadBatchRevisions(batch.batch_id)}
+                              className="text-xs font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400"
                             >
-                              {loading_batch_id === batch.batch_id
-                                ? "Loading..."
-                                : `Show all ${batch.revisions_count.toLocaleString()} row changes`}
+                              Show more ({loaded_count.toLocaleString()} of {batch.revisions_count.toLocaleString()} row changes shown)
                             </button>
                           )}
                         </div>
@@ -629,7 +698,7 @@ export default function LinkBuildingOrderHistoryPanel({
           {has_more && !is_loading && (
             <div className="mt-3 text-center">
               <button
-                onClick={() => meta && loadPage(meta.current_page + 1)}
+                onClick={() => loadEntries(next_before_id)}
                 className="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
               >
                 Load older changes
@@ -638,6 +707,7 @@ export default function LinkBuildingOrderHistoryPanel({
           )}
         </div>
       </aside>
-    </div>
+    </div>,
+    document.body
   );
 }

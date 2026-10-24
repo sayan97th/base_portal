@@ -63,57 +63,68 @@ export interface LinkBuildingOrderRevision {
   created_at: string;
 }
 
-/** One action: every revision written by a single edit, paste, import... */
+/**
+ * Summary of one action: every revision written by a single edit, paste,
+ * import... Its revisions load only when the action is opened, see
+ * getLinkBuildingOrderHistoryBatch().
+ */
 export interface LinkBuildingHistoryBatch {
+  /** Cursor of the list: pass the last one shown as before_id to load older actions. */
+  id: number;
   batch_id: string;
   source: LinkBuildingHistorySource;
   user: LinkBuildingHistoryUser | null;
   started_at: string;
   revisions_count: number;
   rows_count: number;
+  cells_count: number;
   created_count: number;
   updated_count: number;
   deleted_count: number;
-  /** Changed cells, null when the action is larger than its preview. */
-  cells_count: number | null;
+  /** First Order IDs the action touched, to recognize it without opening it. */
+  order_ids_preview: string[];
   /** Set when this action is itself a restore of another one. */
   restored_batch_id: string | null;
   /** Set once this action has been restored. */
-  restored: { restored_at: string; user_id: number | null } | null;
-  /** First revisions of the action, the rest load with getLinkBuildingHistoryBatch(). */
-  revisions: LinkBuildingOrderRevision[];
-  has_more_revisions: boolean;
+  restored: { restored_at: string; user: LinkBuildingHistoryUser | null } | null;
 }
 
-export interface LinkBuildingHistoryMeta {
-  current_page: number;
-  last_page: number;
+/** Cursor pagination: no total count, which a large history would have to scan for. */
+export interface LinkBuildingHistoryListMeta {
   per_page: number;
-  total: number;
+  has_more: boolean;
+  next_before_id: number | null;
+}
+
+export interface LinkBuildingHistoryBatchMeta {
+  per_page: number;
+  has_more: boolean;
+  next_after_id: number | null;
 }
 
 export interface LinkBuildingHistoryFilters {
-  page?: number;
+  /** Id of the last action already shown, to load older ones. */
+  before_id?: number | null;
   per_page?: number;
   source?: LinkBuildingHistorySource | "";
   user_id?: number | null;
-  /** Partial BL- order id. */
+  /** An Order ID or its start, e.g. "BL-257" or "257". */
   order_id?: string;
 }
 
 export interface LinkBuildingHistoryResponse {
   data: LinkBuildingHistoryBatch[];
-  meta: LinkBuildingHistoryMeta;
+  meta: LinkBuildingHistoryListMeta;
 }
 
 export interface LinkBuildingHistoryBatchResponse {
   data: LinkBuildingOrderRevision[];
-  meta: LinkBuildingHistoryMeta;
+  meta: LinkBuildingHistoryBatchMeta;
 }
 
 export interface LinkBuildingRowHistoryResponse {
   data: LinkBuildingOrderRevision[];
-  meta: LinkBuildingHistoryMeta;
+  meta: LinkBuildingHistoryListMeta;
   order_id: string | null;
   is_deleted: boolean;
 }

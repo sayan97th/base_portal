@@ -16,6 +16,7 @@ import type { LinkBuildingHistoryBatch, LinkBuildingOrderRevision } from "@/type
 
 function makeBatch(overrides: Partial<LinkBuildingHistoryBatch> = {}): LinkBuildingHistoryBatch {
   return {
+    id: 1,
     batch_id: "batch-1",
     source: "paste",
     user: { id: 1, name: "Krista B" },
@@ -26,10 +27,9 @@ function makeBatch(overrides: Partial<LinkBuildingHistoryBatch> = {}): LinkBuild
     updated_count: 2,
     deleted_count: 0,
     cells_count: 8,
+    order_ids_preview: ["BL-25730", "BL-25732"],
     restored_batch_id: null,
     restored: null,
-    revisions: [],
-    has_more_revisions: false,
     ...overrides,
   };
 }
@@ -43,9 +43,9 @@ describe("describeBatch", () => {
     expect(describeBatch(makeBatch({ rows_count: 1, updated_count: 1, cells_count: 1 }))).toBe("1 cell");
   });
 
-  it("counts row changes when the action is larger than its preview", () => {
-    expect(describeBatch(makeBatch({ cells_count: null, updated_count: 1200, rows_count: 1200 }))).toBe(
-      "1,200 row changes in 1,200 rows"
+  it("formats large actions with thousands separators", () => {
+    expect(describeBatch(makeBatch({ cells_count: 30000, updated_count: 30000, rows_count: 30000 }))).toBe(
+      "30,000 cells in 30,000 rows"
     );
   });
 

@@ -86,7 +86,7 @@ export function describeBatch(batch: LinkBuildingHistoryBatch): string {
   const parts: string[] = [];
 
   if (batch.updated_count > 0) {
-    const changed = batch.cells_count !== null ? plural(batch.cells_count, "cell") : plural(batch.updated_count, "row change");
+    const changed = plural(batch.cells_count, "cell");
     const rows_changed = batch.rows_count - batch.created_count - batch.deleted_count;
     parts.push(rows_changed > 1 ? `${changed} in ${plural(rows_changed, "row")}` : changed);
   }

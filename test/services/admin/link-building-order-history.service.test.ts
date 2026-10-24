@@ -20,12 +20,12 @@ const mocked = apiClient as jest.Mocked<typeof apiClient>;
 
 beforeEach(() => jest.clearAllMocks());
 
-it("sends the history filters as query parameters", async () => {
+it("sends the history filters and the cursor as query parameters", async () => {
   mocked.get.mockResolvedValue({ data: [], meta: {} });
 
-  await listLinkBuildingOrderHistory({ page: 2, source: "paste", order_id: " BL-257 " });
+  await listLinkBuildingOrderHistory({ before_id: 40, source: "paste", order_id: " BL-257 " });
 
-  expect(mocked.get).toHaveBeenCalledWith("/api/admin/link-building-orders/history?page=2&per_page=20&source=paste&order_id=BL-257");
+  expect(mocked.get).toHaveBeenCalledWith("/api/admin/link-building-orders/history?per_page=20&before_id=40&source=paste&order_id=BL-257");
 });
 
 it("posts the restore target with its conflict strategy", async () => {
@@ -56,4 +56,36 @@ it("still throws other errors", async () => {
   mocked.post.mockRejectedValue({ status_code: 404, message: "Change not found in the history." });
 
   await expect(restoreLinkBuildingOrderHistory({ revision_id: 9 })).rejects.toMatchObject({ status_code: 404 });
+});
+
+it("waits for a large restore running in the background and returns its result", async () => {
+  jest.useFakeTimers();
+  const result = { applied: true, message: "Restored 30,000 cell(s).", reload_required: true };
+  mocked.post.mockResolvedValue({ queued: true, restore_id: "r1", message: "Queued" });
+  mocked.get
+    .mockResolvedValueOnce({ status: "processing" })
+    .mockResolvedValueOnce({ status: "completed", result });
+  const onQueued = jest.fn();
+
+  const promise = restoreLinkBuildingOrderHistory({ batch_id: "import-1" }, "abort", onQueued);
+  await jest.advanceTimersByTimeAsync(2000);
+  await jest.advanceTimersByTimeAsync(2000);
+
+  await expect(promise).resolves.toEqual(result);
+  expect(onQueued).toHaveBeenCalled();
+  expect(mocked.get).toHaveBeenCalledWith("/api/admin/link-building-orders/history/restores/r1");
+  jest.useRealTimers();
+});
+
+it("throws when the background restore fails", async () => {
+  jest.useFakeTimers();
+  mocked.post.mockResolvedValue({ queued: true, restore_id: "r2", message: "Queued" });
+  mocked.get.mockResolvedValueOnce({ status: "failed", message: "The restore could not be completed." });
+
+  const promise = restoreLinkBuildingOrderHistory({ batch_id: "import-1" });
+  const assertion = expect(promise).rejects.toMatchObject({ message: "The restore could not be completed." });
+  await jest.advanceTimersByTimeAsync(2000);
+
+  await assertion;
+  jest.useRealTimers();
 });

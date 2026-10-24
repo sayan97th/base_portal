@@ -1763,6 +1763,17 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     [refreshFilterCounts]
   );
 
+  // Set once fetchRows exists (it is defined after the collaboration hook below).
+  const reload_rows_ref = useRef<(() => void) | null>(null);
+
+  /** Many rows changed at once elsewhere (a large history restore): reload them all, once. */
+  const handleRemoteBulkChanged = useCallback((by_session_id: string | null) => {
+    if (by_session_id === local_session_id_ref.current) return;
+    reload_rows_ref.current?.();
+    on_order_mutated_ref.current?.();
+    refreshFilterCounts();
+  }, [refreshFilterCounts]);
+
   /** Another admin added or changed a formula column or totals cell. */
   const handleRemoteSheetFormulasChanged = useCallback(() => {
     reloadSheetFormulas().catch(() => {/* non-critical, the next change reloads them again */ });
@@ -1786,6 +1797,7 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
     onRowCreated: handleRemoteRowCreated,
     onRowDeleted: handleRemoteRowDeleted,
     onSheetFormulasChanged: handleRemoteSheetFormulasChanged,
+    onBulkChanged: handleRemoteBulkChanged,
   });
 
   const local_session_id_ref = useRef(local_session_id);
@@ -1935,6 +1947,8 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       }
     }
   }, [dropAlreadySavedDrafts]);
+
+  reload_rows_ref.current = () => fetchRows(current_body_ref.current);
 
   // Set when a restored view has text filters, so the first fetch waits for their
   // debounced copies to catch up instead of loading the unfiltered table first.
@@ -2439,8 +2453,21 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
   const closeHistoryPanel = useCallback(() => setHistoryPanel(null), []);
   const showAllHistory = useCallback(() => setHistoryPanel({ row_id: null }), []);
 
-  /** Puts rows restored from the version history into the grid, recreated ones on top. */
+  /**
+   * Puts rows restored from the version history into the grid, recreated ones on
+   * top. A large restore sends no rows back, the grid reloads them instead.
+   */
   const handleHistoryRestored = useCallback((result: LinkBuildingRestoreResult) => {
+    if (result.reload_required) {
+      reload_rows_ref.current?.();
+      setUndoStack([]);
+      setRedoStack([]);
+      on_order_mutated_ref.current?.();
+      refreshFilterCounts();
+      setNotificationBanner(result.message);
+      return;
+    }
+
     const restored_by_id = new Map(result.data.map((r) => [r.id, r]));
     const known_ids = new Set(rows_ref.current.map((r) => r.id));
     const recreated_rows = result.data.filter((r) => result.recreated_ids.includes(r.id) && !known_ids.has(r.id));

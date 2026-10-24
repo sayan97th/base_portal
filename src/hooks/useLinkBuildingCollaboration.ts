@@ -105,6 +105,11 @@ export interface UseLinkBuildingCollaborationOptions {
   onRowDeleted: (row_id: string, by_session_id: string) => void;
   /** A formula column or totals row formula changed, the table should reload them. */
   onSheetFormulasChanged?: (by_session_id: string | null) => void;
+  /**
+   * Many rows changed at once (a large history restore), sent instead of one
+   * event per row. The table should reload its rows.
+   */
+  onBulkChanged?: (by_session_id: string | null) => void;
 }
 
 export interface UseLinkBuildingCollaborationReturn {
@@ -144,6 +149,7 @@ export function useLinkBuildingCollaboration(
     onRowCreated,
     onRowDeleted,
     onSheetFormulasChanged,
+    onBulkChanged,
   } = options;
 
   const [collaborators, setCollaborators] = useState<CollaboratorPresence[]>([]);
@@ -157,6 +163,8 @@ export function useLinkBuildingCollaboration(
   on_row_deleted_ref.current = onRowDeleted;
   const on_sheet_formulas_changed_ref = useRef(onSheetFormulasChanged);
   on_sheet_formulas_changed_ref.current = onSheetFormulasChanged;
+  const on_bulk_changed_ref = useRef(onBulkChanged);
+  on_bulk_changed_ref.current = onBulkChanged;
 
   const channel_ref = useRef<EchoPresenceChannel | null>(null);
 
@@ -300,6 +308,11 @@ export function useLinkBuildingCollaboration(
     channel.listen(".LinkBuildingOrderSheetFormulasChanged", (data: unknown) => {
       const { changed_by_session_id } = data as { changed_by_session_id: string | null };
       on_sheet_formulas_changed_ref.current?.(changed_by_session_id);
+    });
+
+    channel.listen(".LinkBuildingOrdersBulkChanged", (data: unknown) => {
+      const { changed_by_session_id } = data as { changed_by_session_id: string | null };
+      on_bulk_changed_ref.current?.(changed_by_session_id);
     });
 
     return () => {
