@@ -122,6 +122,19 @@ export function normalizeFilterState(
 }
 
 /**
+ * Prepares the per user auto saved view for restoring when the table loads. The
+ * table always opens with its default sort (newest orders first), so a sort picked
+ * in an earlier session does not hide the latest orders. The sort is kept only
+ * while a saved filter is applied, since that sort is part of the saved filter.
+ */
+export function toRestoredViewState(
+  state: LinkBuildingOrderFilterState,
+  applied_saved_filter_id: string | null
+): LinkBuildingOrderFilterState {
+  return applied_saved_filter_id ? state : { ...state, sort_rules: [] };
+}
+
+/**
  * Stable string form of a filter state. Order independent parts (hidden columns,
  * column filter keys, checked values) are sorted, and inactive column filters are
  * left out, so two states that produce the same table compare as equal.

@@ -42,7 +42,7 @@ import {
   type AdvancedFilterColumn,
   type AdvancedFilterColumnKind,
 } from "@/lib/link-building-advanced-filters";
-import { normalizeFilterState, serializeFilterState } from "@/lib/link-building-saved-filters";
+import { normalizeFilterState, serializeFilterState, toRestoredViewState } from "@/lib/link-building-saved-filters";
 import {
   getFilterPreference,
   saveFilterPreference,
@@ -3412,7 +3412,10 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
       .then((preference) => {
         if (is_cancelled) return;
         if (preference.filters) {
-          const restored = normalizeFilterState(preference.filters, VIEW_COLUMN_KEYS);
+          const restored = toRestoredViewState(
+            normalizeFilterState(preference.filters, VIEW_COLUMN_KEYS),
+            preference.applied_saved_filter_id
+          );
           awaiting_restored_text_ref.current =
             restored.search !== "" ||
             restored.client !== "" ||

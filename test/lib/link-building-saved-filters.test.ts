@@ -8,6 +8,7 @@ import {
   normalizeFilterState,
   areFilterStatesEqual,
   countActiveFilters,
+  toRestoredViewState,
 } from "@/lib/link-building-saved-filters";
 import type { LinkBuildingOrderFilterState } from "@/types/admin/link-building-order";
 
@@ -103,5 +104,25 @@ describe("countActiveFilters", () => {
     });
 
     expect(countActiveFilters(state)).toBe(3);
+  });
+});
+
+describe("toRestoredViewState", () => {
+  const restored = makeState({
+    status: "Live",
+    hidden_columns: ["notes"],
+    sort_rules: [{ key: "client", direction: "asc", nulls_last: true }],
+  });
+
+  it("drops the sort so the table opens with the newest orders first", () => {
+    const state = toRestoredViewState(restored, null);
+
+    expect(state.sort_rules).toEqual([]);
+    expect(state.status).toBe("Live");
+    expect(state.hidden_columns).toEqual(["notes"]);
+  });
+
+  it("keeps the sort while a saved filter is applied", () => {
+    expect(toRestoredViewState(restored, "saved-filter-id").sort_rules).toEqual(restored.sort_rules);
   });
 });
