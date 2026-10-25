@@ -321,9 +321,8 @@ async function renderFullyLoaded(rows: LinkBuildingOrderRow[], draft_count = 0):
 }
 
 function pickLinkType(link_type: string) {
-  fireEvent.change(screen.getByRole("combobox", { name: "Filter by link type" }), {
-    target: { value: link_type },
-  });
+  fireEvent.click(screen.getByRole("button", { name: /^Filter by link type/ }));
+  fireEvent.click(screen.getByRole("option", { name: link_type }));
 }
 
 /** Stored the way the table keeps unsaved drafts in this browser. */

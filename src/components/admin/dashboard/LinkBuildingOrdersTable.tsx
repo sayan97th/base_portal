@@ -17,6 +17,7 @@ import SavedFiltersMenu from "./SavedFiltersMenu";
 import AdvancedFilterPanel from "./AdvancedFilterPanel";
 import LinkBuildingFilterPanel from "./LinkBuildingFilterPanel";
 import QuickFilterPanel from "./QuickFilterPanel";
+import LinkTypeFilterSelect from "./LinkTypeFilterSelect";
 import ArticleDocPreview from "./ArticleDocPreview";
 import { isGoogleDocLink } from "@/lib/article-doc-title";
 import { useQuickFilterValues } from "@/hooks/useQuickFilterValues";
@@ -5807,25 +5808,11 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
               className={styles.search_input}
             />
           </div>
-          <div className={`${styles.search_field}${link_type_filter ? ` ${styles.search_field_active}` : ""}`}>
-            <svg className={styles.search_icon} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
-            </svg>
-            <select
-              value={link_type_filter}
-              onChange={(e) => setLinkTypeFilter(e.target.value)}
-              aria-label="Filter by link type"
-              className={styles.search_select}
-            >
-              <option value="">All link types</option>
-              {LINK_TYPE_OPTIONS.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-            <svg className={styles.select_chevron} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-            </svg>
-          </div>
+          <LinkTypeFilterSelect
+            value={link_type_filter}
+            options={LINK_TYPE_OPTIONS}
+            onChange={setLinkTypeFilter}
+          />
         </div>
 
         <div className={styles.toolbar_actions}>

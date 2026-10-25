@@ -201,7 +201,8 @@ $toolbar_focus_ring: rgba(236, 60, 137, 0.12);
 
 // ── Search fields ──────────────────────────────────────────────────────────────
 
-// Search, Company and Link type as three separate compact controls. The search
+// Search, Company and Link type as three separate compact controls (Link type
+// lives in LinkTypeFilterSelect). The search
 // box grows into the free space, the other two keep a fixed width.
 .search_group {
   display: flex;
@@ -269,14 +270,13 @@ $toolbar_focus_ring: rgba(236, 60, 137, 0.12);
   }
 }
 
-// A Company or Link type value is applied: tint the field so it stands out.
+// A Company value is applied: tint the field so it stands out.
 .search_field_active {
   border-color: var(--color-brand-300);
   background: var(--color-brand-25);
   color: var(--color-brand-500);
 
-  .search_input,
-  .search_select {
+  .search_input {
     color: var(--color-brand-700);
     font-weight: 500;
   }
@@ -285,8 +285,7 @@ $toolbar_focus_ring: rgba(236, 60, 137, 0.12);
     border-color: var(--color-brand-700);
     background: rgba(236, 60, 137, 0.1);
 
-    .search_input,
-    .search_select {
+    .search_input {
       color: var(--color-brand-300);
     }
   }
@@ -298,8 +297,7 @@ $toolbar_focus_ring: rgba(236, 60, 137, 0.12);
   flex-shrink: 0;
 }
 
-.search_input,
-.search_select {
+.search_input {
   flex: 1;
   min-width: 0;
   height: 100%;
@@ -320,26 +318,6 @@ $toolbar_focus_ring: rgba(236, 60, 137, 0.12);
   @include dark {
     color: var(--color-gray-500);
   }
-}
-
-.search_select {
-  padding-right: 16px;
-  appearance: none;
-  cursor: pointer;
-  text-overflow: ellipsis;
-
-  option {
-    color: var(--color-gray-800);
-  }
-}
-
-.select_chevron {
-  position: absolute;
-  right: 10px;
-  width: 12px;
-  height: 12px;
-  color: var(--color-gray-400);
-  pointer-events: none;
 }
 
 .search_clear {

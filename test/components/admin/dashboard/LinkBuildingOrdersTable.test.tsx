@@ -1313,9 +1313,8 @@ describe("LinkBuildingOrdersTable, saved filters", () => {
     );
     await renderTableWithRow(makeRow());
 
-    fireEvent.change(screen.getByRole("combobox", { name: "Filter by link type" }), {
-      target: { value: "DR 50+ External" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: /^Filter by link type/ }));
+    fireEvent.click(screen.getByRole("option", { name: "DR 50+ External" }));
     fireEvent.click(screen.getByRole("button", { name: /Saved Filters/ }));
     await screen.findByText(/No saved filters yet/);
 
@@ -1428,9 +1427,8 @@ describe("LinkBuildingOrdersTable, saved filters", () => {
   it("saves the view to the user's account after a filter changes", async () => {
     await renderTableWithRow(makeRow());
 
-    fireEvent.change(screen.getByRole("combobox", { name: "Filter by link type" }), {
-      target: { value: "DR 50+ External" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: /^Filter by link type/ }));
+    fireEvent.click(screen.getByRole("option", { name: "DR 50+ External" }));
 
     await waitFor(() => expect(mockSaveFilterPreference).toHaveBeenCalledTimes(1), { timeout: 2000 });
     expect(mockSaveFilterPreference.mock.calls[0][0]).toEqual({
@@ -1632,9 +1630,8 @@ describe("LinkBuildingOrdersTable, Needs LB TL Approval switch", () => {
   it("keeps the other filters when the view is turned off", async () => {
     await renderTableWithRow(makeRow());
 
-    fireEvent.change(screen.getByRole("combobox", { name: "Filter by link type" }), {
-      target: { value: "DR 50+ External" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: /^Filter by link type/ }));
+    fireEvent.click(screen.getByRole("option", { name: "DR 50+ External" }));
     fireEvent.click(approvalSwitch());
     fireEvent.click(approvalSwitch());
 
@@ -1667,9 +1664,8 @@ describe("LinkBuildingOrdersTable, Needs LB TL Approval switch", () => {
 
 describe("LinkBuildingOrdersTable, loading transitions", () => {
   function pickLinkType(link_type: string) {
-    fireEvent.change(screen.getByRole("combobox", { name: "Filter by link type" }), {
-      target: { value: link_type },
-    });
+    fireEvent.click(screen.getByRole("button", { name: /^Filter by link type/ }));
+    fireEvent.click(screen.getByRole("option", { name: link_type }));
   }
 
   /** A promise for a search response that the test resolves by hand. */

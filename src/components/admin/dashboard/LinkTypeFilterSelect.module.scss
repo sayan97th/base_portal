@@ -1,0 +1,421 @@
+// "Link type" filter of the Link Building Orders toolbar. The trigger keeps the
+// size and look of the Search and Company fields next to it, and the list follows
+// the portal's dropdown look: soft card, grouped options, check on the applied value.
+
+// ── Tokens ─────────────────────────────────────────────────────────────────────
+
+// Fallbacks keep the control readable if Tailwind ever prunes an unused theme variable.
+$brand_25: var(--color-brand-25, #fef5f9);
+$brand_50: var(--color-brand-50, #fdeef5);
+$brand_300: var(--color-brand-300, #f48fbc);
+$brand_500: var(--color-brand-500, #ec3c89);
+$brand_600: var(--color-brand-600, #d4316f);
+$brand_700: var(--color-brand-700, #b02659);
+$brand_dark_bg: rgba(236, 60, 137, 0.1);
+$brand_dark_bg_hover: rgba(236, 60, 137, 0.16);
+$brand_dark_text: #f48fbc;
+$brand_ring: rgba(236, 60, 137, 0.12);
+
+$gray_50: var(--color-gray-50, #f9fafb);
+$gray_100: var(--color-gray-100, #f2f4f7);
+$gray_200: var(--color-gray-200, #e4e7ec);
+$gray_300: var(--color-gray-300, #d0d5dd);
+$gray_400: var(--color-gray-400, #98a2b3);
+$gray_500: var(--color-gray-500, #667085);
+$gray_700: var(--color-gray-700, #344054);
+$gray_800: var(--color-gray-800, #1d2939);
+
+// External links point to outside sites (sky), Internal links stay on the client's site (violet).
+$external_color: #0086c9;
+$external_bg: #f0f9ff;
+$external_dark_color: #7cd4fd;
+$external_dark_bg: rgba(11, 165, 236, 0.15);
+$internal_color: #6938ef;
+$internal_bg: #f4f3ff;
+$internal_dark_color: #bdb4fe;
+$internal_dark_bg: rgba(122, 90, 248, 0.18);
+
+$dark_surface: #1d2939;
+$dark_surface_raised: #253247;
+$dark_border: #344054;
+$dark_text: #f2f4f7;
+$dark_text_muted: #98a2b3;
+
+$control_height: 36px;
+$panel_min_width: 220px;
+$panel_radius: 12px;
+
+@mixin dark {
+  :global(.dark) & {
+    @content;
+  }
+}
+
+// ── Root (the field shell) ─────────────────────────────────────────────────────
+
+.root {
+  position: relative;
+  display: flex;
+  flex: 0 0 176px;
+  min-width: 0;
+  height: $control_height;
+  border: 1px solid $gray_200;
+  border-radius: 8px;
+  background: #fff;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease;
+
+  &:hover {
+    border-color: $gray_300;
+  }
+
+  &:focus-within,
+  &.is_open {
+    border-color: $brand_300;
+    box-shadow: 0 0 0 3px $brand_ring;
+  }
+
+  @include dark {
+    border-color: $dark_border;
+    background: var(--color-gray-800, #1d2939);
+
+    &:focus-within,
+    &.is_open {
+      border-color: $brand_700;
+    }
+  }
+
+  // Phones: shares the second toolbar line with the Company field.
+  @media (max-width: 639px) {
+    flex: 1 1 calc(50% - 4px);
+  }
+}
+
+// A link type is applied: tint the field like the other active toolbar filters.
+.has_value {
+  border-color: $brand_300;
+  background: $brand_25;
+
+  @include dark {
+    border-color: $brand_700;
+    background: $brand_dark_bg;
+  }
+}
+
+// ── Trigger ────────────────────────────────────────────────────────────────────
+
+.trigger {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  padding: 0 10px 0 12px;
+  border-radius: 7px;
+  background: transparent;
+  color: $gray_800;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+
+  @include dark {
+    color: var(--color-gray-100, #f2f4f7);
+  }
+
+  .has_value & {
+    padding-right: 32px;
+  }
+}
+
+.leading_icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: $gray_400;
+  transition: color 0.15s ease;
+
+  .root:focus-within &,
+  .is_open &,
+  .has_value & {
+    color: $brand_500;
+  }
+}
+
+.trigger_value {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.trigger_placeholder {
+  display: block;
+  color: $gray_500;
+  text-overflow: ellipsis;
+
+  @include dark {
+    color: $dark_text_muted;
+  }
+}
+
+.trigger_label {
+  overflow: hidden;
+  color: $brand_700;
+  font-weight: 600;
+  text-overflow: ellipsis;
+
+  @include dark {
+    color: $brand_dark_text;
+  }
+}
+
+.chevron {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  color: $gray_400;
+  transition: transform 0.2s ease;
+
+  .is_open & {
+    transform: rotate(180deg);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+.clear_button {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  color: $brand_500;
+  transform: translateY(-50%);
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+
+  svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  &:hover {
+    background: $brand_50;
+    color: $brand_700;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px $brand_300;
+  }
+
+  @include dark {
+    color: $brand_dark_text;
+
+    &:hover {
+      background: $brand_dark_bg_hover;
+      color: #fff;
+    }
+  }
+}
+
+// ── Placement badge and tones ──────────────────────────────────────────────────
+
+.group_badge {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--tone_bg, #{$gray_100});
+  color: var(--tone_color, #{$gray_500});
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.tone_external {
+  --tone_color: #{$external_color};
+  --tone_bg: #{$external_bg};
+
+  @include dark {
+    --tone_color: #{$external_dark_color};
+    --tone_bg: #{$external_dark_bg};
+  }
+}
+
+.tone_internal {
+  --tone_color: #{$internal_color};
+  --tone_bg: #{$internal_bg};
+
+  @include dark {
+    --tone_color: #{$internal_dark_color};
+    --tone_bg: #{$internal_dark_bg};
+  }
+}
+
+// ── Panel ──────────────────────────────────────────────────────────────────────
+
+.panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: -1px;
+  z-index: 50;
+  width: max(calc(100% + 2px), #{$panel_min_width});
+  max-width: calc(100vw - 2rem);
+  max-height: min(24rem, calc(100dvh - 8rem));
+  padding: 4px;
+  overflow-y: auto;
+  border: 1px solid $gray_200;
+  border-radius: $panel_radius;
+  background: #fff;
+  box-shadow:
+    0 12px 16px -4px rgba(16, 24, 40, 0.08),
+    0 4px 6px -2px rgba(16, 24, 40, 0.03);
+  outline: none;
+  transform-origin: top left;
+  animation: panel_in 0.14s ease-out;
+
+  @include dark {
+    border-color: $dark_border;
+    background: $dark_surface;
+    box-shadow: 0 12px 16px -4px rgba(0, 0, 0, 0.4);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+
+  // Phones: the field sits on the right half of the line, so open towards the left.
+  @media (max-width: 639px) {
+    right: -1px;
+    left: auto;
+    transform-origin: top right;
+  }
+}
+
+@keyframes panel_in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.group {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid $gray_100;
+
+  @include dark {
+    border-top-color: $dark_border;
+  }
+}
+
+.group_header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 4px;
+  color: $gray_500;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  user-select: none;
+
+  @include dark {
+    color: $dark_text_muted;
+  }
+}
+
+.group_dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--tone_color, #{$gray_400});
+}
+
+// ── Options ────────────────────────────────────────────────────────────────────
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+  color: $gray_700;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.1s ease;
+
+  @include dark {
+    color: $dark_text;
+  }
+
+  &.is_active {
+    background: $gray_50;
+
+    @include dark {
+      background: $dark_surface_raised;
+    }
+  }
+
+  &.is_selected {
+    background: $brand_25;
+    color: $brand_700;
+    font-weight: 600;
+
+    @include dark {
+      background: $brand_dark_bg;
+      color: $brand_dark_text;
+    }
+  }
+
+  &.is_selected.is_active {
+    background: $brand_50;
+
+    @include dark {
+      background: $brand_dark_bg_hover;
+    }
+  }
+}
+
+.option_label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.check_icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: $brand_600;
+
+  @include dark {
+    color: $brand_dark_text;
+  }
+}
