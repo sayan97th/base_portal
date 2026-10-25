@@ -326,14 +326,16 @@ export default function CellDatePicker({ value, anchor_el, onSelect }: CellDateP
         <div className={styles.quick_picks}>
           {QUICK_PICKS.map(({ label, days }) => {
             const date = addDays(today, days);
+            const is_selected = isSameDay(date, selected_date);
             return (
               <button
                 key={label}
                 type="button"
                 tabIndex={-1}
+                aria-pressed={is_selected}
                 onMouseDown={keepInputFocus}
                 onClick={() => pickDate(date)}
-                className={`${styles.quick_pick}${isSameDay(date, selected_date) ? ` ${styles.quick_pick_selected}` : ""}`}
+                className={`${styles.quick_pick}${is_selected ? ` ${styles.quick_pick_selected}` : ""}`}
                 title={formatDateMMDDYYYY(date)}
               >
                 {label}

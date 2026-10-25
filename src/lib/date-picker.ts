@@ -106,10 +106,15 @@ export function buildCalendarDays({ year, month }: CalendarMonth): CalendarDay[]
   });
 }
 
-/** The twelve years shown by the year view, a block that holds the given year. */
+/** Years the year view lists before the shown year, the rest come after it. */
+const YEARS_BEFORE = 4;
+
+/**
+ * The twelve years shown by the year view, the shown year plus 4 before and 7
+ * after, so the next few years (delivery and follow up dates) are one click away.
+ */
 export function buildYearRange(year: number): number[] {
-  const start = year - (((year % 12) + 12) % 12);
-  return Array.from({ length: 12 }, (_, i) => start + i);
+  return Array.from({ length: 12 }, (_, i) => year - YEARS_BEFORE + i);
 }
 
 /** Long label for screen readers, e.g. "Sunday, October 25, 2026". */

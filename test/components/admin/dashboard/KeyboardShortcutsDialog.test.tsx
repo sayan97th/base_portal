@@ -60,6 +60,14 @@ describe("KeyboardShortcutsDialog", () => {
     expect(redo.getByText("or")).toBeInTheDocument();
   });
 
+  it.each([true, false])("lists the date picker's Up and Down day stepping the same on every platform (Mac: %s)", (is_mac) => {
+    renderDialog({ is_mac });
+
+    const row = within(shortcutRow("Move a date one day later or earlier (while editing a date)"));
+    expect(row.getByText("↑")).toBeInTheDocument();
+    expect(row.getByText("↓")).toBeInTheDocument();
+  });
+
   it("uses Ctrl labels for Windows and Linux users", () => {
     renderDialog({ is_mac: false });
 

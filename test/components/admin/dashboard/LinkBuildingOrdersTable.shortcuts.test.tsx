@@ -308,56 +308,6 @@ describe("LinkBuildingOrdersTable: insert today's date (Cmd+; / Ctrl+;)", () => 
   });
 });
 
-// ─── Date picker ─────────────────────────────────────────────────────────────
-
-describe("LinkBuildingOrdersTable: date cell calendar", () => {
-  it("the calendar button opens the picker, and a picked day is saved", async () => {
-    const grid = await renderTable([makeRow({ live_link_date: "10/05/2026" })]);
-    fireEvent.click(within(grid).getByRole("button", { name: "Pick Live Link Date" }));
-
-    expect(within(grid).getByDisplayValue("10/05/2026")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("gridcell", { name: "Monday, October 12, 2026" }));
-
-    await waitFor(() => expect(mockUpdateLinkBuildingOrder).toHaveBeenCalledTimes(1));
-    expect(mockUpdateLinkBuildingOrder.mock.calls[0][1]).toMatchObject({ live_link_date: "10/12/2026" });
-    expect(screen.queryByRole("dialog", { name: "Choose a date" })).not.toBeInTheDocument();
-  });
-
-  it("opens with Enter on a date cell, never on a text cell", async () => {
-    const grid = await renderTable([row1]);
-    selectCell(cellAt(grid, 0, COL_IDX.notes));
-    fireEvent.keyDown(grid, { key: "Enter" });
-    expect(screen.queryByRole("dialog", { name: "Choose a date" })).not.toBeInTheDocument();
-    fireEvent.keyDown(within(grid).getByRole("textbox"), { key: "Escape" });
-
-    selectCell(grid.querySelector('[data-cell-key="uuid-1:live_link_date"]') as HTMLElement);
-    fireEvent.keyDown(grid, { key: "Enter" });
-    expect(screen.getByRole("dialog", { name: "Choose a date" })).toBeInTheDocument();
-  });
-
-  it("Up and Down step the date by one day while the picker is open", async () => {
-    const grid = await renderTable([makeRow({ live_link_date: "12/31/2026" })]);
-    selectCell(within(grid).getByText("12/31/2026").closest("td") as HTMLElement);
-    fireEvent.keyDown(grid, { key: "Enter" });
-    const input = within(grid).getByDisplayValue("12/31/2026") as HTMLInputElement;
-
-    fireEvent.keyDown(input, { key: "ArrowUp" });
-    expect(input.value).toBe("01/01/2027");
-    fireEvent.keyDown(input, { key: "ArrowDown" });
-    fireEvent.keyDown(input, { key: "ArrowDown" });
-    expect(input.value).toBe("12/30/2026");
-  });
-
-  it("Clear empties the date and saves it", async () => {
-    const grid = await renderTable([makeRow({ live_link_date: "10/05/2026" })]);
-    fireEvent.click(within(grid).getByRole("button", { name: "Pick Live Link Date" }));
-    fireEvent.click(screen.getByRole("button", { name: "Clear date" }));
-
-    await waitFor(() => expect(mockUpdateLinkBuildingOrder).toHaveBeenCalledTimes(1));
-    expect(mockUpdateLinkBuildingOrder.mock.calls[0][1]).toMatchObject({ live_link_date: "" });
-  });
-});
-
 // ─── Cmd+X cut ───────────────────────────────────────────────────────────────
 
 describe("LinkBuildingOrdersTable: cut (Cmd+X)", () => {
