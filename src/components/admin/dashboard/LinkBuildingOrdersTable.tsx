@@ -73,6 +73,7 @@ import ClientAssignCell from "./ClientAssignCell";
 import ClientSearchableSelect from "./ClientSearchableSelect";
 import AdminSearchableSelect from "./AdminSearchableSelect";
 import CellOptionsDropdown from "./CellOptionsDropdown";
+import CellDatePicker from "./CellDatePicker";
 import type {
   LinkBuildingOrderSearchBody,
   SortRulePayload,
@@ -106,6 +107,7 @@ import { useResizableColumnWidths } from "@/hooks/useResizableColumnWidths";
 import { useTableFind, type TableFindMatch, type TableFindMatchState } from "@/hooks/useTableFind";
 import { useVirtualRows, VIRTUAL_ROW_ATTRIBUTE } from "@/hooks/useVirtualRows";
 import { createOrderRowCache, loadAllLinkBuildingOrderRows } from "@/lib/link-building-order-rows-loader";
+import { addDays, getToday, parseCellDate } from "@/lib/date-picker";
 import TableFindBar from "./TableFindBar";
 import KeyboardShortcutsDialog from "./KeyboardShortcutsDialog";
 import LinkBuildingOrderHistoryPanel from "./LinkBuildingOrderHistoryPanel";
@@ -769,6 +771,10 @@ interface EditableCellProps {
   is_active?: boolean;
   /** Double click on the display cell, opens it for editing. */
   onCellDoubleClick?: () => void;
+  /** Opens the cell for editing from its calendar button (date cells only). */
+  onStartEdit?: () => void;
+  /** Gives keyboard focus back to the grid, after a date is picked with the mouse. */
+  onFocusGrid?: () => void;
   /** Lookup key the table uses to scroll this cell into view during keyboard navigation. */
   cell_key?: string;
   /** When provided, shows a copy-to-clipboard icon on cell hover. */
@@ -829,6 +835,8 @@ function EditableCell({
   edit_entry = "edit",
   is_active = false,
   onCellDoubleClick,
+  onStartEdit,
+  onFocusGrid,
   cell_key,
   onCopy,
   onBulkPaste,
@@ -951,8 +959,23 @@ function EditableCell({
     return true;
   };
 
+  /**
+   * Date cells opened with double click or Enter: Up and Down step the date by one
+   * day, like a native date input, starting from today when the cell holds no date.
+   */
+  const handleDateStepKey = (e: React.KeyboardEvent): boolean => {
+    if (col.type !== "date" || edit_entry === "type" || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return false;
+    if (formula_enabled && value.trimStart().startsWith("=")) return false;
+    e.preventDefault();
+    const base_date = parseCellDate(value) ?? getToday();
+    onUpdate(formatDateMMDDYYYY(addDays(base_date, e.key === "ArrowUp" ? 1 : -1)));
+    requestAnimationFrame(() => input_ref.current?.select());
+    return true;
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (handleArrowCommit(e, ["up", "down", "left", "right"])) return;
+    if (handleDateStepKey(e)) return;
     if (handleInsertDateShortcut(e)) return;
     if (e.key === "Escape") {
       e.preventDefault();
@@ -1077,6 +1100,17 @@ function EditableCell({
     // input into a formula editor (function suggestions, argument hints, clicked
     // cells inserted as references). The <td> anchors the helper popover.
     const is_formula_text = formula_enabled && value.trimStart().startsWith("=");
+    // Date cells add a calendar under the input, hidden while a formula is typed so it
+    // does not cover the formula helper.
+    const shows_date_picker = col.type === "date" && !is_formula_text;
+
+    // Same flushSync reasoning as commitDropdownValue above.
+    const commitPickedDate = (picked_value: string) => {
+      flushSync(() => onUpdate(picked_value));
+      onStopEdit();
+      onFocusGrid?.();
+    };
+
     return (
       <td
         ref={setComboboxAnchorEl}
@@ -1094,7 +1128,11 @@ function EditableCell({
           formula_enabled={formula_enabled}
           anchor_el={combobox_anchor_el}
           className={`${styles.cell_input}${is_formula_text ? ` ${styles.cell_input_formula}` : ""}`}
+          placeholder={shows_date_picker ? "MM/DD/YYYY" : undefined}
         />
+        {shows_date_picker && (
+          <CellDatePicker value={value} anchor_el={combobox_anchor_el} onSelect={commitPickedDate} />
+        )}
       </td>
     );
   }
@@ -1191,6 +1229,8 @@ function EditableCell({
   }
 
   const is_required_error = is_draft && (col.required ?? false) && !shown_value;
+  // Plain date cells get a calendar button, a formula's date is edited through its formula.
+  const show_date_button = col.type === "date" && !is_formula_cell && !!onStartEdit;
   const has_alert = !!alert_message && !is_required_error;
   const has_cell_editors = cell_editors.length > 0;
   const show_row_floater = is_first_col && row_editors.length > 0;
@@ -1269,9 +1309,26 @@ function EditableCell({
           is_active={is_active && !is_range_selected}
         />
       )}
+      {show_date_button && (
+        <button
+          type="button"
+          className={`${styles.cell_date_button}${is_active ? ` ${styles.cell_date_button_active}` : ""}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onStartEdit();
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          title="Pick a date"
+          aria-label={`Pick ${col.label}`}
+        >
+          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </button>
+      )}
       {onCopy && shown_value && !is_required_error && (
         <button
-          className={`absolute right-0.5 top-1/2 -translate-y-1/2 rounded p-0.5 opacity-0 transition-all group-hover:opacity-20 group-hover/cell:opacity-70 hover:!opacity-100 hover:bg-white dark:hover:bg-gray-700 ${just_copied ? "!opacity-100 text-green-500" : "text-gray-400"
+          className={`absolute ${show_date_button ? "right-6" : "right-0.5"} top-1/2 -translate-y-1/2 rounded p-0.5 opacity-0 transition-all group-hover:opacity-20 group-hover/cell:opacity-70 hover:!opacity-100 hover:bg-white dark:hover:bg-gray-700 ${just_copied ? "!opacity-100 text-green-500" : "text-gray-400"
             }`}
           onClick={handleCopy}
           onMouseDown={(e) => e.stopPropagation()}
@@ -6836,6 +6893,8 @@ export default function LinkBuildingOrdersTable({ onOrderMutated }: { onOrderMut
                             is_active={is_active}
                             cell_key={toCellKey(row.id, col.key)}
                             onCellDoubleClick={() => startEditing(row.id, col.key)}
+                            onStartEdit={col.type === "date" ? () => startEditing(row.id, col.key) : undefined}
+                            onFocusGrid={focusGrid}
                             onCancelEdit={cancelEditing}
                             is_draft={is_new}
                             is_first_col={is_first_col}

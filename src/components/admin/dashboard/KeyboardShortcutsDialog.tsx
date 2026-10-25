@@ -47,6 +47,7 @@ export const LINK_BUILDING_ORDER_SHORTCUT_GROUPS: ReadonlyArray<ShortcutGroup> =
       { description: "Cancel the edit", keys: [["Escape"]] },
       { description: "Clear the selected cells", keys: [["Delete"], ["Backspace"]] },
       { description: "Insert today's date", keys: [["Mod", ";"]] },
+      { description: "Move a date one day later or earlier (while editing a date)", keys: [["↑"], ["↓"]] },
       { description: "Start a formula", keys: [["="]] },
     ],
   },

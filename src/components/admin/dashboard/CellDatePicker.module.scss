@@ -1,0 +1,488 @@
+// Calendar popover of the date cells in the Link Building Orders table. Uses the
+// table's selection blue, so the panel reads as part of the cell being edited.
+
+// ── Tokens ─────────────────────────────────────────────────────────────────────
+
+$accent: #1a73e8;
+$accent_hover: #1765cc;
+$accent_soft: #e8f0fe;
+$accent_dark: #8ab4f8;
+$accent_dark_text: #0b1f3f;
+$accent_soft_dark: rgba(138, 180, 248, 0.16);
+
+$surface: #fff;
+$surface_dark: #1f2937;
+$border: #e4e7ec;
+$border_dark: #374151;
+$hover_bg: #f2f4f7;
+$hover_bg_dark: rgba(255, 255, 255, 0.06);
+$text: #1d2939;
+$text_dark: #f2f4f7;
+$text_muted: #667085;
+$text_muted_dark: #98a2b3;
+$text_faint: #b4bcc8;
+$text_faint_dark: #4b5563;
+
+$panel_radius: 12px;
+$day_size: 34px;
+$font_family: var(--font-outfit), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+@mixin dark {
+  :global(.dark) & {
+    @content;
+  }
+}
+
+@mixin reset_button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+@keyframes panel_in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+// ── Panel ──────────────────────────────────────────────────────────────────────
+
+.panel {
+  position: fixed;
+  z-index: 100001;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid $border;
+  border-radius: $panel_radius;
+  background: $surface;
+  color: $text;
+  font-family: $font_family;
+  font-size: 13px;
+  box-shadow:
+    0 12px 32px -8px rgba(16, 24, 40, 0.18),
+    0 4px 8px -4px rgba(16, 24, 40, 0.08);
+  transform-origin: top left;
+  animation: panel_in 120ms ease-out;
+  user-select: none;
+
+  @include dark {
+    border-color: $border_dark;
+    background: $surface_dark;
+    color: $text_dark;
+    box-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.6);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+.icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.chevron {
+  width: 12px;
+  height: 12px;
+  color: $text_muted;
+}
+
+.icon_button {
+  @include reset_button;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: $text_muted;
+  transition: background-color 120ms, color 120ms;
+
+  &:hover:not(:disabled) {
+    background: $hover_bg;
+    color: $text;
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  @include dark {
+    color: $text_muted_dark;
+
+    &:hover:not(:disabled) {
+      background: $hover_bg_dark;
+      color: $text_dark;
+    }
+  }
+}
+
+// ── Header (Today, Clear) ──────────────────────────────────────────────────────
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.today_button {
+  @include reset_button;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid $border;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  transition: border-color 120ms, background-color 120ms, color 120ms;
+
+  &:hover {
+    border-color: $accent;
+    background: $accent_soft;
+    color: $accent;
+  }
+
+  @include dark {
+    border-color: $border_dark;
+
+    &:hover {
+      border-color: $accent_dark;
+      background: $accent_soft_dark;
+      color: $accent_dark;
+    }
+  }
+}
+
+// The picked date spelled out, so a typed date can be checked at a glance.
+.selected_summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1.5px solid $accent;
+  border-radius: 6px;
+  background: $accent_soft;
+  color: $accent;
+  font-size: 12.5px;
+  font-weight: 500;
+
+  @include dark {
+    border-color: $accent_dark;
+    background: $accent_soft_dark;
+    color: $accent_dark;
+  }
+}
+
+.selected_text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selected_placeholder {
+  color: $text_muted;
+  font-weight: 400;
+
+  @include dark {
+    color: $text_muted_dark;
+  }
+}
+
+// ── Month and year navigation ──────────────────────────────────────────────────
+
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.nav_labels,
+.nav_arrows {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.nav_label {
+  @include reset_button;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 13.5px;
+  font-weight: 600;
+  transition: background-color 120ms;
+
+  &:hover {
+    background: $hover_bg;
+  }
+
+  @include dark {
+    &:hover {
+      background: $hover_bg_dark;
+    }
+  }
+}
+
+.nav_label_open {
+  background: $accent_soft;
+  color: $accent;
+
+  .chevron {
+    color: currentColor;
+    transform: rotate(180deg);
+  }
+
+  @include dark {
+    background: $accent_soft_dark;
+    color: $accent_dark;
+  }
+}
+
+// ── Days view ──────────────────────────────────────────────────────────────────
+
+.day_grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.weekday_row,
+.week_row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  justify-items: center;
+}
+
+.weekday {
+  width: $day_size;
+  padding-bottom: 4px;
+  color: $text_muted;
+  font-size: 11.5px;
+  font-weight: 500;
+  text-align: center;
+
+  @include dark {
+    color: $text_muted_dark;
+  }
+}
+
+.day {
+  @include reset_button;
+  position: relative;
+  width: $day_size;
+  height: $day_size;
+  border-radius: 8px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  transition: background-color 100ms, color 100ms;
+
+  &:hover {
+    background: $hover_bg;
+  }
+
+  @include dark {
+    &:hover {
+      background: $hover_bg_dark;
+    }
+  }
+}
+
+.day_outside {
+  color: $text_faint;
+
+  @include dark {
+    color: $text_faint_dark;
+  }
+}
+
+// Today keeps a small underline, so it stays visible when another day is picked.
+.day_today {
+  color: $accent;
+  font-weight: 600;
+
+  &::after {
+    content: "";
+    position: absolute;
+    bottom: 5px;
+    left: 50%;
+    width: 12px;
+    height: 2px;
+    border-radius: 1px;
+    background: currentColor;
+    transform: translateX(-50%);
+  }
+
+  @include dark {
+    color: $accent_dark;
+  }
+}
+
+.day_selected {
+  background: $accent;
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(26, 115, 232, 0.35);
+
+  &:hover {
+    background: $accent_hover;
+  }
+
+  @include dark {
+    background: $accent_dark;
+    color: $accent_dark_text;
+
+    &:hover {
+      background: $accent_dark;
+    }
+  }
+}
+
+// ── Months and years views ─────────────────────────────────────────────────────
+
+.option_grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  // Same height as the days view, so the panel does not jump when switching views.
+  min-height: 7 * $day_size + 6 * 2px;
+  align-content: center;
+}
+
+.option {
+  @include reset_button;
+  height: 40px;
+  border-radius: 8px;
+  font-size: 13px;
+  transition: background-color 100ms, color 100ms;
+
+  &:hover {
+    background: $hover_bg;
+  }
+
+  @include dark {
+    &:hover {
+      background: $hover_bg_dark;
+    }
+  }
+}
+
+.option_today {
+  color: $accent;
+  font-weight: 600;
+
+  @include dark {
+    color: $accent_dark;
+  }
+}
+
+.option_selected {
+  background: $accent;
+  color: #fff;
+  font-weight: 600;
+
+  &:hover {
+    background: $accent_hover;
+  }
+
+  @include dark {
+    background: $accent_dark;
+    color: $accent_dark_text;
+
+    &:hover {
+      background: $accent_dark;
+    }
+  }
+}
+
+// ── Footer (quick picks) ───────────────────────────────────────────────────────
+
+.footer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 2px -12px -12px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid $border;
+
+  @include dark {
+    border-color: $border_dark;
+  }
+}
+
+.footer_label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: $text_muted;
+  font-size: 11.5px;
+  font-weight: 500;
+
+  @include dark {
+    color: $text_muted_dark;
+  }
+}
+
+.sparkle {
+  width: 13px;
+  height: 13px;
+  color: #a855f7;
+}
+
+.quick_picks {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.quick_pick {
+  @include reset_button;
+  height: 26px;
+  border: 1px solid $border;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: border-color 120ms, background-color 120ms, color 120ms;
+
+  &:hover {
+    border-color: $accent;
+    color: $accent;
+  }
+
+  @include dark {
+    border-color: $border_dark;
+
+    &:hover {
+      border-color: $accent_dark;
+      color: $accent_dark;
+    }
+  }
+}
+
+.quick_pick_selected {
+  border-color: $accent;
+  background: $accent_soft;
+  color: $accent;
+
+  @include dark {
+    border-color: $accent_dark;
+    background: $accent_soft_dark;
+    color: $accent_dark;
+  }
+}
