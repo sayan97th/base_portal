@@ -130,4 +130,4 @@ rm -rf "$stage_dir"
 echo
 echo "==> Package ready: $package_file ($(du -h "$package_file" | cut -f1))"
 echo "    Next step: scripts/deploy/upload-package.sh $target_env"
-echo "    (UPLOAD_ENV=1 also uploads $env_file as the server runtime env)"
+echo "    ($env_file is uploaded as the server runtime env if missing; UPLOAD_ENV=1 overwrites it)"

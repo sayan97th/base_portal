@@ -8,8 +8,9 @@
 #   DEPLOY_SSH_HOST overrides the SSH alias from ~/.ssh/config
 #   (default: base-clients-testing for testing, base-clients-prod for staging and production).
 #   APP_ROOT overrides the remote app folder (same defaults as activate-release.sh).
-#   UPLOAD_ENV=1 also uploads .env.<env> to $APP_ROOT/shared/.env.<env>, the runtime env
-#   that activate-release.sh links into every release.
+#   .env.<env> is uploaded to $APP_ROOT/shared/.env.<env> (the runtime env that
+#   activate-release.sh links into every release) when the server does not have it yet.
+#   UPLOAD_ENV=1 always uploads it (overwrites the server copy), UPLOAD_ENV=0 never does.
 set -euo pipefail
 
 target_env="${1:-}"
@@ -45,13 +46,23 @@ echo "==> Uploading $package_name to $ssh_host:$remote_deploy_dir/"
 ssh "$ssh_host" "mkdir -p '$remote_deploy_dir'"
 scp "$package_file" "$project_root/scripts/deploy/activate-release.sh" "$ssh_host:$remote_deploy_dir/"
 
-if [ "${UPLOAD_ENV:-0}" = "1" ]; then
-  env_file="$project_root/.env.$target_env"
+env_file="$project_root/.env.$target_env"
+remote_env_file="$app_root/shared/.env.$target_env"
+upload_env="${UPLOAD_ENV:-}"
+if [ -z "$upload_env" ]; then
+  if ssh "$ssh_host" "test -f '$remote_env_file'"; then
+    upload_env=0
+    echo "==> $remote_env_file already on the server (UPLOAD_ENV=1 to overwrite it)"
+  else
+    upload_env=1
+  fi
+fi
+
+if [ "$upload_env" = "1" ]; then
   [ -s "$env_file" ] || {
     echo "ERROR: $env_file not found or empty." >&2
     exit 1
   }
-  remote_env_file="$app_root/shared/.env.$target_env"
   echo "==> Uploading .env.$target_env to $ssh_host:$remote_env_file"
   ssh "$ssh_host" "mkdir -p '$app_root/shared'"
   scp "$env_file" "$ssh_host:$remote_env_file"

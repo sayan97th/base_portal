@@ -6,7 +6,7 @@
 # Packages are uploaded by upload-package.sh to $APP_ROOT/deploy/.
 #
 # Runtime env (e.g. STRIPE_SECRET_KEY) is read from $APP_ROOT/shared/.env.<env>
-# (upload it with UPLOAD_ENV=1 upload-package.sh <env>). It is linked into each release
+# (upload-package.sh uploads it when it is missing). It is linked into each release
 # as .env.production, the file Next.js reads at runtime. An older
 # $APP_ROOT/shared/.env.production is still used as a fallback.
 #
@@ -146,7 +146,7 @@ if [ ! -f "$runtime_env_file" ] && [ -f "$shared_dir/.env.production" ]; then
   echo "WARNING: $runtime_env_file not found, using $shared_dir/.env.production" >&2
   runtime_env_file="$shared_dir/.env.production"
 fi
-[ -f "$runtime_env_file" ] || fail "missing $runtime_env_file (runtime env, e.g. STRIPE_SECRET_KEY). Upload it with: UPLOAD_ENV=1 scripts/deploy/upload-package.sh $target_env"
+[ -f "$runtime_env_file" ] || fail "missing $runtime_env_file (runtime env, e.g. STRIPE_SECRET_KEY). Run scripts/deploy/upload-package.sh $target_env from your machine (it uploads .env.$target_env when missing)."
 
 release_info="$(tar -xOzf "$package_file" ./RELEASE_INFO)" || fail "RELEASE_INFO not found in package"
 release_id="$(echo "$release_info" | grep '^release_id=' | cut -d= -f2-)"
