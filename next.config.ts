@@ -6,6 +6,8 @@ const apiProtocol = new URL(apiBaseUrl).protocol.replace(":", "") as "http" | "h
 const apiPort = new URL(apiBaseUrl).port || undefined;
 
 const nextConfig: NextConfig = {
+  // Self-contained server in .next/standalone, used by scripts/deploy
+  output: "standalone",
   images: {
     remotePatterns: [
       {

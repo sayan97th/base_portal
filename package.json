@@ -19,7 +19,9 @@
     "pm2:restart:production": "pm2 restart ecosystem/ecosystem.production.config.js",
     "pm2:delete": "pm2 delete base-portal",
     "pm2:logs": "pm2 logs base-portal",
-    "pm2:status": "pm2 status"
+    "pm2:status": "pm2 status",
+    "deploy:package": "bash scripts/deploy/build-package.sh",
+    "deploy:upload": "bash scripts/deploy/upload-package.sh"
   },
   "dependencies": {
     "@formulajs/formulajs": "^4.6.1",

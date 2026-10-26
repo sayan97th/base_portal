@@ -31,6 +31,7 @@ yarn-error.log*
 
 # local env files
 .env*.local
+.env.production
 
 # vercel
 .vercel
@@ -45,3 +46,5 @@ next-env.d.ts
 
 # import
 /import
+# deploy packages (scripts/deploy)
+/deploy/
