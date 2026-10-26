@@ -3,16 +3,14 @@
 #
 # Usage: scripts/deploy/upload-package.sh <testing|staging|production> [package.tar.gz]
 #   Without a package path, the newest deploy/base-portal-<env>-*.tar.gz is used.
-#   DEPLOY_SSH_HOST overrides the SSH alias from ~/.ssh/config
-#   (production: base-clients-prod, testing/staging: workspace-97th).
+#   DEPLOY_SSH_HOST overrides the SSH alias from ~/.ssh/config (default: base-clients-prod).
 set -euo pipefail
 
 target_env="${1:-}"
 package_file="${2:-}"
 
 case "$target_env" in
-  production)      default_ssh_host="base-clients-prod" ;;
-  testing|staging) default_ssh_host="workspace-97th" ;;
+  testing|staging|production) default_ssh_host="base-clients-prod" ;;
   *)
     echo "Usage: $0 <testing|staging|production> [package.tar.gz]" >&2
     exit 1
