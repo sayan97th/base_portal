@@ -3,7 +3,7 @@
 # deploy/base-portal-<env>-<release_id>.tar.gz, ready to upload to the server.
 #
 # Usage: scripts/deploy/build-package.sh <testing|staging|production>
-#   SKIP_INSTALL=1     skip "pnpm install --frozen-lockfile"
+#   SKIP_INSTALL=1     skip "pnpm install"
 #   ALLOW_LOCAL_API=1  allow a localhost NEXT_PUBLIC_API_BASE_URL (testing the flow only)
 #
 # NEXT_PUBLIC_* values are baked into the build. They are read from .env.production
@@ -55,7 +55,7 @@ echo "    NEXT_PUBLIC_API_BASE_URL=$api_base_url"
 
 # 2. Build (SKIP_INSTALL=1 reuses the current node_modules)
 if [ "${SKIP_INSTALL:-0}" != "1" ]; then
-  pnpm install --frozen-lockfile
+  pnpm install
 fi
 pnpm build
 
