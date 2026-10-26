@@ -5,7 +5,8 @@
 #
 # Usage: scripts/deploy/upload-package.sh <testing|staging|production> [package.tar.gz]
 #   Without a package path, the newest deploy/base-portal-<env>-*.tar.gz is used.
-#   DEPLOY_SSH_HOST overrides the SSH alias from ~/.ssh/config (default: base-clients-prod).
+#   DEPLOY_SSH_HOST overrides the SSH alias from ~/.ssh/config
+#   (default: base-clients-testing for testing, base-clients-prod for staging and production).
 #   APP_ROOT overrides the remote app folder (same defaults as activate-release.sh).
 #   UPLOAD_ENV=1 also uploads .env.<env> to $APP_ROOT/shared/.env.<env>, the runtime env
 #   that activate-release.sh links into every release.
@@ -15,15 +16,15 @@ target_env="${1:-}"
 package_file="${2:-}"
 
 case "$target_env" in
-  testing)    default_app_root="/var/www/base-portal.97dev.com" ;;
-  staging)    default_app_root="/var/www/clients.basesearchmarketing.com" ;;
-  production) default_app_root="/var/www/portal.basesearchmarketing.com" ;;
+  testing)    default_app_root="/var/www/base-portal.97dev.com";          default_ssh_host="base-clients-testing" ;;
+  staging)    default_app_root="/var/www/clients.basesearchmarketing.com"; default_ssh_host="base-clients-prod" ;;
+  production) default_app_root="/var/www/portal.basesearchmarketing.com";  default_ssh_host="base-clients-prod" ;;
   *)
     echo "Usage: $0 <testing|staging|production> [package.tar.gz]" >&2
     exit 1
     ;;
 esac
-ssh_host="${DEPLOY_SSH_HOST:-base-clients-prod}"
+ssh_host="${DEPLOY_SSH_HOST:-$default_ssh_host}"
 app_root="${APP_ROOT:-$default_app_root}"
 remote_deploy_dir="$app_root/deploy"
 
