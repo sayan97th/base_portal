@@ -3,8 +3,11 @@
 # "current" at it and restarts PM2. If the app does not answer, it switches back
 # to the previous release automatically.
 #
+# Packages are uploaded by upload-package.sh to $APP_ROOT/deploy/.
+#
 # Usage:
 #   activate-release.sh <env> <package.tar.gz>   activate a new package
+#   activate-release.sh <env> --latest           activate the newest package in $APP_ROOT/deploy/
 #   activate-release.sh <env> --rollback         go back to the previous release
 #   activate-release.sh <env> --list             list releases
 #
@@ -19,11 +22,11 @@ case "$target_env" in
   staging)    default_app_root="/var/www/clients.basesearchmarketing.com" ;;
   production) default_app_root="/var/www/portal.basesearchmarketing.com" ;;
   *)
-    echo "Usage: $0 <testing|staging|production> <package.tar.gz | --rollback | --list>" >&2
+    echo "Usage: $0 <testing|staging|production> <package.tar.gz | --latest | --rollback | --list>" >&2
     exit 1
     ;;
 esac
-[ -n "$action" ] || { echo "Usage: $0 $target_env <package.tar.gz | --rollback | --list>" >&2; exit 1; }
+[ -n "$action" ] || { echo "Usage: $0 $target_env <package.tar.gz | --latest | --rollback | --list>" >&2; exit 1; }
 
 export APP_ROOT="${APP_ROOT:-$default_app_root}"
 export APP_PORT="${APP_PORT:-3777}"
@@ -31,6 +34,7 @@ keep_releases="${KEEP_RELEASES:-5}"
 
 releases_dir="$APP_ROOT/releases"
 shared_dir="$APP_ROOT/shared"
+deploy_dir="$APP_ROOT/deploy"
 current_link="$APP_ROOT/current"
 pm2_app_name="base-portal"
 
@@ -99,7 +103,7 @@ command -v pm2 >/dev/null || fail "pm2 is not installed"
 command -v node >/dev/null || fail "node is not installed"
 command -v curl >/dev/null || fail "curl is not installed"
 
-mkdir -p "$releases_dir" "$shared_dir/logs"
+mkdir -p "$releases_dir" "$shared_dir/logs" "$deploy_dir"
 
 case "$action" in
   --list)
@@ -125,6 +129,10 @@ esac
 
 # Activate a new package
 package_file="$action"
+if [ "$package_file" = "--latest" ]; then
+  package_file="$(ls -1t "$deploy_dir"/base-portal-"$target_env"-*.tar.gz 2>/dev/null | head -n 1 || true)"
+  [ -n "$package_file" ] || fail "no base-portal-$target_env-*.tar.gz found in $deploy_dir"
+fi
 [ -f "$package_file" ] || fail "package not found: $package_file"
 [ -f "$shared_dir/.env.production" ] || fail "missing $shared_dir/.env.production (runtime env, e.g. STRIPE_SECRET_KEY). Create it first."
 
