@@ -11,8 +11,9 @@
 # $APP_ROOT/shared/.env.production is still used as a fallback.
 #
 # Usage:
-#   activate-release.sh <env> <package.tar.gz>   activate a new package
-#   activate-release.sh <env> --latest           activate the newest package in $APP_ROOT/deploy/
+#   activate-release.sh <env>                    activate the newest package in $APP_ROOT/deploy/ (default)
+#   activate-release.sh <env> --latest           same as above
+#   activate-release.sh <env> <package.tar.gz>   activate a specific package
 #   activate-release.sh <env> --rollback         go back to the previous release
 #   activate-release.sh <env> --list             list releases
 #
@@ -20,18 +21,17 @@
 set -euo pipefail
 
 target_env="${1:-}"
-action="${2:-}"
+action="${2:---latest}"
 
 case "$target_env" in
   testing)    default_app_root="/var/www/base-portal.97dev.com" ;;
   staging)    default_app_root="/var/www/clients.basesearchmarketing.com" ;;
   production) default_app_root="/var/www/portal.basesearchmarketing.com" ;;
   *)
-    echo "Usage: $0 <testing|staging|production> <package.tar.gz | --latest | --rollback | --list>" >&2
+    echo "Usage: $0 <testing|staging|production> [--latest | package.tar.gz | --rollback | --list]" >&2
     exit 1
     ;;
 esac
-[ -n "$action" ] || { echo "Usage: $0 $target_env <package.tar.gz | --latest | --rollback | --list>" >&2; exit 1; }
 
 export APP_ROOT="${APP_ROOT:-$default_app_root}"
 export APP_PORT="${APP_PORT:-3777}"
@@ -135,7 +135,8 @@ esac
 # Activate a new package
 package_file="$action"
 if [ "$package_file" = "--latest" ]; then
-  package_file="$(ls -1t "$deploy_dir"/base-portal-"$target_env"-*.tar.gz 2>/dev/null | head -n 1 || true)"
+  # Newest by release_id in the file name (upload time can differ from build time)
+  package_file="$(ls -1 "$deploy_dir"/base-portal-"$target_env"-*.tar.gz 2>/dev/null | sort | tail -n 1 || true)"
   [ -n "$package_file" ] || fail "no base-portal-$target_env-*.tar.gz found in $deploy_dir"
 fi
 [ -f "$package_file" ] || fail "package not found: $package_file"

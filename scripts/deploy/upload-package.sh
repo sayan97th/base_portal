@@ -4,7 +4,7 @@
 # (production: /var/www/portal.basesearchmarketing.com/deploy).
 #
 # Usage: scripts/deploy/upload-package.sh <testing|staging|production> [package.tar.gz]
-#   Without a package path, the newest deploy/base-portal-<env>-*.tar.gz is used.
+#   Without a package path (default), the newest deploy/base-portal-<env>-*.tar.gz is used.
 #   DEPLOY_SSH_HOST overrides the SSH alias from ~/.ssh/config
 #   (default: base-clients-testing for testing, base-clients-prod for staging and production).
 #   APP_ROOT overrides the remote app folder (same defaults as activate-release.sh).
@@ -31,7 +31,8 @@ remote_deploy_dir="$app_root/deploy"
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 if [ -z "$package_file" ]; then
-  package_file="$(ls -1t "$project_root"/deploy/base-portal-"$target_env"-*.tar.gz 2>/dev/null | head -n 1 || true)"
+  # Newest by release_id in the file name
+  package_file="$(ls -1 "$project_root"/deploy/base-portal-"$target_env"-*.tar.gz 2>/dev/null | sort | tail -n 1 || true)"
 fi
 [ -n "$package_file" ] && [ -f "$package_file" ] || {
   echo "ERROR: no package found for '$target_env'. Run scripts/deploy/build-package.sh $target_env first." >&2
@@ -58,7 +59,7 @@ if [ "${UPLOAD_ENV:-0}" = "1" ]; then
 fi
 
 echo
-echo "==> Uploaded. To activate it, run:"
+echo "==> Uploaded. To activate the newest package in $remote_deploy_dir, run:"
+echo "    ssh $ssh_host 'bash $remote_deploy_dir/activate-release.sh $target_env'"
+echo "  or, to activate exactly this package:"
 echo "    ssh $ssh_host 'bash $remote_deploy_dir/activate-release.sh $target_env $remote_deploy_dir/$package_name'"
-echo "  or, to activate the newest package in $remote_deploy_dir:"
-echo "    ssh $ssh_host 'bash $remote_deploy_dir/activate-release.sh $target_env --latest'"
