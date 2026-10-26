@@ -5,6 +5,11 @@
 #
 # Packages are uploaded by upload-package.sh to $APP_ROOT/deploy/.
 #
+# Runtime env (e.g. STRIPE_SECRET_KEY) is read from $APP_ROOT/shared/.env.<env>
+# (upload it with UPLOAD_ENV=1 upload-package.sh <env>). It is linked into each release
+# as .env.production, the file Next.js reads at runtime. An older
+# $APP_ROOT/shared/.env.production is still used as a fallback.
+#
 # Usage:
 #   activate-release.sh <env> <package.tar.gz>   activate a new package
 #   activate-release.sh <env> --latest           activate the newest package in $APP_ROOT/deploy/
@@ -134,7 +139,13 @@ if [ "$package_file" = "--latest" ]; then
   [ -n "$package_file" ] || fail "no base-portal-$target_env-*.tar.gz found in $deploy_dir"
 fi
 [ -f "$package_file" ] || fail "package not found: $package_file"
-[ -f "$shared_dir/.env.production" ] || fail "missing $shared_dir/.env.production (runtime env, e.g. STRIPE_SECRET_KEY). Create it first."
+
+runtime_env_file="$shared_dir/.env.$target_env"
+if [ ! -f "$runtime_env_file" ] && [ -f "$shared_dir/.env.production" ]; then
+  echo "WARNING: $runtime_env_file not found, using $shared_dir/.env.production" >&2
+  runtime_env_file="$shared_dir/.env.production"
+fi
+[ -f "$runtime_env_file" ] || fail "missing $runtime_env_file (runtime env, e.g. STRIPE_SECRET_KEY). Upload it with: UPLOAD_ENV=1 scripts/deploy/upload-package.sh $target_env"
 
 release_info="$(tar -xOzf "$package_file" ./RELEASE_INFO)" || fail "RELEASE_INFO not found in package"
 release_id="$(echo "$release_info" | grep '^release_id=' | cut -d= -f2-)"
@@ -155,7 +166,8 @@ echo "$release_info" | sed 's/^/    /'
 mkdir -p "$new_release_dir"
 tar -xzf "$package_file" -C "$new_release_dir"
 
-ln -sfn "$shared_dir/.env.production" "$new_release_dir/.env.production"
+echo "==> Runtime env: $runtime_env_file"
+ln -sfn "$runtime_env_file" "$new_release_dir/.env.production"
 ln -sfn "$shared_dir/logs" "$new_release_dir/logs"
 
 previous_release_dir=""

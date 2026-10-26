@@ -6,9 +6,14 @@
 #   SKIP_INSTALL=1     skip "pnpm install"
 #   ALLOW_LOCAL_API=1  allow a localhost NEXT_PUBLIC_API_BASE_URL (testing the flow only)
 #
-# NEXT_PUBLIC_* values are baked into the build. They are read from .env.production
-# (and .env.production.local if it exists) and exported to the build process,
-# because "next build" would otherwise let .env.local override .env.production.
+# NEXT_PUBLIC_* values are baked into the build. They are read from .env.<env>
+# (and .env.<env>.local if it exists):
+#   testing    -> .env.testing
+#   staging    -> .env.staging
+#   production -> .env.production
+# and exported to the build process, because "next build" always reads .env.local and
+# .env.production on its own. Keys defined only in those other files are exported empty
+# so no value from another environment ends up in the package.
 set -euo pipefail
 
 target_env="${1:-}"
@@ -33,25 +38,53 @@ fail() {
   exit 1
 }
 
-# 1. Load build env (process env has priority over every .env file in Next.js)
-[ -f .env.production ] || fail ".env.production not found. Create it with the NEXT_PUBLIC_* values for '$target_env'."
+envKeys() {
+  # Prints the variable names defined in a .env file
+  grep -oE '^[[:space:]]*(export[[:space:]]+)?[A-Za-z_][A-Za-z0-9_]*=' "$1" | sed -E 's/^[[:space:]]*(export[[:space:]]+)?//; s/=$//'
+}
 
+# 1. Load build env (process env has priority over every .env file in Next.js)
+env_file=".env.$target_env"
+[ -s "$env_file" ] || fail "$env_file not found or empty. Create it with the values for '$target_env' (see .env.example)."
+
+loaded_env_files="$env_file"
 set -a
-# shellcheck disable=SC1091
-source .env.production
-if [ -f .env.production.local ]; then
-  # shellcheck disable=SC1091
-  source .env.production.local
+# shellcheck disable=SC1090
+source "$env_file"
+if [ -f "$env_file.local" ]; then
+  # shellcheck disable=SC1090
+  source "$env_file.local"
+  loaded_env_files="$loaded_env_files $env_file.local"
 fi
 set +a
 
+# Block keys that "next build" would otherwise take from another environment's file
+for other_env_file in .env .env.local .env.production .env.production.local; do
+  [ -f "$other_env_file" ] || continue
+  for key in $(envKeys "$other_env_file"); do
+    [ -n "${!key+x}" ] || export "$key="
+  done
+done
+
+if [ -f .env.example ]; then
+  missing_keys=()
+  for key in $(envKeys .env.example); do
+    [ -n "${!key:-}" ] || missing_keys+=("$key")
+  done
+  if [ "${#missing_keys[@]}" -gt 0 ]; then
+    echo "WARNING: empty or missing in $env_file: ${missing_keys[*]}" >&2
+  fi
+fi
+
 api_base_url="${NEXT_PUBLIC_API_BASE_URL:-}"
 if [[ -z "$api_base_url" || "$api_base_url" == *localhost* || "$api_base_url" == *127.0.0.1* ]]; then
-  [ "${ALLOW_LOCAL_API:-0}" = "1" ] || fail "NEXT_PUBLIC_API_BASE_URL is '$api_base_url'. Set the server URL in .env.production (or run with ALLOW_LOCAL_API=1)."
+  [ "${ALLOW_LOCAL_API:-0}" = "1" ] || fail "NEXT_PUBLIC_API_BASE_URL is '$api_base_url'. Set the server URL in $env_file (or run with ALLOW_LOCAL_API=1)."
 fi
 
 echo "==> Building '$target_env' release $release_id"
+echo "    env files: $loaded_env_files"
 echo "    NEXT_PUBLIC_API_BASE_URL=$api_base_url"
+echo "    NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-}"
 
 # 2. Build (SKIP_INSTALL=1 reuses the current node_modules)
 if [ "${SKIP_INSTALL:-0}" != "1" ]; then
@@ -72,7 +105,7 @@ if [ -d public ]; then
 fi
 
 # Next copies local .env files into standalone; never ship them.
-# The server uses shared/.env.production instead.
+# The server uses shared/.env.<env> instead (linked as .env.production).
 find "$stage_dir" -maxdepth 1 -name '.env*' -exec rm -f {} +
 
 cp ecosystem/ecosystem.standalone.config.js "$stage_dir/"
@@ -82,6 +115,7 @@ chmod +x "$stage_dir/activate-release.sh"
 cat > "$stage_dir/RELEASE_INFO" <<EOF
 release_id=$release_id
 target_env=$target_env
+env_file=$env_file
 git_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)
 git_commit=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)
 build_arch=$(uname -m)
@@ -96,3 +130,4 @@ rm -rf "$stage_dir"
 echo
 echo "==> Package ready: $package_file ($(du -h "$package_file" | cut -f1))"
 echo "    Next step: scripts/deploy/upload-package.sh $target_env"
+echo "    (UPLOAD_ENV=1 also uploads $env_file as the server runtime env)"

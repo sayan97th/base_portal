@@ -2,7 +2,7 @@
 // Layout on the server:
 //   $APP_ROOT/releases/<release_id>/   one folder per uploaded package
 //   $APP_ROOT/current -> releases/<release_id>
-//   $APP_ROOT/shared/.env.production   runtime secrets, linked into every release
+//   $APP_ROOT/shared/.env.<env>        runtime secrets, linked into every release as .env.production
 //   $APP_ROOT/shared/logs/
 // APP_ROOT and APP_PORT are exported by scripts/deploy/activate-release.sh.
 const path = require("path");

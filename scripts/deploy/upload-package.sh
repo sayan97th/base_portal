@@ -7,6 +7,8 @@
 #   Without a package path, the newest deploy/base-portal-<env>-*.tar.gz is used.
 #   DEPLOY_SSH_HOST overrides the SSH alias from ~/.ssh/config (default: base-clients-prod).
 #   APP_ROOT overrides the remote app folder (same defaults as activate-release.sh).
+#   UPLOAD_ENV=1 also uploads .env.<env> to $APP_ROOT/shared/.env.<env>, the runtime env
+#   that activate-release.sh links into every release.
 set -euo pipefail
 
 target_env="${1:-}"
@@ -40,6 +42,19 @@ package_name="$(basename "$package_file")"
 echo "==> Uploading $package_name to $ssh_host:$remote_deploy_dir/"
 ssh "$ssh_host" "mkdir -p '$remote_deploy_dir'"
 scp "$package_file" "$project_root/scripts/deploy/activate-release.sh" "$ssh_host:$remote_deploy_dir/"
+
+if [ "${UPLOAD_ENV:-0}" = "1" ]; then
+  env_file="$project_root/.env.$target_env"
+  [ -s "$env_file" ] || {
+    echo "ERROR: $env_file not found or empty." >&2
+    exit 1
+  }
+  remote_env_file="$app_root/shared/.env.$target_env"
+  echo "==> Uploading .env.$target_env to $ssh_host:$remote_env_file"
+  ssh "$ssh_host" "mkdir -p '$app_root/shared'"
+  scp "$env_file" "$ssh_host:$remote_env_file"
+  ssh "$ssh_host" "chmod 600 '$remote_env_file'"
+fi
 
 echo
 echo "==> Uploaded. To activate it, run:"
