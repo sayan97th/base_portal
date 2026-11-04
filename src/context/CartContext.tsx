@@ -28,7 +28,6 @@ import type { Discount, BulkDiscountDetail } from "@/types/admin/discounts";
 const CART_STORAGE_KEY = "unified_cart_v1";
 const CART_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
 const SERVER_SYNC_DEBOUNCE_MS = 1500;
-const MINIMUM_CART_FOR_COUPON = 500;
 
 interface CartSnapshot extends UnifiedCartPayload {
   version: 1;
@@ -537,18 +536,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       0
     );
 
-    // Cart dropped below the global minimum — remove all coupons
-    if (new_subtotal < MINIMUM_CART_FOR_COUPON) {
-      setAppliedCoupons([]);
-      setCouponAdjustmentNotice(
-        `Your promo code was removed because your cart dropped below the $${MINIMUM_CART_FOR_COUPON.toLocaleString(
-          "en-US",
-          { minimumFractionDigits: 2, maximumFractionDigits: 2 }
-        )} minimum required for promo codes.`
-      );
-      return;
-    }
-
+    // There is no global cart minimum for promo codes. Only coupons configured
+    // with their own minimum_purchase requirement are checked below.
     let changed = false;
     const updated: CartAppliedCoupon[] = [];
 
@@ -564,7 +553,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         if (applicable_subtotal === 0) {
           changed = true;
           setCouponAdjustmentNotice(
-            `Promo code "${coupon.code}" was removed — none of the qualifying products remain in your cart.`
+            `Promo code "${coupon.code}" was removed because none of the qualifying products remain in your cart.`
           );
           continue;
         }
@@ -580,7 +569,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         if (applicable_subtotal === 0) {
           changed = true;
           setCouponAdjustmentNotice(
-            `Promo code "${coupon.code}" was removed — the qualifying product is no longer in your cart.`
+            `Promo code "${coupon.code}" was removed because the qualifying product is no longer in your cart.`
           );
           continue;
         }
@@ -594,7 +583,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       ) {
         changed = true;
         setCouponAdjustmentNotice(
-          `Promo code "${coupon.code}" was removed — your cart no longer meets the $${coupon.minimum_purchase_amount.toLocaleString(
+          `Promo code "${coupon.code}" was removed because your cart no longer meets the $${coupon.minimum_purchase_amount.toLocaleString(
             "en-US",
             { minimumFractionDigits: 2, maximumFractionDigits: 2 }
           )} minimum purchase requirement.`

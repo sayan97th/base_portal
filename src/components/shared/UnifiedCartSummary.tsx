@@ -6,8 +6,6 @@ import { validateCoupon } from "@/services/client/coupons.service";
 import type { CartProductType } from "@/types/client/unified-cart";
 import type { DiscountAppliesTo } from "@/types/admin/discounts";
 
-const MINIMUM_CART_FOR_COUPON = 500;
-
 const PRODUCT_TYPE_LABELS: Record<CartProductType, string> = {
   link_building: "Link Building",
   content_optimization: "Content Optimization",
@@ -155,11 +153,6 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
     (d) => d.is_applied && active_discount_type === "bulk" && applied_coupons.length === 0
   );
 
-  // Coupon minimum check uses full subtotal since coupon replaces bulk if it wins
-  const cart_below_minimum =
-    subtotal < MINIMUM_CART_FOR_COUPON &&
-    coupon_input_code.trim().length > 0;
-
   const grouped_items = PRODUCT_TYPE_ORDER.map((product_type) => ({
     product_type,
     label: PRODUCT_TYPE_LABELS[product_type],
@@ -188,16 +181,6 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
     // Only one promo code is allowed per order
     if (applied_coupons.length >= 1) {
       setCouponError("Only one promo code can be applied per order. Remove the current one first.");
-      return;
-    }
-
-    if (subtotal < MINIMUM_CART_FOR_COUPON) {
-      setCouponError(
-        `A minimum cart total of $${MINIMUM_CART_FOR_COUPON.toLocaleString(
-          "en-US",
-          { minimumFractionDigits: 2, maximumFractionDigits: 2 }
-        )} is required to apply a promo code.`
-      );
       return;
     }
 
@@ -571,32 +554,6 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
               </span>
             )}
           </div>
-
-          {cart_below_minimum && (
-            <div className="mb-3 flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-500/30 dark:bg-amber-500/10">
-              <svg
-                className="mt-0.5 h-3 w-3 shrink-0 text-amber-600 dark:text-amber-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"
-                />
-              </svg>
-              <p className="text-[11px] font-medium text-amber-700 dark:text-amber-400">
-                A minimum cart total of $
-                {MINIMUM_CART_FOR_COUPON.toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}{" "}
-                is required to use promo codes.
-              </p>
-            </div>
-          )}
 
           {applied_coupons.length > 0 && (
             <div className="mb-3 space-y-2">
