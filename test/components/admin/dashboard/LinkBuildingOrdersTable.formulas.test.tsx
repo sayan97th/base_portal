@@ -232,7 +232,8 @@ describe("LinkBuildingOrdersTable — cell formulas", () => {
 
     openForEditing(notesCell(grid));
     const input = within(grid).getByRole("textbox");
-    fireEvent.change(input, { target: { value: '=UPPER(F1) & " / DR " & S1*2' } });
+    // F is Keyword and T is DR (Est. Turnaround (Days) occupies column M).
+    fireEvent.change(input, { target: { value: '=UPPER(F1) & " / DR " & T1*2' } });
     fireEvent.blur(input);
 
     await waitFor(() => expect(mockUpdateLinkBuildingOrder).toHaveBeenCalledTimes(1));
@@ -311,7 +312,7 @@ describe("LinkBuildingOrdersTable — cell formulas", () => {
     fireEvent.mouseUp(notes);
     fireEvent.mouseDown(screen.getByText(/Notes \(Client\) is empty/));
     const bar_input = await screen.findByRole("textbox", { name: "Formula or value of the active cell" });
-    fireEvent.change(bar_input, { target: { value: "=S1*3" } });
+    fireEvent.change(bar_input, { target: { value: "=T1*3" } });
 
     // Clicking a cell of the second row selects it before the bar loses focus.
     fireEvent.mouseDown(cellOf(grid, "ppc ads"));
@@ -344,12 +345,13 @@ describe("LinkBuildingOrdersTable — formula columns and totals row", () => {
     mockListSheetFormulas.mockResolvedValue({ columns: [sheetFormula({})], summary: [] });
     const grid = await renderTable([
       makeRow({ id: "uuid-1", order_id: "BL-1", dr_lbs: "40" }),
-      makeRow({ id: "uuid-2", order_id: "BL-2", dr_lbs: "15" }),
+      // 21 doubles to 42, a value no other fixture cell holds (turnaround days is "30").
+      makeRow({ id: "uuid-2", order_id: "BL-2", dr_lbs: "21" }),
     ]);
 
     expect(await within(grid).findByText("Double DR")).toBeInTheDocument();
     expect(within(grid).getByText("80")).toBeInTheDocument();
-    expect(within(grid).getByText("30")).toBeInTheDocument();
+    expect(within(grid).getByText("42")).toBeInTheDocument();
   });
 
   it("shows the totals row result under its column", async () => {
@@ -388,7 +390,7 @@ describe("LinkBuildingOrdersTable: VLOOKUP", () => {
 
     openForEditing(notesCellOfRow(grid, 1));
     const input = within(grid).getByRole("textbox");
-    fireEvent.change(input, { target: { value: '=IFERROR(VLOOKUP(N2, $N$1:$X$1, 11, FALSE), "New partner")' } });
+    fireEvent.change(input, { target: { value: '=IFERROR(VLOOKUP(O2, $O$1:$Y$1, 11, FALSE), "New partner")' } });
     fireEvent.blur(input);
 
     await waitFor(() => expect(mockUpdateLinkBuildingOrder).toHaveBeenCalledTimes(1));
@@ -455,7 +457,7 @@ describe("LinkBuildingOrdersTable: VLOOKUP", () => {
     fireEvent.mouseDown(cell);
     fireEvent.mouseUp(cell);
 
-    expect(screen.getByText('=VLOOKUP("Custom", D:AA, 24, FALSE)')).toBeInTheDocument();
+    expect(screen.getByText('=VLOOKUP("Custom", D:AB, 24, FALSE)')).toBeInTheDocument();
     expect(screen.getByTitle('Did not find value "Custom" in VLOOKUP evaluation.')).toBeInTheDocument();
   });
 

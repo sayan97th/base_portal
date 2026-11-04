@@ -14,6 +14,35 @@ if (typeof Blob !== "undefined" && typeof Blob.prototype.arrayBuffer !== "functi
   };
 }
 
+// jsdom does not implement window.matchMedia(). useKeepInViewport reads
+// "(prefers-reduced-motion: reduce)" when scrolling a cell into view, which the
+// admin dashboard tables and filter panels do. Default to "no match", the same
+// as a browser with no user preference set. Tests can still override it.
+if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    configurable: true,
+    value: (query: string): MediaQueryList => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }),
+  });
+}
+
+// jsdom has no layout engine, so it does not implement Element.scrollIntoView().
+// useKeepInViewport and several admin dashboard menus call it after opening.
+// A no-op is enough: tests that assert scrolling assign their own jest.fn()
+// on the element, which takes precedence over this prototype default.
+if (typeof Element !== "undefined" && typeof Element.prototype.scrollIntoView !== "function") {
+  Element.prototype.scrollIntoView = function scrollIntoView(): void {};
+}
+
 // jsdom does not implement Blob/File.prototype.text() either. Tests read the
 // CSV template the metrics dialog downloads (LinkBuildingMetricsUpdateModal).
 if (typeof Blob !== "undefined" && typeof Blob.prototype.text !== "function") {

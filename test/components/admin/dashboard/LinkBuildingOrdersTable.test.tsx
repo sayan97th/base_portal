@@ -754,7 +754,8 @@ describe("LinkBuildingOrdersTable — bulk paste value handling per column type"
     // never filtered against a fixed list. This guards that it keeps accepting
     // whatever text is pasted, including the extra formatting a metrics tool like
     // Ahrefs or Moz tends to add when a cell is copied out of a spreadsheet.
-    const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", dr_lbs: "30" });
+    // DR 35 is unique on the page (turnaround days in the fixture is "30").
+    const row1 = makeRow({ id: "uuid-1", order_id: "BL-1", dr_lbs: "35" });
     const row2 = makeRow({ id: "uuid-2", order_id: "BL-2", dr_lbs: "40" });
     mockListLinkBuildingOrders.mockResolvedValue(mockSearchResponse([row1, row2]));
     render(<LinkBuildingOrdersTable />);
@@ -769,8 +770,8 @@ describe("LinkBuildingOrdersTable — bulk paste value handling per column type"
       ],
     });
 
-    openCellForEditing("30");
-    fireEvent.paste(screen.getByDisplayValue("30"), {
+    openCellForEditing("35");
+    fireEvent.paste(screen.getByDisplayValue("35"), {
       clipboardData: { getData: () => "45 (Ahrefs)\n52 (Moz)" },
     });
 

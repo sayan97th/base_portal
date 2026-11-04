@@ -182,7 +182,9 @@ const row2 = makeRow({ id: "uuid-2", order_id: "BL-2", client: "Globex Inc", key
 
 // Column positions in the grid, after the row number and checkbox cells:
 // E Company, F Keyword, I Notes, K Request Date (locked), R Live Link Date, S DR (number).
-const COL_IDX = { client: 4, keyword: 5, notes: 8, request_date: 10, live_link_date: 17, dr_lbs: 18 } as const;
+// Data column positions (0 based). Est. Turnaround (Days) sits at 12 (column M),
+// so every column after Delivery Date is one position further right.
+const COL_IDX = { client: 4, keyword: 5, notes: 8, request_date: 10, live_link_date: 18, dr_lbs: 19 } as const;
 
 /** Today's date as the table's date columns store it, built here independently of the app code. */
 function todayMMDDYYYY(): string {
@@ -248,7 +250,7 @@ describe("LinkBuildingOrdersTable: insert today's date (Cmd+; / Ctrl+;)", () => 
     await waitFor(() => expect(mockUpdateLinkBuildingOrder).toHaveBeenCalledTimes(1));
     expect(mockUpdateLinkBuildingOrder.mock.calls[0][0]).toBe("uuid-1");
     expect(mockUpdateLinkBuildingOrder.mock.calls[0][1]).toMatchObject({ live_link_date: todayMMDDYYYY() });
-    expect(nameBoxText()).toBe("R2");
+    expect(nameBoxText()).toBe("S2");
   });
 
   it.each([
@@ -496,8 +498,9 @@ describe("LinkBuildingOrdersTable: selection shortcuts", () => {
 
     fireEvent.keyDown(grid, { key: "a", metaKey: true });
 
-    expect(nameBoxText()).toBe("A1:AB2");
-    expect(screen.getByText(/56 cells selected/i)).toBeInTheDocument();
+    // 29 data columns (A to AC) across 2 rows.
+    expect(nameBoxText()).toBe("A1:AC2");
+    expect(screen.getByText(/58 cells selected/i)).toBeInTheDocument();
   });
 
   it("Shift+Space selects the active row", async () => {
@@ -506,7 +509,7 @@ describe("LinkBuildingOrdersTable: selection shortcuts", () => {
 
     fireEvent.keyDown(grid, { key: " ", shiftKey: true });
 
-    expect(nameBoxText()).toBe("A2:AB2");
+    expect(nameBoxText()).toBe("A2:AC2");
     expect(within(grid).queryByRole("textbox")).not.toBeInTheDocument();
   });
 
