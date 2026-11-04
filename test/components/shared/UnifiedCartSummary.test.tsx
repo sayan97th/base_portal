@@ -389,7 +389,7 @@ describe("UnifiedCartSummary", () => {
       });
     });
 
-    it("shows minimum cart warning when subtotal is below $500", () => {
+    it("does not show a global minimum cart warning when subtotal is below $500", () => {
       mockUseCart.mockReturnValue(
         buildCartContext({
           subtotal:          300,
@@ -399,7 +399,7 @@ describe("UnifiedCartSummary", () => {
 
       render(<UnifiedCartSummary show_coupon_field />);
 
-      expect(screen.getByText(/minimum cart total/i)).toBeInTheDocument();
+      expect(screen.queryByText(/minimum cart total/i)).not.toBeInTheDocument();
     });
 
     it("shows applied coupon chip with remove button", () => {
@@ -450,6 +450,173 @@ describe("UnifiedCartSummary", () => {
       fireEvent.click(remove_btn);
 
       expect(mockSetAppliedCoupons).toHaveBeenCalled();
+    });
+  });
+
+  // ─── Promo codes without a global cart minimum ──────────────────────────
+
+  describe("promo codes on small carts", () => {
+    const small_cart_items = [
+      makeCartItem({ tier_id: "dr50", tier_name: "DR 50+", quantity: 1, unit_price: 400 }),
+    ];
+
+    function validResponse(overrides: Partial<Awaited<ReturnType<typeof validateCoupon>>> = {}) {
+      return {
+        valid:                   true,
+        coupon_id:               "coupon-uuid",
+        code:                    "CONF25",
+        name:                    "Conference 25",
+        discount_type:           "percentage" as const,
+        discount_value:          25,
+        applies_to:              "all" as const,
+        product_types:           [],
+        dr_tier_id:              null,
+        minimum_purchase_amount: null,
+        discount_amount:         100,
+        message:                 "",
+        ...overrides,
+      };
+    }
+
+    it("sends the promo code to the API for a $400 cart instead of blocking it", async () => {
+      const mockSetAppliedCoupons = jest.fn();
+
+      mockUseCart.mockReturnValue(
+        buildCartContext({
+          items:             small_cart_items,
+          subtotal:          400,
+          total:             400,
+          coupon_input_code: "CONF25",
+          setAppliedCoupons: mockSetAppliedCoupons,
+        })
+      );
+      mockValidateCoupon.mockResolvedValue(validResponse());
+
+      render(<UnifiedCartSummary show_coupon_field />);
+
+      fireEvent.click(screen.getByRole("button", { name: /add/i }));
+
+      await waitFor(() => expect(mockSetAppliedCoupons).toHaveBeenCalled());
+
+      expect(mockValidateCoupon).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code:                 "CONF25",
+          order_amount:         400,
+          cart_product_types:   ["link_building"],
+          product_type_amounts: { link_building: 400 },
+          dr_tier_ids:          ["dr50"],
+          dr_tier_amounts:      { dr50: 400 },
+        })
+      );
+      expect(screen.queryByText(/minimum cart total/i)).not.toBeInTheDocument();
+    });
+
+    it("stores the applied coupon with its discount for a small cart", async () => {
+      const mockSetAppliedCoupons = jest.fn();
+
+      mockUseCart.mockReturnValue(
+        buildCartContext({
+          items:             small_cart_items,
+          subtotal:          400,
+          total:             400,
+          coupon_input_code: "CONF25",
+          setAppliedCoupons: mockSetAppliedCoupons,
+        })
+      );
+      mockValidateCoupon.mockResolvedValue(validResponse());
+
+      render(<UnifiedCartSummary show_coupon_field />);
+      fireEvent.click(screen.getByRole("button", { name: /add/i }));
+
+      await waitFor(() => expect(mockSetAppliedCoupons).toHaveBeenCalled());
+
+      const updater = mockSetAppliedCoupons.mock.calls[0][0];
+      const next_coupons = typeof updater === "function" ? updater([]) : updater;
+
+      expect(next_coupons).toEqual([
+        expect.objectContaining({ code: "CONF25", discount_amount: 100 }),
+      ]);
+    });
+
+    it("applies a promo code to a very small cart", async () => {
+      mockUseCart.mockReturnValue(
+        buildCartContext({
+          items:             [makeCartItem({ quantity: 1, unit_price: 50 })],
+          subtotal:          50,
+          total:             50,
+          coupon_input_code: "TINY10",
+        })
+      );
+      mockValidateCoupon.mockResolvedValue(
+        validResponse({ code: "TINY10", discount_value: 10, discount_amount: 5 })
+      );
+
+      render(<UnifiedCartSummary show_coupon_field />);
+      fireEvent.click(screen.getByRole("button", { name: /add/i }));
+
+      await waitFor(() =>
+        expect(mockValidateCoupon).toHaveBeenCalledWith(
+          expect.objectContaining({ code: "TINY10", order_amount: 50 })
+        )
+      );
+    });
+
+    it("shows the per coupon minimum message returned by the API", async () => {
+      mockUseCart.mockReturnValue(
+        buildCartContext({
+          items:             small_cart_items,
+          subtotal:          400,
+          total:             400,
+          coupon_input_code: "BIGORDER",
+        })
+      );
+      mockValidateCoupon.mockResolvedValue(
+        validResponse({
+          valid:                   false,
+          code:                    "BIGORDER",
+          applies_to:              "minimum_purchase",
+          minimum_purchase_amount: 1000,
+          discount_amount:         0,
+          message:                 "This coupon requires a minimum purchase of $1,000.00.",
+        })
+      );
+
+      render(<UnifiedCartSummary show_coupon_field />);
+      fireEvent.click(screen.getByRole("button", { name: /add/i }));
+
+      expect(
+        await screen.findByText("This coupon requires a minimum purchase of $1,000.00.")
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/minimum cart total/i)).not.toBeInTheDocument();
+    });
+
+    it("still allows only one promo code per order on a small cart", async () => {
+      const applied: CartAppliedCoupon = {
+        coupon_id:       "uuid-1",
+        code:            "CONF25",
+        coupon_name:     "Conference 25",
+        discount_amount: 100,
+        discount_type:   "percentage",
+        discount_value:  25,
+      };
+
+      mockUseCart.mockReturnValue(
+        buildCartContext({
+          items:             small_cart_items,
+          subtotal:          400,
+          total:             300,
+          applied_coupons:   [applied],
+          coupon_input_code: "SECOND",
+        })
+      );
+
+      render(<UnifiedCartSummary show_coupon_field />);
+      fireEvent.click(screen.getByRole("button", { name: /add/i }));
+
+      expect(
+        await screen.findByText(/only one promo code can be applied per order/i)
+      ).toBeInTheDocument();
+      expect(mockValidateCoupon).not.toHaveBeenCalled();
     });
   });
 
