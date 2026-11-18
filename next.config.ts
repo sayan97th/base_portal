@@ -8,6 +8,9 @@ const apiPort = new URL(apiBaseUrl).port || undefined;
 const nextConfig: NextConfig = {
   // Self-contained server in .next/standalone, used by scripts/deploy
   output: "standalone",
+  experimental: {
+    agentUpgrade: "security",
+  },
   images: {
     remotePatterns: [
       {
