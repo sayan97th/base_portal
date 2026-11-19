@@ -2,6 +2,7 @@ import { apiClient } from "@/lib/api-client";
 import type {
   Coupon,
   CouponDrTier,
+  CouponUsageResponse,
   CreateCouponPayload,
   UpdateCouponPayload,
 } from "@/types/admin/coupons";
@@ -14,6 +15,11 @@ export async function listAdminCoupons(): Promise<Coupon[]> {
 export async function getAdminCoupon(id: string): Promise<Coupon> {
   const response = await apiClient.get<{ data: Coupon }>(`/api/admin/coupons/${id}`);
   return response.data;
+}
+
+/** Usage history of a coupon: every order it was applied to and who placed it. */
+export async function getAdminCouponUsage(id: string): Promise<CouponUsageResponse> {
+  return apiClient.get<CouponUsageResponse>(`/api/admin/coupons/${id}/usages`);
 }
 
 export async function createAdminCoupon(

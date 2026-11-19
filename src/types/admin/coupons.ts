@@ -107,3 +107,81 @@ export interface AdminGiftCardClaimFilters {
   order_id?: string;
   status?: GiftCardClaimStatus;
 }
+
+// ── Coupon usage history ─────────────────────────────────────────────────────
+
+export type CouponUsageProductType = ProductType | "premium_mentions";
+
+export interface CouponUsageItem {
+  label: string;
+  quantity: number;
+  unit_price: number;
+  subtotal: number;
+}
+
+export interface CouponUsageClient {
+  id: number;
+  name: string;
+  email: string;
+  company: string | null;
+  organization: string | null;
+}
+
+export interface CouponUsage {
+  id: string;
+  order_id: string;
+  order_reference: string;
+  order_title: string | null;
+  session_id: string | null;
+  product_type: CouponUsageProductType;
+  product_label: string;
+  status: string;
+  items: CouponUsageItem[];
+  items_quantity: number;
+  subtotal_before_discount: number;
+  discount_amount: number;
+  total_amount: number;
+  /** Gift card value earned on this order, only for gift card reward coupons. */
+  reward_amount: number;
+  gift_card_claim: {
+    id: string;
+    status: GiftCardClaimStatus;
+    reward_amount: number;
+    gift_card_brand: string | null;
+  } | null;
+  invoice: { id: string; invoice_number: string | null; status: string | null } | null;
+  client: CouponUsageClient | null;
+  /** Admin path of the order detail page, null when the product has no detail page. */
+  order_url: string | null;
+  ordered_at: string | null;
+  used_at: string | null;
+}
+
+export interface CouponUsageProductBreakdown {
+  product_type: CouponUsageProductType;
+  product_label: string;
+  order_count: number;
+  discount_amount: number;
+  net_revenue: number;
+}
+
+export interface CouponUsageSummary {
+  order_count: number;
+  /** Checkouts that used the coupon. One checkout can create one order per product. */
+  checkout_count: number;
+  client_count: number;
+  total_discount: number;
+  total_reward: number;
+  gross_revenue: number;
+  net_revenue: number;
+  average_order_value: number;
+  by_product_type: CouponUsageProductBreakdown[];
+  first_used_at: string | null;
+  last_used_at: string | null;
+}
+
+export interface CouponUsageResponse {
+  coupon: Coupon;
+  summary: CouponUsageSummary;
+  data: CouponUsage[];
+}

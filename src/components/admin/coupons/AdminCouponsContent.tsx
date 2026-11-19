@@ -585,7 +585,7 @@ export default function AdminCouponsContent() {
       ) : (
         <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[860px] border-collapse">
+            <table className="w-full min-w-[900px] border-collapse">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50 dark:border-gray-800 dark:bg-gray-900/60">
                   <Th className="w-44 pl-5">Code</Th>
@@ -595,7 +595,7 @@ export default function AdminCouponsContent() {
                   <Th className="w-36">Applies To</Th>
                   <Th className="w-[110px]">Usage</Th>
                   <Th className="w-[118px]">Expires</Th>
-                  <Th className="w-24 pr-5" align="right" />
+                  <Th className="w-32 pr-5" align="right" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
@@ -721,10 +721,17 @@ export default function AdminCouponsContent() {
 
                       {/* Usage */}
                       <td className="px-4 py-4 align-middle">
-                        <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                        <Link
+                          href={`/admin/coupons/${coupon.id}/usage`}
+                          title="See the orders that used this coupon"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-gray-700 underline-offset-2 transition-colors hover:text-brand-600 hover:underline dark:text-gray-300 dark:hover:text-brand-400"
+                        >
                           {coupon.times_used}
                           {coupon.usage_limit ? ` / ${coupon.usage_limit}` : " uses"}
-                        </p>
+                          <svg className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                          </svg>
+                        </Link>
                         {usage_pct !== null && (
                           <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
                             <div
@@ -767,6 +774,15 @@ export default function AdminCouponsContent() {
                       {/* Actions */}
                       <td className="py-4 pl-4 pr-5 align-middle">
                         <div className="flex items-center justify-end gap-1">
+                          <Link
+                            href={`/admin/coupons/${coupon.id}/usage`}
+                            title="Usage and orders"
+                            className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
+                          >
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+                            </svg>
+                          </Link>
                           <button
                             onClick={() => handleToggleStatus(coupon)}
                             title={coupon.is_active ? "Deactivate" : "Activate"}
