@@ -14,7 +14,11 @@ import type {
   UnifiedCheckoutContentOptimizationItem,
   UnifiedCheckoutContentBriefItem,
 } from "@/types/client/unified-cart";
-import type { UnifiedDeferredCheckoutPayload } from "@/types/client/unified-cart";
+import type {
+  UnifiedCheckoutGiftCardReward,
+  UnifiedDeferredCheckoutPayload,
+} from "@/types/client/unified-cart";
+import { isGiftCardRewardDetailsComplete } from "@/types/client/gift-card-rewards";
 
 const PRODUCT_TYPE_LABELS: Record<CartProductType, string> = {
   link_building: "Link Building",
@@ -108,7 +112,27 @@ export function useUnifiedCheckout(
     order_title,
     order_notes,
     clearCart,
+    gift_card_reward_coupon,
+    gift_card_reward_details,
   } = useCart();
+
+  // Gift card details are only sent when a money back promo code is applied
+  // and the client filled in both fields. Skipping is allowed, the client can
+  // complete them later from the order page.
+  const buildGiftCardRewardPayload = useCallback(
+    (coupon_ids: string[] | undefined): UnifiedCheckoutGiftCardReward | undefined => {
+      if (!gift_card_reward_coupon || !coupon_ids?.includes(gift_card_reward_coupon.coupon_id)) {
+        return undefined;
+      }
+      if (!isGiftCardRewardDetailsComplete(gift_card_reward_details)) return undefined;
+
+      return {
+        recipient_email: gift_card_reward_details.recipient_email.trim(),
+        gift_card_brand: gift_card_reward_details.gift_card_brand,
+      };
+    },
+    [gift_card_reward_coupon, gift_card_reward_details]
+  );
 
   const [is_submitting, setIsSubmitting] = useState(false);
   const [submit_error, setSubmitError] = useState<string | null>(null);
@@ -180,6 +204,7 @@ export function useUnifiedCheckout(
           ...(credits_amount && credits_amount > 0 ? { credits_amount } : {}),
           session_id: purchase_group_id,
           coupon_ids,
+          gift_card_reward: buildGiftCardRewardPayload(coupon_ids),
           billing,
           order_title: order_title || null,
           order_notes: order_notes || null,
@@ -323,7 +348,7 @@ export function useUnifiedCheckout(
         setIsSubmitting(false);
       }
     },
-    [items, applied_coupons, total, order_title, order_notes, clearCart, addNotification, fetchNotifications, router, getSuccessRedirect]
+    [items, applied_coupons, total, order_title, order_notes, clearCart, addNotification, fetchNotifications, router, getSuccessRedirect, buildGiftCardRewardPayload]
   );
 
   const handlePayLater = useCallback(async (defer_details?: boolean) => {
@@ -348,6 +373,7 @@ export function useUnifiedCheckout(
         total_amount: total,
         session_id: purchase_group_id,
         coupon_ids,
+        gift_card_reward: buildGiftCardRewardPayload(coupon_ids),
         order_title: order_title || null,
         order_notes: order_notes || null,
         ...(defer_details ? { defer_details: true } : {}),
@@ -451,7 +477,7 @@ export function useUnifiedCheckout(
     } finally {
       setIsSubmitting(false);
     }
-  }, [items, applied_coupons, total, order_title, order_notes, clearCart, addNotification, router, getSuccessRedirect]);
+  }, [items, applied_coupons, total, order_title, order_notes, clearCart, addNotification, router, getSuccessRedirect, buildGiftCardRewardPayload]);
 
   return { is_submitting, submit_error, setSubmitError, handleComplete, handlePayLater };
 }

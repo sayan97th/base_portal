@@ -22,6 +22,7 @@ import type {
 } from "@/types/client/link-building";
 import type { CartProductType } from "@/types/client/unified-cart";
 import OrderComments from "@/components/orders/OrderComments";
+import GiftCardRewardPanel from "@/components/gift-card-rewards/GiftCardRewardPanel";
 import OrderProgressTimeline from "@/components/orders/OrderProgressTimeline";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -908,6 +909,9 @@ const OrderDetailPage: React.FC<OrderDetailPageProps> = ({ order_id }) => {
               </Link>
             )}
           </div>
+
+          {/* Promo gift card (HAPPYHOLIDAYS) rescue view, renders nothing for other orders */}
+          <GiftCardRewardPanel order_id={order_id} />
 
           {/* Main Grid */}
           <div className="grid grid-cols-12 gap-6">

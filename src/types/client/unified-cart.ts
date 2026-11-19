@@ -1,3 +1,5 @@
+import type { GiftCardBrand, GiftCardReward } from "@/types/client/gift-card-rewards";
+
 export type CartProductType =
   | "content_optimization"
   | "link_building"
@@ -49,6 +51,14 @@ export interface CartAppliedCoupon {
   product_types?: string[];
   minimum_purchase_amount?: number | null;
   dr_tier_id?: string | null;
+  /** Money back promo: discount_value is the reward percentage, discount_amount stays 0. */
+  is_gift_card_reward?: boolean;
+}
+
+/** Gift card details sent with a checkout that used a money back promo code. */
+export interface UnifiedCheckoutGiftCardReward {
+  recipient_email: string;
+  gift_card_brand: GiftCardBrand;
 }
 
 export interface UnifiedCartPayload {
@@ -116,6 +126,7 @@ export interface UnifiedCheckoutPayload {
   credits_amount?: number;
   session_id?: string;
   coupon_ids?: string[] | null;
+  gift_card_reward?: UnifiedCheckoutGiftCardReward;
   billing: UnifiedCheckoutBilling;
   order_title?: string | null;
   order_notes?: string | null;
@@ -137,6 +148,7 @@ export interface UnifiedCheckoutResponse {
   orders: UnifiedCheckoutCreatedOrder[];
   session_id?: string;
   invoice_unique_id?: string | null;
+  gift_card_reward?: GiftCardReward | null;
 }
 
 export interface UnifiedDeferredCheckoutPayload {
@@ -144,6 +156,7 @@ export interface UnifiedDeferredCheckoutPayload {
   total_amount: number;
   session_id?: string;
   coupon_ids?: string[] | null;
+  gift_card_reward?: UnifiedCheckoutGiftCardReward;
   order_title?: string | null;
   order_notes?: string | null;
   /** "Skip for now": park intake details as pending for later. */

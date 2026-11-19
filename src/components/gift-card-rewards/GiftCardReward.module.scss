@@ -1,0 +1,765 @@
+@use "sass:list";
+
+// Promo gift card (money back) UI: checkout card, order page panel and the
+// shared brand picker. Clean board style: soft surfaces, rounded tiles,
+// one strong accent color and clear status chips.
+
+// ── Tokens ─────────────────────────────────────────────────────────────────────
+
+$brand_500: var(--color-brand-500);
+$brand_50: var(--color-brand-50);
+$gray_900: var(--color-gray-900);
+$gray_800: var(--color-gray-800);
+$gray_700: var(--color-gray-700);
+$gray_600: var(--color-gray-600);
+$gray_500: var(--color-gray-500);
+$gray_400: var(--color-gray-400);
+$gray_200: var(--color-gray-200);
+$gray_100: var(--color-gray-100);
+$gray_50: var(--color-gray-50);
+
+$festive_from: #ec3c89;
+$festive_via: #a855f7;
+$festive_to: #6366f1;
+$success: #12b76a;
+$success_soft: rgba(18, 183, 106, 0.12);
+$error: #f04438;
+$error_soft: rgba(240, 68, 56, 0.08);
+$radius_lg: 16px;
+$radius_md: 12px;
+$radius_sm: 8px;
+$ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+$brand_themes: (
+  amazon: (#232f3e, #37475a, #ff9900),
+  visa: (#1a1f71, #2b33a8, #f7b600),
+  target: (#cc0000, #e31b23, #ffffff),
+);
+
+@mixin dark {
+  :global(.dark) & {
+    @content;
+  }
+}
+
+@mixin focus_ring($color: rgba(236, 60, 137, 0.28)) {
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px $color;
+  }
+}
+
+@keyframes pop_in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
+// ── Shared header pieces ───────────────────────────────────────────────────────
+
+.ribbon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, $festive_from, $festive_via);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.giftIcon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.amount {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: $gray_900;
+  font-variant-numeric: tabular-nums;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.muted {
+  font-size: 12px;
+  line-height: 1.5;
+  color: $gray_500;
+
+  @include dark {
+    color: $gray_400;
+  }
+}
+
+// ── Brand picker ───────────────────────────────────────────────────────────────
+
+.fieldLabel {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: $gray_700;
+
+  @include dark {
+    color: $gray_200;
+  }
+}
+
+.brandGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.brandTile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 6px;
+  border: 2px solid $gray_200;
+  border-radius: $radius_md;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.18s $ease, transform 0.18s $ease, box-shadow 0.18s $ease;
+  @include focus_ring;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 18px -10px rgba(16, 24, 40, 0.35);
+  }
+
+  @include dark {
+    border-color: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+  }
+}
+
+.brandTileSelected {
+  border-color: $brand_500;
+  box-shadow: 0 0 0 3px rgba(236, 60, 137, 0.14);
+
+  @include dark {
+    border-color: $brand_500;
+  }
+}
+
+.brandCheck {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: $brand_500;
+  color: #fff;
+  box-shadow: 0 0 0 2px #fff;
+  animation: pop_in 0.2s $ease;
+
+  svg {
+    width: 11px;
+    height: 11px;
+  }
+
+  @include dark {
+    box-shadow: 0 0 0 2px $gray_900;
+  }
+}
+
+// Mini gift card illustration inside each tile.
+.miniCard {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 56px;
+  padding: 8px 10px;
+  border-radius: $radius_sm;
+  color: #fff;
+
+  &::after {
+    content: "";
+    position: absolute;
+    right: -14px;
+    bottom: -18px;
+    width: 52px;
+    height: 52px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+  }
+}
+
+@each $name, $colors in $brand_themes {
+  .miniCard_#{$name} {
+    background: linear-gradient(135deg, list.nth($colors, 1), list.nth($colors, 2));
+
+    .miniCardBrand {
+      color: list.nth($colors, 3);
+    }
+  }
+}
+
+.miniCardBrand {
+  position: relative;
+  z-index: 1;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.miniCardChip {
+  position: relative;
+  z-index: 1;
+  width: 18px;
+  height: 12px;
+  border-radius: 3px;
+  background: linear-gradient(135deg, #f5d27a, #c9a14a);
+}
+
+.brandName {
+  padding: 0 2px 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: $gray_700;
+
+  @include dark {
+    color: $gray_200;
+  }
+}
+
+// ── Email field ────────────────────────────────────────────────────────────────
+
+.inputWrap {
+  position: relative;
+}
+
+.inputIcon {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  width: 16px;
+  height: 16px;
+  color: $gray_400;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.input {
+  width: 100%;
+  height: 44px;
+  padding: 0 12px 0 38px;
+  border: 1px solid $gray_200;
+  border-radius: $radius_md;
+  background: #fff;
+  color: $gray_900;
+  font-size: 14px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  &::placeholder {
+    color: $gray_400;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: $brand_500;
+    box-shadow: 0 0 0 3px rgba(236, 60, 137, 0.14);
+  }
+
+  @include dark {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(17, 24, 39, 0.6);
+    color: #fff;
+  }
+}
+
+.inputError {
+  border-color: $error;
+
+  &:focus {
+    border-color: $error;
+    box-shadow: 0 0 0 3px $error_soft;
+  }
+}
+
+.fieldError {
+  margin-top: 6px;
+  font-size: 12px;
+  color: $error;
+}
+
+.formStack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+// ── Checkout card (inside the order summary) ──────────────────────────────────
+
+.checkoutCard {
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 20px;
+  padding: 16px;
+  border: 1px solid rgba(236, 60, 137, 0.22);
+  border-radius: $radius_lg;
+  background:
+    radial-gradient(120% 80% at 100% 0%, rgba(168, 85, 247, 0.1), transparent 60%),
+    linear-gradient(180deg, #fff7fb, #ffffff);
+  animation: pop_in 0.25s $ease;
+
+  @include dark {
+    border-color: rgba(236, 60, 137, 0.28);
+    background:
+      radial-gradient(120% 80% at 100% 0%, rgba(168, 85, 247, 0.14), transparent 60%),
+      rgba(236, 60, 137, 0.06);
+  }
+}
+
+.checkoutHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.checkoutTitle {
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.rewardBadge {
+  flex-shrink: 0;
+  padding: 8px 10px;
+  border-radius: $radius_md;
+  background: #fff;
+  box-shadow: 0 6px 16px -10px rgba(236, 60, 137, 0.6);
+  text-align: right;
+
+  .amount {
+    font-size: 20px;
+  }
+
+  @include dark {
+    background: rgba(255, 255, 255, 0.06);
+  }
+}
+
+.rewardBadgeLabel {
+  display: block;
+  margin-top: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: $brand_500;
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(236, 60, 137, 0.25);
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: $gray_400;
+}
+
+.statusDotReady {
+  background: $success;
+  box-shadow: 0 0 0 4px $success_soft;
+}
+
+// ── Order page panel ───────────────────────────────────────────────────────────
+
+.panel {
+  position: relative;
+  overflow: hidden;
+  border-radius: $radius_lg;
+  border: 1px solid $gray_200;
+  background: #fff;
+  animation: pop_in 0.3s $ease;
+
+  @include dark {
+    border-color: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+  }
+}
+
+.panelAccent {
+  height: 4px;
+  background: linear-gradient(90deg, $festive_from, $festive_via, $festive_to, $festive_from);
+  background-size: 200% 100%;
+  animation: shimmer 6s linear infinite;
+}
+
+.panelBody {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px 24px;
+  padding: 20px;
+
+  @media (min-width: 640px) {
+    flex-wrap: nowrap;
+    padding: 20px 24px;
+  }
+}
+
+.panelIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: 14px;
+  background: linear-gradient(135deg, $festive_from, $festive_via);
+  color: #fff;
+  box-shadow: 0 10px 20px -12px rgba(236, 60, 137, 0.9);
+
+  svg {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+.panelIconDone {
+  background: linear-gradient(135deg, #12b76a, #0e9384);
+  box-shadow: 0 10px 20px -12px rgba(18, 183, 106, 0.9);
+}
+
+.panelText {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.panelTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.panelDescription {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: $gray_600;
+
+  @include dark {
+    color: $gray_400;
+  }
+}
+
+.panelAction {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  width: 100%;
+
+  @media (min-width: 640px) {
+    align-items: flex-end;
+    width: auto;
+  }
+}
+
+.primaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: $radius_md;
+  background: $brand_500;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 0.15s $ease, box-shadow 0.15s $ease, opacity 0.15s ease;
+  box-shadow: 0 8px 18px -10px rgba(236, 60, 137, 0.9);
+  @include focus_ring;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 22px -12px rgba(236, 60, 137, 1);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.secondaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 42px;
+  padding: 0 16px;
+  border: 1px solid $gray_200;
+  border-radius: $radius_md;
+  background: #fff;
+  color: $gray_700;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  @include focus_ring;
+
+  &:hover {
+    background: $gray_50;
+  }
+
+  @include dark {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: transparent;
+    color: $gray_200;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+  }
+}
+
+.deadline {
+  font-size: 11px;
+  color: $gray_500;
+  text-align: center;
+
+  @media (min-width: 640px) {
+    text-align: right;
+  }
+}
+
+// Status chips, like a board status column.
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.chipSubmitted {
+  background: rgba(253, 176, 34, 0.16);
+  color: #b54708;
+
+  @include dark {
+    color: #fdb022;
+  }
+}
+
+.chipFulfilled {
+  background: $success_soft;
+  color: #027a48;
+
+  @include dark {
+    color: #32d583;
+  }
+}
+
+.summaryList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.summaryItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 5px 10px;
+  border-radius: $radius_sm;
+  background: $gray_100;
+  color: $gray_700;
+  font-size: 12px;
+  font-weight: 500;
+
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  @include dark {
+    background: rgba(255, 255, 255, 0.06);
+    color: $gray_200;
+  }
+}
+
+// ── Modal content ──────────────────────────────────────────────────────────────
+
+.modalBody {
+  padding: 28px 22px 22px;
+
+  @media (min-width: 640px) {
+    padding: 32px 32px 28px;
+  }
+}
+
+.modalHero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+  padding: 18px;
+  border-radius: $radius_lg;
+  background: linear-gradient(135deg, $festive_from, $festive_via 60%, $festive_to);
+  color: #fff;
+
+  .amount {
+    color: #fff;
+    font-size: 32px;
+  }
+}
+
+.modalHeroText {
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.modalTitle {
+  margin-bottom: 4px;
+  font-size: 18px;
+  font-weight: 700;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.modalActions {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  margin-top: 22px;
+
+  @media (min-width: 480px) {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+}
+
+.submitError {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: $radius_sm;
+  background: $error_soft;
+  color: $error;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.successState {
+  padding: 8px 0 4px;
+  text-align: center;
+  animation: pop_in 0.3s $ease;
+}
+
+.successIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 14px;
+  border-radius: 999px;
+  background: $success_soft;
+  color: $success;
+
+  svg {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panelAccent,
+  .checkoutCard,
+  .panel,
+  .successState,
+  .brandCheck {
+    animation: none;
+  }
+
+  .brandTile:hover,
+  .primaryButton:hover:not(:disabled) {
+    transform: none;
+  }
+}

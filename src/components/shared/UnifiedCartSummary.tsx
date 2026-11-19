@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useCart } from "@/context/CartContext";
+import GiftCardRewardCheckoutCard from "@/components/gift-card-rewards/GiftCardRewardCheckoutCard";
+import { formatRewardPercentage, isGiftCardRewardCoupon } from "@/types/client/gift-card-rewards";
 import { validateCoupon } from "@/services/client/coupons.service";
 import type { CartProductType } from "@/types/client/unified-cart";
 import type { DiscountAppliesTo } from "@/types/admin/discounts";
@@ -112,6 +114,8 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
     setCouponInputCode,
     coupon_adjustment_notice,
     setCouponAdjustmentNotice,
+    gift_card_reward_coupon,
+    gift_card_reward_amount,
   } = useCart();
 
   const [coupon_error, setCouponError] = useState<string | null>(null);
@@ -219,7 +223,8 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
       if (response.valid) {
         // When a coupon is explicitly applied it overrides the bulk discount.
         // Show a notice so the user knows the bulk discount is being replaced.
-        if (bulk_discount_amount > 0 && response.discount_amount < bulk_discount_amount) {
+        // Money back promo codes keep the bulk discount, so no notice for them.
+        if (!response.is_gift_card_reward && bulk_discount_amount > 0 && response.discount_amount < bulk_discount_amount) {
           setCouponAdjustmentNotice(
             `Promo code "${response.code}" applied — this overrides the bulk discount. The bulk discount ($${bulk_discount_amount.toLocaleString("en-US", {
               minimumFractionDigits: 2,
@@ -246,6 +251,7 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
             product_types: response.product_types ?? [],
             minimum_purchase_amount: response.minimum_purchase_amount,
             dr_tier_id: response.dr_tier_id,
+            is_gift_card_reward: response.is_gift_card_reward === true,
           },
         ]);
       } else {
@@ -586,13 +592,19 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-1.5">
-                    <span className="text-xs font-bold tabular-nums text-emerald-700 dark:text-emerald-400">
-                      &minus;$
-                      {applied.discount_amount.toLocaleString("en-US", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </span>
+                    {isGiftCardRewardCoupon(applied) ? (
+                      <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-600 dark:bg-brand-500/20 dark:text-brand-300">
+                        {formatRewardPercentage(applied.discount_value)} back
+                      </span>
+                    ) : (
+                      <span className="text-xs font-bold tabular-nums text-emerald-700 dark:text-emerald-400">
+                        &minus;$
+                        {applied.discount_amount.toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </span>
+                    )}
                     <button
                       onClick={() => handleRemoveCoupon(applied.code)}
                       className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-emerald-500/50 transition-colors hover:bg-emerald-200 hover:text-emerald-700 dark:hover:bg-emerald-500/20 dark:hover:text-emerald-300"
@@ -700,6 +712,9 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
           )}
         </div>
       )}
+
+      {/* Money back promo (HAPPYHOLIDAYS): gift card brand + email */}
+      {effective_show_coupon && gift_card_reward_coupon && <GiftCardRewardCheckoutCard />}
 
       {/* Subtotal / Discounts / Total */}
       <div className="mb-5 border-t border-gray-100 pt-4 dark:border-gray-800 space-y-2">
@@ -833,6 +848,21 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
             })}
           </p>
         </div>
+
+        {!is_applying_credits && gift_card_reward_coupon && gift_card_reward_amount > 0 && (
+          <div className="flex items-center justify-between rounded-lg bg-brand-50 px-2.5 py-1.5 dark:bg-brand-500/10">
+            <p className="text-xs font-semibold text-brand-600 dark:text-brand-300">
+              Gift card you will receive
+            </p>
+            <p className="text-sm font-bold tabular-nums text-brand-600 dark:text-brand-300">
+              $
+              {gift_card_reward_amount.toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </p>
+          </div>
+        )}
 
         {effective_credits > 0 && total_after_credits <= 0 && (
           <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2.5 dark:border-emerald-500/30 dark:bg-emerald-500/10">

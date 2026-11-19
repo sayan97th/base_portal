@@ -14,6 +14,7 @@ import {
   getAdminCoupon,
 } from "@/services/admin/coupons.service";
 import { listAdminDrTiers } from "@/services/admin/link-building.service";
+import CouponGiftCardClaimsBoard from "@/components/admin/coupons/CouponGiftCardClaimsBoard";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -442,10 +443,11 @@ interface PreviewCardProps {
 
 function PreviewCard({ form, dr_tiers, toggles }: PreviewCardProps) {
   const value = parseFloat(form.discount_value) || 0;
+  const is_reward = form.discount_type === "gift_card_reward";
   const discount_label =
-    form.discount_type === "percentage"
-      ? `${value}%`
-      : `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    form.discount_type === "fixed_amount"
+      ? `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : `${value}%`;
 
   const selected_tiers = dr_tiers.filter((t) => form.dr_tier_ids.includes(t.id));
 
@@ -486,7 +488,7 @@ function PreviewCard({ form, dr_tiers, toggles }: PreviewCardProps) {
       {/* Status pill */}
       <div className="mb-5 flex items-center justify-between">
         <span className="text-xs font-semibold uppercase tracking-widest text-brand-200">
-          Discount Coupon
+          {is_reward ? "Gift Card Reward" : "Discount Coupon"}
         </span>
         <span
           className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
@@ -504,10 +506,12 @@ function PreviewCard({ form, dr_tiers, toggles }: PreviewCardProps) {
         <span className="text-5xl font-black tracking-tight text-white">
           {discount_label}
         </span>
-        <span className="ml-2 text-lg font-medium text-brand-200">OFF</span>
+        <span className="ml-2 text-lg font-medium text-brand-200">{is_reward ? "BACK" : "OFF"}</span>
       </div>
 
-      <p className="mb-6 text-sm text-brand-200">{applies_label}</p>
+      <p className="mb-6 text-sm text-brand-200">
+        {is_reward ? `As an Amazon, Visa or Target gift card. ${applies_label}` : applies_label}
+      </p>
 
       {/* Selected tiers preview */}
       {form.applies_to === "specific_product" && selected_tiers.length > 1 && (
@@ -713,7 +717,7 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
     const val = parseFloat(form.discount_value);
     if (!form.discount_value || isNaN(val) || val <= 0)
       e.discount_value = "Value must be greater than 0.";
-    if (form.discount_type === "percentage" && val > 100)
+    if ((form.discount_type === "percentage" || form.discount_type === "gift_card_reward") && val > 100)
       e.discount_value = "Percentage cannot exceed 100.";
     if (toggles.has_expiry_date && !form.expires_at) e.expires_at = "Expiry date is required.";
     if (form.applies_to === "specific_product" && form.dr_tier_ids.length === 0)
@@ -973,13 +977,22 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
                             </svg>
                           ),
                         },
+                        {
+                          value: "gift_card_reward" as DiscountType,
+                          label: "Gift Card",
+                          icon: (
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M21 11.25v8.25a1.5 1.5 0 0 1-1.5 1.5H5.25a1.5 1.5 0 0 1-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 1 0 9.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1 1 14.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
+                            </svg>
+                          ),
+                        },
                       ]
                     ).map((opt) => (
                       <button
                         key={opt.value}
                         type="button"
                         onClick={() => updateField("discount_type", opt.value)}
-                        className={`flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-medium transition-all ${
+                        className={`flex flex-1 items-center justify-center gap-1.5 px-1 py-2.5 text-xs font-medium transition-all sm:text-sm ${
                           form.discount_type === opt.value
                             ? "bg-brand-500 text-white"
                             : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
@@ -995,16 +1008,20 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
                 {/* Value */}
                 <div>
                   <FieldLabel required>
-                    {form.discount_type === "percentage" ? "Percentage Value" : "Fixed Amount (USD)"}
+                    {form.discount_type === "percentage"
+                      ? "Percentage Value"
+                      : form.discount_type === "gift_card_reward"
+                        ? "Gift Card Value (% of order)"
+                        : "Fixed Amount (USD)"}
                   </FieldLabel>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-400">
-                      {form.discount_type === "percentage" ? "%" : "$"}
+                      {form.discount_type === "fixed_amount" ? "$" : "%"}
                     </span>
                     <input
                       type="number"
                       min="0.01"
-                      max={form.discount_type === "percentage" ? 100 : undefined}
+                      max={form.discount_type === "fixed_amount" ? undefined : 100}
                       step="0.01"
                       value={form.discount_value}
                       onChange={(e) => {
@@ -1014,24 +1031,41 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
                           updateField("discount_value", "0.01");
                           return;
                         }
-                        if (form.discount_type === "percentage" && !isNaN(num) && num > 100) {
+                        if (form.discount_type !== "fixed_amount" && !isNaN(num) && num > 100) {
                           updateField("discount_value", "100");
                           return;
                         }
                         updateField("discount_value", raw);
                       }}
-                      placeholder={form.discount_type === "percentage" ? "10" : "25.00"}
+                      placeholder={form.discount_type === "fixed_amount" ? "25.00" : "10"}
                       className={`${errors.discount_value ? input_error : input_normal} pl-8`}
                     />
                   </div>
                   <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
                     {form.discount_type === "percentage"
                       ? "Allowed range: 0.01% – 100%. Values above 100% are not permitted."
-                      : "Enter a positive dollar amount. No upper limit for fixed discounts."}
+                      : form.discount_type === "gift_card_reward"
+                        ? "Clients pay the full price and receive a gift card worth this % of their order total."
+                        : "Enter a positive dollar amount. No upper limit for fixed discounts."}
                   </p>
                   <FieldError message={errors.discount_value} />
                 </div>
               </div>
+
+              {form.discount_type === "gift_card_reward" && (
+                <div className="mt-4 flex items-start gap-3 rounded-xl border border-brand-100 bg-brand-50/70 px-4 py-3 dark:border-brand-500/20 dark:bg-brand-500/10">
+                  <span className="text-base leading-none">🎁</span>
+                  <div className="text-xs leading-relaxed text-brand-700 dark:text-brand-300">
+                    <p className="font-semibold">Money back promotion</p>
+                    <p className="mt-0.5">
+                      At checkout the client chooses Amazon, Visa or Target and enters the email where the gift card
+                      should be sent. Clients who skip it can finish it from their order page while this coupon is
+                      active. Admins in Email Notification Settings are emailed every time a client submits their
+                      details. This code cannot be combined with other promo codes.
+                    </p>
+                  </div>
+                </div>
+              )}
             </FormSection>
 
             {/* Applies To */}
@@ -1359,6 +1393,13 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
             </div>
           </div>
 
+          {/* ── Gift card requests (money back promos only) ─────────── */}
+          {mode === "edit" && coupon_id && form.discount_type === "gift_card_reward" && (
+            <div id="gift-card-claims" className="col-span-12 scroll-mt-24 lg:col-span-8 lg:order-last">
+              <CouponGiftCardClaimsBoard coupon_id={coupon_id} />
+            </div>
+          )}
+
           {/* ── Right column: live preview ─────────────────────────── */}
           <div className="col-span-12 lg:col-span-4">
             <div className="lg:sticky lg:top-24 space-y-4">
@@ -1395,6 +1436,10 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
                     {
                       icon: "⏱️",
                       text: "Set a per-user limit of 1 to make it a one-time-use coupon.",
+                    },
+                    {
+                      icon: "🎁",
+                      text: "Gift Card coupons do not lower the price. Clients earn a gift card worth the % of their order and admins are notified to send it.",
                     },
                   ].map((tip, i) => (
                     <li key={i} className="flex items-start gap-2.5">

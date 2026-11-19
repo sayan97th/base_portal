@@ -290,7 +290,7 @@ export interface CartResponse {
 
 // ── Coupons ────────────────────────────────────────────────────────────────────
 
-export type CouponDiscountType = "percentage" | "fixed_amount";
+export type CouponDiscountType = "percentage" | "fixed_amount" | "gift_card_reward";
 export type CouponAppliesTo = "all" | "specific_product" | "minimum_purchase";
 
 export interface ValidateCouponPayload {
@@ -314,5 +314,10 @@ export interface ValidateCouponResponse {
   dr_tier_id: string | null;
   minimum_purchase_amount: number | null;
   discount_amount: number;
+  /** Money back promo (for example HAPPYHOLIDAYS): no discount, a gift card is sent instead. */
+  is_gift_card_reward?: boolean;
+  reward_percentage?: number | null;
+  reward_amount?: number;
+  gift_card_brands?: { value: "amazon" | "visa" | "target"; label: string }[];
   message: string;
 }

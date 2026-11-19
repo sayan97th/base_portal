@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Badge from "@/components/ui/badge/Badge";
 import OrderComments from "@/components/orders/OrderComments";
+import GiftCardRewardPanel from "@/components/gift-card-rewards/GiftCardRewardPanel";
 import { linkBuildingService } from "@/services/client/link-building.service";
 import { newContentService } from "@/services/client/new-content.service";
 import { contentOptimizationService } from "@/services/client/content-optimization.service";
@@ -856,6 +857,9 @@ const OrderSessionPage: React.FC<OrderSessionPageProps> = ({ session_id }) => {
           </Link>
         </div>
       )}
+
+      {/* ── Promo gift card (HAPPYHOLIDAYS), renders nothing for other orders ── */}
+      <GiftCardRewardPanel session_id={session_id} auto_open />
 
       {/* ── Order Items Card ── */}
       <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-white/3 overflow-hidden">

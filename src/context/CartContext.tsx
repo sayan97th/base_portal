@@ -24,6 +24,12 @@ import { unifiedCartService } from "@/services/client/unified-cart.service";
 import { getActiveDiscounts } from "@/services/client/discounts.service";
 import { getToken } from "@/lib/api-client";
 import type { Discount, BulkDiscountDetail } from "@/types/admin/discounts";
+import { isGiftCardRewardCoupon, type GiftCardRewardDetails } from "@/types/client/gift-card-rewards";
+
+const EMPTY_GIFT_CARD_REWARD_DETAILS: GiftCardRewardDetails = {
+  recipient_email: "",
+  gift_card_brand: "",
+};
 
 const CART_STORAGE_KEY = "unified_cart_v1";
 const CART_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
@@ -145,6 +151,14 @@ export interface CartContextType {
 
   coupon_adjustment_notice: string | null;
   setCouponAdjustmentNotice: Dispatch<SetStateAction<string | null>>;
+
+  /** Applied money back promo code (HAPPYHOLIDAYS), if any. */
+  gift_card_reward_coupon: CartAppliedCoupon | null;
+  /** Estimated gift card value for the current cart. The API confirms the final amount. */
+  gift_card_reward_amount: number;
+  /** Gift card details the client filled in at checkout. Kept in memory only. */
+  gift_card_reward_details: GiftCardRewardDetails;
+  setGiftCardRewardDetails: Dispatch<SetStateAction<GiftCardRewardDetails>>;
 }
 
 const CartContext = createContext<CartContextType | null>(null);
@@ -158,6 +172,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [is_cart_ready, setIsCartReady] = useState(false);
   const [bulk_discount_configs, setBulkDiscountConfigs] = useState<Discount[]>([]);
   const [coupon_adjustment_notice, setCouponAdjustmentNotice] = useState<string | null>(null);
+  const [gift_card_reward_details, setGiftCardRewardDetails] = useState<GiftCardRewardDetails>(
+    EMPTY_GIFT_CARD_REWARD_DETAILS
+  );
 
   const save_timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -411,6 +428,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setCouponInputCode("");
     setOrderTitle("");
     setOrderNotes("");
+    setGiftCardRewardDetails(EMPTY_GIFT_CARD_REWARD_DETAILS);
     if (save_timer.current) clearTimeout(save_timer.current);
     removeLocalSnapshot();
     if (getToken()) unifiedCartService.deleteCart().catch(() => {});
@@ -501,7 +519,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const subtotal_after_bulk = Math.max(0, subtotal - bulk_discount_amount);
 
-  const total_discount = applied_coupons.reduce(
+  // Money back promo codes never lower the price, so they are left out of the
+  // discount math and the bulk discount keeps applying (mirrors the API).
+  const discount_coupons = applied_coupons.filter((c) => !isGiftCardRewardCoupon(c));
+  const gift_card_reward_coupon = applied_coupons.find((c) => isGiftCardRewardCoupon(c)) ?? null;
+
+  const total_discount = discount_coupons.reduce(
     (sum, c) => sum + c.discount_amount,
     0
   );
@@ -510,7 +533,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   // even if the coupon saves less. The user (or admin) made a deliberate choice
   // to apply the promo, so that decision takes precedence.
   const active_discount_type: "bulk" | "coupon" | "none" =
-    applied_coupons.length > 0
+    discount_coupons.length > 0
       ? "coupon"
       : bulk_discount_amount > 0
       ? "bulk"
@@ -520,6 +543,27 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     active_discount_type === "coupon" ? total_discount : bulk_discount_amount;
 
   const total = Math.max(0, subtotal - effective_discount_amount);
+
+  // Estimated gift card value: reward percentage of what the client pays for
+  // the qualifying products (after the bulk discount on those products).
+  const gift_card_reward_amount = useMemo(() => {
+    if (!gift_card_reward_coupon) return 0;
+
+    const restricted_types = gift_card_reward_coupon.product_types ?? [];
+    let eligible_total = total;
+
+    if (restricted_types.length > 0) {
+      const qualifying_subtotal = items
+        .filter((i) => restricted_types.includes(i.product_type))
+        .reduce((sum, i) => sum + i.quantity * i.unit_price, 0);
+      const qualifying_bulk = bulk_discount_details
+        .filter((d) => d.is_applied && (d.config.applies_to === "all" || restricted_types.includes(d.config.applies_to)))
+        .reduce((sum, d) => sum + d.discount_amount, 0);
+      eligible_total = Math.max(0, qualifying_subtotal - qualifying_bulk);
+    }
+
+    return Math.round(eligible_total * (gift_card_reward_coupon.discount_value / 100) * 100) / 100;
+  }, [gift_card_reward_coupon, total, items, bulk_discount_details]);
 
   const item_count = items.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -591,9 +635,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         continue;
       }
 
-      // Recalculate discount based on current applicable subtotal
-      const new_discount =
-        coupon.discount_type === "percentage"
+      // Recalculate discount based on current applicable subtotal. Money back
+      // promo codes never discount the price, they always stay at 0.
+      const new_discount = isGiftCardRewardCoupon(coupon)
+        ? 0
+        : coupon.discount_type === "percentage"
           ? Math.round(applicable_subtotal * (coupon.discount_value / 100) * 100) / 100
           : Math.min(coupon.discount_value, applicable_subtotal);
 
@@ -650,6 +696,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         bulk_discount_configs,
         coupon_adjustment_notice,
         setCouponAdjustmentNotice,
+        gift_card_reward_coupon,
+        gift_card_reward_amount,
+        gift_card_reward_details,
+        setGiftCardRewardDetails,
       }}
     >
       {children}

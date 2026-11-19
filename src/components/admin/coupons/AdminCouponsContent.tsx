@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import type { Coupon } from "@/types/admin/coupons";
 import {
   listAdminCoupons,
@@ -12,6 +13,7 @@ import {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function formatDiscount(coupon: Coupon): string {
+  if (coupon.discount_type === "gift_card_reward") return `${coupon.discount_value}% back`;
   if (coupon.discount_type === "percentage") return `${coupon.discount_value}% off`;
   return `$${coupon.discount_value.toLocaleString("en-US", { minimumFractionDigits: 2 })} off`;
 }
@@ -674,13 +676,25 @@ export default function AdminCouponsContent() {
                       <td className="px-4 py-4 align-middle">
                         <span
                           className={`inline-flex items-center rounded-lg px-2.5 py-1 text-sm font-bold ${
-                            coupon.discount_type === "percentage"
-                              ? "bg-purple-50 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400"
-                              : "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400"
+                            coupon.discount_type === "gift_card_reward"
+                              ? "bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-300"
+                              : coupon.discount_type === "percentage"
+                                ? "bg-purple-50 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400"
+                                : "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400"
                           }`}
                         >
+                          {coupon.discount_type === "gift_card_reward" && <span className="mr-1">🎁</span>}
                           {formatDiscount(coupon)}
                         </span>
+                        {coupon.discount_type === "gift_card_reward" && (coupon.gift_card_claims_awaiting_count ?? 0) > 0 && (
+                          <Link
+                            href={`/admin/coupons/${coupon.id}/edit#gift-card-claims`}
+                            className="mt-1.5 flex w-fit items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 hover:bg-amber-100 dark:bg-amber-500/10 dark:text-amber-400"
+                          >
+                            {coupon.gift_card_claims_awaiting_count} gift card
+                            {coupon.gift_card_claims_awaiting_count === 1 ? "" : "s"} to send
+                          </Link>
+                        )}
                       </td>
 
                       {/* Applies To */}

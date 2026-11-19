@@ -17,6 +17,7 @@ import type {
 } from "@/types/admin";
 import OrderTrackingPanel from "./OrderTrackingPanel";
 import AdminOrderComments from "./AdminOrderComments";
+import CouponGiftCardClaimsBoard from "@/components/admin/coupons/CouponGiftCardClaimsBoard";
 import { ActionsDropdown, DeleteOrderDialog } from "./OrderActionDialogs";
 
 interface AdminOrderDetailContentProps {
@@ -919,6 +920,13 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
                   </h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">{order.order_notes}</p>
                 </div>
+              )}
+
+              {/* Promo gift card request (HAPPYHOLIDAYS), hidden for other orders */}
+              {order.session_id ? (
+                <CouponGiftCardClaimsBoard session_id={order.session_id} compact />
+              ) : (
+                <CouponGiftCardClaimsBoard order_id={order.id} compact />
               )}
 
               {/* Client Communication Panel */}
