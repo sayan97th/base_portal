@@ -207,7 +207,7 @@ export default function PromoCodeSection() {
         <span className={styles.headerIcon}>
           <TicketIcon />
         </span>
-        <label htmlFor={input_id} className={styles.headerTitle}>
+        <label htmlFor={has_applied_coupon ? undefined : input_id} className={styles.headerTitle}>
           Promo code
         </label>
         {has_applied_coupon && <span className={styles.appliedPill}>Applied</span>}
