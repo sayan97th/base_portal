@@ -68,7 +68,8 @@ export interface CouponStatusControlProps {
 
 function getErrorMessage(error: unknown): string {
   if (error && typeof error === "object" && "message" in error) {
-    return String((error as { message: unknown }).message);
+    const message = String((error as { message: unknown }).message ?? "").trim();
+    if (message) return message;
   }
   return "The status could not be updated. Please try again.";
 }
