@@ -120,7 +120,7 @@ export interface CouponUsageItem {
 }
 
 export interface CouponUsageClient {
-  id: number;
+  id: number | null;
   name: string;
   email: string;
   company: string | null;
@@ -136,6 +136,8 @@ export interface CouponUsage {
   product_type: CouponUsageProductType;
   product_label: string;
   status: string;
+  /** True when the order was deleted. The usage stays in the history with its original prices. */
+  is_order_deleted: boolean;
   items: CouponUsageItem[];
   items_quantity: number;
   subtotal_before_discount: number;
@@ -143,9 +145,16 @@ export interface CouponUsage {
   total_amount: number;
   /** Gift card value earned on this order, only for gift card reward coupons. */
   reward_amount: number;
+  /** Coupon terms at the moment of the purchase, not the current coupon settings. */
+  coupon_terms: {
+    code: string;
+    name: string | null;
+    discount_type: DiscountType;
+    discount_value: number;
+  };
   gift_card_claim: {
     id: string;
-    status: GiftCardClaimStatus;
+    status: GiftCardClaimStatus | null;
     reward_amount: number;
     gift_card_brand: string | null;
   } | null;

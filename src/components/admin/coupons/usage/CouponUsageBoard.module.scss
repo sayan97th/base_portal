@@ -564,6 +564,19 @@ $board_min_width: 1240px;
   }
 }
 
+.deletedTag {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(226, 68, 92, 0.12);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: #e2445c;
+  vertical-align: middle;
+}
+
 .orderTitle {
   @include truncate;
   max-width: 100%;

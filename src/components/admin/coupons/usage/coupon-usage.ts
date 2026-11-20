@@ -42,6 +42,7 @@ export const ORDER_STATUS_META: Record<string, { label: string; color: string }>
   active: { label: "Active", color: "#0086c0" },
   completed: { label: "Completed", color: "#00c875" },
   cancelled: { label: "Cancelled", color: "#e2445c" },
+  deleted: { label: "Order Deleted", color: "#7e7e8f" },
 };
 
 export const GROUP_BY_OPTIONS: { value: CouponUsageGroupBy; label: string }[] = [
@@ -177,7 +178,7 @@ export function groupUsages(usages: CouponUsage[], group_by: CouponUsageGroupBy)
       label = usage.product_label;
       color = PRODUCT_COLORS[usage.product_type] ?? "#c4c4c4";
     } else if (group_by === "client") {
-      key = usage.client ? String(usage.client.id) : "unknown";
+      key = usage.client ? String(usage.client.id ?? usage.client.email) : "unknown";
       label = usage.client?.name ?? "Unknown client";
       color = getColorForKey(key);
     } else if (group_by === "status") {

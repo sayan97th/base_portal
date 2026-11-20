@@ -28,6 +28,14 @@ const GIFT_CARD_STATUS_LABELS: Record<string, string> = {
   fulfilled: "Gift card sent",
 };
 
+/** Coupon terms saved at checkout, so later coupon edits never rewrite history. */
+function formatCouponTerms(usage: CouponUsage): string {
+  const { discount_type, discount_value } = usage.coupon_terms;
+  if (discount_type === "fixed_amount") return `${formatMoney(discount_value)} off`;
+  if (discount_type === "gift_card_reward") return `${discount_value}% back`;
+  return `${discount_value}% off`;
+}
+
 // ── Icons ────────────────────────────────────────────────────────────────────
 
 function ChevronIcon({ is_open }: { is_open: boolean }) {
@@ -65,7 +73,7 @@ interface UsageRowProps {
 
 function UsageRow({ usage, group_color, is_gift_card_reward, is_expanded, onToggle }: UsageRowProps) {
   const status_meta = getStatusMeta(usage.status);
-  const client_key = usage.client ? String(usage.client.id) : "unknown";
+  const client_key = usage.client ? String(usage.client.id ?? usage.client.email) : "unknown";
   const savings_amount = is_gift_card_reward ? usage.reward_amount : usage.discount_amount;
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -91,7 +99,10 @@ function UsageRow({ usage, group_color, is_gift_card_reward, is_expanded, onTogg
         </div>
 
         <div className={styles.cellOrder}>
-          <span className={styles.orderReference}>#{usage.order_reference}</span>
+          <span className={styles.orderReference}>
+            #{usage.order_reference}
+            {usage.is_order_deleted && <span className={styles.deletedTag}>Deleted</span>}
+          </span>
           <span className={styles.orderTitle}>{usage.order_title || usage.product_label}</span>
         </div>
 
@@ -173,7 +184,7 @@ function UsageDetail({ usage, is_gift_card_reward, group_color }: UsageDetailPro
   return (
     <div className={styles.detail} style={{ "--group-color": group_color } as React.CSSProperties}>
       <div className={styles.detailCard}>
-        <p className={styles.detailLabel}>Purchased items</p>
+        <p className={styles.detailLabel}>Purchased items, prices at checkout</p>
         {usage.items.length === 0 ? (
           <p className={styles.detailMuted}>No line items recorded for this order.</p>
         ) : (
@@ -222,12 +233,12 @@ function UsageDetail({ usage, is_gift_card_reward, group_color }: UsageDetailPro
           </div>
           {is_gift_card_reward ? (
             <div>
-              <dt>Gift card earned</dt>
+              <dt>Gift card earned ({formatCouponTerms(usage)})</dt>
               <dd className={styles.breakdownSavings}>{formatMoney(usage.reward_amount)}</dd>
             </div>
           ) : (
             <div>
-              <dt>Coupon discount</dt>
+              <dt>Coupon discount ({formatCouponTerms(usage)})</dt>
               <dd className={styles.breakdownSavings}>-{formatMoney(usage.discount_amount)}</dd>
             </div>
           )}
@@ -236,7 +247,7 @@ function UsageDetail({ usage, is_gift_card_reward, group_color }: UsageDetailPro
             <dd>{formatMoney(usage.total_amount)}</dd>
           </div>
         </dl>
-        {usage.gift_card_claim && (
+        {usage.gift_card_claim?.status && (
           <p className={styles.detailMuted}>
             {GIFT_CARD_STATUS_LABELS[usage.gift_card_claim.status] ?? usage.gift_card_claim.status}
           </p>
@@ -246,6 +257,11 @@ function UsageDetail({ usage, is_gift_card_reward, group_color }: UsageDetailPro
       <div className={styles.detailCard}>
         <p className={styles.detailLabel}>References</p>
         <p className={styles.detailMuted}>Ordered {formatShortDate(usage.ordered_at)}</p>
+        {usage.is_order_deleted && (
+          <p className={styles.detailMuted}>
+            This order was deleted. The amounts above are the ones saved at checkout.
+          </p>
+        )}
         {usage.invoice ? (
           <Link href={`/admin/invoices/${usage.invoice.id}`} className={styles.detailLink}>
             Invoice {usage.invoice.invoice_number ?? usage.invoice.id.slice(0, 8).toUpperCase()}
