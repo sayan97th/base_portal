@@ -56,23 +56,6 @@ function getCouponState(coupon: CouponUsageResponse["coupon"]): { label: string;
 
 // ── Small presentational pieces ──────────────────────────────────────────────
 
-interface KpiCardProps {
-  label: string;
-  value: string;
-  hint?: string;
-  color: string;
-}
-
-function KpiCard({ label, value, hint, color }: KpiCardProps) {
-  return (
-    <div className={styles.kpi} style={{ "--kpi-color": color } as React.CSSProperties}>
-      <p className={styles.kpiLabel}>{label}</p>
-      <p className={styles.kpiValue}>{value}</p>
-      {hint && <p className={styles.kpiHint}>{hint}</p>}
-    </div>
-  );
-}
-
 function LoadingState() {
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6">
@@ -222,7 +205,6 @@ export default function CouponUsageContent({ coupon_id }: CouponUsageContentProp
   const { coupon, summary } = usage_response;
   const is_gift_card_reward = coupon.discount_type === "gift_card_reward";
   const coupon_state = getCouponState(coupon);
-  const total_breakdown_orders = summary.by_product_type.reduce((total, entry) => total + entry.order_count, 0);
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6">
@@ -286,79 +268,6 @@ export default function CouponUsageContent({ coupon_id }: CouponUsageContentProp
             </Link>
           </div>
         </div>
-
-        <div className={styles.kpiGrid}>
-          <KpiCard
-            label="Orders"
-            value={String(summary.order_count)}
-            hint={`${summary.checkout_count} ${summary.checkout_count === 1 ? "checkout" : "checkouts"}`}
-            color="#579bfc"
-          />
-          <KpiCard
-            label="Clients"
-            value={String(summary.client_count)}
-            hint="Unique clients"
-            color="#a25ddc"
-          />
-          {is_gift_card_reward ? (
-            <KpiCard
-              label="Gift cards earned"
-              value={formatMoney(summary.total_reward)}
-              hint="Paid back to clients"
-              color="#ff158a"
-            />
-          ) : (
-            <KpiCard
-              label="Discount given"
-              value={formatMoney(summary.total_discount)}
-              hint={
-                summary.gross_revenue > 0
-                  ? `${((summary.total_discount / summary.gross_revenue) * 100).toFixed(1)}% of gross`
-                  : undefined
-              }
-              color="#ff158a"
-            />
-          )}
-          <KpiCard label="Gross sales" value={formatMoney(summary.gross_revenue)} hint="Before the coupon" color="#fdab3d" />
-          <KpiCard label="Net revenue" value={formatMoney(summary.net_revenue)} hint="After the coupon" color="#00c875" />
-          <KpiCard
-            label="Avg. order"
-            value={formatMoney(summary.average_order_value)}
-            hint="Net per order"
-            color="#0086c0"
-          />
-        </div>
-
-        {total_breakdown_orders > 0 && (
-          <div className={styles.mix}>
-            <div className={styles.mixBar} role="img" aria-label="Orders by product">
-              {summary.by_product_type.map((entry) => (
-                <div
-                  key={entry.product_type}
-                  className={styles.mixSegment}
-                  style={{
-                    width: `${(entry.order_count / total_breakdown_orders) * 100}%`,
-                    backgroundColor: PRODUCT_COLORS[entry.product_type] ?? "#c4c4c4",
-                  }}
-                  title={`${entry.product_label}: ${entry.order_count}`}
-                />
-              ))}
-            </div>
-            <div className={styles.mixLegend}>
-              {summary.by_product_type.map((entry) => (
-                <span key={entry.product_type} className={styles.mixLegendItem}>
-                  <span
-                    className={styles.metaDot}
-                    style={{ backgroundColor: PRODUCT_COLORS[entry.product_type] ?? "#c4c4c4" }}
-                  />
-                  {entry.product_label}
-                  <strong>{entry.order_count}</strong>
-                  <span>{formatMoney(entry.net_revenue)}</span>
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
       </section>
 
       {usages.length === 0 ? (
