@@ -347,7 +347,7 @@ describe("UnifiedCartSummary", () => {
 
       render(<UnifiedCartSummary show_coupon_field />);
 
-      const apply_btn = screen.getByRole("button", { name: /add/i });
+      const apply_btn = screen.getByRole("button", { name: /apply/i });
       fireEvent.click(apply_btn);
 
       await waitFor(() => {
@@ -381,7 +381,7 @@ describe("UnifiedCartSummary", () => {
 
       render(<UnifiedCartSummary show_coupon_field />);
 
-      const apply_btn = screen.getByRole("button", { name: /add/i });
+      const apply_btn = screen.getByRole("button", { name: /apply/i });
       fireEvent.click(apply_btn);
 
       await waitFor(() => {
@@ -494,7 +494,7 @@ describe("UnifiedCartSummary", () => {
 
       render(<UnifiedCartSummary show_coupon_field />);
 
-      fireEvent.click(screen.getByRole("button", { name: /add/i }));
+      fireEvent.click(screen.getByRole("button", { name: /apply/i }));
 
       await waitFor(() => expect(mockSetAppliedCoupons).toHaveBeenCalled());
 
@@ -526,7 +526,7 @@ describe("UnifiedCartSummary", () => {
       mockValidateCoupon.mockResolvedValue(validResponse());
 
       render(<UnifiedCartSummary show_coupon_field />);
-      fireEvent.click(screen.getByRole("button", { name: /add/i }));
+      fireEvent.click(screen.getByRole("button", { name: /apply/i }));
 
       await waitFor(() => expect(mockSetAppliedCoupons).toHaveBeenCalled());
 
@@ -552,7 +552,7 @@ describe("UnifiedCartSummary", () => {
       );
 
       render(<UnifiedCartSummary show_coupon_field />);
-      fireEvent.click(screen.getByRole("button", { name: /add/i }));
+      fireEvent.click(screen.getByRole("button", { name: /apply/i }));
 
       await waitFor(() =>
         expect(mockValidateCoupon).toHaveBeenCalledWith(
@@ -582,7 +582,7 @@ describe("UnifiedCartSummary", () => {
       );
 
       render(<UnifiedCartSummary show_coupon_field />);
-      fireEvent.click(screen.getByRole("button", { name: /add/i }));
+      fireEvent.click(screen.getByRole("button", { name: /apply/i }));
 
       expect(
         await screen.findByText("This coupon requires a minimum purchase of $1,000.00.")
@@ -611,12 +611,91 @@ describe("UnifiedCartSummary", () => {
       );
 
       render(<UnifiedCartSummary show_coupon_field />);
-      fireEvent.click(screen.getByRole("button", { name: /add/i }));
 
-      expect(
-        await screen.findByText(/only one promo code can be applied per order/i)
-      ).toBeInTheDocument();
+      // The field is hidden while a code is applied, so a second one cannot be added
+      expect(screen.queryByPlaceholderText("PROMO CODE")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /apply/i })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /remove coupon CONF25/i })).toBeInTheDocument();
       expect(mockValidateCoupon).not.toHaveBeenCalled();
+    });
+
+    it("shows the money back promo as a gift card ticket with a reminder near the pay button", () => {
+      const reward_coupon: CartAppliedCoupon = {
+        coupon_id:           "uuid-holiday",
+        code:                "HAPPYHOLIDAYS",
+        coupon_name:         "Happy Holidays 10% Back",
+        discount_amount:     0,
+        discount_type:       "gift_card_reward",
+        discount_value:      10,
+        is_gift_card_reward: true,
+      };
+
+      mockUseCart.mockReturnValue(
+        buildCartContext({
+          items:                    small_cart_items,
+          subtotal:                 400,
+          total:                    400,
+          applied_coupons:          [reward_coupon],
+          gift_card_reward_coupon:  reward_coupon,
+          gift_card_reward_amount:  40,
+          gift_card_reward_details: { recipient_email: "", gift_card_brand: "" },
+          setGiftCardRewardDetails: jest.fn(),
+        })
+      );
+
+      render(
+        <UnifiedCartSummary
+          show_coupon_field
+          checkout_action={{ total: 400, is_processing: false, onSubmit: jest.fn() }}
+        />
+      );
+
+      expect(screen.getByText("10% back")).toBeInTheDocument();
+      expect(screen.getByText(/claim your holiday gift card/i)).toBeInTheDocument();
+      expect(screen.getByText("Not started")).toBeInTheDocument();
+      expect(screen.getByText(/your gift card details are not complete yet/i)).toBeInTheDocument();
+    });
+
+    it("hides the reminder and names the brand once the gift card details are complete", () => {
+      const reward_coupon: CartAppliedCoupon = {
+        coupon_id:           "uuid-holiday",
+        code:                "HAPPYHOLIDAYS",
+        coupon_name:         "Happy Holidays 10% Back",
+        discount_amount:     0,
+        discount_type:       "gift_card_reward",
+        discount_value:      10,
+        is_gift_card_reward: true,
+      };
+
+      mockUseCart.mockReturnValue(
+        buildCartContext({
+          items:                    small_cart_items,
+          subtotal:                 400,
+          total:                    400,
+          applied_coupons:          [reward_coupon],
+          gift_card_reward_coupon:  reward_coupon,
+          gift_card_reward_amount:  40,
+          gift_card_reward_details: { recipient_email: "me@example.com", gift_card_brand: "amazon" },
+          setGiftCardRewardDetails: jest.fn(),
+        })
+      );
+
+      render(
+        <UnifiedCartSummary
+          show_coupon_field
+          checkout_action={{ total: 400, is_processing: false, onSubmit: jest.fn() }}
+        />
+      );
+
+      expect(screen.getByText("Ready")).toBeInTheDocument();
+      expect(screen.getByText(/amazon gift card you will receive/i)).toBeInTheDocument();
+      expect(screen.queryByText(/your gift card details are not complete yet/i)).not.toBeInTheDocument();
+
+      // Done collapses the form into a compact summary that can be edited again
+      fireEvent.click(screen.getByRole("button", { name: /^done$/i }));
+      expect(screen.getByText(/sent to me@example.com/i)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /^edit$/i }));
+      expect(screen.getByLabelText(/where should we send it/i)).toBeInTheDocument();
     });
   });
 

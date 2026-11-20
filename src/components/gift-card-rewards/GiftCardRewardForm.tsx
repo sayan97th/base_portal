@@ -5,6 +5,7 @@ import styles from "./GiftCardReward.module.scss";
 import { CheckIcon, MailIcon } from "./GiftCardIcons";
 import {
   GIFT_CARD_BRAND_OPTIONS,
+  isValidGiftCardEmail,
   type GiftCardBrand,
   type GiftCardBrandOption,
   type GiftCardRewardDetails,
@@ -17,6 +18,18 @@ interface GiftCardRewardFormProps {
   email_error?: string | null;
   brand_error?: string | null;
   disabled?: boolean;
+  /** Shows numbered step markers that turn into checks once each field is done. */
+  show_steps?: boolean;
+  /** Offers a one click shortcut to use this email (for example the account email). */
+  suggested_email?: string | null;
+}
+
+function StepMarker({ number, is_done }: { number: number; is_done: boolean }) {
+  return (
+    <span className={`${styles.stepMarker} ${is_done ? styles.stepMarkerDone : ""}`} aria-hidden="true">
+      {is_done ? <CheckIcon /> : number}
+    </span>
+  );
 }
 
 /**
@@ -30,9 +43,16 @@ export default function GiftCardRewardForm({
   email_error,
   brand_error,
   disabled = false,
+  show_steps = false,
+  suggested_email = null,
 }: GiftCardRewardFormProps) {
   const email_id = useId();
   const brand_label_id = useId();
+
+  const is_brand_done = value.gift_card_brand !== "";
+  const is_email_done = isValidGiftCardEmail(value.recipient_email);
+  const can_use_suggested_email =
+    !!suggested_email && suggested_email.trim().toLowerCase() !== value.recipient_email.trim().toLowerCase();
 
   const selectBrand = (brand: GiftCardBrand) => {
     if (disabled) return;
@@ -43,6 +63,7 @@ export default function GiftCardRewardForm({
     <div className={styles.formStack}>
       <div>
         <span id={brand_label_id} className={styles.fieldLabel}>
+          {show_steps && <StepMarker number={1} is_done={is_brand_done} />}
           Which gift card would you like?
         </span>
         <div className={styles.brandGrid} role="radiogroup" aria-labelledby={brand_label_id}>
@@ -77,6 +98,7 @@ export default function GiftCardRewardForm({
 
       <div>
         <label htmlFor={email_id} className={styles.fieldLabel}>
+          {show_steps && <StepMarker number={2} is_done={is_email_done} />}
           Where should we send it?
         </label>
         <div className={styles.inputWrap}>
@@ -95,6 +117,16 @@ export default function GiftCardRewardForm({
           />
         </div>
         {email_error && <p className={styles.fieldError}>{email_error}</p>}
+        {can_use_suggested_email && !disabled && (
+          <button
+            type="button"
+            className={styles.suggestionChip}
+            onClick={() => onChange({ ...value, recipient_email: (suggested_email ?? "").trim() })}
+          >
+            Use my account email
+            <span className={styles.suggestionChipValue}>{suggested_email}</span>
+          </button>
+        )}
       </div>
     </div>
   );

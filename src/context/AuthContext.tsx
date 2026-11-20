@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import React, { useContext, useState, useEffect, useCallback, useRef } from "react";
 import { authService } from "@/services/auth.service";
 import { impersonationService } from "@/services/admin/impersonation.service";
 import { getToken } from "@/lib/api-client";
@@ -8,32 +8,10 @@ import { resetEcho } from "@/lib/echo";
 import { getPrimaryRole, isStaffRole, setPrimaryRoleCookie } from "@/lib/roles";
 import type { RoleName } from "@/lib/roles";
 import type { User, AuthResponse, LoginCredentials, RegisterData, ApiError } from "@/types/auth";
+import { AuthContext, type LoginResult } from "@/context/auth-context-store";
 
-export type LoginResult =
-  | { requires_two_factor: false }
-  | { requires_two_factor: true; two_factor_token: string };
-
-type AuthContextType = {
-  user: User | null;
-  permissions: string[];
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  /** True when the current user belongs to the internal staff team. */
-  isStaff: boolean;
-  /** True when the current user has super_admin or admin role. */
-  isAdmin: boolean;
-  /** Returns true when the user has ALL of the given roles. */
-  hasRole: (...roles: RoleName[]) => boolean;
-  /** Returns true when the user has ALL of the given permissions. */
-  hasPermission: (...perms: string[]) => boolean;
-  login: (credentials: LoginCredentials) => Promise<LoginResult>;
-  loginWithTwoFactor: (two_factor_token: string, code: string) => Promise<void>;
-  register: (data: RegisterData) => Promise<void>;
-  logout: () => Promise<void>;
-  refreshUser: () => Promise<void>;
-};
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export { useOptionalAuth } from "@/context/auth-context-store";
+export type { AuthContextType, LoginResult } from "@/context/auth-context-store";
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);

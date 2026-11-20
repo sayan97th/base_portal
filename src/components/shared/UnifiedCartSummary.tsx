@@ -1,10 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import { useCart } from "@/context/CartContext";
 import GiftCardRewardCheckoutCard from "@/components/gift-card-rewards/GiftCardRewardCheckoutCard";
-import { formatRewardPercentage, isGiftCardRewardCoupon } from "@/types/client/gift-card-rewards";
-import { validateCoupon } from "@/services/client/coupons.service";
+import PromoCodeSection from "@/components/shared/promo-code/PromoCodeSection";
+import {
+  GIFT_CARD_BRAND_OPTIONS,
+  isGiftCardRewardDetailsComplete,
+} from "@/types/client/gift-card-rewards";
 import type { CartProductType } from "@/types/client/unified-cart";
 import type { DiscountAppliesTo } from "@/types/admin/discounts";
 
@@ -103,7 +106,6 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
     applied_coupons,
     coupon_input_code,
     subtotal,
-    bulk_discount_amount,
     bulk_discount_details,
     total_discount,
     effective_discount_amount,
@@ -116,18 +118,15 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
     setCouponAdjustmentNotice,
     gift_card_reward_coupon,
     gift_card_reward_amount,
+    gift_card_reward_details,
   } = useCart();
 
-  const [coupon_error, setCouponError] = useState<string | null>(null);
-  const [coupon_is_applying, setCouponIsApplying] = useState(false);
-
-  // When credits are applied, clear any previously applied coupons — credits
+  // When credits are applied, clear any previously applied coupons. Credits
   // represent pre-purchased value so no additional discounts are allowed.
   useEffect(() => {
     if (is_applying_credits && (applied_coupons.length > 0 || coupon_input_code.trim())) {
       setAppliedCoupons([]);
       setCouponInputCode("");
-      setCouponError(null);
     }
   }, [is_applying_credits]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -143,6 +142,12 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
 
   // Suppress coupon field when paying with credits
   const effective_show_coupon = show_coupon_field && !is_applying_credits;
+
+  const selected_gift_card_label =
+    GIFT_CARD_BRAND_OPTIONS.find((option) => option.value === gift_card_reward_details?.gift_card_brand)?.label ??
+    null;
+  const show_gift_card_reminder =
+    effective_show_coupon && !!gift_card_reward_coupon && !isGiftCardRewardDetailsComplete(gift_card_reward_details);
 
   // Teasers: configs where threshold is not yet met, hidden when a coupon is winning
   const teaser_details = bulk_discount_details.filter((d) => {
@@ -171,103 +176,6 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
     new_quantity: number
   ) => {
     setItemQuantity(product_type, tier_id, tier_name, unit_price, new_quantity);
-  };
-
-  const handleCouponCodeChange = (code: string) => {
-    setCouponInputCode(code);
-    setCouponError(null);
-  };
-
-  const handleApplyCoupon = async () => {
-    const trimmed_code = coupon_input_code.trim();
-    if (!trimmed_code) return;
-
-    // Only one promo code is allowed per order
-    if (applied_coupons.length >= 1) {
-      setCouponError("Only one promo code can be applied per order. Remove the current one first.");
-      return;
-    }
-
-    setCouponIsApplying(true);
-    setCouponError(null);
-
-    try {
-      const lb_items = items.filter((i) => i.product_type === "link_building");
-      const lb_tier_ids = lb_items.map((i) => i.tier_id);
-      const lb_tier_amounts: Record<string, number> = {};
-      lb_items.forEach((i) => {
-        lb_tier_amounts[i.tier_id] =
-          Math.round(i.unit_price * i.quantity * 100) / 100;
-      });
-
-      const cart_product_types = [...new Set(items.map((i) => i.product_type))];
-      const product_type_amounts: Record<string, number> = {};
-      items.forEach((i) => {
-        const item_total = Math.round(i.unit_price * i.quantity * 100) / 100;
-        product_type_amounts[i.product_type] =
-          (product_type_amounts[i.product_type] ?? 0) + item_total;
-      });
-
-      // Validate against full subtotal — if coupon wins, bulk discount won't apply
-      const response = await validateCoupon({
-        code: trimmed_code,
-        order_amount: subtotal,
-        cart_product_types,
-        product_type_amounts,
-        ...(lb_tier_ids.length > 0 && {
-          dr_tier_ids: lb_tier_ids,
-          dr_tier_amounts: lb_tier_amounts,
-        }),
-      });
-
-      if (response.valid) {
-        // When a coupon is explicitly applied it overrides the bulk discount.
-        // Show a notice so the user knows the bulk discount is being replaced.
-        // Money back promo codes keep the bulk discount, so no notice for them.
-        if (!response.is_gift_card_reward && bulk_discount_amount > 0 && response.discount_amount < bulk_discount_amount) {
-          setCouponAdjustmentNotice(
-            `Promo code "${response.code}" applied — this overrides the bulk discount. The bulk discount ($${bulk_discount_amount.toLocaleString("en-US", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}) has been replaced by this promo ($${response.discount_amount.toLocaleString("en-US", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}).`
-          );
-        }
-
-        setCouponInputCode("");
-        setCouponError(null);
-        setCouponAdjustmentNotice(null);
-        setAppliedCoupons([
-          {
-            coupon_id: response.coupon_id,
-            code: response.code,
-            coupon_name: response.name,
-            discount_amount: response.discount_amount,
-            discount_type: response.discount_type,
-            discount_value: response.discount_value,
-            applies_to: response.applies_to,
-            product_types: response.product_types ?? [],
-            minimum_purchase_amount: response.minimum_purchase_amount,
-            dr_tier_id: response.dr_tier_id,
-            is_gift_card_reward: response.is_gift_card_reward === true,
-          },
-        ]);
-      } else {
-        setCouponError(response.message || "Invalid promo code.");
-      }
-    } catch {
-      setCouponError("Could not validate promo code. Please try again.");
-    } finally {
-      setCouponIsApplying(false);
-    }
-  };
-
-  const handleRemoveCoupon = (code: string) => {
-    setAppliedCoupons((prev) => prev.filter((c) => c.code !== code));
-    setCouponError(null);
-    setCouponAdjustmentNotice(null);
   };
 
   return (
@@ -532,188 +440,10 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
         </div>
       )}
 
-      {/* Multi-coupon section */}
-      {effective_show_coupon && (
-        <div className="mb-5">
-          <div className="mb-3 flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-500/20">
-              <svg
-                className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9 14.25l6-6m4.5-3.493V21.75l-4.125-1.5-4.125 1.5-4.125-1.5-4.125 1.5V4.757c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0c1.1.128 1.907 1.077 1.907 2.185z"
-                />
-              </svg>
-            </div>
-            <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-              Promo Codes
-            </span>
-            {applied_coupons.length > 0 && (
-              <span className="ml-auto inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">
-                {applied_coupons.length} active
-              </span>
-            )}
-          </div>
+      {/* Promo code entry: field, applied ticket and inline errors */}
+      {effective_show_coupon && <PromoCodeSection />}
 
-          {applied_coupons.length > 0 && (
-            <div className="mb-3 space-y-2">
-              {applied_coupons.map((applied) => (
-                <div
-                  key={applied.code}
-                  className="flex items-center gap-2 rounded-xl border border-emerald-200/80 bg-linear-to-r from-emerald-50 via-teal-50/60 to-transparent px-3 py-2.5 dark:border-emerald-500/25 dark:from-emerald-500/10 dark:via-teal-500/5 dark:to-transparent"
-                >
-                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20">
-                    <svg
-                      className="h-3 w-3 text-emerald-600 dark:text-emerald-400"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2.5}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M4.5 12.75l6 6 9-13.5"
-                      />
-                    </svg>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[11px] font-semibold leading-tight text-emerald-800 dark:text-emerald-300">
-                      {applied.coupon_name}
-                    </p>
-                    <p className="font-mono text-[10px] tracking-wider text-emerald-600/70 dark:text-emerald-500/60">
-                      {applied.code}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    {isGiftCardRewardCoupon(applied) ? (
-                      <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-600 dark:bg-brand-500/20 dark:text-brand-300">
-                        {formatRewardPercentage(applied.discount_value)} back
-                      </span>
-                    ) : (
-                      <span className="text-xs font-bold tabular-nums text-emerald-700 dark:text-emerald-400">
-                        &minus;$
-                        {applied.discount_amount.toLocaleString("en-US", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </span>
-                    )}
-                    <button
-                      onClick={() => handleRemoveCoupon(applied.code)}
-                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-emerald-500/50 transition-colors hover:bg-emerald-200 hover:text-emerald-700 dark:hover:bg-emerald-500/20 dark:hover:text-emerald-300"
-                      aria-label={`Remove coupon ${applied.code}`}
-                    >
-                      <svg
-                        className="h-2.5 w-2.5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2.5}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={coupon_input_code}
-              onChange={(e) =>
-                handleCouponCodeChange(e.target.value.toUpperCase())
-              }
-              placeholder="PROMO CODE"
-              className={`flex-1 rounded-xl border px-3 py-2.5 text-xs font-mono uppercase tracking-widest bg-white dark:bg-gray-900/60 text-gray-900 dark:text-white placeholder-gray-300 dark:placeholder-gray-600 focus:outline-none focus:ring-2 transition-colors ${coupon_error
-                  ? "border-red-300 dark:border-red-500/60 focus:ring-red-400/40"
-                  : "border-gray-200 dark:border-gray-700/80 focus:ring-brand-500/40 focus:border-brand-400 dark:focus:border-brand-500"
-                }`}
-              onKeyDown={(e) => e.key === "Enter" && handleApplyCoupon()}
-            />
-            <button
-              onClick={handleApplyCoupon}
-              disabled={!coupon_input_code.trim() || coupon_is_applying}
-              className="flex shrink-0 items-center gap-1.5 rounded-xl bg-brand-500 px-3.5 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {coupon_is_applying ? (
-                <svg
-                  className="h-3.5 w-3.5 animate-spin"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                  />
-                </svg>
-              ) : (
-                <>
-                  <svg
-                    className="h-3.5 w-3.5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M12 4.5v15m7.5-7.5h-15"
-                    />
-                  </svg>
-                  Add
-                </>
-              )}
-            </button>
-          </div>
-
-          {coupon_error && (
-            <div className="mt-2 flex items-start gap-1.5 rounded-lg bg-red-50 px-3 py-2 dark:bg-red-500/10">
-              <svg
-                className="mt-0.5 h-3 w-3 shrink-0 text-red-500 dark:text-red-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
-                />
-              </svg>
-              <p className="text-[11px] font-medium text-red-600 dark:text-red-400">
-                {coupon_error}
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Money back promo (HAPPYHOLIDAYS): gift card brand + email */}
+      {/* Money back promo (HAPPYHOLIDAYS): gift card brand + email, collected right after the code is applied */}
       {effective_show_coupon && gift_card_reward_coupon && <GiftCardRewardCheckoutCard />}
 
       {/* Subtotal / Discounts / Total */}
@@ -852,7 +582,9 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
         {!is_applying_credits && gift_card_reward_coupon && gift_card_reward_amount > 0 && (
           <div className="flex items-center justify-between rounded-lg bg-brand-50 px-2.5 py-1.5 dark:bg-brand-500/10">
             <p className="text-xs font-semibold text-brand-600 dark:text-brand-300">
-              Gift card you will receive
+              {selected_gift_card_label
+                ? `${selected_gift_card_label} gift card you will receive`
+                : "Gift card you will receive"}
             </p>
             <p className="text-sm font-bold tabular-nums text-brand-600 dark:text-brand-300">
               $
@@ -909,6 +641,30 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
             <p className="text-xs font-semibold text-red-700 dark:text-red-400">Payment failed</p>
             <p className="mt-0.5 text-xs text-red-600 dark:text-red-400">{payment_error}</p>
           </div>
+        </div>
+      )}
+
+      {/* Gentle reminder next to the pay button when the gift card form is not complete */}
+      {checkout_action && show_gift_card_reminder && (
+        <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-dashed border-brand-200 bg-brand-50/60 px-3 py-2.5 dark:border-brand-500/30 dark:bg-brand-500/10">
+          <svg
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-500"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"
+            />
+          </svg>
+          <p className="text-[11px] font-medium text-brand-700 dark:text-brand-300">
+            Your gift card details are not complete yet. Pick a card and an email above so we can send it right
+            away, or finish it later from your order page.
+          </p>
         </div>
       )}
 

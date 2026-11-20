@@ -1,0 +1,1166 @@
+// Admin coupons board. Coupons are grouped by status like a work management
+// board: each group has its own color edge, status and discount cells are solid
+// color blocks and rows turn into cards when the board gets narrow. The layout
+// uses a container query, so it reacts to the space left by the sidebar and
+// not only to the viewport.
+
+$gray_900: var(--color-gray-900);
+$gray_800: var(--color-gray-800);
+$gray_700: var(--color-gray-700);
+$gray_600: var(--color-gray-600);
+$gray_500: var(--color-gray-500);
+$gray_400: var(--color-gray-400);
+$gray_300: var(--color-gray-300);
+$gray_200: var(--color-gray-200);
+$gray_100: var(--color-gray-100);
+$gray_50: var(--color-gray-50);
+$brand_500: var(--color-brand-500);
+$brand_600: var(--color-brand-600);
+
+$dark_surface: var(--color-gray-900);
+$dark_border: rgba(255, 255, 255, 0.08);
+$dark_border_soft: rgba(255, 255, 255, 0.05);
+
+$status_colors: (
+  active: #00c875,
+  scheduled: #fdab3d,
+  expired: #e2445c,
+  disabled: #c4c4c4,
+);
+
+$discount_colors: (
+  percentage: #a25ddc,
+  fixed_amount: #579bfc,
+  gift_card_reward: #ff158a,
+);
+
+$row_columns: minmax(220px, 2.2fr) 132px 124px minmax(130px, 1.2fr) minmax(120px, 1fr) 118px 112px;
+$card_breakpoint: 940px;
+$radius: 10px;
+
+@mixin dark {
+  :global(.dark) & {
+    @content;
+  }
+}
+
+@mixin truncate {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+@mixin table {
+  @container coupons_board (min-width: #{$card_breakpoint + 1}) {
+    @content;
+  }
+}
+
+@mixin cards {
+  @container coupons_board (max-width: #{$card_breakpoint}) {
+    @content;
+  }
+}
+
+@mixin focus_ring {
+  &:focus-visible {
+    outline: 2px solid $brand_500;
+    outline-offset: 2px;
+  }
+}
+
+// ── Page shell ──────────────────────────────────────────────────────────────
+
+.page {
+  container: coupons_board / inline-size;
+  margin: 0 auto;
+  max-width: 1280px;
+  padding: 24px 16px 48px;
+
+  @media (min-width: 640px) {
+    padding-inline: 24px;
+  }
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.subtitle {
+  margin-top: 2px;
+  font-size: 13px;
+  color: $gray_500;
+}
+
+.primaryButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 10px;
+  background: $brand_500;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 6px 16px -8px $brand_500;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+  @include focus_ring;
+
+  &:hover {
+    background: $brand_600;
+    transform: translateY(-1px);
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  @include cards {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}
+
+// ── Summary tiles (also the status filter) ──────────────────────────────────
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+
+  @include cards {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    margin-inline: -16px;
+    padding: 2px 16px 6px;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+}
+
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid $gray_200;
+  border-radius: 14px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  @include focus_ring;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    border-radius: 14px 0 0 14px;
+    background: var(--tile-color);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  &:hover {
+    border-color: $gray_300;
+    transform: translateY(-1px);
+  }
+
+  @include dark {
+    border-color: $dark_border;
+    background: $dark_surface;
+
+    &:hover {
+      border-color: rgba(255, 255, 255, 0.16);
+    }
+  }
+
+  @include cards {
+    flex: 0 0 132px;
+    scroll-snap-align: start;
+    padding: 12px 14px;
+  }
+}
+
+.tileActive {
+  border-color: var(--tile-color);
+  box-shadow: 0 0 0 1px var(--tile-color), 0 10px 24px -18px var(--tile-color);
+
+  &::before {
+    opacity: 1;
+  }
+
+  &:hover {
+    border-color: var(--tile-color);
+  }
+
+  @include dark {
+    border-color: var(--tile-color);
+
+    &:hover {
+      border-color: var(--tile-color);
+    }
+  }
+}
+
+.tileLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: $gray_500;
+}
+
+.tileDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--tile-color);
+}
+
+.tileValue {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+// ── Gift card reminder ──────────────────────────────────────────────────────
+
+.notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  border: 1px solid rgba(253, 171, 61, 0.45);
+  border-radius: 12px;
+  background: rgba(253, 171, 61, 0.1);
+  font-size: 13px;
+  color: #9a5b00;
+
+  svg {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+  }
+
+  strong {
+    font-weight: 700;
+  }
+
+  @include dark {
+    border-color: rgba(253, 171, 61, 0.3);
+    color: #fdc77a;
+  }
+}
+
+// ── Toolbar ─────────────────────────────────────────────────────────────────
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.search {
+  position: relative;
+  flex: 1 1 260px;
+  max-width: 340px;
+
+  svg {
+    position: absolute;
+    top: 50%;
+    left: 12px;
+    width: 16px;
+    height: 16px;
+    color: $gray_400;
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+
+  input {
+    width: 100%;
+    height: 38px;
+    padding: 0 34px 0 36px;
+    border: 1px solid $gray_200;
+    border-radius: 10px;
+    background: #fff;
+    font-size: 13px;
+    color: $gray_900;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+    &::placeholder {
+      color: $gray_400;
+    }
+
+    &:focus {
+      outline: none;
+      border-color: $brand_500;
+      box-shadow: 0 0 0 3px rgba(236, 60, 137, 0.15);
+    }
+
+    @include dark {
+      border-color: $dark_border;
+      background: $dark_surface;
+      color: #fff;
+    }
+  }
+
+  @include cards {
+    max-width: none;
+  }
+}
+
+.clearSearch {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: $gray_400;
+  cursor: pointer;
+  transform: translateY(-50%);
+
+  svg {
+    position: static;
+    width: 14px;
+    height: 14px;
+    transform: none;
+  }
+
+  &:hover {
+    background: $gray_100;
+    color: $gray_700;
+  }
+}
+
+.select {
+  height: 38px;
+  padding: 0 32px 0 12px;
+  border: 1px solid $gray_200;
+  border-radius: 10px;
+  background-color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  color: $gray_700;
+  cursor: pointer;
+
+  &:focus {
+    outline: none;
+    border-color: $brand_500;
+  }
+
+  @include dark {
+    border-color: $dark_border;
+    background-color: $dark_surface;
+    color: $gray_300;
+  }
+}
+
+.toolbarEnd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+
+  @include cards {
+    width: 100%;
+    margin-left: 0;
+    justify-content: space-between;
+  }
+}
+
+.resultCount {
+  font-size: 12px;
+  font-weight: 500;
+  color: $gray_400;
+  white-space: nowrap;
+}
+
+.linkButton {
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  color: $gray_500;
+  cursor: pointer;
+
+  &:hover {
+    color: $gray_900;
+  }
+
+  @include dark {
+    &:hover {
+      color: #fff;
+    }
+  }
+}
+
+// ── Groups ──────────────────────────────────────────────────────────────────
+
+.group {
+  --group-color: #c4c4c4;
+  margin-top: 22px;
+}
+
+.groupHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 2px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  @include focus_ring;
+}
+
+.chevron {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--group-color);
+  transition: transform 0.2s ease;
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+}
+
+.groupTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--group-color);
+}
+
+.groupCount {
+  font-size: 12px;
+  font-weight: 500;
+  color: $gray_400;
+}
+
+.groupBody {
+  margin-top: 4px;
+  border: 1px solid $gray_200;
+  border-left: 6px solid var(--group-color);
+  border-radius: $radius;
+  background: #fff;
+
+  @include dark {
+    border-color: $dark_border;
+    border-left-color: var(--group-color);
+    background: $dark_surface;
+  }
+
+  @include cards {
+    border: 0;
+    background: transparent;
+
+    @include dark {
+      background: transparent;
+    }
+  }
+}
+
+%grid_row {
+  display: grid;
+  grid-template-columns: $row_columns;
+  align-items: center;
+}
+
+.headRow {
+  @extend %grid_row;
+  border-bottom: 1px solid $gray_200;
+  border-radius: 0 $radius 0 0;
+  background: $gray_50;
+
+  > div {
+    padding: 9px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: $gray_500;
+    white-space: nowrap;
+  }
+
+  @include dark {
+    border-color: $dark_border;
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  @include cards {
+    display: none;
+  }
+}
+
+.headCenter {
+  text-align: center;
+}
+
+.headRight {
+  text-align: right;
+}
+
+.row {
+  @extend %grid_row;
+  min-height: 60px;
+  transition: background 0.12s ease;
+
+  // Table layout: thin dividers between rows.
+  @include table {
+    border-top: 1px solid $gray_100;
+
+    &:last-child {
+      border-radius: 0 0 $radius 0;
+    }
+
+    &:hover {
+      background: rgba(87, 155, 252, 0.05);
+    }
+
+    @include dark {
+      border-top-color: $dark_border_soft;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.025);
+      }
+    }
+  }
+
+  // Card layout: same markup, laid out with named areas.
+  @include cards {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "coupon coupon"
+      "status discount"
+      "applies usage"
+      "expires actions";
+    gap: 12px;
+    margin-top: 10px;
+    padding: 14px;
+    border: 1px solid $gray_200;
+    border-left: 5px solid var(--group-color);
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+
+    @include dark {
+      border-color: $dark_border;
+      border-left-color: var(--group-color);
+      background: $dark_surface;
+    }
+  }
+}
+
+// The row right after the header has no divider on the table layout.
+@include table {
+  .headRow + .row {
+    border-top: 0;
+  }
+}
+
+.cell {
+  min-width: 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: $gray_700;
+
+  @include dark {
+    color: $gray_300;
+  }
+
+  // Small caption above each value in card mode.
+  @include cards {
+    padding: 0;
+
+    &[data-label]::before {
+      content: attr(data-label);
+      display: block;
+      margin-bottom: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: $gray_400;
+    }
+  }
+}
+
+// ── Coupon cell ─────────────────────────────────────────────────────────────
+
+.cellCoupon {
+  @include cards {
+    grid-area: coupon;
+    padding-bottom: 12px;
+    border-bottom: 1px dashed $gray_200;
+
+    @include dark {
+      border-color: $dark_border;
+    }
+  }
+}
+
+.codeLine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.code {
+  @include truncate;
+  padding: 2px 8px;
+  border: 1px dashed $gray_300;
+  border-radius: 6px;
+  background: $gray_50;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: $gray_900;
+
+  @include dark {
+    border-color: rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.04);
+    color: #fff;
+  }
+}
+
+.name {
+  @include truncate;
+  display: block;
+  margin-top: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  color: $gray_900;
+  text-decoration: none;
+
+  &:hover {
+    color: $brand_500;
+  }
+
+  @include dark {
+    color: #fff;
+
+    &:hover {
+      color: $brand_500;
+    }
+  }
+
+  @include cards {
+    font-size: 15px;
+  }
+}
+
+.giftBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(253, 171, 61, 0.15);
+  font-size: 11px;
+  font-weight: 600;
+  color: #b26b00;
+  text-decoration: none;
+
+  &:hover {
+    background: rgba(253, 171, 61, 0.25);
+  }
+
+  @include dark {
+    color: #fdc77a;
+  }
+}
+
+.iconButton {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: $gray_400;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  @include focus_ring;
+
+  svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  &:hover {
+    background: $gray_100;
+    color: $gray_700;
+  }
+
+  @include dark {
+    &:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+    }
+  }
+}
+
+.iconButtonDanger:hover {
+  background: rgba(226, 68, 92, 0.1);
+  color: #e2445c;
+
+  @include dark {
+    background: rgba(226, 68, 92, 0.15);
+    color: #ff7a8e;
+  }
+}
+
+.copied {
+  color: #00a35c;
+}
+
+// ── Solid color cells ───────────────────────────────────────────────────────
+
+.cellBlock {
+  padding: 6px;
+
+  @include cards {
+    padding: 0;
+  }
+}
+
+.cellStatus {
+  position: relative;
+
+  @include cards {
+    grid-area: status;
+  }
+}
+
+.cellDiscount {
+  @include cards {
+    grid-area: discount;
+  }
+}
+
+.block {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  height: 36px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+
+  @include cards {
+    height: 34px;
+  }
+}
+
+.statusButton {
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.15s ease;
+  @include focus_ring;
+
+  &:hover:not(:disabled) {
+    filter: brightness(0.94);
+  }
+
+  &:disabled {
+    cursor: progress;
+    opacity: 0.7;
+  }
+}
+
+.statusCaret {
+  width: 12px;
+  height: 12px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+
+  .statusButton:hover &,
+  .statusButton:focus-visible & {
+    opacity: 0.9;
+  }
+
+  @include cards {
+    opacity: 0.9;
+  }
+}
+
+@each $name, $color in $status_colors {
+  .status_#{$name} {
+    background: $color;
+  }
+}
+
+@each $name, $color in $discount_colors {
+  .discount_#{$name} {
+    background: $color;
+  }
+}
+
+.status_disabled {
+  color: $gray_700;
+}
+
+// ── Status picker ───────────────────────────────────────────────────────────
+
+.picker {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  z-index: 30;
+  width: 220px;
+  padding: 6px;
+  border: 1px solid $gray_200;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 16px 40px -12px rgba(16, 24, 40, 0.25);
+  transform: translateX(-50%);
+  animation: pickerIn 0.12s ease-out;
+
+  @include dark {
+    border-color: $dark_border;
+    background: var(--color-gray-800);
+  }
+
+  @include cards {
+    left: 0;
+    transform: none;
+  }
+}
+
+@keyframes pickerIn {
+  from {
+    opacity: 0;
+    margin-top: -4px;
+  }
+}
+
+.pickerOption {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  @include focus_ring;
+
+  &:hover {
+    background: $gray_50;
+  }
+
+  @include dark {
+    &:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+  }
+}
+
+.pickerSwatch {
+  flex-shrink: 0;
+  width: 26px;
+  height: 18px;
+  border-radius: 4px;
+}
+
+.pickerText {
+  flex: 1;
+  min-width: 0;
+}
+
+.pickerLabel {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.pickerHint {
+  display: block;
+  font-size: 11px;
+  color: $gray_500;
+}
+
+.pickerCheck {
+  width: 16px;
+  height: 16px;
+  color: $brand_500;
+}
+
+// ── Text cells ──────────────────────────────────────────────────────────────
+
+.cellApplies {
+  @include truncate;
+
+  @include cards {
+    grid-area: applies;
+    white-space: normal;
+  }
+}
+
+.cellUsage {
+  @include cards {
+    grid-area: usage;
+  }
+}
+
+.usageLink {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  font-weight: 600;
+  color: $gray_900;
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+
+  &:hover {
+    color: $brand_500;
+  }
+
+  @include dark {
+    color: #fff;
+
+    &:hover {
+      color: $brand_500;
+    }
+  }
+}
+
+.usageMuted {
+  font-size: 12px;
+  font-weight: 500;
+  color: $gray_400;
+}
+
+.usageBar {
+  overflow: hidden;
+  height: 5px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: $gray_100;
+
+  @include dark {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    transition: width 0.3s ease;
+  }
+}
+
+.usageLow {
+  background: #00c875;
+}
+
+.usageMid {
+  background: #fdab3d;
+}
+
+.usageHigh {
+  background: #e2445c;
+}
+
+.cellExpires {
+  @include cards {
+    grid-area: expires;
+  }
+}
+
+.dateText {
+  display: block;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.dateHint {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: $gray_400;
+}
+
+.dateSoon {
+  color: #e2445c;
+}
+
+.dateNear {
+  color: #d98a00;
+}
+
+.muted {
+  color: $gray_400;
+}
+
+.cellActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+
+  @include cards {
+    grid-area: actions;
+    align-self: end;
+  }
+}
+
+// ── States ──────────────────────────────────────────────────────────────────
+
+.skeletonRow {
+  height: 60px;
+  margin-top: 8px;
+  border-radius: $radius;
+  background: $gray_100;
+  animation: pulse 1.4s ease-in-out infinite;
+
+  @include dark {
+    background: rgba(255, 255, 255, 0.05);
+  }
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 16px;
+  padding: 56px 20px;
+  border: 1px dashed $gray_200;
+  border-radius: 16px;
+  background: #fff;
+  text-align: center;
+
+  @include dark {
+    border-color: $dark_border;
+    background: $dark_surface;
+  }
+}
+
+.emptyIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: $gray_100;
+  color: $gray_400;
+
+  svg {
+    width: 28px;
+    height: 28px;
+  }
+
+  @include dark {
+    background: rgba(255, 255, 255, 0.06);
+  }
+}
+
+.emptyTitle {
+  margin-top: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.emptyText {
+  margin-top: 4px;
+  font-size: 13px;
+  color: $gray_500;
+}
+
+.emptyError {
+  color: #e2445c;
+}
+
+.emptyAction {
+  margin-top: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile,
+  .primaryButton,
+  .chevron,
+  .picker,
+  .skeletonRow {
+    animation: none;
+    transition: none;
+  }
+}

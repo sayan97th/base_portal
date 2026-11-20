@@ -1,131 +1,37 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import type { Coupon } from "@/types/admin/coupons";
 import {
   listAdminCoupons,
   toggleAdminCouponStatus,
   deleteAdminCoupon,
 } from "@/services/admin/coupons.service";
+import CouponsBoard from "./list/CouponsBoard";
+import styles from "./list/CouponsBoard.module.scss";
+import {
+  SORT_OPTIONS,
+  STATUS_META,
+  STATUS_ORDER,
+  getCouponStatus,
+  groupCouponsByStatus,
+  matchesSearch,
+  sortCoupons,
+  type CouponSort,
+  type CouponStatus,
+  type StatusFilter,
+} from "./list/coupon-list";
+import {
+  CloseIcon,
+  GiftIcon,
+  PlusIcon,
+  SearchIcon,
+  TicketIcon,
+  WarningIcon,
+} from "./list/CouponIcons";
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
-
-function formatDiscount(coupon: Coupon): string {
-  if (coupon.discount_type === "gift_card_reward") return `${coupon.discount_value}% back`;
-  if (coupon.discount_type === "percentage") return `${coupon.discount_value}% off`;
-  return `$${coupon.discount_value.toLocaleString("en-US", { minimumFractionDigits: 2 })} off`;
-}
-
-function getCouponStatus(coupon: Coupon): "active" | "expired" | "disabled" | "scheduled" {
-  if (!coupon.is_active) return "disabled";
-  const now = new Date();
-  if (coupon.expires_at) {
-    const expires = new Date(coupon.expires_at);
-    if (expires < now) return "expired";
-  }
-  if (coupon.starts_at) {
-    const starts = new Date(coupon.starts_at);
-    if (starts > now) return "scheduled";
-  }
-  return "active";
-}
-
-function getAppliesToLabel(coupon: Coupon): string {
-  if (coupon.applies_to === "specific_product") {
-    const tiers = coupon.dr_tiers ?? [];
-    if (tiers.length === 0) return "Specific Tier";
-    if (tiers.length === 1) return `Tier: ${tiers[0].label}`;
-    return `${tiers.length} DR Tiers`;
-  }
-  if (coupon.applies_to === "minimum_purchase") {
-    const amount = coupon.minimum_purchase_amount?.toLocaleString("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-    });
-    return `Min. ${amount ?? "N/A"}`;
-  }
-  return "All Products";
-}
-
-function formatDate(date_str: string): string {
-  return new Date(date_str).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-function daysUntilExpiry(date_str: string | null): number | null {
-  if (!date_str) return null;
-  const now = new Date();
-  const expires = new Date(date_str);
-  return Math.ceil((expires.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-}
-
-// ── Sub-components ─────────────────────────────────────────────────────────────
-
-interface StatusBadgeProps {
-  status: "active" | "expired" | "disabled" | "scheduled";
-}
-
-function StatusBadge({ status }: StatusBadgeProps) {
-  const styles: Record<string, string> = {
-    active:
-      "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/30",
-    expired:
-      "bg-red-50 text-red-600 ring-1 ring-red-200 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/30",
-    disabled:
-      "bg-gray-100 text-gray-500 ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-500 dark:ring-gray-700",
-    scheduled:
-      "bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/30",
-  };
-  const dotStyles: Record<string, string> = {
-    active: "bg-emerald-500",
-    expired: "bg-red-500",
-    scheduled: "bg-amber-500",
-    disabled: "bg-gray-400",
-  };
-  const labels: Record<string, string> = {
-    active: "Active",
-    expired: "Expired",
-    disabled: "Disabled",
-    scheduled: "Scheduled",
-  };
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap ${styles[status]}`}
-    >
-      <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${dotStyles[status]}`} />
-      {labels[status]}
-    </span>
-  );
-}
-
-interface StatCardProps {
-  label: string;
-  value: string | number;
-  icon: React.ReactNode;
-  color: string;
-}
-
-function StatCard({ label, value, icon, color }: StatCardProps) {
-  return (
-    <div className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${color}`}>
-        {icon}
-      </div>
-      <div>
-        <p className="text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
-        <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{label}</p>
-      </div>
-    </div>
-  );
-}
-
-// ── Delete Confirmation Modal ──────────────────────────────────────────────────
+// ── Delete confirmation modal ────────────────────────────────────────────────
 
 interface DeleteConfirmModalProps {
   coupon: Coupon;
@@ -136,34 +42,21 @@ interface DeleteConfirmModalProps {
 
 function DeleteConfirmModal({ coupon, is_deleting, onConfirm, onCancel }: DeleteConfirmModalProps) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
       <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900">
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-red-100 dark:bg-red-500/10">
-          <svg
-            className="h-6 w-6 text-red-600 dark:text-red-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={1.8}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
-            />
-          </svg>
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-red-100 text-red-600 dark:bg-red-500/10 dark:text-red-400">
+          <WarningIcon width={24} height={24} />
         </div>
-        <h3 className="text-base font-semibold text-gray-900 dark:text-white">Delete Coupon</h3>
+        <h3 className="text-base font-semibold text-gray-900 dark:text-white">Delete coupon</h3>
         <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
           Are you sure you want to delete{" "}
-          <span className="font-mono font-semibold text-gray-800 dark:text-gray-200">
-            {coupon.code}
-          </span>
-          ? This action cannot be undone.
+          <span className="font-mono font-semibold text-gray-800 dark:text-gray-200">{coupon.code}</span>?
+          This action cannot be undone.
         </p>
         <div className="mt-5 flex gap-3">
           <button
+            type="button"
             onClick={onCancel}
             disabled={is_deleting}
             className="flex-1 rounded-lg border border-gray-200 bg-white py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
@@ -171,6 +64,7 @@ function DeleteConfirmModal({ coupon, is_deleting, onConfirm, onCancel }: Delete
             Cancel
           </button>
           <button
+            type="button"
             onClick={onConfirm}
             disabled={is_deleting}
             className="flex-1 rounded-lg bg-red-500 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-600 disabled:opacity-60"
@@ -183,7 +77,7 @@ function DeleteConfirmModal({ coupon, is_deleting, onConfirm, onCancel }: Delete
   );
 }
 
-// ── Toast ──────────────────────────────────────────────────────────────────────
+// ── Toast ────────────────────────────────────────────────────────────────────
 
 interface ToastProps {
   message: string;
@@ -193,66 +87,25 @@ interface ToastProps {
 
 function Toast({ message, type, onDismiss }: ToastProps) {
   useEffect(() => {
-    const t = setTimeout(onDismiss, 3500);
-    return () => clearTimeout(t);
+    const timeout_id = setTimeout(onDismiss, 3500);
+    return () => clearTimeout(timeout_id);
   }, [onDismiss]);
 
   return (
     <div
-      className={`fixed bottom-6 right-6 z-[100] flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium shadow-lg ${
-        type === "success" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"
+      role="status"
+      className={`fixed bottom-6 left-4 right-4 z-[100] flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-white shadow-lg sm:left-auto sm:right-6 ${
+        type === "success" ? "bg-emerald-600" : "bg-red-600"
       }`}
     >
-      {type === "success" ? (
-        <svg
-          className="h-4 w-4 shrink-0"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-        </svg>
-      ) : (
-        <svg
-          className="h-4 w-4 shrink-0"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      )}
       {message}
     </div>
   );
 }
 
-// ── Table header cell ──────────────────────────────────────────────────────────
+// ── Main component ───────────────────────────────────────────────────────────
 
-function Th({
-  children,
-  className = "",
-  align = "left",
-}: {
-  children?: React.ReactNode;
-  className?: string;
-  align?: "left" | "right";
-}) {
-  return (
-    <th
-      scope="col"
-      className={`px-4 py-3 text-${align} text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 ${className}`}
-    >
-      {children}
-    </th>
-  );
-}
-
-// ── Main Component ─────────────────────────────────────────────────────────────
-
-type StatusFilter = "all" | "active" | "scheduled" | "expired" | "disabled";
+const ALL_TILE_COLOR = "var(--color-brand-500)";
 
 export default function AdminCouponsContent() {
   const router = useRouter();
@@ -263,10 +116,13 @@ export default function AdminCouponsContent() {
 
   const [search_query, setSearchQuery] = useState("");
   const [status_filter, setStatusFilter] = useState<StatusFilter>("all");
+  const [sort, setSort] = useState<CouponSort>("newest");
+  const [collapsed_keys, setCollapsedKeys] = useState<Set<CouponStatus>>(new Set());
 
+  const [open_picker_id, setOpenPickerId] = useState<string | null>(null);
+  const [updating_ids, setUpdatingIds] = useState<Set<string>>(new Set());
   const [delete_coupon, setDeleteCoupon] = useState<Coupon | null>(null);
   const [is_deleting, setIsDeleting] = useState(false);
-
   const [copied_code, setCopiedCode] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
@@ -274,77 +130,136 @@ export default function AdminCouponsContent() {
     setToast({ message, type });
   }, []);
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const fetched_coupons = await listAdminCoupons();
-      setCoupons(fetched_coupons);
-    } catch {
-      setError("Failed to load coupons. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
+  const dismissToast = useCallback(() => setToast(null), []);
+
+  // State updates only happen in the promise callbacks, so the initial
+  // fetch inside the effect does not trigger a synchronous re-render.
+  const fetchCoupons = useCallback((isCancelled: () => boolean = () => false) => {
+    return listAdminCoupons()
+      .then((fetched_coupons) => {
+        if (isCancelled()) return;
+        setCoupons(fetched_coupons);
+        setError(null);
+      })
+      .catch(() => {
+        if (isCancelled()) return;
+        setError("Failed to load coupons. Please try again.");
+      })
+      .finally(() => {
+        if (!isCancelled()) setIsLoading(false);
+      });
   }, []);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    let is_cancelled = false;
+    fetchCoupons(() => is_cancelled);
+    return () => {
+      is_cancelled = true;
+    };
+  }, [fetchCoupons]);
 
-  const stats = useMemo(() => {
-    const total = coupons.length;
-    const active = coupons.filter((c) => getCouponStatus(c) === "active").length;
-    const expired = coupons.filter((c) => getCouponStatus(c) === "expired").length;
-    const disabled = coupons.filter((c) => getCouponStatus(c) === "disabled").length;
-    const scheduled = coupons.filter((c) => getCouponStatus(c) === "scheduled").length;
-    return { total, active, expired, disabled, scheduled };
+  const loadData = useCallback(() => {
+    setIsLoading(true);
+    setError(null);
+    fetchCoupons();
+  }, [fetchCoupons]);
+
+  // ── Derived data ───────────────────────────────────────────────────────────
+
+  const status_counts = useMemo(() => {
+    const now = new Date();
+    const counts: Record<CouponStatus, number> = { active: 0, scheduled: 0, expired: 0, disabled: 0 };
+    coupons.forEach((coupon) => {
+      counts[getCouponStatus(coupon, now)] += 1;
+    });
+    return counts;
   }, [coupons]);
 
-  const filtered_coupons = useMemo(() => {
-    return coupons.filter((c) => {
-      if (status_filter !== "all" && getCouponStatus(c) !== status_filter) return false;
-      if (search_query) {
-        const q = search_query.toLowerCase();
-        return (
-          c.code.toLowerCase().includes(q) ||
-          c.name.toLowerCase().includes(q) ||
-          (c.description?.toLowerCase().includes(q) ?? false)
-        );
-      }
-      return true;
-    });
-  }, [coupons, status_filter, search_query]);
+  const awaiting_gift_cards = useMemo(
+    () => coupons.reduce((total, coupon) => total + (coupon.gift_card_claims_awaiting_count ?? 0), 0),
+    [coupons]
+  );
+
+  const visible_coupons = useMemo(() => {
+    const now = new Date();
+    const filtered = coupons.filter(
+      (coupon) =>
+        (status_filter === "all" || getCouponStatus(coupon, now) === status_filter) &&
+        matchesSearch(coupon, search_query)
+    );
+    return sortCoupons(filtered, sort);
+  }, [coupons, status_filter, search_query, sort]);
+
+  const groups = useMemo(() => groupCouponsByStatus(visible_coupons), [visible_coupons]);
+
+  const has_filters = status_filter !== "all" || search_query.trim() !== "";
+
+  const summary_tiles = [
+    { key: "all" as StatusFilter, label: "All", color: ALL_TILE_COLOR, count: coupons.length },
+    ...STATUS_ORDER.map((key) => ({
+      key: key as StatusFilter,
+      label: STATUS_META[key].label,
+      color: STATUS_META[key].color,
+      count: status_counts[key],
+    })),
+  ];
+
+  // ── Handlers ───────────────────────────────────────────────────────────────
 
   const handleCopyCode = useCallback((code: string) => {
-    navigator.clipboard.writeText(code).then(() => {
-      setCopiedCode(code);
-      setTimeout(() => setCopiedCode(null), 2000);
+    navigator.clipboard
+      .writeText(code)
+      .then(() => {
+        setCopiedCode(code);
+        setTimeout(() => setCopiedCode(null), 2000);
+      })
+      .catch(() => showToast("Could not copy the code.", "error"));
+  }, [showToast]);
+
+  const handleToggleGroup = useCallback((key: CouponStatus) => {
+    setCollapsedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
     });
   }, []);
 
-  const handleOpenCreate = () => {
-    router.push("/admin/coupons/new");
+  const handleSelectTile = (key: StatusFilter) => {
+    setStatusFilter((prev) => (prev === key && key !== "all" ? "all" : key));
   };
 
-  const handleOpenEdit = (coupon: Coupon) => {
-    router.push(`/admin/coupons/${coupon.id}/edit`);
+  const handleClearFilters = () => {
+    setStatusFilter("all");
+    setSearchQuery("");
   };
 
-  const handleToggleStatus = async (coupon: Coupon) => {
-    const new_status = !coupon.is_active;
-    setCoupons((prev) =>
-      prev.map((c) => (c.id === coupon.id ? { ...c, is_active: new_status } : c))
-    );
-    try {
-      await toggleAdminCouponStatus(coupon.id, new_status);
-      showToast(new_status ? "Coupon activated." : "Coupon deactivated.", "success");
-    } catch {
-      setCoupons((prev) =>
-        prev.map((c) => (c.id === coupon.id ? { ...c, is_active: !new_status } : c))
-      );
-      showToast("Failed to update status.", "error");
-    }
-  };
+  const handleSetActive = useCallback(
+    async (coupon: Coupon, is_active: boolean) => {
+      const setCouponActive = (value: boolean) =>
+        setCoupons((prev) => prev.map((c) => (c.id === coupon.id ? { ...c, is_active: value } : c)));
+      const setUpdating = (value: boolean) =>
+        setUpdatingIds((prev) => {
+          const next = new Set(prev);
+          if (value) next.add(coupon.id);
+          else next.delete(coupon.id);
+          return next;
+        });
+
+      setCouponActive(is_active);
+      setUpdating(true);
+      try {
+        await toggleAdminCouponStatus(coupon.id, is_active);
+        showToast(is_active ? `${coupon.code} enabled.` : `${coupon.code} disabled.`, "success");
+      } catch {
+        setCouponActive(!is_active);
+        showToast("Failed to update status.", "error");
+      } finally {
+        setUpdating(false);
+      }
+    },
+    [showToast]
+  );
 
   const handleDeleteConfirm = async () => {
     if (!delete_coupon) return;
@@ -361,501 +276,169 @@ export default function AdminCouponsContent() {
     }
   };
 
-  const status_tabs: { key: StatusFilter; label: string; count: number }[] = [
-    { key: "all", label: "All", count: stats.total },
-    { key: "active", label: "Active", count: stats.active },
-    { key: "scheduled", label: "Scheduled", count: stats.scheduled },
-    { key: "expired", label: "Expired", count: stats.expired },
-    { key: "disabled", label: "Disabled", count: stats.disabled },
-  ];
+  const handleOpenCreate = () => router.push("/admin/coupons/new");
 
-  return (
-    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-      {/* Page Header */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Coupons</h1>
-          <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
-            Manage discount coupons for your platform.
-          </p>
-        </div>
-        <button
-          onClick={handleOpenCreate}
-          className="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-600"
-        >
-          <svg
-            className="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2.5}
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
-          Create Coupon
-        </button>
-      </div>
+  // ── Render ─────────────────────────────────────────────────────────────────
 
-      {/* Stats Grid */}
-      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard
-          label="Total Coupons"
-          value={stats.total}
-          color="bg-brand-50 dark:bg-brand-500/10"
-          icon={
-            <svg
-              className="h-5 w-5 text-brand-600 dark:text-brand-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.8}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 14.25l6-6m4.5-3.493V21.75l-3.75-1.5-3.75 1.5-3.75-1.5-3.75 1.5V4.757c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0c1.1.128 1.907 1.077 1.907 2.185zM9.75 9h.008v.008H9.75V9zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm4.125 4.5h.008v.008h-.008V13.5zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"
-              />
-            </svg>
-          }
-        />
-        <StatCard
-          label="Active"
-          value={stats.active}
-          color="bg-emerald-50 dark:bg-emerald-500/10"
-          icon={
-            <svg
-              className="h-5 w-5 text-emerald-600 dark:text-emerald-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.8}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          }
-        />
-        <StatCard
-          label="Expired"
-          value={stats.expired}
-          color="bg-red-50 dark:bg-red-500/10"
-          icon={
-            <svg
-              className="h-5 w-5 text-red-500 dark:text-red-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.8}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          }
-        />
-        <StatCard
-          label="Scheduled"
-          value={stats.scheduled}
-          color="bg-amber-50 dark:bg-amber-500/10"
-          icon={
-            <svg
-              className="h-5 w-5 text-amber-600 dark:text-amber-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.8}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 9v7.5"
-              />
-            </svg>
-          }
-        />
-      </div>
-
-      {/* Filter bar */}
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-1 overflow-x-auto rounded-xl border border-gray-100 bg-gray-50 p-1 dark:border-gray-800 dark:bg-gray-900">
-          {status_tabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setStatusFilter(tab.key)}
-              className={`flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                status_filter === tab.key
-                  ? "bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white"
-                  : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-              }`}
-            >
-              {tab.label}
-              <span
-                className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
-                  status_filter === tab.key
-                    ? "bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-400"
-                    : "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400"
-                }`}
-              >
-                {tab.count}
-              </span>
-            </button>
+  const renderContent = () => {
+    if (is_loading) {
+      return (
+        <div aria-busy="true" aria-label="Loading coupons">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <div key={index} className={styles.skeletonRow} />
           ))}
         </div>
+      );
+    }
 
-        <div className="relative w-full sm:w-64">
-          <svg
-            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-            />
-          </svg>
-          <input
-            type="text"
-            placeholder="Search coupons..."
-            value={search_query}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-          />
-        </div>
-      </div>
-
-      {/* Content */}
-      {is_loading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-16 animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-800" />
-          ))}
-        </div>
-      ) : error ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-white py-16 dark:border-gray-700 dark:bg-gray-900">
-          <p className="text-sm text-red-500">{error}</p>
-          <button
-            onClick={loadData}
-            className="mt-3 rounded-lg bg-brand-500 px-4 py-2 text-xs font-semibold text-white hover:bg-brand-600"
-          >
+    if (error) {
+      return (
+        <div className={styles.emptyState}>
+          <div className={styles.emptyIcon}>
+            <WarningIcon />
+          </div>
+          <p className={`${styles.emptyText} ${styles.emptyError}`}>{error}</p>
+          <button type="button" className={`${styles.primaryButton} ${styles.emptyAction}`} onClick={loadData}>
             Retry
           </button>
         </div>
-      ) : filtered_coupons.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-white py-16 dark:border-gray-700 dark:bg-gray-900">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 dark:bg-gray-800">
-            <svg
-              className="h-7 w-7 text-gray-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 14.25l6-6m4.5-3.493V21.75l-3.75-1.5-3.75 1.5-3.75-1.5-3.75 1.5V4.757c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0c1.1.128 1.907 1.077 1.907 2.185zM9.75 9h.008v.008H9.75V9zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm4.125 4.5h.008v.008h-.008V13.5zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"
-              />
-            </svg>
+      );
+    }
+
+    if (groups.length === 0) {
+      return (
+        <div className={styles.emptyState}>
+          <div className={styles.emptyIcon}>
+            <TicketIcon />
           </div>
-          <h3 className="mt-4 text-base font-semibold text-gray-900 dark:text-white">
-            No coupons found
-          </h3>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            {search_query
-              ? "Try a different search."
+          <h3 className={styles.emptyTitle}>{has_filters ? "No coupons match" : "No coupons yet"}</h3>
+          <p className={styles.emptyText}>
+            {has_filters
+              ? "Try another search or clear the filters."
               : "Create your first coupon to get started."}
           </p>
-          {!search_query && (
-            <button
-              onClick={handleOpenCreate}
-              className="mt-4 rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600"
-            >
-              Create Coupon
+          {has_filters ? (
+            <button type="button" className={`${styles.linkButton} ${styles.emptyAction}`} onClick={handleClearFilters}>
+              Clear filters
+            </button>
+          ) : (
+            <button type="button" className={`${styles.primaryButton} ${styles.emptyAction}`} onClick={handleOpenCreate}>
+              <PlusIcon />
+              Create coupon
             </button>
           )}
         </div>
-      ) : (
-        <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] border-collapse">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50 dark:border-gray-800 dark:bg-gray-900/60">
-                  <Th className="w-44 pl-5">Code</Th>
-                  <Th className="w-[104px]">Status</Th>
-                  <Th>Name</Th>
-                  <Th className="w-32">Discount</Th>
-                  <Th className="w-36">Applies To</Th>
-                  <Th className="w-[110px]">Usage</Th>
-                  <Th className="w-[118px]">Expires</Th>
-                  <Th className="w-32 pr-5" align="right" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-                {filtered_coupons.map((coupon) => {
-                  const status = getCouponStatus(coupon);
-                  const days_left = daysUntilExpiry(coupon.expires_at);
-                  const usage_pct = coupon.usage_limit
-                    ? (coupon.times_used / coupon.usage_limit) * 100
-                    : null;
+      );
+    }
 
-                  return (
-                    <tr
-                      key={coupon.id}
-                      className="group transition-colors hover:bg-gray-50/60 dark:hover:bg-white/[0.02]"
-                    >
-                      {/* Code */}
-                      <td className="py-4 pl-5 pr-4 align-middle">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-mono text-sm font-bold tracking-widest text-gray-900 dark:text-white">
-                            {coupon.code}
-                          </span>
-                          <button
-                            onClick={() => handleCopyCode(coupon.code)}
-                            title="Copy code"
-                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400 transition-all hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-200"
-                          >
-                            {copied_code === coupon.code ? (
-                              <svg
-                                className="h-3.5 w-3.5 text-emerald-500"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2.5}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M5 13l4 4L19 7"
-                                />
-                              </svg>
-                            ) : (
-                              <svg
-                                className="h-3.5 w-3.5"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                                />
-                              </svg>
-                            )}
-                          </button>
-                        </div>
-                      </td>
+    return (
+      <CouponsBoard
+        groups={groups}
+        collapsed_keys={collapsed_keys}
+        copied_code={copied_code}
+        open_picker_id={open_picker_id}
+        updating_ids={updating_ids}
+        onToggleGroup={handleToggleGroup}
+        onCopyCode={handleCopyCode}
+        onTogglePicker={setOpenPickerId}
+        onSetActive={handleSetActive}
+        onDelete={setDeleteCoupon}
+      />
+    );
+  };
 
-                      {/* Status */}
-                      <td className="px-4 py-4 align-middle">
-                        <StatusBadge status={status} />
-                      </td>
+  return (
+    <div className={styles.page}>
+      {/* Header */}
+      <div className={styles.header}>
+        <div>
+          <h1 className={styles.title}>Coupons</h1>
+          <p className={styles.subtitle}>Create, track and manage discount codes.</p>
+        </div>
+        <button type="button" className={styles.primaryButton} onClick={handleOpenCreate}>
+          <PlusIcon />
+          Create coupon
+        </button>
+      </div>
 
-                      {/* Name + Description */}
-                      <td className="px-4 py-4 align-middle">
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">
-                          {coupon.name}
-                        </p>
-                        {coupon.description && (
-                          <p className="mt-0.5 max-w-xs truncate text-xs text-gray-400 dark:text-gray-500">
-                            {coupon.description}
-                          </p>
-                        )}
-                      </td>
+      {/* Summary tiles, also used as the status filter */}
+      <div className={styles.summary} role="group" aria-label="Filter by status">
+        {summary_tiles.map((tile) => (
+          <button
+            key={tile.key}
+            type="button"
+            className={`${styles.tile} ${status_filter === tile.key ? styles.tileActive : ""}`}
+            style={{ "--tile-color": tile.color } as React.CSSProperties}
+            onClick={() => handleSelectTile(tile.key)}
+            aria-pressed={status_filter === tile.key}
+          >
+            <span className={styles.tileLabel}>
+              <span className={styles.tileDot} />
+              {tile.label}
+            </span>
+            <span className={styles.tileValue}>{is_loading ? "..." : tile.count}</span>
+          </button>
+        ))}
+      </div>
 
-                      {/* Discount */}
-                      <td className="px-4 py-4 align-middle">
-                        <span
-                          className={`inline-flex items-center rounded-lg px-2.5 py-1 text-sm font-bold ${
-                            coupon.discount_type === "gift_card_reward"
-                              ? "bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-300"
-                              : coupon.discount_type === "percentage"
-                                ? "bg-purple-50 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400"
-                                : "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400"
-                          }`}
-                        >
-                          {coupon.discount_type === "gift_card_reward" && <span className="mr-1">🎁</span>}
-                          {formatDiscount(coupon)}
-                        </span>
-                        {coupon.discount_type === "gift_card_reward" && (coupon.gift_card_claims_awaiting_count ?? 0) > 0 && (
-                          <Link
-                            href={`/admin/coupons/${coupon.id}/edit#gift-card-claims`}
-                            className="mt-1.5 flex w-fit items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 hover:bg-amber-100 dark:bg-amber-500/10 dark:text-amber-400"
-                          >
-                            {coupon.gift_card_claims_awaiting_count} gift card
-                            {coupon.gift_card_claims_awaiting_count === 1 ? "" : "s"} to send
-                          </Link>
-                        )}
-                      </td>
-
-                      {/* Applies To */}
-                      <td className="px-4 py-4 align-middle">
-                        <span className="inline-flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
-                          {coupon.applies_to === "all" && (
-                            <svg
-                              className="h-3.5 w-3.5 shrink-0 text-gray-400"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={2}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"
-                              />
-                            </svg>
-                          )}
-                          {getAppliesToLabel(coupon)}
-                        </span>
-                      </td>
-
-                      {/* Usage */}
-                      <td className="px-4 py-4 align-middle">
-                        <Link
-                          href={`/admin/coupons/${coupon.id}/usage`}
-                          title="See the orders that used this coupon"
-                          className="inline-flex items-center gap-1 text-xs font-medium text-gray-700 underline-offset-2 transition-colors hover:text-brand-600 hover:underline dark:text-gray-300 dark:hover:text-brand-400"
-                        >
-                          {coupon.times_used}
-                          {coupon.usage_limit ? ` / ${coupon.usage_limit}` : " uses"}
-                          <svg className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                          </svg>
-                        </Link>
-                        {usage_pct !== null && (
-                          <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
-                            <div
-                              className={`h-full rounded-full transition-all ${
-                                usage_pct >= 90
-                                  ? "bg-red-500"
-                                  : usage_pct >= 60
-                                    ? "bg-amber-500"
-                                    : "bg-emerald-500"
-                              }`}
-                              style={{ width: `${Math.min(usage_pct, 100)}%` }}
-                            />
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Expires */}
-                      <td className="px-4 py-4 align-middle">
-                        <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                          {coupon.expires_at ? formatDate(coupon.expires_at) : "No expiry"}
-                        </p>
-                        {coupon.expires_at &&
-                          status !== "expired" &&
-                          status !== "disabled" &&
-                          days_left !== null && (
-                            <p
-                              className={`mt-0.5 text-[11px] ${
-                                days_left <= 7
-                                  ? "text-red-500"
-                                  : days_left <= 30
-                                    ? "text-amber-500"
-                                    : "text-gray-400"
-                              }`}
-                            >
-                              {days_left <= 0 ? "Expires today" : `${days_left}d left`}
-                            </p>
-                          )}
-                      </td>
-
-                      {/* Actions */}
-                      <td className="py-4 pl-4 pr-5 align-middle">
-                        <div className="flex items-center justify-end gap-1">
-                          <Link
-                            href={`/admin/coupons/${coupon.id}/usage`}
-                            title="Usage and orders"
-                            className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
-                          >
-                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
-                            </svg>
-                          </Link>
-                          <button
-                            onClick={() => handleToggleStatus(coupon)}
-                            title={coupon.is_active ? "Deactivate" : "Activate"}
-                            className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${
-                              coupon.is_active
-                                ? "text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
-                                : "text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
-                            }`}
-                          >
-                            <svg
-                              className="h-4 w-4"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={2}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M5.636 5.636a9 9 0 1012.728 0M12 3v9"
-                              />
-                            </svg>
-                          </button>
-
-                          <button
-                            onClick={() => handleOpenEdit(coupon)}
-                            title="Edit"
-                            className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
-                          >
-                            <svg
-                              className="h-3.5 w-3.5"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={2}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
-                              />
-                            </svg>
-                          </button>
-
-                          <button
-                            onClick={() => setDeleteCoupon(coupon)}
-                            title="Delete"
-                            className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10 dark:hover:text-red-400"
-                          >
-                            <svg
-                              className="h-3.5 w-3.5"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={2}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                              />
-                            </svg>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+      {/* Gift card reminder */}
+      {awaiting_gift_cards > 0 && (
+        <div className={styles.notice}>
+          <GiftIcon />
+          <span>
+            <strong>
+              {awaiting_gift_cards} gift card{awaiting_gift_cards === 1 ? "" : "s"}
+            </strong>{" "}
+            waiting to be sent. Open the coupon to review the requests.
+          </span>
         </div>
       )}
+
+      {/* Toolbar */}
+      <div className={styles.toolbar}>
+        <label className={styles.search}>
+          <span className="sr-only">Search coupons</span>
+          <SearchIcon />
+          <input
+            type="text"
+            placeholder="Search by code or name"
+            value={search_query}
+            onChange={(event) => setSearchQuery(event.target.value)}
+          />
+          {search_query && (
+            <button
+              type="button"
+              className={styles.clearSearch}
+              onClick={() => setSearchQuery("")}
+              aria-label="Clear search"
+            >
+              <CloseIcon />
+            </button>
+          )}
+        </label>
+
+        <div className={styles.toolbarEnd}>
+          {!is_loading && (
+            <span className={styles.resultCount}>
+              {visible_coupons.length} of {coupons.length}
+            </span>
+          )}
+          <select
+            className={styles.select}
+            value={sort}
+            onChange={(event) => setSort(event.target.value as CouponSort)}
+            aria-label="Sort coupons"
+          >
+            {SORT_OPTIONS.map((option) => (
+              <option key={option.key} value={option.key}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {renderContent()}
 
       {delete_coupon && (
         <DeleteConfirmModal
@@ -866,9 +449,7 @@ export default function AdminCouponsContent() {
         />
       )}
 
-      {toast && (
-        <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />
-      )}
+      {toast && <Toast message={toast.message} type={toast.type} onDismiss={dismissToast} />}
     </div>
   );
 }

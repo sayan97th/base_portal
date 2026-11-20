@@ -78,6 +78,34 @@ describe("GiftCardRewardForm", () => {
   });
 });
 
+describe("GiftCardRewardForm extras", () => {
+  it("offers the account email as a one click shortcut", () => {
+    const onChange = jest.fn();
+    render(
+      <GiftCardRewardForm
+        value={{ recipient_email: "", gift_card_brand: "visa" }}
+        onChange={onChange}
+        suggested_email="owner@company.com"
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /use my account email/i }));
+    expect(onChange).toHaveBeenCalledWith({ recipient_email: "owner@company.com", gift_card_brand: "visa" });
+  });
+
+  it("hides the shortcut when the email is already filled in with it", () => {
+    render(
+      <GiftCardRewardForm
+        value={{ recipient_email: "owner@company.com", gift_card_brand: "" }}
+        onChange={jest.fn()}
+        suggested_email="owner@company.com"
+      />
+    );
+
+    expect(screen.queryByRole("button", { name: /use my account email/i })).not.toBeInTheDocument();
+  });
+});
+
 describe("GiftCardRewardPanel", () => {
   beforeEach(() => {
     jest.clearAllMocks();

@@ -117,7 +117,9 @@ $brand_themes: (
 // ── Brand picker ───────────────────────────────────────────────────────────────
 
 .fieldLabel {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 8px;
   font-size: 12px;
   font-weight: 600;
@@ -761,5 +763,243 @@ $brand_themes: (
   .brandTile:hover,
   .primaryButton:hover:not(:disabled) {
     transform: none;
+  }
+}
+
+// ── Checkout card: steps, status pills, progress and summary ───────────────────
+
+.stepMarker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1.5px solid $gray_200;
+  background: #fff;
+  color: $gray_500;
+  font-size: 11px;
+  font-weight: 700;
+  transition: background 0.2s $ease, border-color 0.2s $ease, color 0.2s $ease;
+
+  svg {
+    width: 11px;
+    height: 11px;
+  }
+
+  @include dark {
+    border-color: rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.04);
+    color: $gray_400;
+  }
+}
+
+.stepMarkerDone {
+  border-color: $success;
+  background: $success;
+  color: #fff;
+  animation: pop_in 0.2s $ease;
+
+  @include dark {
+    border-color: $success;
+    background: $success;
+    color: #fff;
+  }
+}
+
+.suggestionChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  margin-top: 8px;
+  padding: 4px 10px;
+  border: 1px dashed rgba(236, 60, 137, 0.35);
+  border-radius: 999px;
+  background: rgba(236, 60, 137, 0.05);
+  color: $brand_500;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  @include focus_ring;
+
+  &:hover {
+    border-style: solid;
+    background: rgba(236, 60, 137, 0.1);
+  }
+}
+
+.suggestionChipValue {
+  overflow: hidden;
+  min-width: 0;
+  color: $gray_500;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  @include dark {
+    color: $gray_400;
+  }
+}
+
+.checkoutHeaderText {
+  min-width: 0;
+}
+
+.checkoutMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+// Board style status pills: solid color, white text, one color per state.
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  transition: background 0.25s $ease;
+}
+
+.statusPill_not_started {
+  background: #c4c4c4;
+
+  @include dark {
+    background: #5f6b7a;
+  }
+}
+
+.statusPill_in_progress {
+  background: #fdab3d;
+}
+
+.statusPill_ready {
+  background: #00c875;
+}
+
+.progressTrack {
+  position: relative;
+  overflow: hidden;
+  height: 6px;
+  margin-bottom: 16px;
+  border-radius: 999px;
+  background: rgba(236, 60, 137, 0.1);
+
+  @include dark {
+    background: rgba(255, 255, 255, 0.08);
+  }
+}
+
+.progressFill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, $festive_from, $festive_via, $festive_to);
+  background-size: 200% 100%;
+  animation: shimmer 3s linear infinite;
+  transition: width 0.35s $ease;
+}
+
+.statusRowText {
+  flex: 1;
+  min-width: 0;
+}
+
+.confirmButton {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: $gray_900;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  animation: pop_in 0.2s $ease;
+  transition: opacity 0.15s ease;
+  @include focus_ring;
+
+  &:hover {
+    opacity: 0.88;
+  }
+
+  @include dark {
+    background: #fff;
+    color: $gray_900;
+  }
+}
+
+.claimSummary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid rgba(18, 183, 106, 0.25);
+  border-radius: $radius_md;
+  background: rgba(18, 183, 106, 0.06);
+  animation: pop_in 0.25s $ease;
+}
+
+.claimSummaryCard {
+  width: 64px;
+  height: 42px;
+  flex-shrink: 0;
+  padding: 6px 8px;
+
+  .miniCardBrand {
+    font-size: 9px;
+  }
+
+  .miniCardChip {
+    width: 12px;
+    height: 8px;
+  }
+}
+
+.claimSummaryText {
+  flex: 1;
+  min-width: 0;
+}
+
+.claimSummaryTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.claimSummaryEmail {
+  overflow: hidden;
+  font-size: 12px;
+  color: $gray_500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  @include dark {
+    color: $gray_400;
+  }
+}
+
+.linkButton {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border-radius: $radius_sm;
+  color: $brand_500;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  @include focus_ring;
+
+  &:hover {
+    background: rgba(236, 60, 137, 0.08);
   }
 }

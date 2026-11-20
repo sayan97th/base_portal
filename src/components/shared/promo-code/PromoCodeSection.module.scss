@@ -1,0 +1,418 @@
+// Promo code entry inside the order summary. One field with an inline Apply
+// button, and a ticket style chip (perforated edges) once a code is applied.
+
+$brand_500: var(--color-brand-500);
+$brand_600: var(--color-brand-600);
+$gray_900: var(--color-gray-900);
+$gray_700: var(--color-gray-700);
+$gray_500: var(--color-gray-500);
+$gray_400: var(--color-gray-400);
+$gray_300: var(--color-gray-300);
+$gray_200: var(--color-gray-200);
+
+$festive_from: #ec3c89;
+$festive_via: #a855f7;
+$success: #12b76a;
+$success_dark: #027a48;
+$error: #f04438;
+$radius_md: 12px;
+$ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+$notch: 7px;
+
+@mixin dark {
+  :global(.dark) & {
+    @content;
+  }
+}
+
+@keyframes ticket_in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+// Two identical keyframes so the shake can replay on every failed attempt
+// without remounting the input (which would drop focus).
+@mixin shake_frames($name) {
+  @keyframes #{$name} {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-4px); }
+    40%, 80% { transform: translateX(4px); }
+  }
+}
+@include shake_frames(shake_even);
+@include shake_frames(shake_odd);
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.section {
+  margin-bottom: 20px;
+}
+
+// ── Header ─────────────────────────────────────────────────────────────────────
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.headerIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: rgba(236, 60, 137, 0.1);
+  color: $brand_500;
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+.headerTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: $gray_700;
+
+  @include dark {
+    color: $gray_300;
+  }
+}
+
+.appliedPill {
+  margin-left: auto;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #00c875;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+// ── Input field ────────────────────────────────────────────────────────────────
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 46px;
+  padding: 4px 4px 4px 12px;
+  border: 1px solid $gray_200;
+  border-radius: $radius_md;
+  background: #fff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  &:focus-within {
+    border-color: $brand_500;
+    box-shadow: 0 0 0 3px rgba(236, 60, 137, 0.14);
+  }
+
+  @include dark {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(17, 24, 39, 0.6);
+  }
+}
+
+.fieldError {
+  border-color: $error;
+
+  &:focus-within {
+    border-color: $error;
+    box-shadow: 0 0 0 3px rgba(240, 68, 56, 0.12);
+  }
+
+  @include dark {
+    border-color: rgba(240, 68, 56, 0.6);
+  }
+}
+
+.shakeEven {
+  animation: shake_even 0.35s $ease;
+}
+
+.shakeOdd {
+  animation: shake_odd 0.35s $ease;
+}
+
+.fieldIcon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: $gray_400;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: $gray_900;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+
+  &::placeholder {
+    color: $gray_300;
+    font-weight: 500;
+  }
+
+  &:focus {
+    outline: none;
+  }
+
+  @include dark {
+    color: #fff;
+
+    &::placeholder {
+      color: var(--color-gray-600);
+    }
+  }
+}
+
+.applyButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  height: 100%;
+  padding: 0 14px;
+  border-radius: 9px;
+  background: $brand_500;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+
+  &:hover:not(:disabled) {
+    background: $brand_600;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(236, 60, 137, 0.3);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+  }
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 999px;
+  animation: spin 0.7s linear infinite;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.hint {
+  margin-top: 6px;
+  font-size: 11px;
+  color: $gray_400;
+
+  @include dark {
+    color: var(--color-gray-500);
+  }
+}
+
+.errorText {
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: $error;
+}
+
+// ── Applied ticket ─────────────────────────────────────────────────────────────
+
+.ticketList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+// The notches on both sides are cut with a mask so they look right on any
+// background, light or dark.
+.ticket {
+  --ticket_accent: #{$success};
+  --ticket_soft: rgba(18, 183, 106, 0.08);
+  --ticket_border: rgba(18, 183, 106, 0.3);
+
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  min-height: 56px;
+  border: 1px solid var(--ticket_border);
+  border-radius: $radius_md;
+  background: var(--ticket_soft);
+  animation: ticket_in 0.28s $ease;
+  mask:
+    radial-gradient(circle $notch at 0 50%, transparent 98%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle $notch at 100% 50%, transparent 98%, #000) right / 51% 100% no-repeat;
+}
+
+.ticketReward {
+  --ticket_accent: #{$festive_from};
+  --ticket_soft: rgba(236, 60, 137, 0.06);
+  --ticket_border: rgba(236, 60, 137, 0.3);
+
+  background:
+    radial-gradient(120% 120% at 100% 0%, rgba(168, 85, 247, 0.12), transparent 60%),
+    var(--ticket_soft);
+
+  .ticketStub {
+    background: linear-gradient(160deg, $festive_from, $festive_via);
+  }
+}
+
+.ticketStub {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  flex-shrink: 0;
+  border-radius: 11px 0 0 11px;
+  background: var(--ticket_accent);
+  color: #fff;
+}
+
+.ticketStubIcon {
+  width: 18px;
+  height: 18px;
+}
+
+.ticketBody {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding: 8px 12px;
+  border-left: 2px dashed rgba(255, 255, 255, 0.9);
+
+  @include dark {
+    border-left-color: rgba(0, 0, 0, 0.35);
+  }
+}
+
+.ticketCode {
+  overflow: hidden;
+  color: $gray_900;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.ticketName {
+  overflow: hidden;
+  margin-top: 1px;
+  color: $gray_500;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  @include dark {
+    color: $gray_400;
+  }
+}
+
+.ticketValue {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  padding-right: 12px;
+}
+
+.savings {
+  color: $success_dark;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+
+  @include dark {
+    color: #32d583;
+  }
+}
+
+.rewardTag {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, $festive_from, $festive_via);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.removeButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  color: $gray_400;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+
+  svg {
+    width: 11px;
+    height: 11px;
+  }
+
+  &:hover {
+    background: rgba(16, 24, 40, 0.06);
+    color: $gray_700;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(236, 60, 137, 0.25);
+  }
+
+  @include dark {
+    &:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+    }
+  }
+}
