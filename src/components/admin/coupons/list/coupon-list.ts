@@ -35,7 +35,10 @@ export const SORT_OPTIONS: { key: CouponSort; label: string }[] = [
   { key: "code", label: "Code A to Z" },
 ];
 
-export function getCouponStatus(coupon: Coupon, now: Date = new Date()): CouponStatus {
+export function getCouponStatus(
+  coupon: Pick<Coupon, "is_active" | "starts_at" | "expires_at">,
+  now: Date = new Date()
+): CouponStatus {
   if (!coupon.is_active) return "disabled";
   if (coupon.expires_at && new Date(coupon.expires_at) < now) return "expired";
   if (coupon.starts_at && new Date(coupon.starts_at) > now) return "scheduled";

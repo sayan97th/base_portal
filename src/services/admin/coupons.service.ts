@@ -37,11 +37,16 @@ export async function updateAdminCoupon(
   return response.data;
 }
 
+/**
+ * Enables or disables a coupon through the dedicated status endpoint. It only
+ * validates the status, so a coupon can always be switched off right away even
+ * when other stored fields would fail the full edit validation.
+ */
 export async function toggleAdminCouponStatus(
   id: string,
   is_active: boolean
 ): Promise<Coupon> {
-  const response = await apiClient.patch<{ data: Coupon }>(`/api/admin/coupons/${id}`, { is_active });
+  const response = await apiClient.patch<{ data: Coupon }>(`/api/admin/coupons/${id}/status`, { is_active });
   return response.data;
 }
 

@@ -15,6 +15,7 @@ import {
 } from "@/services/admin/coupons.service";
 import { listAdminDrTiers } from "@/services/admin/link-building.service";
 import CouponGiftCardClaimsBoard from "@/components/admin/coupons/CouponGiftCardClaimsBoard";
+import CouponStatusControl from "@/components/admin/coupons/status/CouponStatusControl";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -426,7 +427,7 @@ function ProductTypeSelector({ selected_types, onChange }: ProductTypeSelectorPr
 
       {none_selected && (
         <p className="mt-2 text-[11px] text-gray-400 dark:text-gray-500">
-          No product selected — this coupon applies to all product types.
+          No product selected, this coupon applies to all product types.
         </p>
       )}
     </div>
@@ -479,7 +480,7 @@ function PreviewCard({ form, dr_tiers, toggles }: PreviewCardProps) {
       : "Never expires";
 
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-600 to-brand-800 p-6 text-white shadow-xl">
+    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-600 to-brand-800 p-5 text-white shadow-xl sm:p-6">
       {/* Decorative circles */}
       <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/5" />
       <div className="absolute -left-4 bottom-4 h-20 w-20 rounded-full bg-white/5" />
@@ -501,9 +502,9 @@ function PreviewCard({ form, dr_tiers, toggles }: PreviewCardProps) {
         </span>
       </div>
 
-      {/* Discount value — hero text */}
+      {/* Discount value, hero text */}
       <div className="mb-1">
-        <span className="text-5xl font-black tracking-tight text-white">
+        <span className="text-4xl font-black tracking-tight text-white sm:text-5xl">
           {discount_label}
         </span>
         <span className="ml-2 text-lg font-medium text-brand-200">{is_reward ? "BACK" : "OFF"}</span>
@@ -532,8 +533,8 @@ function PreviewCard({ form, dr_tiers, toggles }: PreviewCardProps) {
       {/* Dashed divider */}
       <div className="relative mb-5">
         <div className="border-t border-dashed border-white/20" />
-        <div className="absolute -left-6 top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-gray-100 dark:bg-gray-900" />
-        <div className="absolute -right-6 top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-gray-100 dark:bg-gray-900" />
+        <div className="absolute -left-5 sm:-left-6 top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-gray-100 dark:bg-gray-900" />
+        <div className="absolute -right-5 sm:-right-6 top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-gray-100 dark:bg-gray-900" />
       </div>
 
       {/* Coupon code */}
@@ -541,7 +542,7 @@ function PreviewCard({ form, dr_tiers, toggles }: PreviewCardProps) {
         <p className="mb-1 text-[10px] uppercase tracking-widest text-brand-300">
           Coupon Code
         </p>
-        <p className="font-mono text-xl font-bold tracking-[0.3em] text-white">
+        <p className="break-all font-mono text-lg font-bold tracking-[0.2em] text-white sm:text-xl sm:tracking-[0.3em]">
           {form.code || "- - - - - - - -"}
         </p>
       </div>
@@ -582,7 +583,7 @@ function FormSection({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
+    <div className="rounded-2xl border border-gray-100 bg-white p-4 sm:p-6 dark:border-gray-800 dark:bg-gray-900">
       <div className="mb-5">
         <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h3>
         {description && (
@@ -667,6 +668,8 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
   const [load_error, setLoadError] = useState<string | null>(null);
   const [submit_error, setSubmitError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  /** Last version confirmed by the server, used by the instant status control. */
+  const [saved_coupon, setSavedCoupon] = useState<Coupon | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -674,6 +677,7 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
       setDrTiers(tiers.filter((t) => t.is_active));
       if (mode === "edit" && coupon_id) {
         const coupon = await getAdminCoupon(coupon_id);
+        setSavedCoupon(coupon);
         setForm(couponFromRecord(coupon));
         setToggles({
           has_start_date: coupon.starts_at !== null,
@@ -701,6 +705,12 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
       return next;
     });
   };
+
+  // The status is saved on its own, so keep the form and preview in sync with it.
+  const handleStatusSaved = useCallback((coupon: Coupon) => {
+    setSavedCoupon(coupon);
+    setForm((prev) => ({ ...prev, is_active: coupon.is_active }));
+  }, []);
 
   const handleCopyCode = () => {
     if (!form.code) return;
@@ -829,7 +839,7 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
       {/* Page Header */}
-      <div className="mb-6 flex items-center gap-3">
+      <div className="mb-6 flex flex-wrap items-center gap-3">
         <Link
           href="/admin/coupons"
           className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
@@ -838,7 +848,7 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
         </Link>
-        <div>
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
             <Link href="/admin/coupons" className="hover:text-brand-500 transition-colors">
               Coupons
@@ -853,15 +863,28 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
           </h1>
         </div>
         {mode === "edit" && coupon_id && (
-          <Link
-            href={`/admin/coupons/${coupon_id}/usage`}
-            className="ml-auto inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 shadow-theme-xs transition-colors hover:border-brand-300 hover:text-brand-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-brand-500/50 dark:hover:text-brand-400"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
-            </svg>
-            View usage and orders
-          </Link>
+          <div className="flex w-full flex-wrap items-center gap-3 sm:ml-auto sm:w-auto sm:justify-end">
+            {saved_coupon && (
+              <CouponStatusControl
+                variant="compact"
+                coupon_id={coupon_id}
+                coupon_code={saved_coupon.code}
+                is_active={saved_coupon.is_active}
+                starts_at={saved_coupon.starts_at}
+                expires_at={saved_coupon.expires_at}
+                onStatusSaved={handleStatusSaved}
+              />
+            )}
+            <Link
+              href={`/admin/coupons/${coupon_id}/usage`}
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3.5 py-2 sm:flex-none text-sm font-medium text-gray-700 shadow-theme-xs transition-colors hover:border-brand-300 hover:text-brand-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-brand-500/50 dark:hover:text-brand-400"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+              </svg>
+              View usage and orders
+            </Link>
+          </div>
         )}
       </div>
 
@@ -896,7 +919,7 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
                       onChange={(e) => updateField("code", e.target.value.toUpperCase())}
                       placeholder="e.g. SAVE20"
                       maxLength={32}
-                      className={`flex-1 rounded-lg border px-3 py-2.5 text-sm font-mono uppercase tracking-widest bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors ${errors.code ? "border-red-400 dark:border-red-500" : "border-gray-200 dark:border-gray-700"}`}
+                      className={`min-w-0 flex-1 rounded-lg border px-3 py-2.5 text-sm font-mono uppercase tracking-widest bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors ${errors.code ? "border-red-400 dark:border-red-500" : "border-gray-200 dark:border-gray-700"}`}
                     />
                     <button
                       type="button"
@@ -1054,7 +1077,7 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
                   </div>
                   <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
                     {form.discount_type === "percentage"
-                      ? "Allowed range: 0.01% – 100%. Values above 100% are not permitted."
+                      ? "Allowed range: 0.01% to 100%. Values above 100% are not permitted."
                       : form.discount_type === "gift_card_reward"
                         ? "Clients pay the full price and receive a gift card worth this % of their order total."
                         : "Enter a positive dollar amount. No upper limit for fixed discounts."}
@@ -1106,7 +1129,7 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
               </div>
 
               {/* Applies to selector */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
                 {(
                   [
                     {
@@ -1145,7 +1168,7 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
                     key={opt.value}
                     type="button"
                     onClick={() => updateField("applies_to", opt.value)}
-                    className={`flex flex-col items-start gap-2 rounded-xl border p-4 text-left transition-all ${
+                    className={`flex flex-row items-center gap-3 rounded-xl border p-3 text-left transition-all sm:flex-col sm:items-start sm:gap-2 sm:p-4 ${
                       form.applies_to === opt.value
                         ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10 dark:border-brand-500"
                         : "border-gray-200 bg-white hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-gray-600"
@@ -1252,7 +1275,7 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
                     placeholder="Pick a start date"
                   />
                   <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
-                    Optional — if set, coupon is not valid before this date.
+                    Optional. If set, the coupon is not valid before this date.
                   </p>
                 </div>
 
@@ -1279,7 +1302,7 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
                   <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
                     {toggles.has_expiry_date
                       ? "The coupon will be invalid after this date."
-                      : "No expiry — coupon is valid indefinitely."}
+                      : "No expiry. The coupon is valid indefinitely."}
                   </p>
                   <FieldError message={errors.expires_at} />
                 </div>
@@ -1351,38 +1374,53 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
             {/* Status */}
             <FormSection
               title="Status"
-              description="Inactive coupons cannot be applied by users even if all other conditions are met."
+              description={
+                saved_coupon
+                  ? "Status changes are saved instantly, you do not need to click Save Changes. You can disable this coupon at any time."
+                  : "Inactive coupons cannot be applied by users even if all other conditions are met."
+              }
             >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    {form.is_active ? "Coupon is active" : "Coupon is inactive"}
-                  </p>
-                  <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                    {form.is_active
-                      ? "Users can apply this coupon at checkout."
-                      : "This coupon is currently disabled and cannot be used."}
-                  </p>
-                </div>
-                <Toggle
-                  enabled={form.is_active}
-                  onChange={(v) => updateField("is_active", v)}
+              {mode === "edit" && coupon_id && saved_coupon ? (
+                <CouponStatusControl
+                  coupon_id={coupon_id}
+                  coupon_code={saved_coupon.code}
+                  is_active={saved_coupon.is_active}
+                  starts_at={saved_coupon.starts_at}
+                  expires_at={saved_coupon.expires_at}
+                  onStatusSaved={handleStatusSaved}
                 />
-              </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {form.is_active ? "Coupon is active" : "Coupon is inactive"}
+                    </p>
+                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                      {form.is_active
+                        ? "Users can apply this coupon at checkout."
+                        : "This coupon is currently disabled and cannot be used."}
+                    </p>
+                  </div>
+                  <Toggle
+                    enabled={form.is_active}
+                    onChange={(v) => updateField("is_active", v)}
+                  />
+                </div>
+              )}
             </FormSection>
 
             {/* Form Actions */}
-            <div className="flex items-center justify-between rounded-2xl border border-gray-100 bg-white px-6 py-4 dark:border-gray-800 dark:bg-gray-900">
+            <div className="flex flex-col-reverse gap-3 rounded-2xl border border-gray-100 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:border-gray-800 dark:bg-gray-900">
               <Link
                 href="/admin/coupons"
-                className="rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                className="rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-center text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
               >
                 Cancel
               </Link>
               <button
                 type="submit"
                 disabled={is_submitting}
-                className="flex items-center gap-2 rounded-xl bg-brand-500 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-600 disabled:opacity-60"
+                className="flex items-center justify-center gap-2 rounded-xl bg-brand-500 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-600 disabled:opacity-60"
               >
                 {is_submitting ? (
                   <>
