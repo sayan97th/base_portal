@@ -13,13 +13,18 @@ export interface CouponGroup {
   coupons: Coupon[];
 }
 
-/** Board colors, aligned with the usage and gift card boards. */
-export const STATUS_META: Record<CouponStatus, { label: string; color: string }> = {
-  active: { label: "Active", color: "#00c875" },
-  scheduled: { label: "Scheduled", color: "#fdab3d" },
-  expired: { label: "Expired", color: "#e2445c" },
-  disabled: { label: "Disabled", color: "#c4c4c4" },
+/**
+ * Status colors come from the site theme tokens (success, blue light, error, gray),
+ * with hex fallbacks because Tailwind only emits the variables that classes use.
+ */
+export const STATUS_META: Record<CouponStatus, { label: string; color: string; hint: string }> = {
+  active: { label: "Active", color: "var(--color-success-500, #12b76a)", hint: "Live and redeemable" },
+  scheduled: { label: "Scheduled", color: "var(--color-blue-light-500, #0ba5ec)", hint: "Starts in the future" },
+  expired: { label: "Expired", color: "var(--color-error-500, #f04438)", hint: "Past its end date" },
+  disabled: { label: "Disabled", color: "var(--color-gray-400, #98a2b3)", hint: "Paused by an admin" },
 };
+
+export const EXPIRING_SOON_DAYS = 7;
 
 export const STATUS_ORDER: CouponStatus[] = ["active", "scheduled", "expired", "disabled"];
 
@@ -143,4 +148,21 @@ export function groupCouponsByStatus(coupons: Coupon[], now: Date = new Date()):
     color: STATUS_META[key].color,
     coupons: buckets[key],
   }));
+}
+
+/** Active coupons that end within the next `days` days. */
+export function countExpiringSoon(
+  coupons: Coupon[],
+  days: number = EXPIRING_SOON_DAYS,
+  now: Date = new Date()
+): number {
+  return coupons.filter((coupon) => {
+    if (getCouponStatus(coupon, now) !== "active") return false;
+    const days_left = daysUntil(coupon.expires_at, now);
+    return days_left !== null && days_left <= days;
+  }).length;
+}
+
+export function sumRedemptions(coupons: Coupon[]): number {
+  return coupons.reduce((total, coupon) => total + coupon.times_used, 0);
 }

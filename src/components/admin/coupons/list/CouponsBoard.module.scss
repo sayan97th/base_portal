@@ -1,42 +1,72 @@
-// Admin coupons board. Coupons are grouped by status like a work management
-// board: each group has its own color edge, status and discount cells are solid
-// color blocks and rows turn into cards when the board gets narrow. The layout
-// uses a container query, so it reacts to the space left by the sidebar and
-// not only to the viewport.
+@use "sass:list";
 
-$gray_900: var(--color-gray-900);
-$gray_800: var(--color-gray-800);
-$gray_700: var(--color-gray-700);
-$gray_600: var(--color-gray-600);
-$gray_500: var(--color-gray-500);
-$gray_400: var(--color-gray-400);
-$gray_300: var(--color-gray-300);
-$gray_200: var(--color-gray-200);
-$gray_100: var(--color-gray-100);
-$gray_50: var(--color-gray-50);
-$brand_500: var(--color-brand-500);
-$brand_600: var(--color-brand-600);
+// Admin coupons list.
+//
+// Visual language follows the rest of the admin portal: white cards with a
+// 16px radius and gray-100 borders, soft tinted pills, brand pink only for
+// primary actions and focus. Work management touches (status groups that
+// collapse, a thin status strip on each row and an inline status picker) are
+// kept on top of that base.
+//
+// The layout reacts to the width of the page container, not the viewport, so
+// it also adapts when the admin sidebar is open. Under $cards_max the table
+// rows become cards.
 
-$dark_surface: var(--color-gray-900);
-$dark_border: rgba(255, 255, 255, 0.08);
-$dark_border_soft: rgba(255, 255, 255, 0.05);
+// ── Tokens ──────────────────────────────────────────────────────────────────
+// Tailwind only emits theme variables that classes use, so every token has a
+// hex fallback taken from globals.css.
 
-$status_colors: (
-  active: #00c875,
-  scheduled: #fdab3d,
-  expired: #e2445c,
-  disabled: #c4c4c4,
+$white: #fff;
+$gray_25: var(--color-gray-25, #fcfcfd);
+$gray_50: var(--color-gray-50, #f9fafb);
+$gray_100: var(--color-gray-100, #f2f4f7);
+$gray_200: var(--color-gray-200, #e4e7ec);
+$gray_300: var(--color-gray-300, #d0d5dd);
+$gray_400: var(--color-gray-400, #98a2b3);
+$gray_500: var(--color-gray-500, #667085);
+$gray_600: var(--color-gray-600, #475467);
+$gray_700: var(--color-gray-700, #344054);
+$gray_800: var(--color-gray-800, #1d2939);
+$gray_900: var(--color-gray-900, #101828);
+
+$brand_50: var(--color-brand-50, #fdeef5);
+$brand_500: var(--color-brand-500, #ec3c89);
+$brand_600: var(--color-brand-600, #d4316f);
+
+$success_500: var(--color-success-500, #12b76a);
+$warning_500: var(--color-warning-500, #f79009);
+$error_500: var(--color-error-500, #f04438);
+$blue_500: var(--color-blue-light-500, #0ba5ec);
+
+$dark_surface: rgba(255, 255, 255, 0.03);
+$dark_surface_raised: #1a2231;
+$dark_border: var(--color-gray-800, #1d2939);
+$dark_divider: rgba(255, 255, 255, 0.05);
+
+$shadow_xs: 0 1px 2px 0 rgba(16, 24, 40, 0.05);
+$shadow_lg: 0 12px 16px -4px rgba(16, 24, 40, 0.08), 0 4px 6px -2px rgba(16, 24, 40, 0.03);
+$focus_ring: 0 0 0 4px rgba(236, 60, 137, 0.12);
+
+$radius_card: 16px;
+$radius_control: 12px;
+
+// Tones for status and discount pills: base color, text on light, text on dark.
+$tones: (
+  status_active: (#12b76a, #027a48, #32d583),
+  status_scheduled: (#0ba5ec, #026aa2, #36bffa),
+  status_expired: (#f04438, #b42318, #f97066),
+  status_disabled: (#98a2b3, #475467, #98a2b3),
+  discount_percentage: (#7a5af8, #5925dc, #9b8afb),
+  discount_fixed_amount: (#0ba5ec, #026aa2, #36bffa),
+  discount_gift_card_reward: (#ec3c89, #b02659, #f48fbc),
 );
 
-$discount_colors: (
-  percentage: #a25ddc,
-  fixed_amount: #579bfc,
-  gift_card_reward: #ff158a,
-);
+// Coupon, Status, Discount, Applies to, Usage, Expires, Actions.
+$row_columns: minmax(210px, 2.4fr) 132px 124px minmax(128px, 1.3fr) minmax(112px, 1fr) 124px 118px;
+$cards_max: 960px;
+$kpis_wide_min: 720px;
 
-$row_columns: minmax(220px, 2.2fr) 132px 124px minmax(130px, 1.2fr) minmax(120px, 1fr) 118px 112px;
-$card_breakpoint: 940px;
-$radius: 10px;
+// ── Mixins ──────────────────────────────────────────────────────────────────
 
 @mixin dark {
   :global(.dark) & {
@@ -51,31 +81,64 @@ $radius: 10px;
 }
 
 @mixin table {
-  @container coupons_board (min-width: #{$card_breakpoint + 1}) {
+  @container coupons_page (min-width: #{$cards_max + 1}) {
     @content;
   }
 }
 
 @mixin cards {
-  @container coupons_board (max-width: #{$card_breakpoint}) {
+  @container coupons_page (max-width: #{$cards_max}) {
     @content;
   }
 }
 
-@mixin focus_ring {
+@mixin narrow {
+  @container coupons_page (max-width: 520px) {
+    @content;
+  }
+}
+
+@mixin focus_visible {
   &:focus-visible {
-    outline: 2px solid $brand_500;
-    outline-offset: 2px;
+    outline: none;
+    box-shadow: 0 0 0 2px $white, 0 0 0 4px $brand_500;
+
+    @include dark {
+      box-shadow: 0 0 0 2px $gray_900, 0 0 0 4px $brand_500;
+    }
+  }
+}
+
+@mixin surface {
+  border: 1px solid $gray_100;
+  border-radius: $radius_card;
+  background: $white;
+
+  @include dark {
+    border-color: $dark_border;
+    background: $dark_surface;
+  }
+}
+
+@mixin tone_pill($base, $text, $text_dark) {
+  background: color-mix(in srgb, #{$base} 10%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #{$base} 28%, transparent);
+  color: $text;
+
+  @include dark {
+    background: color-mix(in srgb, #{$base} 14%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, #{$base} 30%, transparent);
+    color: $text_dark;
   }
 }
 
 // ── Page shell ──────────────────────────────────────────────────────────────
 
 .page {
-  container: coupons_board / inline-size;
+  container: coupons_page / inline-size;
   margin: 0 auto;
-  max-width: 1280px;
-  padding: 24px 16px 48px;
+  max-width: 1400px;
+  padding: 24px 16px 56px;
 
   @media (min-width: 640px) {
     padding-inline: 24px;
@@ -85,49 +148,71 @@ $radius: 10px;
 .header {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: $brand_500;
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
 }
 
 .title {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  line-height: 1.2;
   color: $gray_900;
 
   @include dark {
-    color: #fff;
+    color: $white;
   }
 }
 
 .subtitle {
-  margin-top: 2px;
-  font-size: 13px;
+  margin-top: 4px;
+  font-size: 14px;
   color: $gray_500;
+
+  @include dark {
+    color: $gray_400;
+  }
 }
 
 .primaryButton {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  height: 40px;
-  padding: 0 16px;
+  height: 44px;
+  padding: 0 18px;
   border: 0;
-  border-radius: 10px;
+  border-radius: $radius_control;
   background: $brand_500;
-  color: #fff;
+  color: $white;
   font-size: 14px;
   font-weight: 600;
-  box-shadow: 0 6px 16px -8px $brand_500;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 6px 16px -6px rgba(236, 60, 137, 0.45);
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.15s ease;
-  @include focus_ring;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+  @include focus_visible;
 
   &:hover {
     background: $brand_600;
-    transform: translateY(-1px);
   }
 
   svg {
@@ -135,128 +220,125 @@ $radius: 10px;
     height: 16px;
   }
 
-  @include cards {
-    flex: 1 1 auto;
-    justify-content: center;
+  @include narrow {
+    width: 100%;
   }
 }
 
-// ── Summary tiles (also the status filter) ──────────────────────────────────
-
-.summary {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 16px;
-
-  @include cards {
-    display: flex;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    margin-inline: -16px;
-    padding: 2px 16px 6px;
-    scrollbar-width: none;
-
-    &::-webkit-scrollbar {
-      display: none;
-    }
-  }
-}
-
-.tile {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  min-width: 0;
-  padding: 14px 16px;
-  border: 1px solid $gray_200;
-  border-radius: 14px;
-  background: #fff;
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
-  @include focus_ring;
-
-  &::before {
-    content: "";
-    position: absolute;
-    inset: 0 auto 0 0;
-    width: 4px;
-    border-radius: 14px 0 0 14px;
-    background: var(--tile-color);
-    opacity: 0;
-    transition: opacity 0.15s ease;
-  }
-
-  &:hover {
-    border-color: $gray_300;
-    transform: translateY(-1px);
-  }
-
-  @include dark {
-    border-color: $dark_border;
-    background: $dark_surface;
-
-    &:hover {
-      border-color: rgba(255, 255, 255, 0.16);
-    }
-  }
-
-  @include cards {
-    flex: 0 0 132px;
-    scroll-snap-align: start;
-    padding: 12px 14px;
-  }
-}
-
-.tileActive {
-  border-color: var(--tile-color);
-  box-shadow: 0 0 0 1px var(--tile-color), 0 10px 24px -18px var(--tile-color);
-
-  &::before {
-    opacity: 1;
-  }
-
-  &:hover {
-    border-color: var(--tile-color);
-  }
-
-  @include dark {
-    border-color: var(--tile-color);
-
-    &:hover {
-      border-color: var(--tile-color);
-    }
-  }
-}
-
-.tileLabel {
+.secondaryButton {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12px;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid $gray_200;
+  border-radius: $radius_control;
+  background: $white;
+  color: $gray_700;
+  font-size: 14px;
   font-weight: 600;
-  color: $gray_500;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  @include focus_visible;
+
+  &:hover {
+    background: $gray_50;
+  }
+
+  @include dark {
+    border-color: $gray_700;
+    background: $gray_800;
+    color: $gray_300;
+
+    &:hover {
+      background: $gray_700;
+    }
+  }
 }
 
-.tileDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--tile-color);
+// ── KPI cards ───────────────────────────────────────────────────────────────
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+
+  @container coupons_page (min-width: #{$kpis_wide_min}) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+  }
 }
 
-.tileValue {
+.kpi {
+  @include surface;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 18px 20px;
+
+  @include narrow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px;
+  }
+}
+
+.kpiIcon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: $radius_control;
+  background: color-mix(in srgb, var(--kpi-color) 12%, transparent);
+  color: var(--kpi-color);
+
+  svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  @include narrow {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+
+    svg {
+      width: 18px;
+      height: 18px;
+    }
+  }
+}
+
+.kpiBody {
+  min-width: 0;
+}
+
+.kpiValue {
   font-size: 24px;
   font-weight: 700;
-  line-height: 1;
+  line-height: 1.15;
   font-variant-numeric: tabular-nums;
   color: $gray_900;
 
   @include dark {
-    color: #fff;
+    color: $white;
+  }
+}
+
+.kpiLabel {
+  @include truncate;
+  margin-top: 2px;
+  font-size: 13px;
+  color: $gray_500;
+
+  @include dark {
+    color: $gray_400;
   }
 }
 
@@ -264,21 +346,22 @@ $radius: 10px;
 
 .notice {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
-  margin-bottom: 16px;
-  padding: 10px 14px;
-  border: 1px solid rgba(253, 171, 61, 0.45);
-  border-radius: 12px;
-  background: rgba(253, 171, 61, 0.1);
-  font-size: 13px;
-  color: #9a5b00;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  border: 1px solid #fedf89;
+  border-radius: $radius_control;
+  background: #fffaeb;
+  font-size: 14px;
+  color: #93370d;
 
   svg {
     flex-shrink: 0;
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
+    margin-top: 1px;
+    color: $warning_500;
   }
 
   strong {
@@ -286,8 +369,9 @@ $radius: 10px;
   }
 
   @include dark {
-    border-color: rgba(253, 171, 61, 0.3);
-    color: #fdc77a;
+    border-color: rgba(247, 144, 9, 0.3);
+    background: rgba(247, 144, 9, 0.08);
+    color: #fec84b;
   }
 }
 
@@ -297,16 +381,135 @@ $radius: 10px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 4px;
+  border: 1px solid $gray_100;
+  border-radius: $radius_control;
+  background: $gray_50;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  @include dark {
+    border-color: $dark_border;
+    background: $dark_surface;
+  }
+
+  @include cards {
+    width: 100%;
+  }
+}
+
+.tab {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: $gray_500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  @include focus_visible;
+
+  &:hover {
+    color: $gray_700;
+  }
+
+  @include dark {
+    color: $gray_400;
+
+    &:hover {
+      color: $gray_200;
+    }
+  }
+}
+
+.tabActive {
+  background: $white;
+  color: $gray_900;
+  box-shadow: $shadow_xs, 0 0 0 1px rgba(16, 24, 40, 0.04);
+
+  &:hover {
+    color: $gray_900;
+  }
+
+  @include dark {
+    background: $gray_800;
+    color: $white;
+
+    &:hover {
+      color: $white;
+    }
+  }
+}
+
+.tabDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--tab-color);
+}
+
+.tabCount {
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: $gray_200;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: $gray_600;
+
+  .tabActive & {
+    background: $brand_50;
+    color: $brand_600;
+  }
+
+  @include dark {
+    background: $gray_700;
+    color: $gray_300;
+  }
+}
+
+:global(.dark) .tabActive .tabCount {
+  background: rgba(236, 60, 137, 0.18);
+  color: #f48fbc;
+}
+
+.toolbarEnd {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
   gap: 10px;
-  margin-bottom: 8px;
+  min-width: 0;
 }
 
 .search {
   position: relative;
-  flex: 1 1 260px;
-  max-width: 340px;
+  flex: 0 1 280px;
+  min-width: 0;
 
-  svg {
+  > svg {
     position: absolute;
     top: 50%;
     left: 12px;
@@ -319,13 +522,14 @@ $radius: 10px;
 
   input {
     width: 100%;
-    height: 38px;
-    padding: 0 34px 0 36px;
+    height: 42px;
+    padding: 0 36px 0 38px;
     border: 1px solid $gray_200;
-    border-radius: 10px;
-    background: #fff;
-    font-size: 13px;
+    border-radius: $radius_control;
+    background: $white;
+    font-size: 14px;
     color: $gray_900;
+    box-shadow: $shadow_xs;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 
     &::placeholder {
@@ -335,172 +539,129 @@ $radius: 10px;
     &:focus {
       outline: none;
       border-color: $brand_500;
-      box-shadow: 0 0 0 3px rgba(236, 60, 137, 0.15);
+      box-shadow: $focus_ring;
     }
 
     @include dark {
-      border-color: $dark_border;
-      background: $dark_surface;
-      color: #fff;
+      border-color: $gray_700;
+      background: $gray_900;
+      color: $white;
     }
   }
 
   @include cards {
-    max-width: none;
+    flex: 1 1 220px;
   }
 }
 
 .clearSearch {
   position: absolute;
   top: 50%;
-  right: 6px;
+  right: 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 26px;
   height: 26px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   color: $gray_400;
   cursor: pointer;
   transform: translateY(-50%);
 
   svg {
-    position: static;
     width: 14px;
     height: 14px;
-    transform: none;
   }
 
   &:hover {
     background: $gray_100;
     color: $gray_700;
   }
+
+  @include dark {
+    &:hover {
+      background: $gray_800;
+      color: $white;
+    }
+  }
 }
 
 .select {
-  height: 38px;
-  padding: 0 32px 0 12px;
+  height: 42px;
+  padding: 0 36px 0 14px;
   border: 1px solid $gray_200;
-  border-radius: 10px;
-  background-color: #fff;
-  font-size: 13px;
+  border-radius: $radius_control;
+  background-color: $white;
+  font-size: 14px;
   font-weight: 500;
   color: $gray_700;
+  box-shadow: $shadow_xs;
   cursor: pointer;
 
   &:focus {
     outline: none;
     border-color: $brand_500;
+    box-shadow: $focus_ring;
   }
 
   @include dark {
-    border-color: $dark_border;
-    background-color: $dark_surface;
+    border-color: $gray_700;
+    background-color: $gray_900;
     color: $gray_300;
   }
+
+  @include narrow {
+    flex: 1 1 auto;
+  }
 }
 
-.toolbarEnd {
+.resultLine {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
-  margin-left: auto;
-
-  @include cards {
-    width: 100%;
-    margin-left: 0;
-    justify-content: space-between;
-  }
-}
-
-.resultCount {
-  font-size: 12px;
-  font-weight: 500;
-  color: $gray_400;
-  white-space: nowrap;
-}
-
-.linkButton {
-  border: 0;
-  background: transparent;
-  font-size: 12px;
-  font-weight: 600;
+  gap: 4px 12px;
+  margin: -4px 0 12px;
+  font-size: 13px;
   color: $gray_500;
-  cursor: pointer;
 
-  &:hover {
-    color: $gray_900;
-  }
+  strong {
+    font-weight: 600;
+    color: $gray_700;
 
-  @include dark {
-    &:hover {
-      color: #fff;
+    @include dark {
+      color: $gray_300;
     }
   }
 }
 
-// ── Groups ──────────────────────────────────────────────────────────────────
-
-.group {
-  --group-color: #c4c4c4;
-  margin-top: 22px;
-}
-
-.groupHeader {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 6px 2px;
+.linkButton {
+  padding: 0;
   border: 0;
   background: transparent;
-  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  color: $brand_500;
   cursor: pointer;
-  @include focus_ring;
-}
 
-.chevron {
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  color: var(--group-color);
-  transition: transform 0.2s ease;
-}
-
-.chevronOpen {
-  transform: rotate(90deg);
-}
-
-.groupTitle {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--group-color);
-}
-
-.groupCount {
-  font-size: 12px;
-  font-weight: 500;
-  color: $gray_400;
-}
-
-.groupBody {
-  margin-top: 4px;
-  border: 1px solid $gray_200;
-  border-left: 6px solid var(--group-color);
-  border-radius: $radius;
-  background: #fff;
-
-  @include dark {
-    border-color: $dark_border;
-    border-left-color: var(--group-color);
-    background: $dark_surface;
+  &:hover {
+    color: $brand_600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
+}
+
+// ── Board shell ─────────────────────────────────────────────────────────────
+
+.board {
+  @include surface;
+  box-shadow: $shadow_xs;
 
   @include cards {
     border: 0;
     background: transparent;
+    box-shadow: none;
 
     @include dark {
       background: transparent;
@@ -516,23 +677,29 @@ $radius: 10px;
 
 .headRow {
   @extend %grid_row;
-  border-bottom: 1px solid $gray_200;
-  border-radius: 0 $radius 0 0;
+  border-bottom: 1px solid $gray_100;
+  border-radius: $radius_card $radius_card 0 0;
   background: $gray_50;
 
   > div {
-    padding: 9px 12px;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    padding: 12px 14px;
+    font-size: 12px;
+    font-weight: 500;
     color: $gray_500;
     white-space: nowrap;
+
+    &:first-child {
+      padding-left: 22px;
+    }
   }
 
   @include dark {
     border-color: $dark_border;
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(255, 255, 255, 0.02);
+
+    > div {
+      color: $gray_400;
+    }
   }
 
   @include cards {
@@ -540,95 +707,238 @@ $radius: 10px;
   }
 }
 
-.headCenter {
-  text-align: center;
-}
-
-.headRight {
+.headActions {
   text-align: right;
 }
 
-.row {
-  @extend %grid_row;
-  min-height: 60px;
-  transition: background 0.12s ease;
+// ── Groups ──────────────────────────────────────────────────────────────────
 
-  // Table layout: thin dividers between rows.
+.group {
+  --group-color: #{$gray_400};
+
   @include table {
-    border-top: 1px solid $gray_100;
+    & + & {
+      border-top: 1px solid $gray_100;
 
-    &:last-child {
-      border-radius: 0 0 $radius 0;
-    }
-
-    &:hover {
-      background: rgba(87, 155, 252, 0.05);
-    }
-
-    @include dark {
-      border-top-color: $dark_border_soft;
-
-      &:hover {
-        background: rgba(255, 255, 255, 0.025);
+      @include dark {
+        border-top-color: $dark_border;
       }
     }
   }
 
-  // Card layout: same markup, laid out with named areas.
   @include cards {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    & + & {
+      margin-top: 20px;
+    }
+  }
+}
+
+.groupRow {
+  display: block;
+}
+
+.groupCell {
+  display: block;
+}
+
+.groupHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 16px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  @include focus_visible;
+
+  &:hover {
+    background: $gray_25;
+  }
+
+  @include dark {
+    &:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+  }
+
+  @include cards {
+    padding: 4px 2px 10px;
+
+    &:hover {
+      background: transparent;
+    }
+  }
+}
+
+.chevron {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  color: $gray_400;
+  transition: transform 0.2s ease;
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+}
+
+.groupDot {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--group-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--group-color) 18%, transparent);
+}
+
+.groupTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: $gray_900;
+
+  @include dark {
+    color: $white;
+  }
+}
+
+.groupCount {
+  min-width: 24px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: $gray_100;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: $gray_600;
+
+  @include dark {
+    background: $gray_800;
+    color: $gray_300;
+  }
+}
+
+.groupMeta {
+  @include truncate;
+  margin-left: auto;
+  font-size: 12px;
+  color: $gray_400;
+
+  @include narrow {
+    display: none;
+  }
+}
+
+.groupBody {
+  display: block;
+}
+
+// ── Row ─────────────────────────────────────────────────────────────────────
+
+.row {
+  @extend %grid_row;
+  --row-color: #{$gray_400};
+  position: relative;
+  transition: background-color 0.12s ease;
+
+  @include table {
+    min-height: 72px;
+    border-top: 1px solid $gray_100;
+    // Thin status strip, the work management cue, kept subtle.
+    box-shadow: inset 3px 0 0 var(--row-color);
+
+    &:hover {
+      background: $gray_25;
+    }
+
+    @include dark {
+      border-top-color: $dark_divider;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.02);
+      }
+    }
+  }
+
+  @include cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-template-areas:
       "coupon coupon"
-      "status discount"
-      "applies usage"
-      "expires actions";
-    gap: 12px;
-    margin-top: 10px;
-    padding: 14px;
-    border: 1px solid $gray_200;
-    border-left: 5px solid var(--group-color);
-    border-radius: 14px;
-    background: #fff;
-    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+      "discount applies"
+      "usage expires"
+      "actions actions";
+    gap: 8px;
+    padding: 16px;
+    border: 1px solid $gray_100;
+    border-radius: $radius_card;
+    background: $white;
+    box-shadow: $shadow_xs, inset 0 3px 0 var(--row-color);
+
+    & + & {
+      margin-top: 12px;
+    }
 
     @include dark {
       border-color: $dark_border;
-      border-left-color: var(--group-color);
       background: $dark_surface;
     }
   }
 }
 
-// The row right after the header has no divider on the table layout.
+.rowRaised {
+  z-index: 5;
+}
+
 @include table {
-  .headRow + .row {
+  // Bottom corners of the last visible row follow the card radius.
+  .group:last-child .row:last-child {
+    border-radius: 0 0 $radius_card $radius_card;
+  }
+
+  // Without group rows the first coupon sits right under the column header.
+  .headRow + .group > .groupBody:first-child > .row:first-child {
     border-top: 0;
   }
 }
 
 .cell {
   min-width: 0;
-  padding: 10px 12px;
-  font-size: 13px;
+  padding: 14px;
+  font-size: 14px;
   color: $gray_700;
 
   @include dark {
     color: $gray_300;
   }
 
-  // Small caption above each value in card mode.
   @include cards {
     padding: 0;
 
-    &[data-label]::before {
-      content: attr(data-label);
-      display: block;
-      margin-bottom: 4px;
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      color: $gray_400;
+    // Metric tiles in card mode, each with its caption.
+    &[data-label] {
+      padding: 10px 12px;
+      border-radius: $radius_control;
+      background: $gray_50;
+
+      @include dark {
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      &::before {
+        content: attr(data-label);
+        display: block;
+        margin-bottom: 6px;
+        font-size: 11px;
+        font-weight: 500;
+        color: $gray_500;
+
+        @include dark {
+          color: $gray_400;
+        }
+      }
     }
   }
 }
@@ -636,61 +946,67 @@ $radius: 10px;
 // ── Coupon cell ─────────────────────────────────────────────────────────────
 
 .cellCoupon {
+  @include table {
+    padding-left: 22px;
+  }
+
   @include cards {
     grid-area: coupon;
-    padding-bottom: 12px;
-    border-bottom: 1px dashed $gray_200;
+    // Room for the status pill that sits in the same grid area.
+    padding: 0 128px 8px 0;
+  }
 
-    @include dark {
-      border-color: $dark_border;
-    }
+  @include narrow {
+    padding-right: 0;
+    padding-top: 40px;
   }
 }
 
 .codeLine {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
 }
 
 .code {
   @include truncate;
-  padding: 2px 8px;
+  padding: 3px 9px;
   border: 1px dashed $gray_300;
-  border-radius: 6px;
+  border-radius: 8px;
   background: $gray_50;
-  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
-  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
   font-weight: 700;
   letter-spacing: 0.08em;
   color: $gray_900;
 
   @include dark {
-    border-color: rgba(255, 255, 255, 0.16);
+    border-color: $gray_700;
     background: rgba(255, 255, 255, 0.04);
-    color: #fff;
+    color: $white;
   }
 }
 
 .name {
   @include truncate;
   display: block;
-  margin-top: 5px;
-  font-size: 13px;
+  margin-top: 8px;
+  font-size: 14px;
   font-weight: 600;
   color: $gray_900;
   text-decoration: none;
+  transition: color 0.15s ease;
 
   &:hover {
     color: $brand_500;
   }
 
   @include dark {
-    color: #fff;
+    color: $white;
 
     &:hover {
-      color: $brand_500;
+      color: #f48fbc;
     }
   }
 
@@ -699,25 +1015,45 @@ $radius: 10px;
   }
 }
 
+.description {
+  @include truncate;
+  margin-top: 2px;
+  font-size: 12px;
+  color: $gray_400;
+
+  @include dark {
+    color: $gray_500;
+  }
+}
+
 .giftBadge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  margin-top: 6px;
-  padding: 2px 8px;
+  gap: 5px;
+  margin-top: 8px;
+  padding: 3px 9px;
   border-radius: 999px;
-  background: rgba(253, 171, 61, 0.15);
+  background: #fffaeb;
+  box-shadow: inset 0 0 0 1px #fedf89;
   font-size: 11px;
   font-weight: 600;
-  color: #b26b00;
+  color: #b54708;
   text-decoration: none;
+  transition: background-color 0.15s ease;
+
+  svg {
+    width: 12px;
+    height: 12px;
+  }
 
   &:hover {
-    background: rgba(253, 171, 61, 0.25);
+    background: #fef0c7;
   }
 
   @include dark {
-    color: #fdc77a;
+    background: rgba(247, 144, 9, 0.12);
+    box-shadow: inset 0 0 0 1px rgba(247, 144, 9, 0.3);
+    color: #fec84b;
   }
 }
 
@@ -733,12 +1069,12 @@ $radius: 10px;
   background: transparent;
   color: $gray_400;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
-  @include focus_ring;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  @include focus_visible;
 
   svg {
-    width: 15px;
-    height: 15px;
+    width: 14px;
+    height: 14px;
   }
 
   &:hover {
@@ -748,149 +1084,172 @@ $radius: 10px;
 
   @include dark {
     &:hover {
-      background: rgba(255, 255, 255, 0.08);
-      color: #fff;
+      background: $gray_800;
+      color: $white;
     }
   }
 }
 
-.iconButtonDanger:hover {
-  background: rgba(226, 68, 92, 0.1);
-  color: #e2445c;
+// The copy button stays quiet until the row is hovered, touch keeps it visible.
+.copyButton {
+  @include table {
+    @media (hover: hover) {
+      opacity: 0;
 
-  @include dark {
-    background: rgba(226, 68, 92, 0.15);
-    color: #ff7a8e;
+      .row:hover &,
+      &:focus-visible {
+        opacity: 1;
+      }
+    }
   }
 }
 
 .copied {
-  color: #00a35c;
-}
+  opacity: 1 !important;
+  color: $success_500;
 
-// ── Solid color cells ───────────────────────────────────────────────────────
-
-.cellBlock {
-  padding: 6px;
-
-  @include cards {
-    padding: 0;
+  &:hover {
+    color: $success_500;
   }
 }
+
+// ── Status ──────────────────────────────────────────────────────────────────
 
 .cellStatus {
   position: relative;
 
   @include cards {
-    grid-area: status;
+    grid-area: coupon;
+    align-self: start;
+    justify-self: end;
+  }
+
+  @include narrow {
+    justify-self: start;
   }
 }
 
-.cellDiscount {
-  @include cards {
-    grid-area: discount;
-  }
-}
-
-.block {
-  display: flex;
+%pill {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 6px;
-  width: 100%;
-  height: 36px;
-  padding: 0 8px;
+  height: 28px;
+  padding: 0 10px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
-  color: #fff;
   white-space: nowrap;
-
-  @include cards {
-    height: 34px;
-  }
 }
 
-.statusButton {
+.statusPill {
+  @extend %pill;
   cursor: pointer;
-  transition: filter 0.15s ease, transform 0.15s ease;
-  @include focus_ring;
+  transition: filter 0.15s ease, transform 0.1s ease;
+  @include focus_visible;
 
   &:hover:not(:disabled) {
-    filter: brightness(0.94);
+    filter: saturate(1.2) brightness(0.97);
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.97);
   }
 
   &:disabled {
     cursor: progress;
-    opacity: 0.7;
+    opacity: 0.6;
   }
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
 }
 
 .statusCaret {
   width: 12px;
   height: 12px;
-  opacity: 0;
-  transition: opacity 0.15s ease;
+  margin-right: -2px;
+  opacity: 0.5;
+  transition: opacity 0.15s ease, transform 0.15s ease;
 
-  .statusButton:hover &,
-  .statusButton:focus-visible & {
-    opacity: 0.9;
+  .statusPill:hover &,
+  .statusPill[aria-expanded="true"] & {
+    opacity: 1;
   }
 
-  @include cards {
-    opacity: 0.9;
-  }
-}
-
-@each $name, $color in $status_colors {
-  .status_#{$name} {
-    background: $color;
+  .statusPill[aria-expanded="true"] & {
+    transform: rotate(180deg);
   }
 }
 
-@each $name, $color in $discount_colors {
-  .discount_#{$name} {
-    background: $color;
+.discountPill {
+  @extend %pill;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+
+  svg {
+    width: 14px;
+    height: 14px;
   }
 }
 
-.status_disabled {
-  color: $gray_700;
+@each $name, $tone in $tones {
+  .#{$name} {
+    @include tone_pill(list.nth($tone, 1), list.nth($tone, 2), list.nth($tone, 3));
+  }
 }
 
 // ── Status picker ───────────────────────────────────────────────────────────
 
 .picker {
   position: absolute;
-  top: calc(100% + 4px);
-  left: 50%;
+  top: calc(100% - 6px);
+  left: 8px;
   z-index: 30;
-  width: 220px;
+  width: 260px;
   padding: 6px;
   border: 1px solid $gray_200;
-  border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 16px 40px -12px rgba(16, 24, 40, 0.25);
-  transform: translateX(-50%);
-  animation: pickerIn 0.12s ease-out;
+  border-radius: 14px;
+  background: $white;
+  box-shadow: $shadow_lg;
+  animation: pickerIn 0.14s ease-out;
 
   @include dark {
-    border-color: $dark_border;
-    background: var(--color-gray-800);
+    border-color: $gray_700;
+    background: $dark_surface_raised;
   }
 
   @include cards {
+    top: calc(100% + 6px);
+    right: 0;
+    left: auto;
+  }
+
+  @include narrow {
+    right: auto;
     left: 0;
-    transform: none;
   }
 }
 
 @keyframes pickerIn {
   from {
     opacity: 0;
-    margin-top: -4px;
+    transform: translateY(-4px);
   }
+}
+
+.pickerTitle {
+  padding: 6px 8px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: $gray_400;
 }
 
 .pickerOption {
@@ -898,13 +1257,14 @@ $radius: 10px;
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 8px;
+  padding: 10px 8px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 10px;
   background: transparent;
   text-align: left;
   cursor: pointer;
-  @include focus_ring;
+  transition: background-color 0.12s ease;
+  @include focus_visible;
 
   &:hover {
     background: $gray_50;
@@ -912,16 +1272,24 @@ $radius: 10px;
 
   @include dark {
     &:hover {
-      background: rgba(255, 255, 255, 0.06);
+      background: rgba(255, 255, 255, 0.05);
     }
   }
 }
 
-.pickerSwatch {
+.pickerOptionCurrent {
+  background: $gray_50;
+
+  @include dark {
+    background: rgba(255, 255, 255, 0.04);
+  }
+}
+
+.pickerDot {
   flex-shrink: 0;
-  width: 26px;
-  height: 18px;
-  border-radius: 4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
 }
 
 .pickerText {
@@ -931,36 +1299,65 @@ $radius: 10px;
 
 .pickerLabel {
   display: block;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: $gray_900;
 
   @include dark {
-    color: #fff;
+    color: $white;
   }
 }
 
 .pickerHint {
   display: block;
-  font-size: 11px;
+  margin-top: 1px;
+  font-size: 12px;
   color: $gray_500;
 }
 
 .pickerCheck {
+  flex-shrink: 0;
   width: 16px;
   height: 16px;
   color: $brand_500;
 }
 
-// ── Text cells ──────────────────────────────────────────────────────────────
+// ── Discount, applies to, usage, expires ────────────────────────────────────
+
+.cellDiscount {
+  @include cards {
+    grid-area: discount;
+  }
+}
 
 .cellApplies {
-  @include truncate;
-
   @include cards {
     grid-area: applies;
-    white-space: normal;
   }
+}
+
+.applies {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  font-size: 13px;
+  color: $gray_600;
+
+  svg {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    color: $gray_400;
+  }
+
+  @include dark {
+    color: $gray_300;
+  }
+}
+
+.appliesText {
+  @include truncate;
 }
 
 .cellUsage {
@@ -972,22 +1369,24 @@ $radius: 10px;
 .usageLink {
   display: inline-flex;
   align-items: baseline;
-  gap: 3px;
-  font-weight: 600;
-  color: $gray_900;
-  font-variant-numeric: tabular-nums;
+  gap: 4px;
   text-decoration: none;
+  transition: color 0.15s ease;
 
-  &:hover {
+  &:hover .usageValue {
     color: $brand_500;
   }
+}
+
+.usageValue {
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: $gray_900;
+  transition: color 0.15s ease;
 
   @include dark {
-    color: #fff;
-
-    &:hover {
-      color: $brand_500;
-    }
+    color: $white;
   }
 }
 
@@ -999,33 +1398,46 @@ $radius: 10px;
 
 .usageBar {
   overflow: hidden;
-  height: 5px;
-  margin-top: 6px;
+  width: 100%;
+  max-width: 120px;
+  height: 6px;
+  margin-top: 8px;
   border-radius: 999px;
   background: $gray_100;
 
   @include dark {
-    background: rgba(255, 255, 255, 0.08);
+    background: $gray_800;
+  }
+
+  @include cards {
+    max-width: none;
   }
 
   span {
     display: block;
     height: 100%;
     border-radius: inherit;
-    transition: width 0.3s ease;
+    transition: width 0.4s ease;
   }
 }
 
 .usageLow {
-  background: #00c875;
+  background: $success_500;
 }
 
 .usageMid {
-  background: #fdab3d;
+  background: $warning_500;
 }
 
 .usageHigh {
-  background: #e2445c;
+  background: $error_500;
+}
+
+.subtle {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: $gray_400;
 }
 
 .cellExpires {
@@ -1036,77 +1448,229 @@ $radius: 10px;
 
 .dateText {
   display: block;
+  margin-top: 0;
+  font-size: 13px;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  color: $gray_700;
+
+  @include dark {
+    color: $gray_300;
+  }
+
+  &.subtle {
+    font-weight: 400;
+    color: $gray_400;
+  }
 }
 
 .dateHint {
-  display: block;
-  margin-top: 2px;
+  display: inline-block;
+  margin-top: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
   font-size: 11px;
   font-weight: 600;
-  color: $gray_400;
+  white-space: nowrap;
 }
 
-.dateSoon {
-  color: #e2445c;
+.hintDanger {
+  background: #fef3f2;
+  color: #b42318;
+
+  @include dark {
+    background: rgba(240, 68, 56, 0.14);
+    color: #f97066;
+  }
 }
 
-.dateNear {
-  color: #d98a00;
+.hintWarning {
+  background: #fffaeb;
+  color: #b54708;
+
+  @include dark {
+    background: rgba(247, 144, 9, 0.14);
+    color: #fdb022;
+  }
 }
 
-.muted {
-  color: $gray_400;
+.hintInfo {
+  background: #f0f9ff;
+  color: #026aa2;
+
+  @include dark {
+    background: rgba(11, 165, 236, 0.14);
+    color: #36bffa;
+  }
 }
+
+// ── Actions ─────────────────────────────────────────────────────────────────
 
 .cellActions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 2px;
+  gap: 4px;
+
+  @include table {
+    padding-right: 16px;
+  }
 
   @include cards {
     grid-area: actions;
-    align-self: end;
+    gap: 8px;
+    margin-top: 6px;
+    padding-top: 14px;
+    border-top: 1px solid $gray_100;
+
+    @include dark {
+      border-top-color: $dark_border;
+    }
   }
 }
 
-// ── States ──────────────────────────────────────────────────────────────────
+.actionButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: $gray_400;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  @include focus_visible;
+
+  svg {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+  }
+
+  &:hover {
+    background: $gray_100;
+    color: $gray_700;
+  }
+
+  @include dark {
+    &:hover {
+      background: $gray_800;
+      color: $white;
+    }
+  }
+
+  // Labeled, touch friendly buttons in card mode.
+  @include cards {
+    flex: 1 1 0;
+    width: auto;
+    height: 38px;
+    border: 1px solid $gray_200;
+    border-radius: 10px;
+    color: $gray_700;
+
+    @include dark {
+      border-color: $gray_700;
+      color: $gray_300;
+    }
+  }
+}
+
+.actionDanger:hover {
+  background: #fef3f2;
+  color: $error_500;
+
+  @include dark {
+    background: rgba(240, 68, 56, 0.14);
+    color: #f97066;
+  }
+}
+
+.actionLabel {
+  display: none;
+
+  @include cards {
+    display: inline;
+  }
+}
+
+// ── Loading, empty and error states ─────────────────────────────────────────
+
+.skeletonBoard {
+  @include surface;
+  overflow: hidden;
+}
 
 .skeletonRow {
-  height: 60px;
-  margin-top: 8px;
-  border-radius: $radius;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 20px 22px;
+
+  & + & {
+    border-top: 1px solid $gray_100;
+
+    @include dark {
+      border-top-color: $dark_divider;
+    }
+  }
+}
+
+.skeletonBar {
+  height: 12px;
+  border-radius: 999px;
   background: $gray_100;
   animation: pulse 1.4s ease-in-out infinite;
 
   @include dark {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  &:nth-child(1) {
+    flex: 2.4;
+    height: 28px;
+    border-radius: 8px;
+  }
+
+  &:nth-child(2) {
+    flex: 0 0 88px;
+    height: 24px;
+  }
+
+  &:nth-child(3) {
+    flex: 1;
+  }
+
+  &:nth-child(4) {
+    flex: 1;
+
+    @include cards {
+      display: none;
+    }
   }
 }
 
 @keyframes pulse {
   50% {
-    opacity: 0.5;
+    opacity: 0.45;
   }
 }
 
 .emptyState {
+  @include surface;
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-top: 16px;
-  padding: 56px 20px;
-  border: 1px dashed $gray_200;
-  border-radius: 16px;
-  background: #fff;
+  padding: 64px 24px;
+  border-style: dashed;
+  border-color: $gray_200;
   text-align: center;
-
-  @include dark {
-    border-color: $dark_border;
-    background: $dark_surface;
-  }
 }
 
 .emptyIcon {
@@ -1115,9 +1679,9 @@ $radius: 10px;
   justify-content: center;
   width: 56px;
   height: 56px;
-  border-radius: 16px;
-  background: $gray_100;
-  color: $gray_400;
+  border-radius: $radius_card;
+  background: $brand_50;
+  color: $brand_500;
 
   svg {
     width: 28px;
@@ -1125,41 +1689,54 @@ $radius: 10px;
   }
 
   @include dark {
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(236, 60, 137, 0.12);
+  }
+}
+
+.emptyIconError {
+  background: #fef3f2;
+  color: $error_500;
+
+  @include dark {
+    background: rgba(240, 68, 56, 0.12);
   }
 }
 
 .emptyTitle {
-  margin-top: 14px;
-  font-size: 15px;
+  margin-top: 16px;
+  font-size: 16px;
   font-weight: 600;
   color: $gray_900;
 
   @include dark {
-    color: #fff;
+    color: $white;
   }
 }
 
 .emptyText {
+  max-width: 360px;
   margin-top: 4px;
-  font-size: 13px;
+  font-size: 14px;
   color: $gray_500;
-}
 
-.emptyError {
-  color: #e2445c;
+  @include dark {
+    color: $gray_400;
+  }
 }
 
 .emptyAction {
-  margin-top: 16px;
+  margin-top: 20px;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tile,
   .primaryButton,
+  .tab,
   .chevron,
+  .statusPill,
+  .statusCaret,
   .picker,
-  .skeletonRow {
+  .skeletonBar,
+  .usageBar span {
     animation: none;
     transition: none;
   }

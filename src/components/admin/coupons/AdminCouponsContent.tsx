@@ -11,18 +11,25 @@ import {
 import CouponsBoard from "./list/CouponsBoard";
 import styles from "./list/CouponsBoard.module.scss";
 import {
+  EXPIRING_SOON_DAYS,
   SORT_OPTIONS,
   STATUS_META,
   STATUS_ORDER,
+  countExpiringSoon,
   getCouponStatus,
   groupCouponsByStatus,
   matchesSearch,
   sortCoupons,
+  sumRedemptions,
   type CouponSort,
   type CouponStatus,
   type StatusFilter,
 } from "./list/coupon-list";
 import {
+  ChartIcon,
+  CheckCircleIcon,
+  CheckIcon,
+  ClockIcon,
   CloseIcon,
   GiftIcon,
   PlusIcon,
@@ -98,6 +105,11 @@ function Toast({ message, type, onDismiss }: ToastProps) {
         type === "success" ? "bg-emerald-600" : "bg-red-600"
       }`}
     >
+      {type === "success" ? (
+        <CheckIcon className="h-4 w-4 shrink-0" />
+      ) : (
+        <CloseIcon className="h-4 w-4 shrink-0" />
+      )}
       {message}
     </div>
   );
@@ -105,7 +117,7 @@ function Toast({ message, type, onDismiss }: ToastProps) {
 
 // ── Main component ───────────────────────────────────────────────────────────
 
-const ALL_TILE_COLOR = "var(--color-brand-500)";
+const ALL_TAB_COLOR = "var(--color-brand-500, #ec3c89)";
 
 export default function AdminCouponsContent() {
   const router = useRouter();
@@ -194,8 +206,8 @@ export default function AdminCouponsContent() {
 
   const has_filters = status_filter !== "all" || search_query.trim() !== "";
 
-  const summary_tiles = [
-    { key: "all" as StatusFilter, label: "All", color: ALL_TILE_COLOR, count: coupons.length },
+  const status_tabs = [
+    { key: "all" as StatusFilter, label: "All", color: ALL_TAB_COLOR, count: coupons.length },
     ...STATUS_ORDER.map((key) => ({
       key: key as StatusFilter,
       label: STATUS_META[key].label,
@@ -203,6 +215,40 @@ export default function AdminCouponsContent() {
       count: status_counts[key],
     })),
   ];
+
+  const kpi_cards = useMemo(() => {
+    const expiring_soon = countExpiringSoon(coupons);
+    return [
+      {
+        key: "total",
+        label: "Total coupons",
+        value: coupons.length,
+        color: "var(--color-brand-500, #ec3c89)",
+        icon: <TicketIcon />,
+      },
+      {
+        key: "active",
+        label: "Active now",
+        value: status_counts.active,
+        color: STATUS_META.active.color,
+        icon: <CheckCircleIcon />,
+      },
+      {
+        key: "redemptions",
+        label: "Total redemptions",
+        value: sumRedemptions(coupons),
+        color: "var(--color-theme-purple-500, #7a5af8)",
+        icon: <ChartIcon />,
+      },
+      {
+        key: "expiring",
+        label: `Ending in ${EXPIRING_SOON_DAYS} days`,
+        value: expiring_soon,
+        color: expiring_soon > 0 ? "var(--color-warning-500, #f79009)" : "var(--color-gray-400, #98a2b3)",
+        icon: <ClockIcon />,
+      },
+    ];
+  }, [coupons, status_counts]);
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
@@ -225,8 +271,9 @@ export default function AdminCouponsContent() {
     });
   }, []);
 
-  const handleSelectTile = (key: StatusFilter) => {
-    setStatusFilter((prev) => (prev === key && key !== "all" ? "all" : key));
+  const handleSelectTab = (key: StatusFilter) => {
+    setOpenPickerId(null);
+    setStatusFilter(key);
   };
 
   const handleClearFilters = () => {
@@ -283,9 +330,14 @@ export default function AdminCouponsContent() {
   const renderContent = () => {
     if (is_loading) {
       return (
-        <div aria-busy="true" aria-label="Loading coupons">
+        <div className={styles.skeletonBoard} aria-busy="true" aria-label="Loading coupons">
           {Array.from({ length: 5 }).map((_, index) => (
-            <div key={index} className={styles.skeletonRow} />
+            <div key={index} className={styles.skeletonRow}>
+              <span className={styles.skeletonBar} />
+              <span className={styles.skeletonBar} />
+              <span className={styles.skeletonBar} />
+              <span className={styles.skeletonBar} />
+            </div>
           ))}
         </div>
       );
@@ -293,13 +345,14 @@ export default function AdminCouponsContent() {
 
     if (error) {
       return (
-        <div className={styles.emptyState}>
-          <div className={styles.emptyIcon}>
+        <div className={styles.emptyState} role="alert">
+          <div className={`${styles.emptyIcon} ${styles.emptyIconError}`}>
             <WarningIcon />
           </div>
-          <p className={`${styles.emptyText} ${styles.emptyError}`}>{error}</p>
+          <h3 className={styles.emptyTitle}>Something went wrong</h3>
+          <p className={styles.emptyText}>{error}</p>
           <button type="button" className={`${styles.primaryButton} ${styles.emptyAction}`} onClick={loadData}>
-            Retry
+            Try again
           </button>
         </div>
       );
@@ -314,11 +367,11 @@ export default function AdminCouponsContent() {
           <h3 className={styles.emptyTitle}>{has_filters ? "No coupons match" : "No coupons yet"}</h3>
           <p className={styles.emptyText}>
             {has_filters
-              ? "Try another search or clear the filters."
-              : "Create your first coupon to get started."}
+              ? "Try another search term or status, or clear the filters to see every coupon."
+              : "Create your first discount code and share it with your clients."}
           </p>
           {has_filters ? (
-            <button type="button" className={`${styles.linkButton} ${styles.emptyAction}`} onClick={handleClearFilters}>
+            <button type="button" className={`${styles.secondaryButton} ${styles.emptyAction}`} onClick={handleClearFilters}>
               Clear filters
             </button>
           ) : (
@@ -334,6 +387,7 @@ export default function AdminCouponsContent() {
     return (
       <CouponsBoard
         groups={groups}
+        show_group_headers={status_filter === "all"}
         collapsed_keys={collapsed_keys}
         copied_code={copied_code}
         open_picker_id={open_picker_id}
@@ -350,79 +404,92 @@ export default function AdminCouponsContent() {
   return (
     <div className={styles.page}>
       {/* Header */}
-      <div className={styles.header}>
+      <header className={styles.header}>
         <div>
+          <p className={styles.eyebrow}>
+            <TicketIcon />
+            Promotions
+          </p>
           <h1 className={styles.title}>Coupons</h1>
-          <p className={styles.subtitle}>Create, track and manage discount codes.</p>
+          <p className={styles.subtitle}>Create, track and manage the discount codes your clients can redeem.</p>
         </div>
         <button type="button" className={styles.primaryButton} onClick={handleOpenCreate}>
           <PlusIcon />
           Create coupon
         </button>
-      </div>
+      </header>
 
-      {/* Summary tiles, also used as the status filter */}
-      <div className={styles.summary} role="group" aria-label="Filter by status">
-        {summary_tiles.map((tile) => (
-          <button
-            key={tile.key}
-            type="button"
-            className={`${styles.tile} ${status_filter === tile.key ? styles.tileActive : ""}`}
-            style={{ "--tile-color": tile.color } as React.CSSProperties}
-            onClick={() => handleSelectTile(tile.key)}
-            aria-pressed={status_filter === tile.key}
-          >
-            <span className={styles.tileLabel}>
-              <span className={styles.tileDot} />
-              {tile.label}
-            </span>
-            <span className={styles.tileValue}>{is_loading ? "..." : tile.count}</span>
-          </button>
+      {/* KPI cards */}
+      <section className={styles.kpis} aria-label="Coupon overview">
+        {kpi_cards.map((card) => (
+          <div key={card.key} className={styles.kpi} style={{ "--kpi-color": card.color } as React.CSSProperties}>
+            <span className={styles.kpiIcon}>{card.icon}</span>
+            <div className={styles.kpiBody}>
+              <p className={styles.kpiValue}>{is_loading ? "..." : card.value.toLocaleString("en-US")}</p>
+              <p className={styles.kpiLabel}>{card.label}</p>
+            </div>
+          </div>
         ))}
-      </div>
+      </section>
 
       {/* Gift card reminder */}
       {awaiting_gift_cards > 0 && (
-        <div className={styles.notice}>
+        <div className={styles.notice} role="status">
           <GiftIcon />
           <span>
             <strong>
               {awaiting_gift_cards} gift card{awaiting_gift_cards === 1 ? "" : "s"}
             </strong>{" "}
-            waiting to be sent. Open the coupon to review the requests.
+            waiting to be sent. Open the coupon marked below to review the requests.
           </span>
         </div>
       )}
 
-      {/* Toolbar */}
+      {/* Toolbar: status tabs, search and sort */}
       <div className={styles.toolbar}>
-        <label className={styles.search}>
-          <span className="sr-only">Search coupons</span>
-          <SearchIcon />
-          <input
-            type="text"
-            placeholder="Search by code or name"
-            value={search_query}
-            onChange={(event) => setSearchQuery(event.target.value)}
-          />
-          {search_query && (
-            <button
-              type="button"
-              className={styles.clearSearch}
-              onClick={() => setSearchQuery("")}
-              aria-label="Clear search"
-            >
-              <CloseIcon />
-            </button>
-          )}
-        </label>
+        <div className={styles.tabs} role="tablist" aria-label="Filter by status">
+          {status_tabs.map((tab) => {
+            const is_active = status_filter === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                role="tab"
+                aria-selected={is_active}
+                className={`${styles.tab} ${is_active ? styles.tabActive : ""}`}
+                style={{ "--tab-color": tab.color } as React.CSSProperties}
+                onClick={() => handleSelectTab(tab.key)}
+              >
+                {tab.key !== "all" && <span className={styles.tabDot} />}
+                {tab.label}
+                <span className={styles.tabCount}>{is_loading ? "-" : tab.count}</span>
+              </button>
+            );
+          })}
+        </div>
 
         <div className={styles.toolbarEnd}>
-          {!is_loading && (
-            <span className={styles.resultCount}>
-              {visible_coupons.length} of {coupons.length}
-            </span>
-          )}
+          <label className={styles.search}>
+            <span className="sr-only">Search coupons</span>
+            <SearchIcon />
+            <input
+              type="search"
+              placeholder="Search by code or name"
+              value={search_query}
+              onChange={(event) => setSearchQuery(event.target.value)}
+            />
+            {search_query && (
+              <button
+                type="button"
+                className={styles.clearSearch}
+                onClick={() => setSearchQuery("")}
+                aria-label="Clear search"
+              >
+                <CloseIcon />
+              </button>
+            )}
+          </label>
+
           <select
             className={styles.select}
             value={sort}
@@ -437,6 +504,17 @@ export default function AdminCouponsContent() {
           </select>
         </div>
       </div>
+
+      {!is_loading && !error && has_filters && (
+        <p className={styles.resultLine} aria-live="polite">
+          <span>
+            Showing <strong>{visible_coupons.length}</strong> of <strong>{coupons.length}</strong> coupons
+          </span>
+          <button type="button" className={styles.linkButton} onClick={handleClearFilters}>
+            Clear filters
+          </button>
+        </p>
+      )}
 
       {renderContent()}
 

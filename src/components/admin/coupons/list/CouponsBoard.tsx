@@ -18,6 +18,7 @@ import {
   type CouponStatus,
 } from "./coupon-list";
 import {
+  CartIcon,
   ChartIcon,
   CheckIcon,
   ChevronDownIcon,
@@ -25,6 +26,8 @@ import {
   CopyIcon,
   EditIcon,
   GiftIcon,
+  GridIcon,
+  LayersIcon,
   TrashIcon,
 } from "./CouponIcons";
 
@@ -40,13 +43,13 @@ const PICKER_OPTIONS = [
   {
     is_active: true,
     label: "Enabled",
-    hint: "Clients can use it within its dates",
+    hint: "Clients can redeem it within its dates",
     color: STATUS_META.active.color,
   },
   {
     is_active: false,
     label: "Disabled",
-    hint: "Paused, clients cannot use it",
+    hint: "Paused, clients cannot redeem it",
     color: STATUS_META.disabled.color,
   },
 ];
@@ -79,25 +82,64 @@ function StatusPicker({ coupon, onSelect, onClose }: StatusPickerProps) {
 
   return (
     <div ref={picker_ref} className={styles.picker} role="menu" aria-label={`Status for ${coupon.code}`}>
-      {PICKER_OPTIONS.map((option) => (
-        <button
-          key={option.label}
-          type="button"
-          role="menuitemradio"
-          aria-checked={coupon.is_active === option.is_active}
-          className={styles.pickerOption}
-          onClick={() => onSelect(option.is_active)}
-        >
-          <span className={styles.pickerSwatch} style={{ background: option.color }} />
-          <span className={styles.pickerText}>
-            <span className={styles.pickerLabel}>{option.label}</span>
-            <span className={styles.pickerHint}>{option.hint}</span>
-          </span>
-          {coupon.is_active === option.is_active && <CheckIcon className={styles.pickerCheck} />}
-        </button>
-      ))}
+      <p className={styles.pickerTitle}>Coupon status</p>
+      {PICKER_OPTIONS.map((option) => {
+        const is_current = coupon.is_active === option.is_active;
+        return (
+          <button
+            key={option.label}
+            type="button"
+            role="menuitemradio"
+            aria-checked={is_current}
+            className={`${styles.pickerOption} ${is_current ? styles.pickerOptionCurrent : ""}`}
+            onClick={() => onSelect(option.is_active)}
+          >
+            <span className={styles.pickerDot} style={{ background: option.color }} />
+            <span className={styles.pickerText}>
+              <span className={styles.pickerLabel}>{option.label}</span>
+              <span className={styles.pickerHint}>{option.hint}</span>
+            </span>
+            {is_current && <CheckIcon className={styles.pickerCheck} />}
+          </button>
+        );
+      })}
     </div>
   );
+}
+
+// ── Row helpers ──────────────────────────────────────────────────────────────
+
+type HintTone = "danger" | "warning" | "info";
+
+function getDateHint(coupon: Coupon, status: CouponStatus): { text: string; tone: HintTone } | null {
+  if (status === "scheduled" && coupon.starts_at) {
+    return { text: `Starts ${formatShortDate(coupon.starts_at)}`, tone: "info" };
+  }
+  if (status !== "active") return null;
+  const days_left = daysUntil(coupon.expires_at);
+  if (days_left === null) return null;
+  if (days_left <= 1) return { text: "Ends today", tone: "danger" };
+  if (days_left <= 7) return { text: `${days_left} days left`, tone: "danger" };
+  if (days_left <= 30) return { text: `${days_left} days left`, tone: "warning" };
+  return null;
+}
+
+const HINT_TONE_CLASS: Record<HintTone, string> = {
+  danger: styles.hintDanger,
+  warning: styles.hintWarning,
+  info: styles.hintInfo,
+};
+
+function getUsageTone(usage_pct: number): string {
+  if (usage_pct >= 90) return styles.usageHigh;
+  if (usage_pct >= 60) return styles.usageMid;
+  return styles.usageLow;
+}
+
+function AppliesToIcon({ coupon }: { coupon: Coupon }) {
+  if (coupon.applies_to === "specific_product") return <LayersIcon />;
+  if (coupon.applies_to === "minimum_purchase") return <CartIcon />;
+  return <GridIcon />;
 }
 
 // ── Row ──────────────────────────────────────────────────────────────────────
@@ -114,19 +156,6 @@ interface CouponRowProps {
   onDelete: (coupon: Coupon) => void;
 }
 
-function getExpiryHint(coupon: Coupon, status: CouponStatus): { text: string; class_name: string } | null {
-  if (status === "scheduled" && coupon.starts_at) {
-    return { text: `Starts ${formatShortDate(coupon.starts_at)}`, class_name: styles.dateNear };
-  }
-  if (status !== "active") return null;
-  const days_left = daysUntil(coupon.expires_at);
-  if (days_left === null) return null;
-  if (days_left <= 1) return { text: "Ends today", class_name: styles.dateSoon };
-  if (days_left <= 7) return { text: `${days_left} days left`, class_name: styles.dateSoon };
-  if (days_left <= 30) return { text: `${days_left} days left`, class_name: styles.dateNear };
-  return null;
-}
-
 function CouponRow({
   coupon,
   status,
@@ -141,26 +170,22 @@ function CouponRow({
   const edit_href = `/admin/coupons/${coupon.id}/edit`;
   const usage_href = `/admin/coupons/${coupon.id}/usage`;
   const usage_pct = getUsagePercent(coupon);
-  const expiry_hint = getExpiryHint(coupon, status);
+  const date_hint = getDateHint(coupon, status);
   const awaiting_gift_cards = coupon.gift_card_claims_awaiting_count ?? 0;
-  const usage_bar_class =
-    usage_pct === null
-      ? ""
-      : usage_pct >= 90
-        ? styles.usageHigh
-        : usage_pct >= 60
-          ? styles.usageMid
-          : styles.usageLow;
 
   return (
-    <div className={styles.row} role="row">
-      {/* Coupon: code + name */}
+    <div
+      className={`${styles.row} ${is_picker_open ? styles.rowRaised : ""}`}
+      role="row"
+      style={{ "--row-color": STATUS_META[status].color } as React.CSSProperties}
+    >
+      {/* Coupon: code, name and description */}
       <div className={`${styles.cell} ${styles.cellCoupon}`} role="cell">
         <div className={styles.codeLine}>
           <span className={styles.code}>{coupon.code}</span>
           <button
             type="button"
-            className={`${styles.iconButton} ${is_copied ? styles.copied : ""}`}
+            className={`${styles.iconButton} ${styles.copyButton} ${is_copied ? styles.copied : ""}`}
             onClick={() => onCopyCode(coupon.code)}
             title={is_copied ? "Copied" : "Copy code"}
             aria-label={`Copy code ${coupon.code}`}
@@ -168,27 +193,34 @@ function CouponRow({
             {is_copied ? <CheckIcon /> : <CopyIcon />}
           </button>
         </div>
-        <Link href={edit_href} className={styles.name} title={coupon.description ?? coupon.name}>
+        <Link href={edit_href} className={styles.name}>
           {coupon.name}
         </Link>
+        {coupon.description && (
+          <p className={styles.description} title={coupon.description}>
+            {coupon.description}
+          </p>
+        )}
         {coupon.discount_type === "gift_card_reward" && awaiting_gift_cards > 0 && (
           <Link href={`${edit_href}#gift-card-claims`} className={styles.giftBadge}>
+            <GiftIcon />
             {awaiting_gift_cards} gift card{awaiting_gift_cards === 1 ? "" : "s"} to send
           </Link>
         )}
       </div>
 
-      {/* Status: solid block, opens the picker */}
-      <div className={`${styles.cell} ${styles.cellBlock} ${styles.cellStatus}`} role="cell" data-label="Status">
+      {/* Status pill, opens the picker */}
+      <div className={`${styles.cell} ${styles.cellStatus}`} role="cell">
         <button
           type="button"
-          className={`${styles.block} ${styles.statusButton} ${styles[`status_${status}`]}`}
+          className={`${styles.statusPill} ${styles[`status_${status}`]}`}
           onClick={() => onTogglePicker(is_picker_open ? null : coupon.id)}
           disabled={is_updating}
           aria-haspopup="menu"
           aria-expanded={is_picker_open}
           title="Change status"
         >
+          <span className={styles.statusDot} />
           {STATUS_META[status].label}
           <ChevronDownIcon className={styles.statusCaret} />
         </button>
@@ -204,80 +236,90 @@ function CouponRow({
         )}
       </div>
 
-      {/* Discount: solid block colored by type */}
-      <div className={`${styles.cell} ${styles.cellBlock} ${styles.cellDiscount}`} role="cell" data-label="Discount">
+      {/* Discount */}
+      <div className={`${styles.cell} ${styles.cellDiscount}`} role="cell" data-label="Discount">
         <span
-          className={`${styles.block} ${styles[`discount_${coupon.discount_type}`]}`}
+          className={`${styles.discountPill} ${styles[`discount_${coupon.discount_type}`]}`}
           title={getDiscountTypeLabel(coupon)}
         >
-          {coupon.discount_type === "gift_card_reward" && <GiftIcon width={14} height={14} />}
+          {coupon.discount_type === "gift_card_reward" && <GiftIcon />}
           {formatDiscount(coupon)}
         </span>
       </div>
 
       {/* Applies to */}
-      <div
-        className={`${styles.cell} ${styles.cellApplies}`}
-        role="cell"
-        data-label="Applies to"
-        title={getAppliesToTitle(coupon)}
-      >
-        {getAppliesToLabel(coupon)}
+      <div className={`${styles.cell} ${styles.cellApplies}`} role="cell" data-label="Applies to">
+        <span className={styles.applies} title={getAppliesToTitle(coupon)}>
+          <AppliesToIcon coupon={coupon} />
+          <span className={styles.appliesText}>{getAppliesToLabel(coupon)}</span>
+        </span>
       </div>
 
       {/* Usage */}
       <div className={`${styles.cell} ${styles.cellUsage}`} role="cell" data-label="Usage">
         <Link href={usage_href} className={styles.usageLink} title="See the orders that used this coupon">
-          {coupon.times_used}
+          <span className={styles.usageValue}>{coupon.times_used}</span>
           <span className={styles.usageMuted}>
-            {coupon.usage_limit ? `/ ${coupon.usage_limit}` : coupon.times_used === 1 ? "use" : "uses"}
+            {coupon.usage_limit ? `of ${coupon.usage_limit}` : coupon.times_used === 1 ? "use" : "uses"}
           </span>
         </Link>
-        {usage_pct !== null && (
-          <div className={styles.usageBar} aria-hidden="true">
-            <span className={usage_bar_class} style={{ width: `${usage_pct}%` }} />
+        {usage_pct !== null ? (
+          <div
+            className={styles.usageBar}
+            role="progressbar"
+            aria-valuenow={Math.round(usage_pct)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`${Math.round(usage_pct)}% of the usage limit`}
+          >
+            <span className={getUsageTone(usage_pct)} style={{ width: `${Math.max(usage_pct, 2)}%` }} />
           </div>
+        ) : (
+          <span className={styles.subtle}>No limit</span>
         )}
       </div>
 
       {/* Expires */}
       <div className={`${styles.cell} ${styles.cellExpires}`} role="cell" data-label="Expires">
-        {coupon.expires_at ? (
-          <span className={styles.dateText}>{formatShortDate(coupon.expires_at)}</span>
-        ) : (
-          <span className={`${styles.dateText} ${styles.muted}`}>No end date</span>
-        )}
-        {expiry_hint && (
-          <span className={`${styles.dateHint} ${expiry_hint.class_name}`}>{expiry_hint.text}</span>
+        <span className={`${styles.dateText} ${coupon.expires_at ? "" : styles.subtle}`}>
+          {coupon.expires_at ? formatShortDate(coupon.expires_at) : "No end date"}
+        </span>
+        {date_hint && (
+          <span className={`${styles.dateHint} ${HINT_TONE_CLASS[date_hint.tone]}`}>{date_hint.text}</span>
         )}
       </div>
 
       {/* Actions */}
       <div className={`${styles.cell} ${styles.cellActions}`} role="cell">
-        <Link href={usage_href} className={styles.iconButton} title="Usage and orders" aria-label="Usage and orders">
+        <Link href={usage_href} className={styles.actionButton} title="Usage and orders">
           <ChartIcon />
+          <span className={styles.actionLabel}>Usage</span>
         </Link>
-        <Link href={edit_href} className={styles.iconButton} title="Edit" aria-label={`Edit ${coupon.code}`}>
+        <Link href={edit_href} className={styles.actionButton} title="Edit" aria-label={`Edit ${coupon.code}`}>
           <EditIcon />
+          <span className={styles.actionLabel}>Edit</span>
         </Link>
         <button
           type="button"
-          className={`${styles.iconButton} ${styles.iconButtonDanger}`}
+          className={`${styles.actionButton} ${styles.actionDanger}`}
           onClick={() => onDelete(coupon)}
           title="Delete"
           aria-label={`Delete ${coupon.code}`}
         >
           <TrashIcon />
+          <span className={styles.actionLabel}>Delete</span>
         </button>
       </div>
     </div>
   );
 }
 
-// ── Group ────────────────────────────────────────────────────────────────────
+// ── Board ────────────────────────────────────────────────────────────────────
 
 interface CouponsBoardProps {
   groups: CouponGroup[];
+  /** Group rows are hidden when a single status is filtered, they would only repeat the tab. */
+  show_group_headers: boolean;
   collapsed_keys: Set<CouponStatus>;
   copied_code: string | null;
   open_picker_id: string | null;
@@ -291,20 +333,21 @@ interface CouponsBoardProps {
 
 const HEAD_COLUMNS: { label: string; class_name?: string }[] = [
   { label: "Coupon" },
-  { label: "Status", class_name: styles.headCenter },
-  { label: "Discount", class_name: styles.headCenter },
+  { label: "Status" },
+  { label: "Discount" },
   { label: "Applies to" },
   { label: "Usage" },
   { label: "Expires" },
-  { label: "", class_name: styles.headRight },
+  { label: "Actions", class_name: styles.headActions },
 ];
 
 /**
- * Coupons grouped by status, with solid status and discount cells.
- * Rows switch to cards when the board is narrow (container query in the SCSS).
+ * Coupon list grouped by status, with collapsible groups and an inline status
+ * picker. Rows become cards when the page is narrow (container query in the SCSS).
  */
 export default function CouponsBoard({
   groups,
+  show_group_headers,
   collapsed_keys,
   copied_code,
   open_picker_id,
@@ -318,39 +361,53 @@ export default function CouponsBoard({
   const now = new Date();
 
   return (
-    <div>
+    <div className={styles.board} role="table" aria-label="Coupons">
+      <div className={styles.headRow} role="row">
+        {HEAD_COLUMNS.map((column) => (
+          <div key={column.label} className={column.class_name} role="columnheader">
+            <span className={column.label === "Actions" ? "sr-only" : undefined}>{column.label}</span>
+          </div>
+        ))}
+      </div>
+
       {groups.map((group) => {
-        const is_open = !collapsed_keys.has(group.key);
+        const is_open = !show_group_headers || !collapsed_keys.has(group.key);
         const body_id = `coupon-group-${group.key}`;
+        const group_uses = group.coupons.reduce((total, coupon) => total + coupon.times_used, 0);
+
         return (
-          <section
+          <div
             key={group.key}
             className={styles.group}
+            role="rowgroup"
             style={{ "--group-color": group.color } as React.CSSProperties}
           >
-            <button
-              type="button"
-              className={styles.groupHeader}
-              onClick={() => onToggleGroup(group.key)}
-              aria-expanded={is_open}
-              aria-controls={body_id}
-            >
-              <ChevronRightIcon className={`${styles.chevron} ${is_open ? styles.chevronOpen : ""}`} />
-              <span className={styles.groupTitle}>{group.label}</span>
-              <span className={styles.groupCount}>
-                {group.coupons.length} {group.coupons.length === 1 ? "coupon" : "coupons"}
-              </span>
-            </button>
+            {show_group_headers && (
+              <div className={styles.groupRow} role="row">
+                <div role="cell" className={styles.groupCell}>
+                  <button
+                    type="button"
+                    className={styles.groupHeader}
+                    onClick={() => onToggleGroup(group.key)}
+                    aria-expanded={is_open}
+                    aria-controls={body_id}
+                  >
+                    <ChevronRightIcon className={`${styles.chevron} ${is_open ? styles.chevronOpen : ""}`} />
+                    <span className={styles.groupDot} />
+                    <span className={styles.groupTitle}>{group.label}</span>
+                    <span className={styles.groupCount}>{group.coupons.length}</span>
+                    <span className={styles.groupMeta}>
+                      {STATUS_META[group.key].hint}
+                      <span aria-hidden="true"> · </span>
+                      {group_uses} {group_uses === 1 ? "use" : "uses"}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {is_open && (
-              <div id={body_id} className={styles.groupBody} role="table" aria-label={`${group.label} coupons`}>
-                <div className={styles.headRow} role="row">
-                  {HEAD_COLUMNS.map((column, index) => (
-                    <div key={index} className={column.class_name} role="columnheader">
-                      {column.label}
-                    </div>
-                  ))}
-                </div>
+              <div id={body_id} className={styles.groupBody}>
                 {group.coupons.map((coupon) => (
                   <CouponRow
                     key={coupon.id}
@@ -367,7 +424,7 @@ export default function CouponsBoard({
                 ))}
               </div>
             )}
-          </section>
+          </div>
         );
       })}
     </div>
