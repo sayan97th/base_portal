@@ -577,6 +577,23 @@ $board_min_width: 1240px;
   vertical-align: middle;
 }
 
+.countTag {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(87, 155, 252, 0.14);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: #3b7ddd;
+  vertical-align: middle;
+
+  @include dark {
+    color: #8fbcff;
+  }
+}
+
 .orderTitle {
   @include truncate;
   max-width: 100%;
@@ -938,6 +955,162 @@ $board_min_width: 1240px;
   }
 }
 
+
+// ── Checkout detail ─────────────────────────────────────────────────────────
+// A checkout groups every product order bought together. Orders the coupon
+// did not discount stay visible but muted, so the promo reads first.
+
+.checkoutDetail {
+  display: grid;
+  grid-template-columns: minmax(0, 2.2fr) minmax(260px, 1fr);
+  gap: 12px;
+  padding: 4px 16px 16px 46px;
+  animation: detail_in 0.18s ease;
+}
+
+.checkoutSide {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.checkoutOrders {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.checkoutOrder {
+  padding: 12px;
+  border: 1px solid $gray_200;
+  border-radius: 10px;
+  background: $gray_50;
+
+  @include dark {
+    border-color: $dark_border;
+    background: rgba(255, 255, 255, 0.02);
+  }
+}
+
+.checkoutOrderMuted {
+  border-style: dashed;
+  background: transparent;
+
+  @include dark {
+    background: transparent;
+  }
+}
+
+.checkoutOrderHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.checkoutOrderReference {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  font-weight: 700;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.checkoutOrderLink {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: $brand_500;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.checkoutOrderTotals {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 14px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed $gray_200;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: $gray_500;
+
+  strong {
+    color: $gray_900;
+
+    @include dark {
+      color: #fff;
+    }
+  }
+
+  @include dark {
+    border-color: $dark_border;
+  }
+}
+
+.miniPill {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.12);
+}
+
+%promo_badge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.promoBadge {
+  @extend %promo_badge;
+  background: rgba(0, 163, 92, 0.12);
+  color: $savings_color;
+
+  @include dark {
+    color: #34d399;
+  }
+}
+
+.noPromoBadge {
+  @extend %promo_badge;
+  background: $gray_100;
+  color: $gray_500;
+
+  @include dark {
+    background: rgba(255, 255, 255, 0.06);
+  }
+}
+
+.itemPromoApplied {
+  font-weight: 600;
+  color: $savings_color;
+
+  @include dark {
+    color: #34d399;
+  }
+}
+
+.itemPromoNone {
+  color: $gray_400;
+}
+
 // ── Empty and loading states ────────────────────────────────────────────────
 
 .empty {
@@ -1007,6 +1180,11 @@ $board_min_width: 1240px;
 @media (max-width: 1024px) {
   .detail {
     grid-template-columns: 1fr 1fr;
+    padding-left: 16px;
+  }
+
+  .checkoutDetail {
+    grid-template-columns: 1fr;
     padding-left: 16px;
   }
 }

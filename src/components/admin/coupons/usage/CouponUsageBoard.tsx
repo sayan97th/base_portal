@@ -4,8 +4,11 @@ import React, { useState } from "react";
 import Link from "next/link";
 import type { CouponUsage } from "@/types/admin/coupons";
 import styles from "./CouponUsageBoard.module.scss";
+import { ArrowOutIcon, ChevronIcon } from "./UsageIcons";
 import {
+  GIFT_CARD_STATUS_LABELS,
   PRODUCT_COLORS,
+  formatCouponTerms,
   formatMoney,
   formatShortDate,
   formatTime,
@@ -20,45 +23,6 @@ import {
 interface CouponUsageBoardProps {
   groups: CouponUsageGroup[];
   is_gift_card_reward: boolean;
-}
-
-const GIFT_CARD_STATUS_LABELS: Record<string, string> = {
-  pending_details: "Waiting for client details",
-  submitted: "Ready to send",
-  fulfilled: "Gift card sent",
-};
-
-/** Coupon terms saved at checkout, so later coupon edits never rewrite history. */
-function formatCouponTerms(usage: CouponUsage): string {
-  const { discount_type, discount_value } = usage.coupon_terms;
-  if (discount_type === "fixed_amount") return `${formatMoney(discount_value)} off`;
-  if (discount_type === "gift_card_reward") return `${discount_value}% back`;
-  return `${discount_value}% off`;
-}
-
-// ── Icons ────────────────────────────────────────────────────────────────────
-
-function ChevronIcon({ is_open }: { is_open: boolean }) {
-  return (
-    <svg
-      className={`${styles.chevron} ${is_open ? styles.chevronOpen : ""}`}
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={2.5}
-      aria-hidden="true"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-    </svg>
-  );
-}
-
-function ArrowOutIcon() {
-  return (
-    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-    </svg>
-  );
 }
 
 // ── Row ──────────────────────────────────────────────────────────────────────
@@ -233,12 +197,12 @@ function UsageDetail({ usage, is_gift_card_reward, group_color }: UsageDetailPro
           </div>
           {is_gift_card_reward ? (
             <div>
-              <dt>Gift card earned ({formatCouponTerms(usage)})</dt>
+              <dt>Gift card earned ({formatCouponTerms(usage.coupon_terms)})</dt>
               <dd className={styles.breakdownSavings}>{formatMoney(usage.reward_amount)}</dd>
             </div>
           ) : (
             <div>
-              <dt>Coupon discount ({formatCouponTerms(usage)})</dt>
+              <dt>Coupon discount ({formatCouponTerms(usage.coupon_terms)})</dt>
               <dd className={styles.breakdownSavings}>-{formatMoney(usage.discount_amount)}</dd>
             </div>
           )}

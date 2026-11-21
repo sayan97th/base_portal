@@ -5,21 +5,31 @@ import Link from "next/link";
 import type { CouponUsageProductType, CouponUsageResponse } from "@/types/admin/coupons";
 import { getAdminCouponUsage } from "@/services/admin/coupons.service";
 import { downloadCsv } from "@/lib/exportCsv";
+import CouponCheckoutBoard from "./CouponCheckoutBoard";
 import CouponUsageBoard from "./CouponUsageBoard";
 import styles from "./CouponUsageBoard.module.scss";
 import {
   GROUP_BY_OPTIONS,
   PRODUCT_COLORS,
   SORT_OPTIONS,
+  VIEW_OPTIONS,
+  buildCheckoutExport,
+  buildProductOrderExport,
+  checkoutIncludesProduct,
+  countByProduct,
   formatMoney,
   formatShortDate,
   getCouponStateBadge,
-  getStatusMeta,
+  getProductLabel,
+  groupCheckouts,
   groupUsages,
+  matchesCheckoutSearch,
   matchesSearch,
+  sortCheckouts,
   sortUsages,
   type CouponUsageGroupBy,
   type CouponUsageSort,
+  type CouponUsageView,
 } from "./coupon-usage";
 
 interface CouponUsageContentProps {
@@ -27,18 +37,30 @@ interface CouponUsageContentProps {
 }
 
 const GROUP_BY_STORAGE_KEY = "admin_coupon_usage_group_by";
+const VIEW_STORAGE_KEY = "admin_coupon_usage_view";
 
-function readStoredGroupBy(): CouponUsageGroupBy {
-  if (typeof window === "undefined") return "product";
+function readStoredOption<T extends string>(
+  storage_key: string,
+  options: { value: T }[],
+  fallback: T
+): T {
+  if (typeof window === "undefined") return fallback;
   try {
-    const stored_value = window.localStorage.getItem(GROUP_BY_STORAGE_KEY);
-    if (GROUP_BY_OPTIONS.some((option) => option.value === stored_value)) {
-      return stored_value as CouponUsageGroupBy;
-    }
+    const stored_value = window.localStorage.getItem(storage_key);
+    const match = options.find((option) => option.value === stored_value);
+    if (match) return match.value;
   } catch {
     // Storage can be unavailable (private mode), fall back to the default.
   }
-  return "product";
+  return fallback;
+}
+
+function storeOption(storage_key: string, value: string): void {
+  try {
+    window.localStorage.setItem(storage_key, value);
+  } catch {
+    // Remembering the choice is a convenience only.
+  }
 }
 
 function formatCouponDiscount(response: CouponUsageResponse["coupon"]): string {
@@ -86,7 +108,12 @@ export default function CouponUsageContent({ coupon_id }: CouponUsageContentProp
   const [search_term, setSearchTerm] = useState("");
   // The board only renders after the data loads, so reading storage here
   // never changes the server rendered markup.
-  const [group_by, setGroupBy] = useState<CouponUsageGroupBy>(readStoredGroupBy);
+  const [view, setView] = useState<CouponUsageView>(() =>
+    readStoredOption(VIEW_STORAGE_KEY, VIEW_OPTIONS, "checkout")
+  );
+  const [group_by, setGroupBy] = useState<CouponUsageGroupBy>(() =>
+    readStoredOption(GROUP_BY_STORAGE_KEY, GROUP_BY_OPTIONS, "none")
+  );
   const [sort, setSort] = useState<CouponUsageSort>("newest");
   const [product_filter, setProductFilter] = useState<CouponUsageProductType | "all">("all");
   const [reload_key, setReloadKey] = useState(0);
@@ -120,14 +147,16 @@ export default function CouponUsageContent({ coupon_id }: CouponUsageContentProp
 
   const handleGroupByChange = (value: CouponUsageGroupBy) => {
     setGroupBy(value);
-    try {
-      window.localStorage.setItem(GROUP_BY_STORAGE_KEY, value);
-    } catch {
-      // Remembering the grouping is a convenience only.
-    }
+    storeOption(GROUP_BY_STORAGE_KEY, value);
+  };
+
+  const handleViewChange = (value: CouponUsageView) => {
+    setView(value);
+    storeOption(VIEW_STORAGE_KEY, value);
   };
 
   const usages = useMemo(() => usage_response?.data ?? [], [usage_response]);
+  const checkouts = useMemo(() => usage_response?.checkouts ?? [], [usage_response]);
 
   const filtered_usages = useMemo(() => {
     const matching = usages.filter(
@@ -137,41 +166,38 @@ export default function CouponUsageContent({ coupon_id }: CouponUsageContentProp
     return sortUsages(matching, sort);
   }, [usages, product_filter, search_term, sort]);
 
-  const groups = useMemo(() => groupUsages(filtered_usages, group_by), [filtered_usages, group_by]);
+  const filtered_checkouts = useMemo(() => {
+    const matching = checkouts.filter(
+      (checkout) => checkoutIncludesProduct(checkout, product_filter) && matchesCheckoutSearch(checkout, search_term)
+    );
+    return sortCheckouts(matching, sort);
+  }, [checkouts, product_filter, search_term, sort]);
+
+  const usage_groups = useMemo(() => groupUsages(filtered_usages, group_by), [filtered_usages, group_by]);
+  const checkout_groups = useMemo(() => groupCheckouts(filtered_checkouts, group_by), [filtered_checkouts, group_by]);
+
+  // Chip counts follow the view: checkouts that include the product, or discounted orders of it.
+  const product_counts = useMemo(
+    () =>
+      view === "checkout"
+        ? countByProduct(checkouts)
+        : countByProduct(usages.map((usage) => ({ product_types: [usage.product_type] }))),
+    [view, checkouts, usages]
+  );
+
+  const is_checkout_view = view === "checkout";
+  const listed_count = is_checkout_view ? filtered_checkouts.length : filtered_usages.length;
+  const total_count = is_checkout_view ? checkouts.length : usages.length;
+  const record_noun = `${is_checkout_view ? "checkout" : "product order"}${total_count === 1 ? "" : "s"}`;
 
   const handleExport = () => {
     if (!usage_response) return;
-    const headers = [
-      "Order",
-      "Order ID",
-      "Product",
-      "Status",
-      "Client",
-      "Client Email",
-      "Company",
-      "Items",
-      "Subtotal",
-      usage_response.coupon.is_gift_card_reward ? "Gift Card Earned" : "Discount",
-      "Total",
-      "Invoice",
-      "Used On",
-    ];
-    const rows = filtered_usages.map((usage) => [
-      usage.order_reference,
-      usage.order_id,
-      usage.product_label,
-      getStatusMeta(usage.status).label,
-      usage.client?.name ?? "",
-      usage.client?.email ?? "",
-      usage.client?.company ?? usage.client?.organization ?? "",
-      usage.items.map((item) => `${item.quantity} x ${item.label}`).join("; "),
-      usage.subtotal_before_discount.toFixed(2),
-      (usage_response.coupon.is_gift_card_reward ? usage.reward_amount : usage.discount_amount).toFixed(2),
-      usage.total_amount.toFixed(2),
-      usage.invoice?.invoice_number ?? "",
-      usage.used_at ? new Date(usage.used_at).toISOString() : "",
-    ]);
-    downloadCsv(`coupon-${usage_response.coupon.code.toLowerCase()}-usage.csv`, headers, rows);
+    const is_gift_card_reward = usage_response.coupon.discount_type === "gift_card_reward";
+    const code = usage_response.coupon.code.toLowerCase();
+    const { headers, rows } = is_checkout_view
+      ? buildCheckoutExport(filtered_checkouts, is_gift_card_reward)
+      : buildProductOrderExport(filtered_usages, is_gift_card_reward);
+    downloadCsv(`coupon-${code}-${is_checkout_view ? "checkouts" : "product-orders"}.csv`, headers, rows);
   };
 
   if (is_loading && !usage_response) return <LoadingState />;
@@ -230,6 +256,15 @@ export default function CouponUsageContent({ coupon_id }: CouponUsageContentProp
                 {coupon.times_used}
                 {coupon.usage_limit ? ` / ${coupon.usage_limit}` : ""} {coupon.times_used === 1 ? "use" : "uses"}
               </span>
+              {summary.checkout_count > 0 && (
+                <span className={styles.metaChip}>
+                  {summary.checkout_count} {summary.checkout_count === 1 ? "checkout" : "checkouts"},{" "}
+                  {summary.order_count} discounted {summary.order_count === 1 ? "product order" : "product orders"}
+                </span>
+              )}
+              {summary.checkout_count > 0 && (
+                <span className={styles.metaChip}>Avg. checkout {formatMoney(summary.average_checkout_value)}</span>
+              )}
               {summary.first_used_at && (
                 <span>
                   First used {formatShortDate(summary.first_used_at)}, last used {formatShortDate(summary.last_used_at)}
@@ -249,7 +284,7 @@ export default function CouponUsageContent({ coupon_id }: CouponUsageContentProp
               type="button"
               onClick={handleExport}
               className={styles.button}
-              disabled={filtered_usages.length === 0}
+              disabled={listed_count === 0}
             >
               <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
@@ -263,7 +298,7 @@ export default function CouponUsageContent({ coupon_id }: CouponUsageContentProp
         </div>
       </section>
 
-      {usages.length === 0 ? (
+      {checkouts.length === 0 && usages.length === 0 ? (
         <div className="mt-6">
           <EmptyState
             title="No orders yet"
@@ -274,6 +309,21 @@ export default function CouponUsageContent({ coupon_id }: CouponUsageContentProp
         <>
           {/* Toolbar */}
           <div className={styles.toolbar}>
+            <div className={styles.segmented} role="group" aria-label="View">
+              <span className={styles.segmentedLabel}>View</span>
+              {VIEW_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => handleViewChange(option.value)}
+                  className={`${styles.segment} ${view === option.value ? styles.segmentActive : ""}`}
+                  aria-pressed={view === option.value}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
             <label className={styles.search}>
               <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
@@ -282,7 +332,7 @@ export default function CouponUsageContent({ coupon_id }: CouponUsageContentProp
                 type="search"
                 value={search_term}
                 onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Search client, email, order or invoice"
+                placeholder="Search client, email, order, product or invoice"
                 aria-label="Search orders"
               />
             </label>
@@ -306,7 +356,7 @@ export default function CouponUsageContent({ coupon_id }: CouponUsageContentProp
               value={sort}
               onChange={(event) => setSort(event.target.value as CouponUsageSort)}
               className={styles.select}
-              aria-label="Sort orders"
+              aria-label={is_checkout_view ? "Sort checkouts" : "Sort orders"}
             >
               {SORT_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -316,11 +366,11 @@ export default function CouponUsageContent({ coupon_id }: CouponUsageContentProp
             </select>
 
             <span className={styles.resultCount}>
-              Showing {filtered_usages.length} of {usages.length} {usages.length === 1 ? "order" : "orders"}
+              Showing {listed_count} of {total_count} {record_noun}
             </span>
           </div>
 
-          {summary.by_product_type.length > 1 && (
+          {product_counts.size > 1 && (
             <div className={styles.filterChips}>
               <button
                 type="button"
@@ -329,24 +379,26 @@ export default function CouponUsageContent({ coupon_id }: CouponUsageContentProp
               >
                 All products
               </button>
-              {summary.by_product_type.map((entry) => (
+              {Array.from(product_counts.entries()).map(([product_type, count]) => (
                 <button
-                  key={entry.product_type}
+                  key={product_type}
                   type="button"
-                  onClick={() => setProductFilter(entry.product_type)}
-                  className={`${styles.filterChip} ${product_filter === entry.product_type ? styles.filterChipActive : ""}`}
-                  style={{ "--chip-color": PRODUCT_COLORS[entry.product_type] } as React.CSSProperties}
+                  onClick={() => setProductFilter(product_type)}
+                  className={`${styles.filterChip} ${product_filter === product_type ? styles.filterChipActive : ""}`}
+                  style={{ "--chip-color": PRODUCT_COLORS[product_type] } as React.CSSProperties}
                 >
-                  {entry.product_label} ({entry.order_count})
+                  {getProductLabel(product_type)} ({count})
                 </button>
               ))}
             </div>
           )}
 
-          {filtered_usages.length === 0 ? (
-            <EmptyState title="No matching orders" text="Try a different search or clear the product filter." />
+          {listed_count === 0 ? (
+            <EmptyState title={`No matching ${record_noun}`} text="Try a different search or clear the product filter." />
+          ) : is_checkout_view ? (
+            <CouponCheckoutBoard groups={checkout_groups} is_gift_card_reward={is_gift_card_reward} />
           ) : (
-            <CouponUsageBoard groups={groups} is_gift_card_reward={is_gift_card_reward} />
+            <CouponUsageBoard groups={usage_groups} is_gift_card_reward={is_gift_card_reward} />
           )}
         </>
       )}

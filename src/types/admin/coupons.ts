@@ -149,10 +149,17 @@ export interface CouponGiftCardClaimsResponse {
 export type CouponUsageProductType = ProductType | "premium_mentions";
 
 export interface CouponUsageItem {
+  tier_id?: string | null;
   label: string;
   quantity: number;
   unit_price: number;
   subtotal: number;
+  /** Whether the coupon applied to this item at checkout. */
+  is_coupon_applied: boolean;
+  /** Share of the order discount on this item. Null for snapshots taken before items carried it. */
+  discount_amount: number | null;
+  /** Share of the order gift card reward on this item. Null for older snapshots. */
+  reward_amount: number | null;
 }
 
 export interface CouponUsageClient {
@@ -165,6 +172,10 @@ export interface CouponUsageClient {
 
 export interface CouponUsage {
   id: string;
+  /** Groups the product orders placed in the same checkout. */
+  checkout_key: string;
+  /** False for the orders of the checkout that the coupon did not discount. */
+  is_coupon_applied: boolean;
   order_id: string;
   order_reference: string;
   order_title: string | null;
@@ -206,6 +217,7 @@ export interface CouponUsageProductBreakdown {
   product_type: CouponUsageProductType;
   product_label: string;
   order_count: number;
+  checkout_count: number;
   discount_amount: number;
   net_revenue: number;
 }
@@ -214,19 +226,64 @@ export interface CouponUsageSummary {
   order_count: number;
   /** Checkouts that used the coupon. One checkout can create one order per product. */
   checkout_count: number;
+  /** Checkouts with more than one product order. */
+  multi_product_checkout_count: number;
   client_count: number;
   total_discount: number;
   total_reward: number;
   gross_revenue: number;
   net_revenue: number;
   average_order_value: number;
+  /** Totals of every order bought in the checkouts that used the coupon. */
+  checkout_net_revenue: number;
+  average_checkout_value: number;
   by_product_type: CouponUsageProductBreakdown[];
   first_used_at: string | null;
   last_used_at: string | null;
 }
 
+/** An order of a checkout as listed inside it. Client and coupon terms live on the checkout. */
+export type CouponCheckoutOrder = Omit<CouponUsage, "client" | "coupon_terms">;
+
+/**
+ * One checkout where the coupon was used: every product order bought
+ * together, including the ones the coupon did not discount.
+ */
+export interface CouponUsageCheckout {
+  id: string;
+  session_id: string | null;
+  reference: string;
+  title: string | null;
+  /** Shared status of its orders, or "mixed" when they differ. */
+  status: string;
+  client: CouponUsageClient | null;
+  coupon_terms: CouponUsage["coupon_terms"];
+  gift_card_claim: CouponUsage["gift_card_claim"];
+  invoices: NonNullable<CouponUsage["invoice"]>[];
+  product_types: CouponUsageProductType[];
+  applied_product_types: CouponUsageProductType[];
+  order_count: number;
+  applied_order_count: number;
+  items_quantity: number;
+  applied_items_quantity: number;
+  subtotal_before_discount: number;
+  /** Subtotal of the items the coupon applied to. */
+  eligible_subtotal: number;
+  discount_amount: number;
+  reward_amount: number;
+  total_amount: number;
+  has_deleted_orders: boolean;
+  is_fully_deleted: boolean;
+  session_url: string | null;
+  used_at: string | null;
+  orders: CouponCheckoutOrder[];
+}
+
 export interface CouponUsageResponse {
   coupon: Coupon;
   summary: CouponUsageSummary;
+  /** Discounted product orders, one row each. */
   data: CouponUsage[];
+  /** Checkouts where the coupon was used, with every order bought together. */
+  checkouts: CouponUsageCheckout[];
 }
