@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import type { AdminDrTier, CreateDrTierPayload, UpdateDrTierPayload } from "@/types/admin/link-building";
 import DrTierFormModal from "./DrTierFormModal";
+import ConfirmDeleteDialog from "@/components/ui/modal/ConfirmDeleteDialog";
 import {
   createAdminDrTier,
   updateAdminDrTier,
@@ -14,58 +15,6 @@ interface DrTiersPanelProps {
   tiers: AdminDrTier[];
   service_name: string;
   onRefresh: () => void;
-}
-
-interface DeleteConfirmProps {
-  label: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-  is_loading: boolean;
-}
-
-function DeleteConfirmModal({ label, onConfirm, onCancel, is_loading }: DeleteConfirmProps) {
-  return (
-    <div className="fixed inset-0 z-99999 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-900">
-        <div className="p-6">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-error-50 dark:bg-error-500/10">
-            <svg className="h-6 w-6 text-error-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <h3 className="text-center text-base font-semibold text-gray-900 dark:text-white">
-            Remove DR Tier
-          </h3>
-          <p className="mt-2 text-center text-sm text-gray-500 dark:text-gray-400">
-            Are you sure you want to remove <span className="font-medium text-gray-700 dark:text-gray-300">{label}</span>? This action will mark it as unavailable.
-          </p>
-          <div className="mt-5 flex gap-3">
-            <button
-              onClick={onCancel}
-              disabled={is_loading}
-              className="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-400"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={onConfirm}
-              disabled={is_loading}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-error-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-error-600 disabled:opacity-50"
-            >
-              {is_loading && (
-                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                </svg>
-              )}
-              Remove
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 export default function DrTiersPanel({
@@ -333,14 +282,25 @@ export default function DrTiersPanel({
       />
 
       {/* Delete confirmation */}
-      {deleting_tier && (
-        <DeleteConfirmModal
-          label={deleting_tier.label}
-          onConfirm={handleDelete}
-          onCancel={() => setDeletingTier(null)}
-          is_loading={is_deleting}
-        />
-      )}
+      <ConfirmDeleteDialog
+        is_open={deleting_tier !== null}
+        variant="remove"
+        title="Remove DR tier"
+        description={
+          <>
+            This tier will be marked as unavailable for <strong>{service_name}</strong>.
+          </>
+        }
+        item_label="DR tier"
+        item_name={deleting_tier?.label}
+        item_meta={
+          deleting_tier ? `$${Number(deleting_tier.price_per_link).toFixed(2)} per link` : undefined
+        }
+        confirm_label="Remove tier"
+        is_loading={is_deleting}
+        onConfirm={handleDelete}
+        onClose={() => setDeletingTier(null)}
+      />
     </>
   );
 }

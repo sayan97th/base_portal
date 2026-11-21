@@ -7,6 +7,7 @@ import flatpickr from "flatpickr";
 import type { Instance } from "flatpickr/dist/types/instance";
 import "flatpickr/dist/flatpickr.css";
 import { adminScheduledCallService } from "@/services/admin/scheduled-call.service";
+import DeleteAppointmentDialog from "@/components/ui/modal/DeleteAppointmentDialog";
 import type {
   AdminScheduledCallAppointment,
   AdminScheduledCallStatus,
@@ -329,72 +330,6 @@ function AppointmentUpdateModal({
               </svg>
             )}
             {is_saving ? "Saving…" : "Save Changes"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Delete confirmation modal ──────────────────────────────────────────────────
-
-function DeleteConfirmModal({
-  appointment_id,
-  is_deleting,
-  onConfirm,
-  onCancel,
-}: {
-  appointment_id: number;
-  is_deleting: boolean;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-99999 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-900">
-        <div className="flex items-center gap-3 border-b border-gray-100 px-6 py-5 dark:border-gray-800">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-error-50 dark:bg-error-500/10">
-            <svg className="h-5 w-5 text-error-600 dark:text-error-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-            </svg>
-          </div>
-          <div>
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-              Delete Appointment
-            </h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Call #{appointment_id} &middot; This action cannot be undone
-            </p>
-          </div>
-        </div>
-        <div className="px-6 py-5">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Are you sure you want to permanently delete this scheduled call record? All related data will be removed.
-          </p>
-        </div>
-        <div className="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4 dark:border-gray-800">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={is_deleting}
-            className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={is_deleting}
-            className="inline-flex items-center gap-2 rounded-xl bg-error-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-error-600 disabled:opacity-60"
-          >
-            {is_deleting && (
-              <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-              </svg>
-            )}
-            {is_deleting ? "Deleting…" : "Delete"}
           </button>
         </div>
       </div>
@@ -770,14 +705,17 @@ export default function AdminScheduledCallDetail({ appointment_id }: AdminSchedu
         />
       )}
 
-      {show_delete_modal && (
-        <DeleteConfirmModal
-          appointment_id={appointment_id}
-          is_deleting={is_deleting}
-          onConfirm={handleDelete}
-          onCancel={() => setShowDeleteModal(false)}
-        />
-      )}
+      <DeleteAppointmentDialog
+        is_open={show_delete_modal}
+        appointment_type="Scheduled call"
+        appointment_id={appointment.id}
+        client_name={[appointment.user?.first_name, appointment.user?.last_name].filter(Boolean).join(" ")}
+        status_label={status_cfg.label}
+        scheduled_at={appointment.scheduled_at}
+        is_loading={is_deleting}
+        onConfirm={handleDelete}
+        onClose={() => setShowDeleteModal(false)}
+      />
     </>
   );
 }

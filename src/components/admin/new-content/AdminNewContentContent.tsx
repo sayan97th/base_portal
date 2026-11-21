@@ -16,6 +16,7 @@ import {
 } from "@/services/admin/new-content.service";
 import NewContentTierCard from "./NewContentTierCard";
 import NewContentTierFormModal from "./NewContentTierFormModal";
+import ConfirmDeleteDialog from "@/components/ui/modal/ConfirmDeleteDialog";
 
 type StatusFilter = "all" | "active" | "disabled" | "hidden";
 
@@ -33,71 +34,6 @@ function StripStat({ label, value, dot_color }: StripStatProps) {
         {label}:{" "}
         <span className="font-semibold text-gray-900 dark:text-white">{value}</span>
       </span>
-    </div>
-  );
-}
-
-interface DeleteConfirmModalProps {
-  tier: AdminNewContentTier | null;
-  is_deleting: boolean;
-  onConfirm: () => void;
-  onCancel: () => void;
-}
-
-function DeleteConfirmModal({ tier, is_deleting, onConfirm, onCancel }: DeleteConfirmModalProps) {
-  if (!tier) return null;
-  return (
-    <div className="fixed inset-0 z-99999 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-900">
-        <div className="p-6">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-error-50 dark:bg-error-500/10">
-            <svg
-              className="h-6 w-6 text-error-600 dark:text-error-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
-              />
-            </svg>
-          </div>
-          <h3 className="mt-4 text-base font-semibold text-gray-900 dark:text-white">
-            Delete &ldquo;{tier.label}&rdquo;?
-          </h3>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            This action cannot be undone. The tier &ldquo;
-            <span className="font-mono font-medium text-gray-700 dark:text-gray-300">{tier.id}</span>
-            &rdquo; will be permanently removed.
-          </p>
-        </div>
-        <div className="flex gap-3 border-t border-gray-100 px-6 py-4 dark:border-gray-800">
-          <button
-            onClick={onCancel}
-            disabled={is_deleting}
-            className="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={is_deleting}
-            className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-error-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-error-700 disabled:opacity-50"
-          >
-            {is_deleting && (
-              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-              </svg>
-            )}
-            Delete Tier
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -372,11 +308,20 @@ export default function AdminNewContentContent() {
         onSubmit={editing_tier ? handleUpdate : handleCreate}
       />
 
-      <DeleteConfirmModal
-        tier={deleting_tier}
-        is_deleting={is_deleting}
+      <ConfirmDeleteDialog
+        is_open={deleting_tier !== null}
+        title="Delete new content tier"
+        description="Clients will no longer be able to order this tier."
+        item_label="New content tier"
+        item_name={deleting_tier?.label}
+        item_meta={deleting_tier ? `$${Number(deleting_tier.price).toFixed(2)}` : undefined}
+        consequences={
+          deleting_tier?.is_active ? ["This tier is currently active and visible to clients."] : []
+        }
+        confirm_label="Delete tier"
+        is_loading={is_deleting}
         onConfirm={handleDelete}
-        onCancel={() => setDeletingTier(null)}
+        onClose={() => setDeletingTier(null)}
       />
     </>
   );
