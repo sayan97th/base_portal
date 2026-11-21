@@ -910,6 +910,44 @@ $cards_small_breakpoint: 640px;
   color: $gray_400;
 }
 
+// Card title with an action on its right, e.g. the client card "View profile" button.
+.detailCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+
+  .detailLabel {
+    margin-bottom: 0;
+  }
+}
+
+.profileButton {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  padding: 3px 10px;
+  border: 1px solid $brand_500;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  color: $brand_500;
+  transition: background 0.15s ease, color 0.15s ease;
+
+  &:hover {
+    background: $brand_500;
+    color: #fff;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $brand_500;
+    outline-offset: 1px;
+  }
+}
+
 .detailValue {
   font-size: 14px;
   font-weight: 600;

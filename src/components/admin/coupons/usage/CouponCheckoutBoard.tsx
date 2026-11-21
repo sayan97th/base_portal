@@ -268,7 +268,18 @@ function CheckoutDetail({ checkout, is_gift_card_reward, group_color }: Checkout
 
       <div className={styles.checkoutSide}>
         <div className={styles.detailCard}>
-          <p className={styles.detailLabel}>Client</p>
+          <div className={styles.detailCardHeader}>
+            <p className={styles.detailLabel}>Client</p>
+            {checkout.client?.id ? (
+              <Link
+                href={`/admin/users/${checkout.client.id}?from=clients`}
+                className={styles.profileButton}
+                aria-label={`View profile of ${checkout.client.name}`}
+              >
+                View profile
+              </Link>
+            ) : null}
+          </div>
           <p className={styles.detailValue}>{checkout.client?.name ?? "Unknown client"}</p>
           {checkout.client?.email && (
             <a href={`mailto:${checkout.client.email}`} className={styles.detailLink}>
