@@ -440,7 +440,7 @@ export default function AdminCouponsContent() {
             <strong>
               {awaiting_gift_cards} gift card{awaiting_gift_cards === 1 ? "" : "s"}
             </strong>{" "}
-            waiting to be sent. Open the coupon marked below to review the requests.
+            waiting to be sent. Click the gift card badge on a coupon below to review and export its requests.
           </span>
         </div>
       )}

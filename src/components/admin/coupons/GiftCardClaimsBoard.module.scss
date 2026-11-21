@@ -1,8 +1,8 @@
 @use "sass:list";
 
-// Admin board for promo gift card requests. Each row is a request and the
-// status cell is a solid color block, like a board status column, so the
-// team can see at a glance what still has to be sent.
+// Promo gift card card on admin order pages. The status cell is a solid
+// color block, like a board status column, so the team can see at a glance
+// whether the gift card still has to be sent.
 
 $gray_900: var(--color-gray-900);
 $gray_700: var(--color-gray-700);
@@ -65,156 +65,22 @@ $brand_colors: (
   }
 }
 
+.viewAllLink {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: $brand_500;
+  white-space: nowrap;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
 .subtitle {
   margin-top: 2px;
   font-size: 12px;
   color: $gray_500;
-}
-
-.tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 30px;
-  padding: 0 10px;
-  border: 1px solid $gray_200;
-  border-radius: 999px;
-  background: #fff;
-  color: $gray_700;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
-
-  &:hover {
-    background: $gray_50;
-  }
-
-  @include dark {
-    border-color: rgba(255, 255, 255, 0.1);
-    background: transparent;
-    color: var(--color-gray-300);
-  }
-}
-
-.tabActive {
-  border-color: $gray_900;
-  background: $gray_900;
-  color: #fff;
-
-  &:hover {
-    background: $gray_900;
-  }
-
-  @include dark {
-    border-color: #fff;
-    background: #fff;
-    color: $gray_900;
-
-    &:hover {
-      background: #fff;
-    }
-  }
-}
-
-.tabDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-}
-
-.tabCount {
-  font-variant-numeric: tabular-nums;
-  opacity: 0.7;
-}
-
-.dotWaiting {
-  background: $status_waiting;
-}
-
-.dotReady {
-  background: $status_ready;
-}
-
-.dotSent {
-  background: $status_sent;
-}
-
-.scroller {
-  overflow-x: auto;
-}
-
-.table {
-  width: 100%;
-  min-width: 760px;
-  border-collapse: separate;
-  border-spacing: 0;
-  font-size: 13px;
-
-  th {
-    padding: 10px 14px;
-    background: $gray_50;
-    color: $gray_500;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-align: left;
-    text-transform: uppercase;
-    white-space: nowrap;
-
-    @include dark {
-      background: rgba(255, 255, 255, 0.03);
-    }
-  }
-
-  td {
-    padding: 12px 14px;
-    border-top: 1px solid $gray_100;
-    color: $gray_700;
-    vertical-align: middle;
-
-    @include dark {
-      border-color: rgba(255, 255, 255, 0.05);
-      color: var(--color-gray-300);
-    }
-  }
-
-  tr:hover td {
-    background: rgba(236, 60, 137, 0.03);
-  }
-}
-
-// Left color edge per row, mirrors the status color.
-.rowEdge {
-  width: 4px;
-  padding: 0 !important;
-}
-
-.edgeWaiting {
-  background: $status_waiting;
-}
-
-.edgeReady {
-  background: $status_ready;
-}
-
-.edgeSent {
-  background: $status_sent;
-}
-
-.clientName {
-  font-weight: 600;
-  color: $gray_900;
-
-  @include dark {
-    color: #fff;
-  }
 }
 
 .clientMeta {
@@ -341,13 +207,6 @@ $brand_colors: (
   color: $gray_400;
 }
 
-.empty {
-  padding: 36px 20px;
-  color: $gray_500;
-  font-size: 13px;
-  text-align: center;
-}
-
 .error {
   margin: 12px 20px;
   padding: 10px 12px;
@@ -355,23 +214,6 @@ $brand_colors: (
   background: rgba(240, 68, 56, 0.08);
   color: #d92d20;
   font-size: 12px;
-}
-
-.skeleton {
-  height: 14px;
-  border-radius: 6px;
-  background: $gray_100;
-  animation: pulse 1.4s ease-in-out infinite;
-
-  @include dark {
-    background: rgba(255, 255, 255, 0.06);
-  }
-}
-
-@keyframes pulse {
-  50% {
-    opacity: 0.5;
-  }
 }
 
 // Compact list used on admin order pages.

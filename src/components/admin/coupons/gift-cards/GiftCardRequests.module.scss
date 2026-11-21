@@ -1,0 +1,1393 @@
+// Gift card requests view. A work management style board: groups with a
+// color edge, solid color status and brand cells, a totals row per group,
+// KPI cards that double as filters and a floating bar for bulk actions.
+
+$gray_900: var(--color-gray-900);
+$gray_800: var(--color-gray-800);
+$gray_700: var(--color-gray-700);
+$gray_600: var(--color-gray-600);
+$gray_500: var(--color-gray-500);
+$gray_400: var(--color-gray-400);
+$gray_200: var(--color-gray-200);
+$gray_100: var(--color-gray-100);
+$gray_50: var(--color-gray-50);
+$brand_500: var(--color-brand-500);
+$brand_50: var(--color-brand-50);
+
+$dark_border: rgba(255, 255, 255, 0.08);
+$dark_border_soft: rgba(255, 255, 255, 0.05);
+
+$gift_orange: #fdab3d;
+$gift_green: #00c875;
+$gift_blue: #579bfc;
+
+$row_height: 56px;
+$row_columns: 44px minmax(220px, 1.5fr) 120px 140px minmax(220px, 1.4fr) 150px 150px 130px;
+$board_min_width: 1180px;
+
+@mixin dark {
+  :global(.dark) & {
+    @content;
+  }
+}
+
+@mixin truncate {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+@mixin surface {
+  border: 1px solid $gray_200;
+  background: #fff;
+
+  @include dark {
+    border-color: $dark_border;
+    background: var(--color-gray-900);
+  }
+}
+
+// ── Buttons ─────────────────────────────────────────────────────────────────
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid $gray_200;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  color: $gray_700;
+  white-space: nowrap;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  &:hover:not(:disabled) {
+    border-color: $brand_500;
+    color: $brand_500;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  @include dark {
+    border-color: $dark_border;
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--color-gray-300);
+  }
+}
+
+.buttonPrimary {
+  border-color: $brand_500;
+  background: $brand_500;
+  color: #fff;
+
+  &:hover:not(:disabled) {
+    color: #fff;
+    filter: brightness(1.08);
+  }
+
+  @include dark {
+    border-color: $brand_500;
+    background: $brand_500;
+    color: #fff;
+  }
+}
+
+// ── Hero ────────────────────────────────────────────────────────────────────
+
+.hero {
+  position: relative;
+  padding: 24px;
+  border: 1px solid $gray_200;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(253, 171, 61, 0.18), transparent 42%),
+    radial-gradient(circle at 0% 100%, rgba(0, 200, 117, 0.12), transparent 40%),
+    #fff;
+
+  @include dark {
+    border-color: $dark_border;
+    background:
+      radial-gradient(circle at 100% 0%, rgba(253, 171, 61, 0.14), transparent 42%),
+      radial-gradient(circle at 0% 100%, rgba(0, 200, 117, 0.08), transparent 40%),
+      var(--color-gray-900);
+  }
+}
+
+.heroTop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.heroMain {
+  min-width: 0;
+}
+
+.heroTitleLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.couponCode {
+  padding: 6px 12px;
+  border: 2px dashed rgba(253, 171, 61, 0.7);
+  border-radius: 12px;
+  background: rgba(253, 171, 61, 0.08);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.heroTitle {
+  font-size: 22px;
+  font-weight: 700;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.heroMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.metaChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: $gray_100;
+  font-size: 12px;
+  font-weight: 600;
+  color: $gray_700;
+
+  @include dark {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--color-gray-300);
+  }
+}
+
+.metaDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+}
+
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+// ── KPI cards ───────────────────────────────────────────────────────────────
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+
+  @media (min-width: 1024px) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+  }
+}
+
+.kpi {
+  @include surface;
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  overflow: hidden;
+  padding: 16px;
+  border-radius: 16px;
+  text-align: left;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+
+  &::before {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    background: var(--kpi-color);
+    content: "";
+  }
+
+}
+
+.kpiButton {
+  cursor: pointer;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px -14px rgba(16, 24, 40, 0.35);
+  }
+
+  &:focus-visible {
+    outline: 2px solid $brand_500;
+    outline-offset: 2px;
+  }
+}
+
+.kpiActive {
+  border-color: var(--kpi-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--kpi-color) 22%, transparent);
+
+  @include dark {
+    border-color: var(--kpi-color);
+  }
+}
+
+.kpiIcon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--kpi-color) 16%, transparent);
+  color: var(--kpi-color);
+
+  svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.kpiBody {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.kpiValue {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.kpiLabel {
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: $gray_700;
+
+  @include dark {
+    color: var(--color-gray-300);
+  }
+}
+
+.kpiSub {
+  @include truncate;
+  font-size: 11px;
+  color: $gray_500;
+}
+
+// ── Alerts and empty states ─────────────────────────────────────────────────
+
+.alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 10px 14px;
+  border: 1px solid rgba(226, 68, 92, 0.3);
+  border-radius: 12px;
+  background: rgba(226, 68, 92, 0.08);
+  font-size: 13px;
+  color: #c02a42;
+
+  button {
+    display: inline-flex;
+    color: inherit;
+
+    svg {
+      width: 16px;
+      height: 16px;
+    }
+  }
+
+  @include dark {
+    color: #ff8597;
+  }
+}
+
+.emptyCard {
+  @include surface;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 20px;
+  padding: 48px 24px;
+  border-radius: 16px;
+  text-align: center;
+}
+
+.emptyIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 14px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(253, 171, 61, 0.2), rgba(0, 200, 117, 0.2));
+  color: #b86e00;
+
+  svg {
+    width: 26px;
+    height: 26px;
+  }
+
+  @include dark {
+    color: $gift_orange;
+  }
+}
+
+.emptyTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.emptyText {
+  max-width: 420px;
+  margin-top: 4px;
+  font-size: 13px;
+  color: $gray_500;
+}
+
+.skeleton {
+  border-radius: 8px;
+  background: linear-gradient(90deg, $gray_100 25%, $gray_50 50%, $gray_100 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease infinite;
+
+  @include dark {
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.04) 25%, rgba(255, 255, 255, 0.08) 50%, rgba(255, 255, 255, 0.04) 75%);
+    background-size: 200% 100%;
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}
+
+// ── Toolbar and filter chips ────────────────────────────────────────────────
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 22px 0 12px;
+}
+
+.search {
+  position: relative;
+  flex: 1 1 240px;
+  max-width: 340px;
+
+  svg {
+    position: absolute;
+    top: 50%;
+    left: 12px;
+    width: 16px;
+    height: 16px;
+    color: $gray_400;
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+
+  input {
+    width: 100%;
+    height: 38px;
+    padding: 0 12px 0 36px;
+    border: 1px solid $gray_200;
+    border-radius: 10px;
+    background: #fff;
+    font-size: 13px;
+    color: $gray_900;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+    &:focus {
+      border-color: $brand_500;
+      box-shadow: 0 0 0 3px rgba(236, 60, 137, 0.14);
+    }
+
+    @include dark {
+      border-color: $dark_border;
+      background: rgba(255, 255, 255, 0.03);
+      color: #fff;
+    }
+  }
+}
+
+.select {
+  height: 38px;
+  padding: 0 32px 0 12px;
+  border: 1px solid $gray_200;
+  border-radius: 10px;
+  background-color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  color: $gray_700;
+  outline: none;
+
+  @include dark {
+    border-color: $dark_border;
+    background-color: var(--color-gray-900);
+    color: var(--color-gray-300);
+  }
+}
+
+.resultCount {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  font-size: 12px;
+  color: $gray_500;
+}
+
+// Shows the status picked in the KPI cards, click to remove it.
+.activeFilter {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 8px 0 10px;
+  border-radius: 999px;
+  background: var(--chip-color);
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  transition: filter 0.15s ease;
+
+  svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  &:hover {
+    filter: brightness(1.06);
+  }
+}
+
+// ── Board ───────────────────────────────────────────────────────────────────
+
+.board {
+  @include surface;
+  border-radius: 16px;
+}
+
+.scroller {
+  overflow-x: auto;
+  padding: 8px 16px 16px;
+}
+
+.group {
+  min-width: $board_min_width;
+  margin-top: 18px;
+
+  &:first-child {
+    margin-top: 8px;
+  }
+}
+
+.groupHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  color: var(--group-color);
+  cursor: pointer;
+}
+
+.groupTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--group-color);
+}
+
+.groupCount {
+  font-size: 12px;
+  font-weight: 500;
+  color: $gray_400;
+}
+
+.groupCollapsedTotal {
+  margin-left: 8px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: $gray_100;
+  font-size: 12px;
+  font-weight: 600;
+  color: $gray_700;
+
+  @include dark {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--color-gray-300);
+  }
+}
+
+.chevron {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  transition: transform 0.2s ease;
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+}
+
+.groupBody {
+  overflow: hidden;
+  border: 1px solid $gray_200;
+  border-left: 0;
+  border-radius: 0 10px 10px 0;
+  box-shadow: inset 6px 0 0 var(--group-color);
+
+  @include dark {
+    border-color: $dark_border;
+  }
+}
+
+%grid_row {
+  display: grid;
+  grid-template-columns: $row_columns;
+  align-items: stretch;
+}
+
+.headRow {
+  @extend %grid_row;
+  border-bottom: 1px solid $gray_200;
+  background: $gray_50;
+
+  > div {
+    display: flex;
+    align-items: center;
+    padding: 9px 10px;
+    border-right: 1px solid $gray_100;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: $gray_500;
+
+    &:last-child {
+      border-right: 0;
+    }
+  }
+
+  @include dark {
+    border-color: $dark_border;
+    background: rgba(255, 255, 255, 0.02);
+
+    > div {
+      border-color: $dark_border_soft;
+    }
+  }
+}
+
+.headCenter {
+  justify-content: center;
+}
+
+.row {
+  @extend %grid_row;
+  min-height: $row_height;
+  border-bottom: 1px solid $gray_100;
+  transition: background 0.12s ease;
+
+  > div {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    padding: 0 10px;
+    border-right: 1px solid $gray_100;
+
+    &:last-child {
+      border-right: 0;
+    }
+
+    @include dark {
+      border-color: $dark_border_soft;
+    }
+  }
+
+  &:hover {
+    background: rgba(87, 155, 252, 0.06);
+  }
+
+  @include dark {
+    border-color: $dark_border_soft;
+  }
+}
+
+.rowSelected {
+  background: rgba(87, 155, 252, 0.1);
+
+  &:hover {
+    background: rgba(87, 155, 252, 0.14);
+  }
+}
+
+.cellCheck {
+  justify-content: center;
+  padding: 0 !important;
+}
+
+.checkbox {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  accent-color: $gift_blue;
+  cursor: pointer;
+}
+
+.cellClient {
+  gap: 10px;
+}
+
+.avatar {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  box-shadow: 0 0 0 2px #fff;
+
+  @include dark {
+    box-shadow: 0 0 0 2px var(--color-gray-900);
+  }
+}
+
+.clientText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.clientName {
+  @include truncate;
+  font-size: 13px;
+  font-weight: 600;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.clientMeta {
+  @include truncate;
+  font-size: 11px;
+  color: $gray_400;
+}
+
+// Solid color block cell, like a board status column.
+.cellBlock {
+  padding: 0 !important;
+}
+
+.block {
+  @include truncate;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: $row_height;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.brandBlock {
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.blockMuted {
+  font-weight: 600;
+
+  @include dark {
+    background-color: rgba(255, 255, 255, 0.06) !important;
+    color: var(--color-gray-400) !important;
+  }
+}
+
+.statusBlock {
+  position: relative;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+  transition: filter 0.15s ease;
+
+  // Folded corner, a hint that the cell is clickable.
+  &::after {
+    position: absolute;
+    top: 0;
+    right: 0;
+    border-width: 0 10px 10px 0;
+    border-style: solid;
+    border-color: transparent rgba(255, 255, 255, 0.45) transparent transparent;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    content: "";
+  }
+
+  &:hover:not(:disabled) {
+    filter: brightness(1.06);
+
+    &::after {
+      opacity: 1;
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid $gray_900;
+    outline-offset: -3px;
+  }
+
+  &:disabled {
+    cursor: default;
+  }
+}
+
+.cellValue,
+.cellDate,
+.cellOrder,
+.summaryValue {
+  flex-direction: column;
+  align-items: flex-start !important;
+  justify-content: center;
+  gap: 1px;
+}
+
+.amount {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.muted {
+  @include truncate;
+  max-width: 100%;
+  font-size: 11px;
+  color: $gray_400;
+}
+
+.cellEmail {
+  gap: 6px;
+}
+
+.email {
+  @include truncate;
+  font-size: 13px;
+  color: $gray_700;
+
+  @include dark {
+    color: var(--color-gray-300);
+  }
+}
+
+.iconButton {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  color: $gray_400;
+  transition: background 0.15s ease, color 0.15s ease;
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  &:hover {
+    background: $gray_100;
+    color: $gray_700;
+  }
+
+  @include dark {
+    &:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+    }
+  }
+}
+
+.iconButtonDone {
+  color: $gift_green;
+}
+
+.cellDate {
+  font-size: 12px;
+  color: $gray_700;
+
+  @include dark {
+    color: var(--color-gray-300);
+  }
+}
+
+.orderLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: $brand_500;
+
+  svg {
+    width: 12px;
+    height: 12px;
+    opacity: 0.6;
+  }
+
+  &:hover {
+    text-decoration: underline;
+
+    svg {
+      opacity: 1;
+    }
+  }
+}
+
+.summaryRow {
+  @extend %grid_row;
+  min-height: 46px;
+  background: $gray_50;
+
+  > div {
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+  }
+
+  @include dark {
+    background: rgba(255, 255, 255, 0.02);
+  }
+}
+
+.summaryLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: $gray_500;
+}
+
+.summaryBattery {
+  gap: 2px;
+  padding: 0 14px !important;
+
+  span {
+    height: 10px;
+    min-width: 6px;
+    border-radius: 3px;
+  }
+}
+
+// ── Bulk actions bar ────────────────────────────────────────────────────────
+
+.bulkBar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  z-index: 50;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 10px 10px 10px 12px;
+  border: 1px solid $gray_200;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 24px 48px -16px rgba(16, 24, 40, 0.35);
+  transform: translateX(-50%);
+  animation: bulk_in 0.2s ease;
+
+  @include dark {
+    border-color: $dark_border;
+    background: var(--color-gray-800);
+  }
+}
+
+@keyframes bulk_in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.bulkCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 8px;
+  border-radius: 12px;
+  background: $gift_blue;
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.bulkLabel {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  font-weight: 600;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.bulkSub {
+  font-size: 11px;
+  font-weight: 500;
+  color: $gray_500;
+}
+
+.bulkActions {
+  display: flex;
+  gap: 8px;
+}
+
+.bulkButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid $gray_200;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  color: $gray_700;
+  transition: border-color 0.15s ease, filter 0.15s ease;
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  &:hover:not(:disabled) {
+    border-color: $gray_400;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  @include dark {
+    border-color: $dark_border;
+    background: transparent;
+    color: var(--color-gray-300);
+  }
+}
+
+.bulkButtonSuccess {
+  border-color: $gift_green;
+  background: $gift_green;
+  color: #fff;
+
+  &:hover:not(:disabled) {
+    border-color: $gift_green;
+    filter: brightness(1.06);
+  }
+
+  @include dark {
+    border-color: $gift_green;
+    background: $gift_green;
+    color: #fff;
+  }
+}
+
+// Last on wide screens, next to the label on phones.
+.bulkClose {
+  order: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: $gray_400;
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  &:hover {
+    background: $gray_100;
+    color: $gray_700;
+  }
+
+  @include dark {
+    &:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+    }
+  }
+}
+
+// ── Tablets ─────────────────────────────────────────────────────────────────
+
+@media (max-width: 1023px) {
+  .toolbar {
+    margin-top: 18px;
+  }
+}
+
+// ── Phones: every request becomes a card ────────────────────────────────────
+
+@media (max-width: 767px) {
+  .hero {
+    padding: 18px;
+    border-radius: 16px;
+  }
+
+  .couponCode {
+    font-size: 15px;
+  }
+
+  .heroTitle {
+    width: 100%;
+    font-size: 18px;
+  }
+
+  .heroActions {
+    width: 100%;
+
+    > * {
+      flex: 1 1 0;
+      justify-content: center;
+    }
+
+    // The export dropdown wrapper has to stretch its button too.
+    > div > button {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+
+  .kpis {
+    gap: 10px;
+  }
+
+  .kpi {
+    gap: 10px;
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .kpiIcon {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+
+    svg {
+      width: 16px;
+      height: 16px;
+    }
+  }
+
+  .kpiValue {
+    font-size: 18px;
+  }
+
+  .kpiLabel {
+    font-size: 12px;
+  }
+
+  .toolbar {
+    gap: 8px;
+  }
+
+  .search {
+    flex-basis: 100%;
+    max-width: none;
+  }
+
+  .select {
+    flex: 1;
+  }
+
+  .resultCount {
+    margin-left: 0;
+  }
+
+  // Board: no horizontal scroll, the grid becomes stacked cards.
+  .scroller {
+    overflow: visible;
+    padding: 4px 12px 12px;
+  }
+
+  .group {
+    min-width: 0;
+  }
+
+  .groupBody {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 10px 10px 16px;
+    overflow: visible;
+    border-radius: 0 12px 12px 0;
+  }
+
+  .headRow {
+    display: none;
+  }
+
+  .row {
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "check client client"
+      ". brand value"
+      ". email email"
+      ". date order"
+      "status status status";
+    row-gap: 10px;
+    min-height: 0;
+    padding: 12px;
+    border: 1px solid $gray_200;
+    border-radius: 12px;
+    background: #fff;
+
+    > div {
+      padding: 0;
+      border-right: 0;
+    }
+
+    &:hover {
+      background: #fff;
+    }
+
+    @include dark {
+      border-color: $dark_border;
+      background: rgba(255, 255, 255, 0.02);
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.02);
+      }
+    }
+  }
+
+  .rowSelected,
+  .rowSelected:hover {
+    border-color: $gift_blue;
+    background: rgba(87, 155, 252, 0.08);
+
+    @include dark {
+      border-color: $gift_blue;
+      background: rgba(87, 155, 252, 0.12);
+    }
+  }
+
+  .cellCheck {
+    grid-area: check;
+    justify-content: flex-start;
+  }
+
+  .cellClient {
+    grid-area: client;
+  }
+
+  .cellBrand {
+    grid-area: brand;
+
+    .block {
+      width: auto;
+      min-height: 26px;
+      padding: 0 10px;
+      border-radius: 6px;
+      font-size: 11px;
+    }
+  }
+
+  .cellValue {
+    grid-area: value;
+    align-items: flex-end !important;
+    text-align: right;
+  }
+
+  .cellEmail {
+    grid-area: email;
+    padding: 8px 6px 8px 10px !important;
+    border-radius: 8px;
+    background: $gray_50;
+
+    @include dark {
+      background: rgba(255, 255, 255, 0.04);
+    }
+  }
+
+  .cellDate {
+    grid-area: date;
+  }
+
+  .cellOrder {
+    grid-area: order;
+    align-items: flex-end !important;
+  }
+
+  .cellStatus {
+    grid-area: status;
+
+    .block {
+      min-height: 40px;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+  }
+
+  // Status cell is always tappable on touch screens, show the corner hint.
+  .statusBlock::after {
+    opacity: 1;
+  }
+
+  .summaryRow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    min-height: 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+
+    > div {
+      padding: 0;
+    }
+
+    > div:empty {
+      display: none;
+    }
+  }
+
+  .summaryValue {
+    flex: 1;
+  }
+
+  .summaryBattery {
+    flex-basis: 100%;
+    padding: 0 !important;
+  }
+
+  .bulkBar {
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    width: auto;
+    max-width: none;
+    transform: none;
+    animation-name: bulk_in_mobile;
+  }
+
+  .bulkLabel {
+    flex: 1;
+  }
+
+  .bulkClose {
+    order: 0;
+  }
+
+  .bulkActions {
+    flex-basis: 100%;
+
+    > button {
+      flex: 1;
+      justify-content: center;
+    }
+  }
+}
+
+@keyframes bulk_in_mobile {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

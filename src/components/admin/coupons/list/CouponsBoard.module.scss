@@ -62,7 +62,7 @@ $tones: (
 );
 
 // Coupon, Status, Discount, Applies to, Usage, Expires, Actions.
-$row_columns: minmax(210px, 2.4fr) 132px 124px minmax(128px, 1.3fr) minmax(112px, 1fr) 124px 118px;
+$row_columns: minmax(210px, 2.4fr) 132px 124px minmax(128px, 1.3fr) minmax(112px, 1fr) 124px 154px;
 $cards_max: 960px;
 $kpis_wide_min: 720px;
 
@@ -1579,6 +1579,16 @@ $kpis_wide_min: 720px;
       border-color: $gray_700;
       color: $gray_300;
     }
+  }
+}
+
+.actionGift:hover {
+  background: rgba(253, 171, 61, 0.14);
+  color: #b86e00;
+
+  @include dark {
+    background: rgba(253, 171, 61, 0.16);
+    color: #fdab3d;
   }
 }
 

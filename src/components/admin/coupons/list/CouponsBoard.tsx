@@ -169,6 +169,8 @@ function CouponRow({
 }: CouponRowProps) {
   const edit_href = `/admin/coupons/${coupon.id}/edit`;
   const usage_href = `/admin/coupons/${coupon.id}/usage`;
+  const gift_cards_href = `/admin/coupons/${coupon.id}/gift-cards`;
+  const is_gift_card_reward = coupon.discount_type === "gift_card_reward";
   const usage_pct = getUsagePercent(coupon);
   const date_hint = getDateHint(coupon, status);
   const awaiting_gift_cards = coupon.gift_card_claims_awaiting_count ?? 0;
@@ -201,8 +203,8 @@ function CouponRow({
             {coupon.description}
           </p>
         )}
-        {coupon.discount_type === "gift_card_reward" && awaiting_gift_cards > 0 && (
-          <Link href={`${edit_href}#gift-card-claims`} className={styles.giftBadge}>
+        {is_gift_card_reward && awaiting_gift_cards > 0 && (
+          <Link href={`${gift_cards_href}?status=submitted`} className={styles.giftBadge}>
             <GiftIcon />
             {awaiting_gift_cards} gift card{awaiting_gift_cards === 1 ? "" : "s"} to send
           </Link>
@@ -295,6 +297,17 @@ function CouponRow({
           <ChartIcon />
           <span className={styles.actionLabel}>Usage</span>
         </Link>
+        {is_gift_card_reward && (
+          <Link
+            href={gift_cards_href}
+            className={`${styles.actionButton} ${styles.actionGift}`}
+            title="Gift card requests"
+            aria-label={`Gift card requests of ${coupon.code}`}
+          >
+            <GiftIcon />
+            <span className={styles.actionLabel}>Gift cards</span>
+          </Link>
+        )}
         <Link href={edit_href} className={styles.actionButton} title="Edit" aria-label={`Edit ${coupon.code}`}>
           <EditIcon />
           <span className={styles.actionLabel}>Edit</span>

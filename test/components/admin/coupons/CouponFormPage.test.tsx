@@ -33,11 +33,6 @@ jest.mock("flatpickr", () => ({
   default: jest.fn(() => ({ destroy: jest.fn(), setDate: jest.fn() })),
 }));
 
-jest.mock("@/components/admin/coupons/CouponGiftCardClaimsBoard", () => ({
-  __esModule: true,
-  default: () => <div data-testid="gift-card-claims-board" />,
-}));
-
 jest.mock("@/services/admin/coupons.service", () => ({
   createAdminCoupon: jest.fn(),
   updateAdminCoupon: jest.fn(),

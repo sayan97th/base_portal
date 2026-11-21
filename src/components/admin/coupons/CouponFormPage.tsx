@@ -14,7 +14,6 @@ import {
   getAdminCoupon,
 } from "@/services/admin/coupons.service";
 import { listAdminDrTiers } from "@/services/admin/link-building.service";
-import CouponGiftCardClaimsBoard from "@/components/admin/coupons/CouponGiftCardClaimsBoard";
 import CouponStatusControl from "@/components/admin/coupons/status/CouponStatusControl";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -884,6 +883,22 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
               </svg>
               View usage and orders
             </Link>
+            {saved_coupon?.discount_type === "gift_card_reward" && (
+              <Link
+                href={`/admin/coupons/${coupon_id}/gift-cards`}
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-3.5 py-2 sm:flex-none text-sm font-medium text-orange-700 shadow-theme-xs transition-colors hover:border-orange-300 hover:bg-orange-100 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300 dark:hover:bg-orange-500/20"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                </svg>
+                Gift card requests
+                {(saved_coupon.gift_card_claims_awaiting_count ?? 0) > 0 && (
+                  <span className="rounded-full bg-orange-500 px-1.5 py-0.5 text-[11px] font-bold leading-none text-white">
+                    {saved_coupon.gift_card_claims_awaiting_count}
+                  </span>
+                )}
+              </Link>
+            )}
           </div>
         )}
       </div>
@@ -1441,13 +1456,6 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
               </button>
             </div>
           </div>
-
-          {/* ── Gift card requests (money back promos only) ─────────── */}
-          {mode === "edit" && coupon_id && form.discount_type === "gift_card_reward" && (
-            <div id="gift-card-claims" className="col-span-12 scroll-mt-24 lg:col-span-8 lg:order-last">
-              <CouponGiftCardClaimsBoard coupon_id={coupon_id} />
-            </div>
-          )}
 
           {/* ── Right column: live preview ─────────────────────────── */}
           <div className="col-span-12 lg:col-span-4">

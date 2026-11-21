@@ -108,6 +108,36 @@ export interface AdminGiftCardClaimFilters {
   status?: GiftCardClaimStatus;
 }
 
+export interface GiftCardClaimStatusTotals {
+  count: number;
+  reward_total: number;
+}
+
+export interface GiftCardClaimBrandTotals {
+  brand: NonNullable<AdminGiftCardClaim["gift_card_brand"]>;
+  label: string;
+  count: number;
+  reward_total: number;
+}
+
+export interface CouponGiftCardClaimsSummary {
+  total_count: number;
+  client_count: number;
+  reward_total: number;
+  order_total: number;
+  by_status: Record<GiftCardClaimStatus, GiftCardClaimStatusTotals>;
+  by_brand: GiftCardClaimBrandTotals[];
+  first_created_at: string | null;
+  last_created_at: string | null;
+}
+
+/** GET /api/admin/coupons/{id}/gift-card-claims */
+export interface CouponGiftCardClaimsResponse {
+  coupon: Coupon;
+  summary: CouponGiftCardClaimsSummary;
+  data: AdminGiftCardClaim[];
+}
+
 // ── Coupon usage history ─────────────────────────────────────────────────────
 
 export type CouponUsageProductType = ProductType | "premium_mentions";

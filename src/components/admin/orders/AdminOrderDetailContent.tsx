@@ -924,9 +924,9 @@ const AdminOrderDetailContent: React.FC<AdminOrderDetailContentProps> = ({ order
 
               {/* Promo gift card request (HAPPYHOLIDAYS), hidden for other orders */}
               {order.session_id ? (
-                <CouponGiftCardClaimsBoard session_id={order.session_id} compact />
+                <CouponGiftCardClaimsBoard session_id={order.session_id} />
               ) : (
-                <CouponGiftCardClaimsBoard order_id={order.id} compact />
+                <CouponGiftCardClaimsBoard order_id={order.id} />
               )}
 
               {/* Client Communication Panel */}

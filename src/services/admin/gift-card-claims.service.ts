@@ -1,5 +1,9 @@
 import { apiClient } from "@/lib/api-client";
-import type { AdminGiftCardClaim, AdminGiftCardClaimFilters } from "@/types/admin/coupons";
+import type {
+  AdminGiftCardClaim,
+  AdminGiftCardClaimFilters,
+  CouponGiftCardClaimsResponse,
+} from "@/types/admin/coupons";
 
 /** GET /api/admin/gift-card-claims */
 export async function listAdminGiftCardClaims(
@@ -27,4 +31,12 @@ export async function updateAdminGiftCardClaimFulfillment(
     { is_fulfilled }
   );
   return response.data;
+}
+
+/**
+ * GET /api/admin/coupons/{id}/gift-card-claims
+ * Every gift card request of one coupon (not capped) plus its totals.
+ */
+export async function getAdminCouponGiftCardClaims(coupon_id: string): Promise<CouponGiftCardClaimsResponse> {
+  return apiClient.get<CouponGiftCardClaimsResponse>(`/api/admin/coupons/${coupon_id}/gift-card-claims`);
 }
