@@ -292,8 +292,17 @@ function CouponRow({
       </div>
 
       {/* Actions */}
-      <div className={`${styles.cell} ${styles.cellActions}`} role="cell">
-        <Link href={usage_href} className={styles.actionButton} title="Usage and orders">
+      {/* Actions: always labeled. Gift card coupons have four, so they wrap into a 2x2 grid. */}
+      <div
+        className={`${styles.cell} ${styles.cellActions} ${is_gift_card_reward ? styles.cellActionsStacked : ""}`}
+        role="cell"
+      >
+        <Link
+          href={usage_href}
+          className={styles.actionButton}
+          title="See usage and orders"
+          aria-label={`Usage of ${coupon.code}`}
+        >
           <ChartIcon />
           <span className={styles.actionLabel}>Usage</span>
         </Link>
@@ -301,14 +310,19 @@ function CouponRow({
           <Link
             href={gift_cards_href}
             className={`${styles.actionButton} ${styles.actionGift}`}
-            title="Gift card requests"
-            aria-label={`Gift card requests of ${coupon.code}`}
+            title="See gift card requests"
+            aria-label={`Gift cards of ${coupon.code}`}
           >
             <GiftIcon />
             <span className={styles.actionLabel}>Gift cards</span>
           </Link>
         )}
-        <Link href={edit_href} className={styles.actionButton} title="Edit" aria-label={`Edit ${coupon.code}`}>
+        <Link
+          href={edit_href}
+          className={styles.actionButton}
+          title="Edit coupon"
+          aria-label={`Edit ${coupon.code}`}
+        >
           <EditIcon />
           <span className={styles.actionLabel}>Edit</span>
         </Link>
@@ -316,7 +330,7 @@ function CouponRow({
           type="button"
           className={`${styles.actionButton} ${styles.actionDanger}`}
           onClick={() => onDelete(coupon)}
-          title="Delete"
+          title="Delete coupon"
           aria-label={`Delete ${coupon.code}`}
         >
           <TrashIcon />

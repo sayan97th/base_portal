@@ -62,8 +62,12 @@ $tones: (
 );
 
 // Coupon, Status, Discount, Applies to, Usage, Expires, Actions.
-$row_columns: minmax(210px, 2.4fr) 132px 124px minmax(128px, 1.3fr) minmax(112px, 1fr) 124px 154px;
-$cards_max: 960px;
+// The actions column fits three labeled buttons in one line (Usage, Edit,
+// Delete). Gift card coupons add a fourth one and switch to a 2x2 grid.
+$row_columns: minmax(188px, 2.4fr) 128px 120px minmax(116px, 1.3fr) minmax(100px, 1fr) 120px 236px;
+// Sum of the minimum column widths, so the table never overflows before it
+// turns into cards.
+$cards_max: 1023px;
 $kpis_wide_min: 720px;
 
 // ── Mixins ──────────────────────────────────────────────────────────────────
@@ -1506,19 +1510,24 @@ $kpis_wide_min: 720px;
 }
 
 // ── Actions ─────────────────────────────────────────────────────────────────
+// Every action shows its label, the client asked for text over icon only
+// buttons. Table mode uses compact outlined buttons, card mode uses full width,
+// touch friendly ones laid out on a grid so they never squeeze each other.
 
 .cellActions {
-  display: flex;
+  display: grid;
+  grid-auto-flow: column;
   align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
+  gap: 6px;
 
   @include table {
+    justify-content: end;
     padding-right: 16px;
   }
 
   @include cards {
     grid-area: actions;
+    grid-auto-columns: minmax(0, 1fr);
     gap: 8px;
     margin-top: 6px;
     padding-top: 14px;
@@ -1530,84 +1539,139 @@ $kpis_wide_min: 720px;
   }
 }
 
+// Four actions: two per line in the table and on phones, one line otherwise.
+.cellActionsStacked {
+  @include table {
+    grid-auto-flow: row;
+    // Each column takes its widest button, so both lines align.
+    grid-template-columns: repeat(2, max-content);
+  }
+
+  @include narrow {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .actionButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  width: 32px;
-  height: 32px;
-  border: 0;
+  gap: 5px;
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid $gray_200;
   border-radius: 8px;
-  background: transparent;
-  color: $gray_400;
-  font-size: 13px;
+  background: $white;
+  color: $gray_700;
+  font-size: 12.5px;
   font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
   text-decoration: none;
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
   @include focus_visible;
 
   svg {
     flex-shrink: 0;
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
+    color: $gray_500;
+    transition: color 0.15s ease;
   }
 
   &:hover {
-    background: $gray_100;
-    color: $gray_700;
-  }
+    border-color: $gray_300;
+    background: $gray_50;
+    color: $gray_900;
 
-  @include dark {
-    &:hover {
-      background: $gray_800;
-      color: $white;
+    svg {
+      color: currentColor;
     }
   }
 
-  // Labeled, touch friendly buttons in card mode.
-  @include cards {
-    flex: 1 1 0;
-    width: auto;
-    height: 38px;
-    border: 1px solid $gray_200;
-    border-radius: 10px;
-    color: $gray_700;
+  @include dark {
+    border-color: $gray_700;
+    background: transparent;
+    color: $gray_300;
 
-    @include dark {
-      border-color: $gray_700;
-      color: $gray_300;
+    svg {
+      color: $gray_400;
+    }
+
+    &:hover {
+      border-color: $gray_600;
+      background: $gray_800;
+      color: $white;
+
+      svg {
+        color: currentColor;
+      }
+    }
+  }
+
+  // Taller, full width buttons for touch in card mode.
+  @include cards {
+    width: 100%;
+    min-width: 0;
+    height: 40px;
+    padding: 0 10px;
+    gap: 6px;
+    border-radius: 10px;
+    font-size: 13px;
+
+    svg {
+      width: 16px;
+      height: 16px;
     }
   }
 }
 
 .actionGift:hover {
-  background: rgba(253, 171, 61, 0.14);
+  border-color: rgba(253, 171, 61, 0.45);
+  background: rgba(253, 171, 61, 0.12);
   color: #b86e00;
 
   @include dark {
+    border-color: rgba(253, 171, 61, 0.4);
     background: rgba(253, 171, 61, 0.16);
     color: #fdab3d;
   }
 }
 
-.actionDanger:hover {
-  background: #fef3f2;
-  color: $error_500;
+.actionDanger {
+  // The destructive tone is always visible, in the table and in the cards.
+  color: #b42318;
+
+  svg {
+    color: currentColor;
+  }
 
   @include dark {
-    background: rgba(240, 68, 56, 0.14);
     color: #f97066;
+
+    svg {
+      color: currentColor;
+    }
+  }
+
+  &:hover {
+    border-color: #fecdca;
+    background: #fef3f2;
+    color: #b42318;
+
+    @include dark {
+      border-color: rgba(240, 68, 56, 0.4);
+      background: rgba(240, 68, 56, 0.14);
+      color: #f97066;
+    }
   }
 }
 
 .actionLabel {
-  display: none;
-
-  @include cards {
-    display: inline;
-  }
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 // ── Loading, empty and error states ─────────────────────────────────────────
