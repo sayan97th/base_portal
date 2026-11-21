@@ -101,8 +101,9 @@ function CheckoutRow({ checkout, group_color, is_gift_card_reward, is_expanded, 
           </span>
           <span className={styles.clientText}>
             <span className={styles.clientName}>{checkout.client?.name ?? "Unknown client"}</span>
-            <span className={styles.clientEmail}>
-              {checkout.client?.company || checkout.client?.organization || checkout.client?.email || ""}
+            {/* Every client shares the same organization, so the company is what tells them apart. */}
+            <span className={styles.clientEmail} title={checkout.client?.company || checkout.client?.email || undefined}>
+              {checkout.client?.company || checkout.client?.email || ""}
             </span>
           </span>
         </div>
@@ -274,8 +275,8 @@ function CheckoutDetail({ checkout, is_gift_card_reward, group_color }: Checkout
               {checkout.client.email}
             </a>
           )}
-          {(checkout.client?.company || checkout.client?.organization) && (
-            <p className={styles.detailMuted}>{checkout.client?.company || checkout.client?.organization}</p>
+          {checkout.client?.company && (
+            <p className={styles.detailMuted}>Company: {checkout.client.company}</p>
           )}
         </div>
 

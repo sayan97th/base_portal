@@ -279,7 +279,6 @@ export function matchesCheckoutSearch(checkout: CouponUsageCheckout, search_term
     checkout.client?.name,
     checkout.client?.email,
     checkout.client?.company,
-    checkout.client?.organization,
     ...checkout.invoices.map((invoice) => invoice.invoice_number),
     ...checkout.orders.flatMap((order) => [
       order.order_reference,
@@ -384,7 +383,7 @@ export function buildCheckoutExport(checkouts: CouponUsageCheckout[], is_gift_ca
             checkout.session_id ?? "",
             checkout.client?.name ?? "",
             checkout.client?.email ?? "",
-            checkout.client?.company ?? checkout.client?.organization ?? "",
+            checkout.client?.company ?? "",
             order.order_reference,
             order.product_label,
             getStatusMeta(order.status).label,
