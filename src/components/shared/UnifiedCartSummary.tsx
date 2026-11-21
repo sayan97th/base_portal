@@ -6,6 +6,7 @@ import GiftCardRewardCheckoutCard from "@/components/gift-card-rewards/GiftCardR
 import PromoCodeSection from "@/components/shared/promo-code/PromoCodeSection";
 import {
   GIFT_CARD_BRAND_OPTIONS,
+  ORDER_GIFT_CARD_NOTE,
   isGiftCardRewardDetailsComplete,
 } from "@/types/client/gift-card-rewards";
 import type { CartProductType } from "@/types/client/unified-cart";
@@ -580,12 +581,15 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
         </div>
 
         {!is_applying_credits && gift_card_reward_coupon && gift_card_reward_amount > 0 && (
-          <div className="flex items-center justify-between rounded-lg bg-brand-50 px-2.5 py-1.5 dark:bg-brand-500/10">
-            <p className="text-xs font-semibold text-brand-600 dark:text-brand-300">
-              {selected_gift_card_label
-                ? `${selected_gift_card_label} gift card you will receive`
-                : "Gift card you will receive"}
-            </p>
+          <div className="flex items-center justify-between gap-3 rounded-lg bg-brand-50 px-2.5 py-1.5 dark:bg-brand-500/10">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-brand-600 dark:text-brand-300">
+                {selected_gift_card_label
+                  ? `${selected_gift_card_label} gift card for this order`
+                  : "Gift card for this order"}
+              </p>
+              <p className="text-[10px] font-medium text-brand-500/80 dark:text-brand-300/70">{ORDER_GIFT_CARD_NOTE}</p>
+            </div>
             <p className="text-sm font-bold tabular-nums text-brand-600 dark:text-brand-300">
               $
               {gift_card_reward_amount.toLocaleString("en-US", {
@@ -662,8 +666,8 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
             />
           </svg>
           <p className="text-[11px] font-medium text-brand-700 dark:text-brand-300">
-            Your gift card details are not complete yet. Pick a card and an email above so we can send it right
-            away, or finish it later from your order page.
+            Your order gift card details are not complete yet. Pick a card and an email above so we can send it
+            right away, or finish it later from your order page.
           </p>
         </div>
       )}

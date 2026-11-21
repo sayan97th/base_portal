@@ -265,6 +265,13 @@ export default function CouponUsageContent({ coupon_id }: CouponUsageContentProp
               {summary.checkout_count > 0 && (
                 <span className={styles.metaChip}>Avg. checkout {formatMoney(summary.average_checkout_value)}</span>
               )}
+              {is_gift_card_reward && summary.checkout_count > 0 && (
+                <span className={styles.metaChip} title="Gift cards are earned once per order, never per product">
+                  {summary.gift_card_count ?? summary.checkout_count}{" "}
+                  {(summary.gift_card_count ?? summary.checkout_count) === 1 ? "gift card" : "gift cards"}, one per order,{" "}
+                  {formatMoney(summary.total_reward)} total
+                </span>
+              )}
               {summary.first_used_at && (
                 <span>
                   First used {formatShortDate(summary.first_used_at)}, last used {formatShortDate(summary.last_used_at)}
@@ -391,6 +398,14 @@ export default function CouponUsageContent({ coupon_id }: CouponUsageContentProp
                 </button>
               ))}
             </div>
+          )}
+
+          {is_gift_card_reward && !is_checkout_view && listed_count > 0 && (
+            <p className="mb-3 rounded-lg border border-dashed border-brand-200 bg-brand-50/60 px-3 py-2 text-xs font-medium text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300">
+              Gift cards are earned once per order, never per product. Product orders bought together share the same
+              order gift card, so the amount shown on each row is the gift card of its whole order. Use the Checkouts
+              view to see each gift card once.
+            </p>
           )}
 
           {listed_count === 0 ? (

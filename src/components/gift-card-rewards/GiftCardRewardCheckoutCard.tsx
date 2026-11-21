@@ -8,6 +8,7 @@ import { useCart } from "@/context/CartContext";
 import { useOptionalAuth } from "@/context/auth-context-store";
 import {
   GIFT_CARD_BRAND_OPTIONS,
+  describeOrderGiftCardCoverage,
   formatRewardPercentage,
   isGiftCardRewardDetailsComplete,
   isValidGiftCardEmail,
@@ -31,9 +32,13 @@ const STATUS_LABELS: Record<ClaimStatus, string> = {
  * where it should be sent, and those details travel with the checkout so the
  * BASE team is notified right away. Filling it in is optional: anyone who
  * skips it can finish it later from the order page.
+ *
+ * The gift card is earned per order, never per product: a cart with several
+ * items or products still earns one single gift card for the whole order.
  */
 export default function GiftCardRewardCheckoutCard() {
   const {
+    items,
     gift_card_reward_coupon,
     gift_card_reward_amount,
     gift_card_reward_details,
@@ -59,6 +64,13 @@ export default function GiftCardRewardCheckoutCard() {
   const reward_percentage = formatRewardPercentage(gift_card_reward_coupon.discount_value);
   const show_summary = is_complete && is_collapsed;
 
+  // Items the gift card is calculated on. They all share one gift card.
+  const restricted_types = gift_card_reward_coupon.product_types ?? [];
+  const covered_item_count = items
+    .filter((item) => restricted_types.length === 0 || restricted_types.includes(item.product_type))
+    .reduce((sum, item) => sum + item.quantity, 0);
+  const coverage_text = describeOrderGiftCardCoverage(covered_item_count);
+
   return (
     <section className={styles.checkoutCard} aria-label="Holiday gift card reward">
       <div className={styles.checkoutHeader}>
@@ -74,13 +86,14 @@ export default function GiftCardRewardCheckoutCard() {
           </div>
           <p className={styles.checkoutTitle}>Claim your holiday gift card</p>
           <p className={styles.muted}>
-            Thanks for using {gift_card_reward_coupon.code}. We will send you a gift card worth{" "}
-            {reward_percentage} of this order.
+            Thanks for using {gift_card_reward_coupon.code}. We will send you one gift card worth{" "}
+            {reward_percentage} of this order total.
           </p>
+          <p className={styles.coverageNote}>{coverage_text}</p>
         </div>
         <div className={styles.rewardBadge}>
           <span className={styles.amount}>{formatMoney(gift_card_reward_amount)}</span>
-          <span className={styles.rewardBadgeLabel}>Gift card</span>
+          <span className={styles.rewardBadgeLabel}>Order gift card</span>
         </div>
       </div>
 
@@ -105,7 +118,7 @@ export default function GiftCardRewardCheckoutCard() {
           </span>
           <div className={styles.claimSummaryText}>
             <p className={styles.claimSummaryTitle}>
-              {selected_brand.label} gift card, {formatMoney(gift_card_reward_amount)}
+              One {selected_brand.label} gift card for this order, {formatMoney(gift_card_reward_amount)}
             </p>
             <p className={styles.claimSummaryEmail} title={email}>
               Sent to {email}

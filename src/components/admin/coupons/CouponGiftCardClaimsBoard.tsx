@@ -107,8 +107,11 @@ export default function CouponGiftCardClaimsBoard({ order_id, session_id }: Coup
     <div className={styles.board}>
       <div className={styles.header}>
         <div>
-          <p className={styles.title}>🎁 Promo gift card</p>
-          <p className={styles.subtitle}>This order used the {claims[0].coupon_code} money back promo code.</p>
+          <p className={styles.title}>🎁 Order gift card</p>
+          <p className={styles.subtitle}>
+            This order used the {claims[0].coupon_code} money back promo code. Send one gift card for the whole
+            order, not one per product.
+          </p>
         </div>
         {coupon_id && (
           <Link href={`/admin/coupons/${coupon_id}/gift-cards`} className={styles.viewAllLink}>
@@ -134,7 +137,8 @@ export default function CouponGiftCardClaimsBoard({ order_id, session_id }: Coup
                 )}
               </div>
               <p className={styles.clientMeta}>
-                {claim.reward_percentage}% of {formatMoney(claim.order_total)}
+                {claim.reward_percentage}% of the {formatMoney(claim.order_total)} order total
+                {claim.order_ids.length > 1 && `, covers all ${claim.order_ids.length} products`}
               </p>
               <div className="mt-1">
                 {claim.recipient_email ? (

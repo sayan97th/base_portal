@@ -14,6 +14,7 @@ import {
   formatTime,
   getColorForKey,
   getInitials,
+  getOrderGiftCardAmount,
   getStatusMeta,
   summarizeItems,
   sumUsages,
@@ -38,7 +39,7 @@ interface UsageRowProps {
 function UsageRow({ usage, group_color, is_gift_card_reward, is_expanded, onToggle }: UsageRowProps) {
   const status_meta = getStatusMeta(usage.status);
   const client_key = usage.client ? String(usage.client.id ?? usage.client.email) : "unknown";
-  const savings_amount = is_gift_card_reward ? usage.reward_amount : usage.discount_amount;
+  const order_gift_card_amount = getOrderGiftCardAmount(usage);
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Enter" || event.key === " ") {
@@ -103,9 +104,19 @@ function UsageRow({ usage, group_color, is_gift_card_reward, is_expanded, onTogg
 
         <div className={styles.cellMoney}>{formatMoney(usage.subtotal_before_discount)}</div>
 
-        <div className={`${styles.cellMoney} ${styles.cellSavings}`}>
-          {savings_amount > 0 ? `${is_gift_card_reward ? "" : "-"}${formatMoney(savings_amount)}` : formatMoney(0)}
-        </div>
+        {is_gift_card_reward ? (
+          <div
+            className={`${styles.cellMoney} ${styles.cellSavings}`}
+            title="One gift card for the whole order (checkout), shared by all of its products"
+          >
+            {formatMoney(order_gift_card_amount)}
+            <span className={styles.orderLevelTag}>per order</span>
+          </div>
+        ) : (
+          <div className={`${styles.cellMoney} ${styles.cellSavings}`}>
+            {usage.discount_amount > 0 ? `-${formatMoney(usage.discount_amount)}` : formatMoney(0)}
+          </div>
+        )}
 
         <div className={`${styles.cellMoney} ${styles.cellTotal}`}>{formatMoney(usage.total_amount)}</div>
 
@@ -197,8 +208,8 @@ function UsageDetail({ usage, is_gift_card_reward, group_color }: UsageDetailPro
           </div>
           {is_gift_card_reward ? (
             <div>
-              <dt>Gift card earned ({formatCouponTerms(usage.coupon_terms)})</dt>
-              <dd className={styles.breakdownSavings}>{formatMoney(usage.reward_amount)}</dd>
+              <dt>Order gift card ({formatCouponTerms(usage.coupon_terms)}), one per order</dt>
+              <dd className={styles.breakdownSavings}>{formatMoney(getOrderGiftCardAmount(usage))}</dd>
             </div>
           ) : (
             <div>
@@ -211,6 +222,12 @@ function UsageDetail({ usage, is_gift_card_reward, group_color }: UsageDetailPro
             <dd>{formatMoney(usage.total_amount)}</dd>
           </div>
         </dl>
+        {is_gift_card_reward && (
+          <p className={styles.detailMuted}>
+            This gift card covers the whole checkout. Every product bought with it shares the same gift card, so
+            only one is sent.
+          </p>
+        )}
         {usage.gift_card_claim?.status && (
           <p className={styles.detailMuted}>
             {GIFT_CARD_STATUS_LABELS[usage.gift_card_claim.status] ?? usage.gift_card_claim.status}
@@ -291,7 +308,7 @@ function UsageGroup({ group, is_gift_card_reward, expanded_ids, onToggleRow }: U
             <div>Items</div>
             <div className={styles.headCenter}>Status</div>
             <div className={styles.headRight}>Subtotal</div>
-            <div className={styles.headRight}>{is_gift_card_reward ? "Gift card" : "Discount"}</div>
+            <div className={styles.headRight}>{is_gift_card_reward ? "Order gift card" : "Discount"}</div>
             <div className={styles.headRight}>Total</div>
             <div>Used on</div>
             <div />
@@ -316,8 +333,12 @@ function UsageGroup({ group, is_gift_card_reward, expanded_ids, onToggleRow }: U
             <div />
             <div />
             <div className={styles.cellMoney}>{formatMoney(totals.subtotal)}</div>
-            <div className={`${styles.cellMoney} ${styles.cellSavings}`}>
-              {is_gift_card_reward ? formatMoney(totals.reward) : `-${formatMoney(totals.discount)}`}
+            {/* Product orders share their checkout gift card, so it is never summed here. */}
+            <div
+              className={`${styles.cellMoney} ${styles.cellSavings}`}
+              title={is_gift_card_reward ? "Gift cards are counted per order, see the Checkouts view" : undefined}
+            >
+              {is_gift_card_reward ? <span className={styles.orderLevelTag}>per order</span> : `-${formatMoney(totals.discount)}`}
             </div>
             <div className={`${styles.cellMoney} ${styles.cellTotal}`}>{formatMoney(totals.total)}</div>
             <div />

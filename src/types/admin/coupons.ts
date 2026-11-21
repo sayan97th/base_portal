@@ -89,6 +89,8 @@ export interface AdminGiftCardClaim {
   coupon_id: string | null;
   session_id: string;
   order_ids: string[];
+  /** Product orders covered by this single gift card. */
+  order_count?: number;
   coupon_code: string;
   promotion_name: string;
   order_total: number;
@@ -158,8 +160,7 @@ export interface CouponUsageItem {
   is_coupon_applied: boolean;
   /** Share of the order discount on this item. Null for snapshots taken before items carried it. */
   discount_amount: number | null;
-  /** Share of the order gift card reward on this item. Null for older snapshots. */
-  reward_amount: number | null;
+  // No gift card amount here on purpose: the gift card is earned per order, never per item.
 }
 
 export interface CouponUsageClient {
@@ -190,8 +191,6 @@ export interface CouponUsage {
   subtotal_before_discount: number;
   discount_amount: number;
   total_amount: number;
-  /** Gift card value earned on this order, only for gift card reward coupons. */
-  reward_amount: number;
   /** Coupon terms at the moment of the purchase, not the current coupon settings. */
   coupon_terms: {
     code: string;
@@ -199,9 +198,14 @@ export interface CouponUsage {
     discount_type: DiscountType;
     discount_value: number;
   };
+  /**
+   * The single gift card earned by the whole checkout (order). Every product
+   * order of that checkout points to the same claim, so never add it up per product.
+   */
   gift_card_claim: {
     id: string;
     status: GiftCardClaimStatus | null;
+    /** Value of the whole order gift card, not a share for this product order. */
     reward_amount: number;
     gift_card_brand: string | null;
   } | null;
@@ -230,7 +234,10 @@ export interface CouponUsageSummary {
   multi_product_checkout_count: number;
   client_count: number;
   total_discount: number;
+  /** Value of every gift card earned, one per checkout. */
   total_reward: number;
+  /** Gift cards earned, always one per checkout (order). */
+  gift_card_count?: number;
   gross_revenue: number;
   net_revenue: number;
   average_order_value: number;
@@ -270,6 +277,7 @@ export interface CouponUsageCheckout {
   /** Subtotal of the items the coupon applied to. */
   eligible_subtotal: number;
   discount_amount: number;
+  /** The one gift card earned by this checkout (the whole order). */
   reward_amount: number;
   total_amount: number;
   has_deleted_orders: boolean;

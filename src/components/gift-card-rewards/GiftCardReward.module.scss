@@ -383,6 +383,32 @@ $brand_themes: (
   }
 }
 
+// "One gift card for this whole order" note: the reward is per order, never per product.
+.coverageNote {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: $brand_500;
+  background: $brand_50;
+
+  @include dark {
+    background: rgba(255, 255, 255, 0.06);
+  }
+}
+
+.panelCoverage {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: $brand_500;
+}
+
 .rewardBadgeLabel {
   display: block;
   margin-top: 4px;

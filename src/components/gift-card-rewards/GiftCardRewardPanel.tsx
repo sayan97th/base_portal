@@ -1,12 +1,14 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import styles from "./GiftCardReward.module.scss";
 import GiftCardRewardForm from "./GiftCardRewardForm";
 import { CheckIcon, GiftIcon, MailIcon, SpinnerIcon } from "./GiftCardIcons";
 import { Modal } from "@/components/ui/modal";
 import { giftCardRewardsService } from "@/services/client/gift-card-rewards.service";
 import {
+  describeOrderGiftCardCoverage,
   formatRewardPercentage,
   isValidGiftCardEmail,
   type GiftCardReward,
@@ -78,6 +80,10 @@ function markPrompted(claim_id: string): void {
  * Renders nothing unless the order used the promo. While the promo is still
  * running and details are missing, it invites the client to pick a gift card;
  * once submitted it shows a short confirmation instead.
+ *
+ * One checkout earns one gift card for the whole order. When the checkout
+ * created several product orders, every one of their pages shows this same
+ * gift card, so the panel says it covers the whole order and is not per product.
  */
 export default function GiftCardRewardPanel({ session_id, order_id, auto_open = false }: GiftCardRewardPanelProps) {
   const [reward, setReward] = useState<GiftCardReward | null>(null);
@@ -164,6 +170,28 @@ export default function GiftCardRewardPanel({ session_id, order_id, auto_open = 
   const is_pending = reward.status === "pending_details" && reward.is_claimable;
   const is_fulfilled = reward.status === "fulfilled";
 
+  // Product orders bought together in this checkout, all covered by this one gift card.
+  const covered_order_count = reward.order_count ?? reward.order_ids.length;
+  const is_multi_product = covered_order_count > 1;
+  const coverage_text = describeOrderGiftCardCoverage(covered_order_count, "product");
+  // On a single product order page, point to the full order this gift card belongs to.
+  const full_order_href = order_id && is_multi_product && reward.session_id ? `/orders/session/${reward.session_id}` : null;
+
+  const coverage_line = (
+    <p className={styles.panelCoverage}>
+      {coverage_text}
+      {is_multi_product && " You will not receive a separate gift card for each product."}
+      {full_order_href && (
+        <>
+          {" "}
+          <Link href={full_order_href} className={styles.linkButton}>
+            View full order
+          </Link>
+        </>
+      )}
+    </p>
+  );
+
   return (
     <>
       <section className={styles.panel} aria-label="Promo gift card">
@@ -177,18 +205,19 @@ export default function GiftCardRewardPanel({ session_id, order_id, auto_open = 
             {is_pending ? (
               <>
                 <p className={styles.panelTitle}>
-                  You earned a {formatMoney(reward.reward_amount)} gift card
+                  You earned a {formatMoney(reward.reward_amount)} gift card for this order
                 </p>
                 <p className={styles.panelDescription}>
                   Thanks for ordering with {reward.coupon_code}. Choose Amazon, Visa or Target and tell us where to
-                  send your {percentage} back.
+                  send your {percentage} back on the {formatMoney(reward.order_total)} order total.
                 </p>
+                {coverage_line}
               </>
             ) : (
               <>
                 <div className="flex flex-wrap items-center gap-2">
                   <p className={styles.panelTitle}>
-                    {is_fulfilled ? "Your gift card has been sent" : "Gift card request received"}
+                    {is_fulfilled ? "Your order gift card has been sent" : "Order gift card request received"}
                   </p>
                   <span className={`${styles.chip} ${is_fulfilled ? styles.chipFulfilled : styles.chipSubmitted}`}>
                     {is_fulfilled ? "Sent" : "In progress"}
@@ -199,6 +228,7 @@ export default function GiftCardRewardPanel({ session_id, order_id, auto_open = 
                     ? "Check your inbox for your gift card. Happy holidays!"
                     : "Our team will email your gift card shortly."}
                 </p>
+                {coverage_line}
                 <div className={styles.summaryList}>
                   <span className={styles.summaryItem}>
                     <GiftIcon className={styles.giftIcon} />
@@ -238,8 +268,8 @@ export default function GiftCardRewardPanel({ session_id, order_id, auto_open = 
               </div>
               <p className={styles.modalTitle}>You are all set!</p>
               <p className={styles.muted}>
-                We will send your {formatMoney(reward.reward_amount)} {brandLabel(reward)} gift card to{" "}
-                <strong>{reward.recipient_email}</strong>.
+                We will send one {formatMoney(reward.reward_amount)} {brandLabel(reward)} gift card for your whole
+                order to <strong>{reward.recipient_email}</strong>.
               </p>
               <div className={styles.modalActions} style={{ justifyContent: "center" }}>
                 <button type="button" className={styles.primaryButton} onClick={closeModal}>
@@ -262,9 +292,9 @@ export default function GiftCardRewardPanel({ session_id, order_id, auto_open = 
                 <span className={styles.amount}>{formatMoney(reward.reward_amount)}</span>
               </div>
 
-              <p className={styles.modalTitle}>Claim your gift card</p>
+              <p className={styles.modalTitle}>Claim your order gift card</p>
               <p className={styles.muted} style={{ marginBottom: 18 }}>
-                Pick your favorite and we will email it to you.
+                {coverage_text} Pick your favorite and we will email it to you.
               </p>
 
               <GiftCardRewardForm

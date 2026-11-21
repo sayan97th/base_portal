@@ -37,8 +37,9 @@ function getProductsBackground(checkout: CouponUsageCheckout): string {
   return `linear-gradient(90deg, ${stops.join(", ")})`;
 }
 
-function getItemSavings(item: CouponUsageItem, is_gift_card_reward: boolean): number | null {
-  return is_gift_card_reward ? item.reward_amount : item.discount_amount;
+/** Discount share of an item. Gift cards are earned per order, so items never carry one. */
+function getItemDiscount(item: CouponUsageItem, is_gift_card_reward: boolean): number | null {
+  return is_gift_card_reward ? null : item.discount_amount;
 }
 
 // ── Row ──────────────────────────────────────────────────────────────────────
@@ -168,7 +169,7 @@ interface CheckoutOrderSectionProps {
 
 function CheckoutOrderSection({ order, is_gift_card_reward }: CheckoutOrderSectionProps) {
   const status_meta = getStatusMeta(order.status);
-  const order_savings = is_gift_card_reward ? order.reward_amount : order.discount_amount;
+  const order_discount = is_gift_card_reward ? 0 : order.discount_amount;
 
   return (
     <div className={`${styles.checkoutOrder} ${order.is_coupon_applied ? "" : styles.checkoutOrderMuted}`}>
@@ -211,7 +212,7 @@ function CheckoutOrderSection({ order, is_gift_card_reward }: CheckoutOrderSecti
           </thead>
           <tbody>
             {order.items.map((item, index) => {
-              const item_savings = getItemSavings(item, is_gift_card_reward);
+              const item_discount = getItemDiscount(item, is_gift_card_reward);
               return (
                 <tr key={`${item.tier_id ?? item.label}-${index}`}>
                   <td>{item.label}</td>
@@ -221,9 +222,7 @@ function CheckoutOrderSection({ order, is_gift_card_reward }: CheckoutOrderSecti
                   <td>
                     {item.is_coupon_applied ? (
                       <span className={styles.itemPromoApplied}>
-                        {item_savings !== null && item_savings > 0
-                          ? `${is_gift_card_reward ? "" : "-"}${formatMoney(item_savings)}`
-                          : "Applied"}
+                        {item_discount !== null && item_discount > 0 ? `-${formatMoney(item_discount)}` : "Applied"}
                       </span>
                     ) : (
                       <span className={styles.itemPromoNone}>Not applied</span>
@@ -238,11 +237,11 @@ function CheckoutOrderSection({ order, is_gift_card_reward }: CheckoutOrderSecti
 
       <div className={styles.checkoutOrderTotals}>
         <span>Subtotal {formatMoney(order.subtotal_before_discount)}</span>
-        {order_savings > 0 && (
-          <span className={styles.breakdownSavings}>
-            {is_gift_card_reward ? "Gift card" : "Discount"} {is_gift_card_reward ? "" : "-"}
-            {formatMoney(order_savings)}
-          </span>
+        {order_discount > 0 && (
+          <span className={styles.breakdownSavings}>Discount -{formatMoney(order_discount)}</span>
+        )}
+        {is_gift_card_reward && order.is_coupon_applied && (
+          <span className={styles.detailMuted}>Included in the order gift card</span>
         )}
         <strong>Total {formatMoney(order.total_amount)}</strong>
       </div>
@@ -299,7 +298,7 @@ function CheckoutDetail({ checkout, is_gift_card_reward, group_color }: Checkout
             </div>
             {is_gift_card_reward ? (
               <div>
-                <dt>Gift card earned ({coupon_terms})</dt>
+                <dt>Order gift card ({coupon_terms}), one per order</dt>
                 <dd className={styles.breakdownSavings}>{formatMoney(checkout.reward_amount)}</dd>
               </div>
             ) : (
@@ -313,6 +312,11 @@ function CheckoutDetail({ checkout, is_gift_card_reward, group_color }: Checkout
               <dd>{formatMoney(checkout.total_amount)}</dd>
             </div>
           </dl>
+          {is_gift_card_reward && checkout.order_count > 1 && (
+            <p className={styles.detailMuted}>
+              One gift card covers all {checkout.order_count} products of this checkout. Do not send one per product.
+            </p>
+          )}
           {checkout.gift_card_claim?.status && (
             <p className={styles.detailMuted}>
               {GIFT_CARD_STATUS_LABELS[checkout.gift_card_claim.status] ?? checkout.gift_card_claim.status}
@@ -392,7 +396,7 @@ function CheckoutGroup({ group, is_gift_card_reward, expanded_ids, onToggleRow }
             <div>Items</div>
             <div className={styles.headCenter}>Status</div>
             <div className={styles.headRight}>Subtotal</div>
-            <div className={styles.headRight}>{is_gift_card_reward ? "Gift card" : "Discount"}</div>
+            <div className={styles.headRight}>{is_gift_card_reward ? "Order gift card" : "Discount"}</div>
             <div className={styles.headRight}>Total</div>
             <div>Used on</div>
             <div />

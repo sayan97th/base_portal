@@ -1,6 +1,9 @@
 import type { CouponCheckoutOrder, CouponUsageCheckout, CouponUsageItem } from "@/types/admin/coupons";
 import {
   buildCheckoutExport,
+  buildProductOrderExport,
+  getOrderGiftCardAmount,
+  sumUsages,
   checkoutIncludesProduct,
   countByProduct,
   describeAppliedProducts,
@@ -19,7 +22,6 @@ function buildItem(overrides: Partial<CouponUsageItem> = {}): CouponUsageItem {
     subtotal: 400,
     is_coupon_applied: true,
     discount_amount: 100,
-    reward_amount: 0,
     ...overrides,
   };
 }
@@ -42,7 +44,6 @@ function buildOrder(overrides: Partial<CouponCheckoutOrder> = {}): CouponCheckou
     subtotal_before_discount: 400,
     discount_amount: 100,
     total_amount: 300,
-    reward_amount: 0,
     gift_card_claim: null,
     invoice: null,
     order_url: "/admin/orders/order-1",
@@ -170,5 +171,65 @@ describe("coupon checkout helpers", () => {
     expect(rows[1][headers.indexOf("Item")]).toBe("Basic Article");
     expect(rows[1][promo_index]).toBe("No");
     expect(rows[1][headers.indexOf("Checkout Total")]).toBe("400.00");
+  });
+
+  describe("gift card reward coupons, one gift card per order", () => {
+    const gift_card_claim = { id: "claim-1", status: "submitted" as const, reward_amount: 50, gift_card_brand: "amazon" };
+
+    function buildGiftCardCheckout(): CouponUsageCheckout {
+      const base = buildCheckout();
+      const orders = base.orders.map((order) => ({
+        ...order,
+        is_coupon_applied: true,
+        discount_amount: 0,
+        gift_card_claim,
+        items: order.items.map((item) => ({ ...item, is_coupon_applied: true, discount_amount: 0 })),
+      }));
+
+      return {
+        ...base,
+        coupon_terms: { code: "HAPPYHOLIDAYS", name: "Happy Holidays", discount_type: "gift_card_reward", discount_value: 10 },
+        gift_card_claim,
+        discount_amount: 0,
+        reward_amount: 50,
+        orders,
+      };
+    }
+
+    it("exports the order gift card once per checkout and never per item", () => {
+      const { headers, rows } = buildCheckoutExport([buildGiftCardCheckout()], true);
+      const gift_card_index = headers.indexOf("Order Gift Card (one per checkout)");
+
+      expect(headers).not.toContain("Item Discount");
+      expect(headers.some((header) => header.toLowerCase().includes("item gift card"))).toBe(false);
+      expect(gift_card_index).toBeGreaterThan(-1);
+      expect(rows).toHaveLength(2);
+      expect(rows.every((row) => row[gift_card_index] === "50.00")).toBe(true);
+      expect(rows.every((row) => row.length === headers.length)).toBe(true);
+    });
+
+    it("shows the shared order gift card on each product order without splitting it", () => {
+      const [link_building, new_content] = buildGiftCardCheckout().orders;
+
+      expect(getOrderGiftCardAmount(link_building)).toBe(50);
+      expect(getOrderGiftCardAmount(new_content)).toBe(50);
+      expect(getOrderGiftCardAmount(buildOrder())).toBe(0);
+    });
+
+    it("never adds the gift card up per product order", () => {
+      const checkout = buildGiftCardCheckout();
+
+      expect(sumUsages(checkout.orders).reward).toBe(0);
+      expect(sumUsages([checkout]).reward).toBe(50);
+    });
+
+    it("labels the product order export column as a per order gift card", () => {
+      const usage = { ...buildGiftCardCheckout().orders[0], client: null, coupon_terms: buildGiftCardCheckout().coupon_terms };
+      const { headers, rows } = buildProductOrderExport([usage], true);
+      const column = headers.findIndex((header) => header.startsWith("Order Gift Card"));
+
+      expect(column).toBeGreaterThan(-1);
+      expect(rows[0][column]).toBe("50.00");
+    });
   });
 });

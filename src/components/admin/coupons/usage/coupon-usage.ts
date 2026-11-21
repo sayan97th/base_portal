@@ -216,7 +216,7 @@ export function sortUsages(usages: CouponUsage[], sort: CouponUsageSort): Coupon
   sorted.sort((left, right) => {
     if (sort === "oldest") return timeOf(left) - timeOf(right);
     if (sort === "discount") {
-      return right.discount_amount + right.reward_amount - (left.discount_amount + left.reward_amount);
+      return right.discount_amount + getOrderGiftCardAmount(right) - (left.discount_amount + getOrderGiftCardAmount(left));
     }
     if (sort === "total") return right.total_amount - left.total_amount;
     return timeOf(right) - timeOf(left);
@@ -293,12 +293,28 @@ export function groupUsages(usages: CouponUsage[], group_by: CouponUsageGroupBy)
   ).map(({ records, ...meta }) => ({ ...meta, usages: records }));
 }
 
-export function sumUsages(usages: { subtotal_before_discount: number; discount_amount: number; reward_amount: number; total_amount: number }[]) {
+/**
+ * Value of the gift card earned by the order (checkout) a product order
+ * belongs to. Every product order of a checkout shares the same gift card,
+ * so this is for display only and must never be summed per product order.
+ */
+export function getOrderGiftCardAmount(usage: Pick<CouponUsage, "gift_card_claim">): number {
+  return usage.gift_card_claim?.reward_amount ?? 0;
+}
+
+/**
+ * Totals of a list of rows. Gift cards (reward) are only counted for
+ * checkouts, which carry the single gift card of the order. Product orders
+ * carry none, so their reward total stays 0 instead of double counting.
+ */
+export function sumUsages(
+  usages: { subtotal_before_discount: number; discount_amount: number; reward_amount?: number; total_amount: number }[]
+) {
   return usages.reduce(
     (totals, usage) => ({
       subtotal: totals.subtotal + usage.subtotal_before_discount,
       discount: totals.discount + usage.discount_amount,
-      reward: totals.reward + usage.reward_amount,
+      reward: totals.reward + (usage.reward_amount ?? 0),
       total: totals.total + usage.total_amount,
     }),
     { subtotal: 0, discount: 0, reward: 0, total: 0 }
@@ -425,7 +441,7 @@ export function buildProductOrderExport(usages: CouponUsage[], is_gift_card_rewa
       "Company",
       "Items",
       "Subtotal",
-      is_gift_card_reward ? "Gift Card Earned" : "Discount",
+      is_gift_card_reward ? "Order Gift Card (one per checkout, shared by its products)" : "Discount",
       "Total",
       "Invoice",
       "Used On",
@@ -441,7 +457,7 @@ export function buildProductOrderExport(usages: CouponUsage[], is_gift_card_rewa
       usage.client?.company ?? usage.client?.organization ?? "",
       usage.items.map((item) => `${item.quantity} x ${item.label}`).join("; "),
       usage.subtotal_before_discount.toFixed(2),
-      (is_gift_card_reward ? usage.reward_amount : usage.discount_amount).toFixed(2),
+      (is_gift_card_reward ? getOrderGiftCardAmount(usage) : usage.discount_amount).toFixed(2),
       usage.total_amount.toFixed(2),
       usage.invoice?.invoice_number ?? "",
       usage.used_at ? new Date(usage.used_at).toISOString() : "",
@@ -449,10 +465,12 @@ export function buildProductOrderExport(usages: CouponUsage[], is_gift_card_rewa
   };
 }
 
-/** One row per purchased item, so the file shows every product of each checkout and which got the promo. */
+/**
+ * One row per purchased item, so the file shows every product of each
+ * checkout and which got the promo. Gift card reward coupons have no item
+ * column: the gift card is earned once per order, never per item.
+ */
 export function buildCheckoutExport(checkouts: CouponUsageCheckout[], is_gift_card_reward: boolean): CsvExport {
-  const savings_header = is_gift_card_reward ? "Item Gift Card Share" : "Item Discount";
-
   return {
     headers: [
       "Checkout",
@@ -468,9 +486,9 @@ export function buildCheckoutExport(checkouts: CouponUsageCheckout[], is_gift_ca
       "Unit Price",
       "Item Subtotal",
       "Promo Applied",
-      savings_header,
+      ...(is_gift_card_reward ? [] : ["Item Discount"]),
       "Checkout Subtotal",
-      is_gift_card_reward ? "Checkout Gift Card" : "Checkout Discount",
+      is_gift_card_reward ? "Order Gift Card (one per checkout)" : "Checkout Discount",
       "Checkout Total",
       "Invoices",
       "Used On",
@@ -478,7 +496,7 @@ export function buildCheckoutExport(checkouts: CouponUsageCheckout[], is_gift_ca
     rows: checkouts.flatMap((checkout) =>
       checkout.orders.flatMap((order) =>
         order.items.map((item) => {
-          const item_savings = is_gift_card_reward ? item.reward_amount : item.discount_amount;
+          const item_discount = is_gift_card_reward ? [] : [item.discount_amount === null ? "" : item.discount_amount.toFixed(2)];
           return [
             checkout.reference,
             checkout.session_id ?? "",
@@ -493,7 +511,7 @@ export function buildCheckoutExport(checkouts: CouponUsageCheckout[], is_gift_ca
             item.unit_price.toFixed(2),
             item.subtotal.toFixed(2),
             item.is_coupon_applied ? "Yes" : "No",
-            item_savings === null ? "" : item_savings.toFixed(2),
+            ...item_discount,
             checkout.subtotal_before_discount.toFixed(2),
             (is_gift_card_reward ? checkout.reward_amount : checkout.discount_amount).toFixed(2),
             checkout.total_amount.toFixed(2),

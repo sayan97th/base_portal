@@ -29,6 +29,9 @@ export interface GiftCardReward {
   id: string;
   session_id: string;
   order_ids: string[];
+  /** Product orders covered by this single gift card. One checkout always earns one gift card. */
+  order_count?: number;
+  product_types?: string[];
   coupon_code: string;
   promotion_name: string;
   order_total: number;
@@ -85,4 +88,16 @@ export function isGiftCardRewardDetailsComplete(
 
 export function formatRewardPercentage(value: number): string {
   return `${Number.isInteger(value) ? value : value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "")}%`;
+}
+
+/**
+ * The gift card is always earned per order (one checkout), never per product
+ * or item. Shared copy so every screen explains it the same way.
+ */
+export const ORDER_GIFT_CARD_NOTE = "One gift card per order, never one per product or item.";
+
+/** For example "One gift card for this whole order, covering all 3 items." */
+export function describeOrderGiftCardCoverage(count: number, noun: "item" | "product" = "item"): string {
+  if (count <= 1) return "One gift card for this order.";
+  return `One gift card for this whole order, covering all ${count} ${noun}s.`;
 }

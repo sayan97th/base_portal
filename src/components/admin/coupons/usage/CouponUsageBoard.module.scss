@@ -577,6 +577,22 @@ $board_min_width: 1240px;
   vertical-align: middle;
 }
 
+// Marks a gift card amount that belongs to the whole order (checkout), not to the product row.
+.orderLevelTag {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(236, 60, 137, 0.1);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: #c0306f;
+  text-transform: uppercase;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
 .countTag {
   margin-left: 6px;
   padding: 1px 6px;
