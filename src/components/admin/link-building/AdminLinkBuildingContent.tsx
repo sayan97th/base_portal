@@ -21,6 +21,7 @@ import {
   toggleAdminContentRefreshTierStatus,
   deleteAdminContentRefreshTier,
 } from "@/services/admin/link-building.service";
+import ConfirmDeleteDialog from "@/components/ui/modal/ConfirmDeleteDialog";
 import DrTierCard from "./DrTierCard";
 import DrTierFormModal from "./DrTierFormModal";
 import DrTierDetailModal from "./DrTierDetailModal";
@@ -107,6 +108,8 @@ export default function AdminLinkBuildingContent() {
   const [cr_error, setCrError] = useState<string | null>(null);
   const [cr_form_modal_open, setCrFormModalOpen] = useState(false);
   const [cr_editing_tier, setCrEditingTier] = useState<AdminContentRefreshTier | null>(null);
+  const [cr_delete_target, setCrDeleteTarget] = useState<AdminContentRefreshTier | null>(null);
+  const [cr_is_deleting, setCrIsDeleting] = useState(false);
 
   // ── Fetch DR Tiers ─────────────────────────────────────────────────────────
 
@@ -231,10 +234,19 @@ export default function AdminLinkBuildingContent() {
     fetchCrTiers();
   };
 
-  const handleDeleteCrTier = async (tier_id: string) => {
-    if (!confirm("Are you sure you want to delete this tier? This action cannot be undone.")) return;
-    await deleteAdminContentRefreshTier(tier_id);
-    fetchCrTiers();
+  const handleDeleteCrTier = async () => {
+    if (!cr_delete_target) return;
+    setCrIsDeleting(true);
+    try {
+      await deleteAdminContentRefreshTier(cr_delete_target.id);
+      setCrDeleteTarget(null);
+      fetchCrTiers();
+    } catch {
+      setCrError("Failed to delete tier. Please try again.");
+      setCrDeleteTarget(null);
+    } finally {
+      setCrIsDeleting(false);
+    }
   };
 
   const openCrAdd = () => {
@@ -418,7 +430,7 @@ export default function AdminLinkBuildingContent() {
                           tier={tier}
                           onEdit={() => openCrEdit(tier)}
                           onToggleStatus={(is_active) => handleToggleCrTierStatus(tier.id, is_active)}
-                          onDelete={() => handleDeleteCrTier(tier.id)}
+                          onDelete={() => setCrDeleteTarget(tier)}
                         />
                       ))}
                   </div>
@@ -536,6 +548,29 @@ export default function AdminLinkBuildingContent() {
         tier={cr_editing_tier}
         onClose={() => { setCrFormModalOpen(false); setCrEditingTier(null); }}
         onSubmit={cr_editing_tier ? handleUpdateCrTier : handleCreateCrTier}
+      />
+
+      {/* Delete Content Refresh tier confirmation */}
+      <ConfirmDeleteDialog
+        is_open={cr_delete_target !== null}
+        title="Delete content refresh tier"
+        description="Clients will no longer be able to order this tier."
+        item_label="Content refresh tier"
+        item_name={cr_delete_target?.label}
+        item_meta={
+          cr_delete_target
+            ? `${cr_delete_target.word_count_range} words · $${Number(cr_delete_target.price).toFixed(2)}`
+            : undefined
+        }
+        consequences={
+          cr_delete_target?.is_active
+            ? ["This tier is currently active and visible to clients."]
+            : []
+        }
+        confirm_label="Delete tier"
+        is_loading={cr_is_deleting}
+        onConfirm={handleDeleteCrTier}
+        onClose={() => setCrDeleteTarget(null)}
       />
 
       {/* Detail modal */}

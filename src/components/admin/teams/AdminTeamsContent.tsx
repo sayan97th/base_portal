@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import ConfirmDeleteDialog from "@/components/ui/modal/ConfirmDeleteDialog";
 import type { AdminTeam } from "@/types/admin/teams";
 import {
   listAdminTeams,
@@ -164,51 +165,8 @@ function TeamCard({ team, toggle_loading, on_view, on_edit, on_delete, on_toggle
   );
 }
 
-// ── Confirm Delete Modal ───────────────────────────────────────────────────────
-
-function ConfirmDeleteModal({
-  team,
-  on_confirm,
-  on_cancel,
-  is_loading,
-}: {
-  team: AdminTeam;
-  on_confirm: () => void;
-  on_cancel: () => void;
-  is_loading: boolean;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900">
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-500/15">
-          <svg className="h-6 w-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-          </svg>
-        </div>
-        <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">Delete Team</h3>
-        <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">
-          Are you sure you want to delete{" "}
-          <span className="font-semibold text-gray-700 dark:text-gray-300">{team.name}</span>?
-          All members will be removed. This action cannot be undone.
-        </p>
-        <div className="flex gap-3">
-          <button
-            onClick={on_cancel}
-            className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={on_confirm}
-            disabled={is_loading}
-            className="flex-1 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-600 disabled:opacity-60"
-          >
-            {is_loading ? "Deleting…" : "Delete"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+function formatMemberCount(count: number): string {
+  return `${count} ${count === 1 ? "member" : "members"}`;
 }
 
 // ── Pagination Controls ────────────────────────────────────────────────────────
@@ -520,14 +478,24 @@ export default function AdminTeamsContent() {
       )}
 
       {/* Delete modal */}
-      {deleting && (
-        <ConfirmDeleteModal
-          team={deleting}
-          on_confirm={handleDelete}
-          on_cancel={() => setDeleting(null)}
-          is_loading={delete_loading}
-        />
-      )}
+      <ConfirmDeleteDialog
+        is_open={deleting !== null}
+        title="Delete team"
+        description="The team and its membership list will be permanently removed."
+        item_label="Team"
+        item_name={deleting?.name}
+        item_meta={deleting ? formatMemberCount(deleting.members_count) : undefined}
+        consequences={
+          deleting && deleting.members_count > 0
+            ? ["All members will be removed from this team."]
+            : []
+        }
+        confirmation_text={deleting && deleting.members_count > 0 ? deleting.name : undefined}
+        confirm_label="Delete team"
+        is_loading={delete_loading}
+        onConfirm={handleDelete}
+        onClose={() => setDeleting(null)}
+      />
     </div>
   );
 }

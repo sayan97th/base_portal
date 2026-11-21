@@ -1,0 +1,723 @@
+// Shared destructive confirmation dialog.
+// Visual language: soft frosted backdrop, a card with a subtle danger glow,
+// an animated icon badge with halo rings, a preview of the record being
+// deleted and a clear, high contrast primary action.
+
+$danger_50: var(--color-error-50, #fef3f2);
+$danger_100: var(--color-error-100, #fee4e2);
+$danger_200: var(--color-error-200, #fecdca);
+$danger_400: var(--color-error-400, #f97066);
+$danger_500: var(--color-error-500, #f04438);
+$danger_600: var(--color-error-600, #d92d20);
+$danger_700: var(--color-error-700, #b42318);
+
+$gray_900: var(--color-gray-900, #101828);
+$gray_800: var(--color-gray-800, #1d2939);
+$gray_700: var(--color-gray-700, #344054);
+$gray_600: var(--color-gray-600, #475467);
+$gray_500: var(--color-gray-500, #667085);
+$gray_400: var(--color-gray-400, #98a2b3);
+$gray_200: var(--color-gray-200, #e4e7ec);
+$gray_100: var(--color-gray-100, #f2f4f7);
+$gray_50: var(--color-gray-50, #f9fafb);
+
+$radius_card: 20px;
+$radius_inner: 14px;
+$ease_out: cubic-bezier(0.16, 1, 0.3, 1);
+
+@mixin dark {
+  :global(.dark) & {
+    @content;
+  }
+}
+
+@mixin focus_ring($color) {
+  outline: none;
+  box-shadow:
+    0 0 0 2px #fff,
+    0 0 0 4px $color;
+
+  @include dark {
+    box-shadow:
+      0 0 0 2px $gray_900,
+      0 0 0 4px $color;
+  }
+}
+
+// ── Keyframes ────────────────────────────────────────────────────────────────
+
+@keyframes backdrop_in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes card_in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes icon_pop {
+  0% {
+    transform: scale(0.4) rotate(-12deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.08) rotate(4deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0);
+  }
+}
+
+@keyframes halo_pulse {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(1.55);
+    opacity: 0;
+  }
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-4px);
+  }
+  40%,
+  80% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// ── Layout ───────────────────────────────────────────────────────────────────
+
+.root {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 40%, rgba(240, 68, 56, 0.12), transparent 60%),
+    rgba(16, 24, 40, 0.55);
+  backdrop-filter: blur(6px) saturate(120%);
+  animation: backdrop_in 0.2s ease-out both;
+
+  @include dark {
+    background:
+      radial-gradient(circle at 50% 40%, rgba(240, 68, 56, 0.16), transparent 60%),
+      rgba(0, 0, 0, 0.7);
+  }
+}
+
+.card {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  overflow: hidden;
+  border: 1px solid rgba(16, 24, 40, 0.06);
+  border-radius: $radius_card;
+  background: #fff;
+  box-shadow:
+    0 1px 2px rgba(16, 24, 40, 0.04),
+    0 24px 48px -12px rgba(16, 24, 40, 0.28),
+    0 0 0 1px rgba(240, 68, 56, 0.04);
+  animation: card_in 0.32s $ease_out both;
+
+  @include dark {
+    border-color: rgba(255, 255, 255, 0.08);
+    background: $gray_900;
+    box-shadow:
+      0 24px 64px -12px rgba(0, 0, 0, 0.7),
+      0 0 0 1px rgba(240, 68, 56, 0.08);
+  }
+
+  // Soft danger wash behind the header.
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 140px;
+    background: linear-gradient(180deg, rgba(240, 68, 56, 0.08), rgba(240, 68, 56, 0));
+    pointer-events: none;
+
+    @include dark {
+      background: linear-gradient(180deg, rgba(240, 68, 56, 0.14), rgba(240, 68, 56, 0));
+    }
+  }
+
+  // Thin accent bar on top.
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 3px;
+    background: linear-gradient(90deg, $danger_400, $danger_600, $danger_400);
+  }
+}
+
+.card_shake {
+  animation: shake 0.36s ease-in-out;
+}
+
+// ── Header ───────────────────────────────────────────────────────────────────
+
+.close_button {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: $gray_400;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s ease;
+
+  &:hover:not(:disabled) {
+    background: $gray_100;
+    color: $gray_700;
+    transform: rotate(90deg);
+
+    @include dark {
+      background: rgba(255, 255, 255, 0.06);
+      color: #fff;
+    }
+  }
+
+  &:focus-visible {
+    @include focus_ring($gray_400);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.header {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 28px 0;
+  text-align: center;
+}
+
+.icon_wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 18px;
+}
+
+.icon_halo {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: $danger_200;
+  animation: halo_pulse 2.4s ease-out infinite;
+
+  @include dark {
+    background: rgba(240, 68, 56, 0.35);
+  }
+
+  &:nth-child(2) {
+    animation-delay: 1.2s;
+  }
+}
+
+.icon_badge {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border: 6px solid $danger_50;
+  border-radius: 50%;
+  background: linear-gradient(145deg, $danger_100, $danger_200);
+  color: $danger_600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  animation: icon_pop 0.5s $ease_out 0.08s both;
+
+  @include dark {
+    border-color: rgba(240, 68, 56, 0.12);
+    background: linear-gradient(145deg, rgba(240, 68, 56, 0.28), rgba(240, 68, 56, 0.14));
+    color: $danger_400;
+    box-shadow: none;
+  }
+
+  svg {
+    width: 26px;
+    height: 26px;
+  }
+}
+
+.title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.description {
+  max-width: 340px;
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: $gray_500;
+
+  @include dark {
+    color: $gray_400;
+  }
+
+  strong {
+    font-weight: 600;
+    color: $gray_800;
+
+    @include dark {
+      color: $gray_200;
+    }
+  }
+}
+
+// ── Body ─────────────────────────────────────────────────────────────────────
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 22px 28px 4px;
+}
+
+.target {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid $gray_200;
+  border-radius: $radius_inner;
+  background: $gray_50;
+
+  @include dark {
+    border-color: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+  }
+}
+
+.target_icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #fff;
+  color: $gray_500;
+  box-shadow:
+    0 1px 2px rgba(16, 24, 40, 0.06),
+    inset 0 0 0 1px $gray_200;
+
+  @include dark {
+    background: rgba(255, 255, 255, 0.05);
+    color: $gray_400;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  }
+
+  svg {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.target_text {
+  min-width: 0;
+  flex: 1;
+  text-align: left;
+}
+
+.target_label {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: $gray_400;
+
+  @include dark {
+    color: $gray_500;
+  }
+}
+
+.target_name {
+  display: block;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.target_name_mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.02em;
+}
+
+.target_meta {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: $gray_500;
+
+  @include dark {
+    color: $gray_400;
+  }
+}
+
+.consequences {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid $danger_100;
+  border-radius: $radius_inner;
+  background: rgba(254, 243, 242, 0.7);
+  list-style: none;
+
+  @include dark {
+    border-color: rgba(240, 68, 56, 0.18);
+    background: rgba(240, 68, 56, 0.07);
+  }
+}
+
+.consequence {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: left;
+  color: $danger_700;
+
+  @include dark {
+    color: $danger_400;
+  }
+
+  svg {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    margin-top: 1px;
+  }
+}
+
+.confirm_field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+.confirm_label {
+  font-size: 13px;
+  color: $gray_600;
+
+  @include dark {
+    color: $gray_400;
+  }
+
+  code {
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: $gray_100;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: $gray_900;
+
+    @include dark {
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+    }
+  }
+}
+
+.confirm_input {
+  width: 100%;
+  height: 42px;
+  padding: 0 14px;
+  border: 1px solid $gray_200;
+  border-radius: 12px;
+  background: #fff;
+  font-size: 14px;
+  color: $gray_900;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+
+  @include dark {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.03);
+    color: #fff;
+  }
+
+  &::placeholder {
+    color: $gray_400;
+  }
+
+  &:focus {
+    border-color: $danger_400;
+    outline: none;
+    box-shadow: 0 0 0 4px rgba(240, 68, 56, 0.12);
+  }
+}
+
+.confirm_input_valid {
+  border-color: $danger_500;
+}
+
+.irreversible {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 500;
+  color: $gray_400;
+
+  @include dark {
+    color: $gray_500;
+  }
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+// ── Footer ───────────────────────────────────────────────────────────────────
+
+.footer {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 10px;
+  margin-top: 20px;
+  padding: 16px 28px 24px;
+  border-top: 1px solid $gray_100;
+  background: $gray_50;
+
+  @include dark {
+    border-color: rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  @media (min-width: 480px) {
+    flex-direction: row;
+  }
+}
+
+.button {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.1s ease,
+    opacity 0.15s ease;
+
+  &:active:not(:disabled) {
+    transform: translateY(1px) scale(0.99);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.button_cancel {
+  border: 1px solid $gray_200;
+  background: #fff;
+  color: $gray_700;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+
+  @include dark {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+    color: $gray_200;
+  }
+
+  &:hover:not(:disabled) {
+    border-color: $gray_400;
+    background: $gray_50;
+
+    @include dark {
+      background: rgba(255, 255, 255, 0.08);
+    }
+  }
+
+  &:focus-visible {
+    @include focus_ring($gray_400);
+  }
+}
+
+.button_danger {
+  border: 1px solid $danger_600;
+  background: linear-gradient(180deg, $danger_500, $danger_600);
+  color: #fff;
+  box-shadow:
+    0 1px 2px rgba(16, 24, 40, 0.08),
+    0 8px 20px -6px rgba(240, 68, 56, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+
+  &:hover:not(:disabled) {
+    background: linear-gradient(180deg, $danger_600, $danger_700);
+    box-shadow:
+      0 1px 2px rgba(16, 24, 40, 0.08),
+      0 10px 24px -6px rgba(240, 68, 56, 0.65),
+      inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  }
+
+  &:focus-visible {
+    @include focus_ring($danger_500);
+  }
+
+  &:disabled {
+    box-shadow: none;
+  }
+}
+
+.spinner {
+  animation: spin 0.8s linear infinite;
+}
+
+.kbd_hint {
+  display: none;
+  justify-content: center;
+  gap: 6px;
+  margin-top: -12px;
+  padding-bottom: 16px;
+  font-size: 11px;
+  color: $gray_400;
+  background: $gray_50;
+
+  @include dark {
+    color: $gray_500;
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  @media (min-width: 640px) {
+    display: flex;
+  }
+
+  kbd {
+    padding: 1px 6px;
+    border: 1px solid $gray_200;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    background: #fff;
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    color: $gray_500;
+
+    @include dark {
+      border-color: rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.04);
+      color: $gray_400;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop,
+  .card,
+  .card_shake,
+  .icon_badge,
+  .icon_halo,
+  .close_button {
+    animation: none !important;
+    transition: none !important;
+  }
+}

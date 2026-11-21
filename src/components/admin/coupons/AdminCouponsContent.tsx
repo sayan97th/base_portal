@@ -8,6 +8,7 @@ import {
   toggleAdminCouponStatus,
   deleteAdminCoupon,
 } from "@/services/admin/coupons.service";
+import ConfirmDeleteDialog from "@/components/ui/modal/ConfirmDeleteDialog";
 import CouponsBoard from "./list/CouponsBoard";
 import styles from "./list/CouponsBoard.module.scss";
 import {
@@ -38,50 +39,27 @@ import {
   WarningIcon,
 } from "./list/CouponIcons";
 
-// ── Delete confirmation modal ────────────────────────────────────────────────
+// ── Delete dialog helpers ────────────────────────────────────────────────────
 
-interface DeleteConfirmModalProps {
-  coupon: Coupon;
-  is_deleting: boolean;
-  onConfirm: () => void;
-  onCancel: () => void;
+function getCouponDeleteMeta(coupon: Coupon): string {
+  const redemption_label = coupon.times_used === 1 ? "redemption" : "redemptions";
+  return `${coupon.name} · ${coupon.times_used} ${redemption_label}`;
 }
 
-function DeleteConfirmModal({ coupon, is_deleting, onConfirm, onCancel }: DeleteConfirmModalProps) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900">
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-red-100 text-red-600 dark:bg-red-500/10 dark:text-red-400">
-          <WarningIcon width={24} height={24} />
-        </div>
-        <h3 className="text-base font-semibold text-gray-900 dark:text-white">Delete coupon</h3>
-        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-          Are you sure you want to delete{" "}
-          <span className="font-mono font-semibold text-gray-800 dark:text-gray-200">{coupon.code}</span>?
-          This action cannot be undone.
-        </p>
-        <div className="mt-5 flex gap-3">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={is_deleting}
-            className="flex-1 rounded-lg border border-gray-200 bg-white py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={is_deleting}
-            className="flex-1 rounded-lg bg-red-500 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-600 disabled:opacity-60"
-          >
-            {is_deleting ? "Deleting..." : "Delete"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+function getCouponDeleteConsequences(coupon: Coupon): string[] {
+  const consequences: string[] = [];
+  if (coupon.is_active) {
+    consequences.push("This coupon is currently active and will stop working immediately.");
+  }
+  const awaiting_count = coupon.gift_card_claims_awaiting_count ?? 0;
+  if (awaiting_count > 0) {
+    consequences.push(
+      awaiting_count === 1
+        ? "1 gift card request is still waiting to be sent."
+        : `${awaiting_count} gift card requests are still waiting to be sent.`
+    );
+  }
+  return consequences;
 }
 
 // ── Toast ────────────────────────────────────────────────────────────────────
@@ -518,14 +496,21 @@ export default function AdminCouponsContent() {
 
       {renderContent()}
 
-      {delete_coupon && (
-        <DeleteConfirmModal
-          coupon={delete_coupon}
-          is_deleting={is_deleting}
-          onConfirm={handleDeleteConfirm}
-          onCancel={() => setDeleteCoupon(null)}
-        />
-      )}
+      <ConfirmDeleteDialog
+        is_open={delete_coupon !== null}
+        title="Delete coupon"
+        description="Clients will no longer be able to redeem this code at checkout."
+        item_label="Coupon code"
+        item_name={delete_coupon?.code}
+        item_meta={delete_coupon ? getCouponDeleteMeta(delete_coupon) : undefined}
+        item_icon={<TicketIcon />}
+        is_item_name_mono
+        consequences={delete_coupon ? getCouponDeleteConsequences(delete_coupon) : []}
+        confirm_label="Delete coupon"
+        is_loading={is_deleting}
+        onConfirm={handleDeleteConfirm}
+        onClose={() => setDeleteCoupon(null)}
+      />
 
       {toast && <Toast message={toast.message} type={toast.type} onDismiss={dismissToast} />}
     </div>

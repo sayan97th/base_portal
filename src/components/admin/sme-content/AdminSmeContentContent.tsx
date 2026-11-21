@@ -6,6 +6,7 @@ import type { SmeAuthoredTier } from "@/services/client/sme-authored.service";
 import { adminSmeAuthoredService } from "@/services/admin/sme-authored.service";
 import { adminSmeCollaborationService } from "@/services/admin/sme-collaboration.service";
 import { adminSmeEnhancedService } from "@/services/admin/sme-enhanced.service";
+import ConfirmDeleteDialog from "@/components/ui/modal/ConfirmDeleteDialog";
 import SmeServiceCard, { type SmeServiceType } from "./SmeServiceCard";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -70,60 +71,8 @@ function StripStat({ label, value, dot_color }: StripStatProps) {
   );
 }
 
-// ── Delete confirm modal ───────────────────────────────────────────────────────
-
-interface DeleteModalProps {
-  service_label: string;
-  is_deleting: boolean;
-  onConfirm: () => void;
-  onCancel: () => void;
-}
-
-function DeleteConfirmModal({ service_label, is_deleting, onConfirm, onCancel }: DeleteModalProps) {
-  return (
-    <div className="fixed inset-0 z-99999 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-900">
-        <div className="p-6">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-error-50 dark:bg-error-500/10">
-            <svg className="h-6 w-6 text-error-600 dark:text-error-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-            </svg>
-          </div>
-          <h3 className="mt-4 text-base font-semibold text-gray-900 dark:text-white">
-            Delete service tier
-          </h3>
-          <p className="mt-1.5 text-sm text-gray-500 dark:text-gray-400">
-            Are you sure you want to delete{" "}
-            <span className="font-semibold text-gray-700 dark:text-gray-300">{service_label}</span>?
-            This action cannot be undone.
-          </p>
-        </div>
-        <div className="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4 dark:border-gray-800">
-          <button
-            onClick={onCancel}
-            disabled={is_deleting}
-            className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={is_deleting}
-            className="inline-flex items-center gap-2 rounded-lg bg-error-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-error-700 disabled:opacity-50"
-          >
-            {is_deleting && (
-              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-              </svg>
-            )}
-            Delete
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+function formatTierPrice(price: number): string {
+  return `$${Number(price).toFixed(2)}`;
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
@@ -425,14 +374,18 @@ export default function AdminSmeContentContent({ default_tab = "authored" }: Adm
       </div>
 
       {/* Delete confirmation modal */}
-      {delete_target && (
-        <DeleteConfirmModal
-          service_label={delete_target.label}
-          is_deleting={is_deleting}
-          onConfirm={handleDeleteConfirm}
-          onCancel={() => setDeleteTarget(null)}
-        />
-      )}
+      <ConfirmDeleteDialog
+        is_open={delete_target !== null}
+        title="Delete service tier"
+        description="Clients will no longer see this tier when ordering."
+        item_label="Service tier"
+        item_name={delete_target?.label}
+        item_meta={delete_target ? formatTierPrice(delete_target.price) : undefined}
+        confirm_label="Delete tier"
+        is_loading={is_deleting}
+        onConfirm={handleDeleteConfirm}
+        onClose={() => setDeleteTarget(null)}
+      />
     </>
   );
 }

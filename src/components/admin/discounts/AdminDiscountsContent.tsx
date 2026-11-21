@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import ConfirmDeleteDialog from "@/components/ui/modal/ConfirmDeleteDialog";
 import type { Discount, DiscountDrTier, DiscountAppliesTo } from "@/types/admin/discounts";
 import {
   listAdminDiscounts,
@@ -67,50 +68,6 @@ function DrTierBadges({ dr_tiers }: { dr_tiers: DiscountDrTier[] }) {
           +{overflow} more
         </span>
       )}
-    </div>
-  );
-}
-
-// ── Confirm Delete Modal ───────────────────────────────────────────────────────
-
-interface ConfirmDeleteModalProps {
-  discount: Discount;
-  onConfirm: () => void;
-  onCancel: () => void;
-  is_loading: boolean;
-}
-
-function ConfirmDeleteModal({ discount, onConfirm, onCancel, is_loading }: ConfirmDeleteModalProps) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900">
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-500/15">
-          <svg className="h-6 w-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-          </svg>
-        </div>
-        <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">Delete Discount</h3>
-        <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">
-          Are you sure you want to delete{" "}
-          <span className="font-semibold text-gray-700 dark:text-gray-300">{discount.name}</span>?
-          This action cannot be undone.
-        </p>
-        <div className="flex gap-3">
-          <button
-            onClick={onCancel}
-            className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={is_loading}
-            className="flex-1 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-600 disabled:opacity-60"
-          >
-            {is_loading ? "Deleting..." : "Delete"}
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -401,14 +358,23 @@ export default function AdminDiscountsContent() {
       )}
 
       {/* Delete confirmation modal */}
-      {deleting && (
-        <ConfirmDeleteModal
-          discount={deleting}
-          onConfirm={handleDelete}
-          onCancel={() => setDeleting(null)}
-          is_loading={delete_loading}
-        />
-      )}
+      <ConfirmDeleteDialog
+        is_open={deleting !== null}
+        title="Delete discount"
+        description="Orders already placed keep their price. New carts will no longer get this discount."
+        item_label="Discount"
+        item_name={deleting?.name}
+        item_meta={deleting?.description ?? undefined}
+        consequences={
+          deleting?.is_active
+            ? ["This discount is currently active and will stop applying immediately."]
+            : []
+        }
+        confirm_label="Delete discount"
+        is_loading={delete_loading}
+        onConfirm={handleDelete}
+        onClose={() => setDeleting(null)}
+      />
     </div>
   );
 }

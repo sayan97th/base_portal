@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import ConfirmDeleteDialog from "@/components/ui/modal/ConfirmDeleteDialog";
 import type { AdminTeamDetail as TeamDetail, AdminTeamMember, AdminTeamMemberRole } from "@/types/admin/teams";
 import type { AdminUser } from "@/types/admin";
 import {
@@ -273,90 +274,6 @@ function AddMemberModal({
             </button>
           </div>
         )}
-      </div>
-    </div>
-  );
-}
-
-// ── Confirm Remove Modal ───────────────────────────────────────────────────────
-
-function ConfirmRemoveMemberModal({
-  member,
-  on_confirm,
-  on_cancel,
-  is_loading,
-}: {
-  member: AdminTeamMember;
-  on_confirm: () => void;
-  on_cancel: () => void;
-  is_loading: boolean;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900">
-        <h3 className="mb-2 text-base font-semibold text-gray-900 dark:text-white">Remove Member</h3>
-        <p className="mb-5 text-sm text-gray-500 dark:text-gray-400">
-          Remove{" "}
-          <span className="font-semibold text-gray-700 dark:text-gray-300">
-            {member.first_name} {member.last_name}
-          </span>{" "}
-          from this team?
-        </p>
-        <div className="flex gap-3">
-          <button
-            onClick={on_cancel}
-            className="flex-1 rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={on_confirm}
-            disabled={is_loading}
-            className="flex-1 rounded-xl bg-red-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-600 disabled:opacity-60"
-          >
-            {is_loading ? "Removing…" : "Remove"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Confirm Delete Team Modal ──────────────────────────────────────────────────
-
-function ConfirmDeleteTeamModal({
-  team_name,
-  on_confirm,
-  on_cancel,
-  is_loading,
-}: {
-  team_name: string;
-  on_confirm: () => void;
-  on_cancel: () => void;
-  is_loading: boolean;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-900">
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-500/15">
-          <svg className="h-6 w-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-          </svg>
-        </div>
-        <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">Delete Team</h3>
-        <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">
-          Are you sure you want to delete{" "}
-          <span className="font-semibold text-gray-700 dark:text-gray-300">{team_name}</span>?
-          All members will be removed. This action cannot be undone.
-        </p>
-        <div className="flex gap-3">
-          <button onClick={on_cancel} className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">
-            Cancel
-          </button>
-          <button onClick={on_confirm} disabled={is_loading} className="flex-1 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-600 disabled:opacity-60">
-            {is_loading ? "Deleting…" : "Delete Team"}
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -717,22 +634,39 @@ export default function AdminTeamDetail({ team_id }: { team_id: string }) {
           on_added={(updated) => setTeam(updated)}
         />
       )}
-      {removing_member && (
-        <ConfirmRemoveMemberModal
-          member={removing_member}
-          on_confirm={handleRemoveMember}
-          on_cancel={() => setRemovingMember(null)}
-          is_loading={remove_loading}
-        />
-      )}
-      {show_delete_team && (
-        <ConfirmDeleteTeamModal
-          team_name={team.name}
-          on_confirm={handleDeleteTeam}
-          on_cancel={() => setShowDeleteTeam(false)}
-          is_loading={delete_team_loading}
-        />
-      )}
+      <ConfirmDeleteDialog
+        is_open={removing_member !== null}
+        variant="remove"
+        title="Remove member"
+        description={
+          <>
+            They will lose access to <strong>{team.name}</strong>. You can add them back at any time.
+          </>
+        }
+        item_label="Member"
+        item_name={
+          removing_member ? `${removing_member.first_name} ${removing_member.last_name}` : undefined
+        }
+        item_meta={removing_member?.email}
+        confirm_label="Remove member"
+        is_loading={remove_loading}
+        onConfirm={handleRemoveMember}
+        onClose={() => setRemovingMember(null)}
+      />
+      <ConfirmDeleteDialog
+        is_open={show_delete_team}
+        title="Delete team"
+        description="The team and its membership list will be permanently removed."
+        item_label="Team"
+        item_name={team.name}
+        item_meta={`${team.members.length} ${team.members.length === 1 ? "member" : "members"}`}
+        consequences={team.members.length > 0 ? ["All members will be removed from this team."] : []}
+        confirmation_text={team.members.length > 0 ? team.name : undefined}
+        confirm_label="Delete team"
+        is_loading={delete_team_loading}
+        onConfirm={handleDeleteTeam}
+        onClose={() => setShowDeleteTeam(false)}
+      />
     </div>
   );
 }
