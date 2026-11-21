@@ -405,10 +405,12 @@ export default function AdminScheduledCallDetail({ appointment_id }: AdminSchedu
 
   async function handleDelete() {
     setIsDeleting(true);
+    setSaveError(null);
     try {
       await adminScheduledCallService.deleteAppointment(appointment_id);
       router.push("/admin/scheduled-calls");
     } catch {
+      setSaveError("Failed to delete appointment. Please try again.");
       setIsDeleting(false);
       setShowDeleteModal(false);
     }

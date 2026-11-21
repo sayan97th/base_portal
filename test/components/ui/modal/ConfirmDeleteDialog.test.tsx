@@ -100,6 +100,70 @@ describe("ConfirmDeleteDialog", () => {
     expect(screen.queryByText(/cannot be undone/i)).not.toBeInTheDocument();
   });
 
+  it("renders into document.body through a portal", () => {
+    const { container } = renderDialog();
+    expect(container).toBeEmptyDOMElement();
+    expect(document.body).toContainElement(screen.getByRole("alertdialog"));
+  });
+
+  it("closes when the backdrop is clicked", async () => {
+    const { on_close } = renderDialog();
+    const backdrop = screen.getByRole("alertdialog").previousElementSibling as HTMLElement;
+
+    await userEvent.click(backdrop);
+
+    expect(on_close).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores backdrop clicks while deleting", async () => {
+    const { on_close } = renderDialog({ is_loading: true });
+    const backdrop = screen.getByRole("alertdialog").previousElementSibling as HTMLElement;
+
+    await userEvent.click(backdrop);
+
+    expect(on_close).not.toHaveBeenCalled();
+  });
+
+  it("keeps keyboard focus inside the dialog", async () => {
+    renderDialog({ confirm_label: "Delete coupon" });
+
+    const close_button = screen.getByRole("button", { name: "Close dialog" });
+    const cancel_button = screen.getByRole("button", { name: "Cancel" });
+    const delete_button = screen.getByRole("button", { name: "Delete coupon" });
+
+    expect(cancel_button).toHaveFocus();
+    await userEvent.tab();
+    expect(delete_button).toHaveFocus();
+    await userEvent.tab();
+    expect(close_button).toHaveFocus();
+    await userEvent.tab({ shift: true });
+    expect(delete_button).toHaveFocus();
+  });
+
+  it("locks page scroll while open and restores it on close", () => {
+    document.body.style.overflow = "auto";
+    const { unmount } = renderDialog();
+
+    expect(document.body.style.overflow).toBe("hidden");
+    unmount();
+    expect(document.body.style.overflow).toBe("auto");
+  });
+
+  it("hides the preview card when no item name is given", () => {
+    renderDialog({ item_name: undefined, item_label: "Coupon code" });
+    expect(screen.queryByText("Coupon code")).not.toBeInTheDocument();
+  });
+
+  it("shows the item meta line", () => {
+    renderDialog({ item_meta: "Summer Sale · 12 redemptions" });
+    expect(screen.getByText("Summer Sale · 12 redemptions")).toBeInTheDocument();
+  });
+
+  it("shows a custom loading label", () => {
+    renderDialog({ is_loading: true, loading_label: "Removing coupon..." });
+    expect(screen.getByRole("button", { name: "Removing coupon..." })).toBeDisabled();
+  });
+
   it("restores focus to the trigger after closing", async () => {
     const trigger = document.createElement("button");
     document.body.appendChild(trigger);
