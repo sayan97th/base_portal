@@ -15,6 +15,7 @@ import {
 } from "@/services/admin/coupons.service";
 import { listAdminDrTiers } from "@/services/admin/link-building.service";
 import CouponStatusControl from "@/components/admin/coupons/status/CouponStatusControl";
+import { formatShortDate } from "@/components/admin/coupons/list/coupon-list";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -471,11 +472,7 @@ function PreviewCard({ form, dr_tiers, toggles }: PreviewCardProps) {
 
   const expiry_label =
     toggles.has_expiry_date && form.expires_at
-      ? new Date(form.expires_at).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        })
+      ? formatShortDate(form.expires_at)
       : "Never expires";
 
   return (
@@ -1290,7 +1287,7 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
                     placeholder="Pick a start date"
                   />
                   <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
-                    Optional. If set, the coupon is not valid before this date.
+                    Optional. If set, the coupon starts working at the beginning of this day.
                   </p>
                 </div>
 
@@ -1316,7 +1313,7 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
                   />
                   <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
                     {toggles.has_expiry_date
-                      ? "The coupon will be invalid after this date."
+                      ? "Last day the coupon works. It stays valid until the end of this day."
                       : "No expiry. The coupon is valid indefinitely."}
                   </p>
                   <FieldError message={errors.expires_at} />

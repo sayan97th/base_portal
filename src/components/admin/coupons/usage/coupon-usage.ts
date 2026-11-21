@@ -1,4 +1,5 @@
-import type { CouponUsage, CouponUsageProductType } from "@/types/admin/coupons";
+import type { Coupon, CouponUsage, CouponUsageProductType } from "@/types/admin/coupons";
+import { getCouponStatus, parseCouponDate, type CouponStatus } from "../list/coupon-list";
 
 export type CouponUsageGroupBy = "product" | "client" | "status" | "month" | "none";
 export type CouponUsageSort = "newest" | "oldest" | "discount" | "total";
@@ -70,9 +71,21 @@ export function formatMoney(value: number | null | undefined): string {
   return currency_formatter.format(value ?? 0);
 }
 
+const COUPON_STATE_BADGES: Record<CouponStatus, { label: string; color: string }> = {
+  active: { label: "Active", color: "#00c875" },
+  scheduled: { label: "Scheduled", color: "#579bfc" },
+  expired: { label: "Expired", color: "#e2445c" },
+  disabled: { label: "Disabled", color: "#c4c4c4" },
+};
+
+/** Badge for the coupon header on the usage and gift card request pages. */
+export function getCouponStateBadge(coupon: Coupon, now: Date = new Date()): { label: string; color: string } {
+  return COUPON_STATE_BADGES[getCouponStatus(coupon, now)];
+}
+
 export function formatShortDate(value: string | null | undefined): string {
   if (!value) return "Not available";
-  return new Date(value).toLocaleDateString("en-US", {
+  return parseCouponDate(value).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",

@@ -119,6 +119,24 @@ describe("GiftCardRewardPanel", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("shows the last day of the promo, including that whole day", async () => {
+    mockLookup.mockResolvedValue(
+      makeReward({ promotion_ends_at: "2026-12-19T06:59:59+00:00", promotion_last_day: "2026-12-18" })
+    );
+
+    render(<GiftCardRewardPanel order_id="order-1" />);
+
+    expect(await screen.findByText(/available until december 18, 2026/i)).toBeInTheDocument();
+  });
+
+  it("works out the last day from the end moment when no last day is sent", async () => {
+    mockLookup.mockResolvedValue(makeReward({ promotion_ends_at: "2027-01-01T00:00:00+00:00" }));
+
+    render(<GiftCardRewardPanel order_id="order-1" />);
+
+    expect(await screen.findByText(/available until december 31, 2026/i)).toBeInTheDocument();
+  });
+
   it("lets the client submit missing details from the order page", async () => {
     mockLookup.mockResolvedValue(makeReward());
     mockSubmit.mockResolvedValue(

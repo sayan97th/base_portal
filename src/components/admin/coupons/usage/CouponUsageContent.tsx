@@ -13,6 +13,7 @@ import {
   SORT_OPTIONS,
   formatMoney,
   formatShortDate,
+  getCouponStateBadge,
   getStatusMeta,
   groupUsages,
   matchesSearch,
@@ -44,14 +45,6 @@ function formatCouponDiscount(response: CouponUsageResponse["coupon"]): string {
   if (response.discount_type === "gift_card_reward") return `${response.discount_value}% back as a gift card`;
   if (response.discount_type === "percentage") return `${response.discount_value}% off`;
   return `${formatMoney(response.discount_value)} off`;
-}
-
-function getCouponState(coupon: CouponUsageResponse["coupon"]): { label: string; color: string } {
-  const now = new Date();
-  if (!coupon.is_active) return { label: "Disabled", color: "#c4c4c4" };
-  if (coupon.expires_at && new Date(coupon.expires_at) < now) return { label: "Expired", color: "#e2445c" };
-  if (coupon.starts_at && new Date(coupon.starts_at) > now) return { label: "Scheduled", color: "#579bfc" };
-  return { label: "Active", color: "#00c875" };
 }
 
 // ── Small presentational pieces ──────────────────────────────────────────────
@@ -204,7 +197,7 @@ export default function CouponUsageContent({ coupon_id }: CouponUsageContentProp
 
   const { coupon, summary } = usage_response;
   const is_gift_card_reward = coupon.discount_type === "gift_card_reward";
-  const coupon_state = getCouponState(coupon);
+  const coupon_state = getCouponStateBadge(coupon);
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6">

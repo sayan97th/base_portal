@@ -7,7 +7,7 @@ import {
   getAdminCouponGiftCardClaims,
   updateAdminGiftCardClaimFulfillment,
 } from "@/services/admin/gift-card-claims.service";
-import { formatMoney, formatShortDate } from "../usage/coupon-usage";
+import { formatMoney, formatShortDate, getCouponStateBadge } from "../usage/coupon-usage";
 import GiftCardRequestsBoard from "./GiftCardRequestsBoard";
 import GiftCardExportMenu, { type GiftCardExportScope } from "./GiftCardExportMenu";
 import styles from "./GiftCardRequests.module.scss";
@@ -26,14 +26,6 @@ import {
 interface GiftCardRequestsContentProps {
   coupon_id: string;
   initial_status?: GiftCardStatusFilter;
-}
-
-function getCouponState(coupon: Coupon): { label: string; color: string } {
-  const now = new Date();
-  if (!coupon.is_active) return { label: "Disabled", color: "#c4c4c4" };
-  if (coupon.expires_at && new Date(coupon.expires_at) < now) return { label: "Expired", color: "#e2445c" };
-  if (coupon.starts_at && new Date(coupon.starts_at) > now) return { label: "Scheduled", color: "#579bfc" };
-  return { label: "Active", color: "#00c875" };
 }
 
 // ── Icons ────────────────────────────────────────────────────────────────────
@@ -284,7 +276,7 @@ export default function GiftCardRequestsContent({ coupon_id, initial_status = "a
     );
   }
 
-  const coupon_state = getCouponState(coupon);
+  const coupon_state = getCouponStateBadge(coupon);
 
   const export_scopes: GiftCardExportScope[] = [
     {

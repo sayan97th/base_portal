@@ -35,13 +35,46 @@ export const SORT_OPTIONS: { key: CouponSort; label: string }[] = [
   { key: "code", label: "Code A to Z" },
 ];
 
-export function getCouponStatus(
-  coupon: Pick<Coupon, "is_active" | "starts_at" | "expires_at">,
-  now: Date = new Date()
-): CouponStatus {
+const CALENDAR_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * Parses a coupon date. Calendar dates (Y-m-d) are read as local days instead of
+ * UTC midnight, so "2026-12-18" never shows up as December 17. Use "end" for an
+ * expiry date, since the whole last day is part of the promotion.
+ */
+export function parseCouponDate(date_str: string, boundary: "start" | "end" = "start"): Date {
+  const match = CALENDAR_DATE_PATTERN.exec(date_str);
+  if (!match) return new Date(date_str);
+
+  const [, year, month, day] = match.map(Number);
+  return boundary === "end"
+    ? new Date(year, month - 1, day, 23, 59, 59, 999)
+    : new Date(year, month - 1, day, 0, 0, 0, 0);
+}
+
+type CouponWindowFields = Pick<Coupon, "is_active" | "starts_at" | "expires_at"> &
+  Partial<Pick<Coupon, "active_from" | "active_until">>;
+
+/**
+ * Coupon status. Prefers the exact moments sent by the API (active_from and
+ * active_until) and falls back to the calendar days, both days included.
+ */
+export function getCouponStatus(coupon: CouponWindowFields, now: Date = new Date()): CouponStatus {
   if (!coupon.is_active) return "disabled";
-  if (coupon.expires_at && new Date(coupon.expires_at) < now) return "expired";
-  if (coupon.starts_at && new Date(coupon.starts_at) > now) return "scheduled";
+
+  const ends_at = coupon.active_until
+    ? new Date(coupon.active_until)
+    : coupon.expires_at
+      ? parseCouponDate(coupon.expires_at, "end")
+      : null;
+  const starts_at = coupon.active_from
+    ? new Date(coupon.active_from)
+    : coupon.starts_at
+      ? parseCouponDate(coupon.starts_at, "start")
+      : null;
+
+  if (ends_at && ends_at < now) return "expired";
+  if (starts_at && starts_at > now) return "scheduled";
   return "active";
 }
 
@@ -87,7 +120,7 @@ export function getAppliesToTitle(coupon: Coupon): string | undefined {
 }
 
 export function formatShortDate(date_str: string): string {
-  return new Date(date_str).toLocaleDateString("en-US", {
+  return parseCouponDate(date_str).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -96,7 +129,7 @@ export function formatShortDate(date_str: string): string {
 
 export function daysUntil(date_str: string | null, now: Date = new Date()): number | null {
   if (!date_str) return null;
-  const diff_ms = new Date(date_str).getTime() - now.getTime();
+  const diff_ms = parseCouponDate(date_str, "end").getTime() - now.getTime();
   return Math.ceil(diff_ms / (1000 * 60 * 60 * 24));
 }
 

@@ -39,7 +39,10 @@ export interface GiftCardReward {
   status: GiftCardRewardStatus;
   /** True while the client can still fill in the form (pending + promo running). */
   is_claimable: boolean;
+  /** Exact moment the promo stops working (ISO 8601). */
   promotion_ends_at: string | null;
+  /** Last day the promo code works (Y-m-d). The whole day is included. */
+  promotion_last_day?: string | null;
   submitted_at: string | null;
   fulfilled_at: string | null;
   brands: GiftCardBrandOption[];

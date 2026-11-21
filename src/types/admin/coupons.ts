@@ -32,8 +32,14 @@ export interface Coupon {
   dr_tier_ids: string[];
   dr_tiers: CouponDrTier[];
   minimum_purchase_amount: number | null;
+  /** First day the coupon works (Y-m-d, promotion timezone). The whole day is included. */
   starts_at: string | null;
+  /** Last day the coupon works (Y-m-d, promotion timezone). The whole day is included. */
   expires_at: string | null;
+  /** Exact moment the coupon starts working (ISO 8601). */
+  active_from?: string | null;
+  /** Exact moment the coupon stops working (ISO 8601). */
+  active_until?: string | null;
   usage_limit: number | null;
   usage_per_user: number | null;
   times_used: number;

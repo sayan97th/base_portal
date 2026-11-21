@@ -34,11 +34,23 @@ function formatMoney(value: number): string {
   return `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function formatDeadline(iso: string | null): string | null {
+/** Fallback when only the end moment is known: the last valid day is the UTC day of the moment just before it. */
+function lastDayFromEndMoment(iso: string | null): string | null {
   if (!iso) return null;
-  // The promo ends at the start of the expiry date, so the last valid day is the day before.
-  const last_day = new Date(new Date(iso).getTime() - 1);
-  return last_day.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
+  return new Date(new Date(iso).getTime() - 1000).toISOString().slice(0, 10);
+}
+
+/** Last day the promo works, for example "December 18, 2026". The whole day is included. */
+function formatDeadline(reward: Pick<GiftCardReward, "promotion_last_day" | "promotion_ends_at">): string | null {
+  const last_day = reward.promotion_last_day ?? lastDayFromEndMoment(reward.promotion_ends_at);
+  if (!last_day) return null;
+  // Read as a calendar date in UTC so the browser timezone never shifts the day.
+  return new Date(`${last_day}T00:00:00Z`).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 }
 
 function brandLabel(reward: GiftCardReward): string {
@@ -148,7 +160,7 @@ export default function GiftCardRewardPanel({ session_id, order_id, auto_open = 
   if (!reward) return null;
 
   const percentage = formatRewardPercentage(reward.reward_percentage);
-  const deadline = formatDeadline(reward.promotion_ends_at);
+  const deadline = formatDeadline(reward);
   const is_pending = reward.status === "pending_details" && reward.is_claimable;
   const is_fulfilled = reward.status === "fulfilled";
 
