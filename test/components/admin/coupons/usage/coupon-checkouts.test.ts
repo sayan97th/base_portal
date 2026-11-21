@@ -1,8 +1,6 @@
 import type { CouponCheckoutOrder, CouponUsageCheckout, CouponUsageItem } from "@/types/admin/coupons";
 import {
   buildCheckoutExport,
-  buildProductOrderExport,
-  getOrderGiftCardAmount,
   sumUsages,
   checkoutIncludesProduct,
   countByProduct,
@@ -208,28 +206,11 @@ describe("coupon checkout helpers", () => {
       expect(rows.every((row) => row.length === headers.length)).toBe(true);
     });
 
-    it("shows the shared order gift card on each product order without splitting it", () => {
-      const [link_building, new_content] = buildGiftCardCheckout().orders;
-
-      expect(getOrderGiftCardAmount(link_building)).toBe(50);
-      expect(getOrderGiftCardAmount(new_content)).toBe(50);
-      expect(getOrderGiftCardAmount(buildOrder())).toBe(0);
-    });
-
     it("never adds the gift card up per product order", () => {
       const checkout = buildGiftCardCheckout();
 
       expect(sumUsages(checkout.orders).reward).toBe(0);
       expect(sumUsages([checkout]).reward).toBe(50);
-    });
-
-    it("labels the product order export column as a per order gift card", () => {
-      const usage = { ...buildGiftCardCheckout().orders[0], client: null, coupon_terms: buildGiftCardCheckout().coupon_terms };
-      const { headers, rows } = buildProductOrderExport([usage], true);
-      const column = headers.findIndex((header) => header.startsWith("Order Gift Card"));
-
-      expect(column).toBeGreaterThan(-1);
-      expect(rows[0][column]).toBe("50.00");
     });
   });
 });

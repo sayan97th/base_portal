@@ -7,8 +7,6 @@ import type {
 } from "@/types/admin/coupons";
 import { getCouponStatus, parseCouponDate, type CouponStatus } from "../list/coupon-list";
 
-/** "checkout" shows every order bought together, "product" one row per discounted product order. */
-export type CouponUsageView = "checkout" | "product";
 export type CouponUsageGroupBy = "product" | "client" | "status" | "month" | "none";
 export type CouponUsageSort = "newest" | "oldest" | "discount" | "total";
 
@@ -16,10 +14,6 @@ interface GroupMeta {
   key: string;
   label: string;
   color: string;
-}
-
-export interface CouponUsageGroup extends GroupMeta {
-  usages: CouponUsage[];
 }
 
 export interface CouponCheckoutGroup extends GroupMeta {
@@ -77,11 +71,6 @@ export const ORDER_STATUS_META: Record<string, { label: string; color: string }>
   deleted: { label: "Order Deleted", color: "#7e7e8f" },
   [MIXED_STATUS]: { label: "Mixed statuses", color: "#9d99b9" },
 };
-
-export const VIEW_OPTIONS: { value: CouponUsageView; label: string }[] = [
-  { value: "checkout", label: "Checkouts" },
-  { value: "product", label: "Product orders" },
-];
 
 export const GROUP_BY_OPTIONS: { value: CouponUsageGroupBy; label: string }[] = [
   { value: "product", label: "Product" },
@@ -176,55 +165,6 @@ export function getColorForKey(key: string): string {
   return GROUP_PALETTE[Math.abs(hash) % GROUP_PALETTE.length];
 }
 
-export function summarizeItems(usage: CouponUsage): string {
-  if (usage.items.length === 0) return usage.product_label;
-  if (usage.items.length === 1) {
-    const [item] = usage.items;
-    return `${item.quantity} x ${item.label}`;
-  }
-  return `${usage.items_quantity} items, ${usage.items.length} tiers`;
-}
-
-export function matchesSearch(usage: CouponUsage, search_term: string): boolean {
-  const query = search_term.trim().toLowerCase();
-  if (!query) return true;
-
-  const haystack = [
-    usage.order_reference,
-    usage.order_id,
-    usage.order_title,
-    usage.product_label,
-    getStatusMeta(usage.status).label,
-    usage.client?.name,
-    usage.client?.email,
-    usage.client?.company,
-    usage.client?.organization,
-    usage.invoice?.invoice_number,
-    ...usage.items.map((item) => item.label),
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-
-  return haystack.includes(query);
-}
-
-export function sortUsages(usages: CouponUsage[], sort: CouponUsageSort): CouponUsage[] {
-  const sorted = [...usages];
-  const timeOf = (usage: CouponUsage) => (usage.used_at ? new Date(usage.used_at).getTime() : 0);
-
-  sorted.sort((left, right) => {
-    if (sort === "oldest") return timeOf(left) - timeOf(right);
-    if (sort === "discount") {
-      return right.discount_amount + getOrderGiftCardAmount(right) - (left.discount_amount + getOrderGiftCardAmount(left));
-    }
-    if (sort === "total") return right.total_amount - left.total_amount;
-    return timeOf(right) - timeOf(left);
-  });
-
-  return sorted;
-}
-
 function getProductColor(product_type: CouponUsageProductType): string {
   return PRODUCT_COLORS[product_type] ?? "#c4c4c4";
 }
@@ -233,7 +173,7 @@ function getClientKey(client: CouponUsageClient | null): string {
   return client ? String(client.id ?? client.email) : "unknown";
 }
 
-/** Group key, label and color shared by both views for client, status and month. */
+/** Group key, label and color for client, status and month groupings. */
 function resolveSharedGroupMeta(
   group_by: Exclude<CouponUsageGroupBy, "product" | "none">,
   record: { client: CouponUsageClient | null; status: string; used_at: string | null }
@@ -279,27 +219,6 @@ function buildGroups<T>(
   }
 
   return group_list.sort((left, right) => right.records.length - left.records.length);
-}
-
-export function groupUsages(usages: CouponUsage[], group_by: CouponUsageGroupBy): CouponUsageGroup[] {
-  if (group_by === "none") {
-    return [{ key: "all", label: "All orders", color: "#579bfc", usages }];
-  }
-
-  return buildGroups(usages, group_by, (usage) =>
-    group_by === "product"
-      ? { key: usage.product_type, label: usage.product_label, color: getProductColor(usage.product_type) }
-      : resolveSharedGroupMeta(group_by, usage)
-  ).map(({ records, ...meta }) => ({ ...meta, usages: records }));
-}
-
-/**
- * Value of the gift card earned by the order (checkout) a product order
- * belongs to. Every product order of a checkout shares the same gift card,
- * so this is for display only and must never be summed per product order.
- */
-export function getOrderGiftCardAmount(usage: Pick<CouponUsage, "gift_card_claim">): number {
-  return usage.gift_card_claim?.reward_amount ?? 0;
 }
 
 /**
@@ -427,43 +346,6 @@ export function countByProduct(
 }
 
 // ── CSV export ───────────────────────────────────────────────────────────────
-
-export function buildProductOrderExport(usages: CouponUsage[], is_gift_card_reward: boolean): CsvExport {
-  return {
-    headers: [
-      "Order",
-      "Order ID",
-      "Checkout",
-      "Product",
-      "Status",
-      "Client",
-      "Client Email",
-      "Company",
-      "Items",
-      "Subtotal",
-      is_gift_card_reward ? "Order Gift Card (one per checkout, shared by its products)" : "Discount",
-      "Total",
-      "Invoice",
-      "Used On",
-    ],
-    rows: usages.map((usage) => [
-      usage.order_reference,
-      usage.order_id,
-      usage.session_id ?? "",
-      usage.product_label,
-      getStatusMeta(usage.status).label,
-      usage.client?.name ?? "",
-      usage.client?.email ?? "",
-      usage.client?.company ?? usage.client?.organization ?? "",
-      usage.items.map((item) => `${item.quantity} x ${item.label}`).join("; "),
-      usage.subtotal_before_discount.toFixed(2),
-      (is_gift_card_reward ? getOrderGiftCardAmount(usage) : usage.discount_amount).toFixed(2),
-      usage.total_amount.toFixed(2),
-      usage.invoice?.invoice_number ?? "",
-      usage.used_at ? new Date(usage.used_at).toISOString() : "",
-    ]),
-  };
-}
 
 /**
  * One row per purchased item, so the file shows every product of each

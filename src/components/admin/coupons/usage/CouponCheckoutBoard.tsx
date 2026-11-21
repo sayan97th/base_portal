@@ -4,7 +4,9 @@ import React, { useState } from "react";
 import Link from "next/link";
 import type { CouponCheckoutOrder, CouponUsageCheckout, CouponUsageItem } from "@/types/admin/coupons";
 import styles from "./CouponUsageBoard.module.scss";
-import { ArrowOutIcon, ChevronIcon } from "./UsageIcons";
+import { ChevronIcon } from "./UsageIcons";
+import MoneyCell from "./MoneyCell";
+import RowActions from "./RowActions";
 import {
   GIFT_CARD_STATUS_LABELS,
   PRODUCT_COLORS,
@@ -82,11 +84,7 @@ function CheckoutRow({ checkout, group_color, is_gift_card_reward, is_expanded, 
         className={styles.row}
         style={{ "--group-color": group_color } as React.CSSProperties}
       >
-        <div className={styles.cellExpand}>
-          <ChevronIcon is_open={is_expanded} />
-        </div>
-
-        <div className={styles.cellOrder}>
+        <div className={styles.cellOrder} data-label="Checkout">
           <span className={styles.orderReference}>
             #{checkout.reference}
             {checkout.order_count > 1 && (
@@ -97,7 +95,7 @@ function CheckoutRow({ checkout, group_color, is_gift_card_reward, is_expanded, 
           <span className={styles.orderTitle}>{checkout.title || applied_products}</span>
         </div>
 
-        <div className={styles.cellClient}>
+        <div className={styles.cellClient} data-label="Client">
           <span className={styles.avatar} style={{ backgroundColor: getColorForKey(client_key) }}>
             {getInitials(checkout.client?.name)}
           </span>
@@ -109,48 +107,44 @@ function CheckoutRow({ checkout, group_color, is_gift_card_reward, is_expanded, 
           </span>
         </div>
 
-        <div className={styles.cellPill} title={`Promo applied to ${applied_products}`}>
+        <div className={styles.cellPill} data-label="Promo applied to" title={`Promo applied to ${applied_products}`}>
           <span className={styles.pill} style={{ background: getProductsBackground(checkout) }}>
             {products_label}
           </span>
         </div>
 
-        <div className={styles.cellItems} title={items_summary}>
+        <div className={styles.cellItems} data-label="Items" title={items_summary}>
           {items_summary}
         </div>
 
-        <div className={styles.cellPill}>
+        <div className={styles.cellPill} data-label="Status">
           <span className={styles.pill} style={{ backgroundColor: status_meta.color }}>
             {status_meta.label}
           </span>
         </div>
 
-        <div className={styles.cellMoney}>{formatMoney(checkout.subtotal_before_discount)}</div>
+        <MoneyCell label="Subtotal" value={formatMoney(checkout.subtotal_before_discount)} />
 
-        <div className={`${styles.cellMoney} ${styles.cellSavings}`}>
-          {savings_amount > 0 ? `${is_gift_card_reward ? "" : "-"}${formatMoney(savings_amount)}` : formatMoney(0)}
-        </div>
+        <MoneyCell
+          label={is_gift_card_reward ? "Order gift card" : "Discount"}
+          className={styles.cellSavings}
+          value={savings_amount > 0 ? `${is_gift_card_reward ? "" : "-"}${formatMoney(savings_amount)}` : formatMoney(0)}
+        />
 
-        <div className={`${styles.cellMoney} ${styles.cellTotal}`}>{formatMoney(checkout.total_amount)}</div>
+        <MoneyCell label="Total" className={styles.cellTotal} value={formatMoney(checkout.total_amount)} />
 
-        <div className={styles.cellDate}>
+        <div className={styles.cellDate} data-label="Used on">
           <span>{formatShortDate(checkout.used_at)}</span>
           <span className={styles.cellDateTime}>{formatTime(checkout.used_at)}</span>
         </div>
 
-        <div className={styles.cellAction}>
-          {checkout.session_url ? (
-            <Link
-              href={checkout.session_url}
-              onClick={(event) => event.stopPropagation()}
-              className={styles.openButton}
-              title="Open checkout session"
-              aria-label={`Open checkout ${checkout.reference}`}
-            >
-              <ArrowOutIcon />
-            </Link>
-          ) : null}
-        </div>
+        <RowActions
+          is_expanded={is_expanded}
+          onToggle={onToggle}
+          open_url={checkout.session_url}
+          open_label="Open checkout"
+          open_aria_label={`Open checkout ${checkout.reference}`}
+        />
       </div>
 
       {is_expanded && (
@@ -389,7 +383,6 @@ function CheckoutGroup({ group, is_gift_card_reward, expanded_ids, onToggleRow }
       {!is_collapsed && (
         <div className={styles.groupBody}>
           <div className={styles.headRow}>
-            <div />
             <div>Checkout</div>
             <div>Client</div>
             <div className={styles.headCenter}>Promo applied to</div>
@@ -399,7 +392,7 @@ function CheckoutGroup({ group, is_gift_card_reward, expanded_ids, onToggleRow }
             <div className={styles.headRight}>{is_gift_card_reward ? "Order gift card" : "Discount"}</div>
             <div className={styles.headRight}>Total</div>
             <div>Used on</div>
-            <div />
+            <div className={styles.headCenter}>Actions</div>
           </div>
 
           {group.checkouts.map((checkout) => (
@@ -414,17 +407,18 @@ function CheckoutGroup({ group, is_gift_card_reward, expanded_ids, onToggleRow }
           ))}
 
           <div className={styles.summaryRow}>
-            <div />
             <div className={styles.summaryLabel}>Group total</div>
             <div />
             <div />
             <div />
             <div />
-            <div className={styles.cellMoney}>{formatMoney(totals.subtotal)}</div>
-            <div className={`${styles.cellMoney} ${styles.cellSavings}`}>
-              {is_gift_card_reward ? formatMoney(totals.reward) : `-${formatMoney(totals.discount)}`}
-            </div>
-            <div className={`${styles.cellMoney} ${styles.cellTotal}`}>{formatMoney(totals.total)}</div>
+            <MoneyCell label="Subtotal" value={formatMoney(totals.subtotal)} />
+            <MoneyCell
+              label={is_gift_card_reward ? "Order gift card" : "Discount"}
+              className={styles.cellSavings}
+              value={is_gift_card_reward ? formatMoney(totals.reward) : `-${formatMoney(totals.discount)}`}
+            />
+            <MoneyCell label="Total" className={styles.cellTotal} value={formatMoney(totals.total)} />
             <div />
             <div />
           </div>

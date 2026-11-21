@@ -6,15 +6,12 @@ import type { CouponUsageProductType, CouponUsageResponse } from "@/types/admin/
 import { getAdminCouponUsage } from "@/services/admin/coupons.service";
 import { downloadCsv } from "@/lib/exportCsv";
 import CouponCheckoutBoard from "./CouponCheckoutBoard";
-import CouponUsageBoard from "./CouponUsageBoard";
 import styles from "./CouponUsageBoard.module.scss";
 import {
   GROUP_BY_OPTIONS,
   PRODUCT_COLORS,
   SORT_OPTIONS,
-  VIEW_OPTIONS,
   buildCheckoutExport,
-  buildProductOrderExport,
   checkoutIncludesProduct,
   countByProduct,
   formatMoney,
@@ -22,14 +19,10 @@ import {
   getCouponStateBadge,
   getProductLabel,
   groupCheckouts,
-  groupUsages,
   matchesCheckoutSearch,
-  matchesSearch,
   sortCheckouts,
-  sortUsages,
   type CouponUsageGroupBy,
   type CouponUsageSort,
-  type CouponUsageView,
 } from "./coupon-usage";
 
 interface CouponUsageContentProps {
@@ -37,7 +30,6 @@ interface CouponUsageContentProps {
 }
 
 const GROUP_BY_STORAGE_KEY = "admin_coupon_usage_group_by";
-const VIEW_STORAGE_KEY = "admin_coupon_usage_view";
 
 function readStoredOption<T extends string>(
   storage_key: string,
@@ -108,9 +100,6 @@ export default function CouponUsageContent({ coupon_id }: CouponUsageContentProp
   const [search_term, setSearchTerm] = useState("");
   // The board only renders after the data loads, so reading storage here
   // never changes the server rendered markup.
-  const [view, setView] = useState<CouponUsageView>(() =>
-    readStoredOption(VIEW_STORAGE_KEY, VIEW_OPTIONS, "checkout")
-  );
   const [group_by, setGroupBy] = useState<CouponUsageGroupBy>(() =>
     readStoredOption(GROUP_BY_STORAGE_KEY, GROUP_BY_OPTIONS, "none")
   );
@@ -150,21 +139,7 @@ export default function CouponUsageContent({ coupon_id }: CouponUsageContentProp
     storeOption(GROUP_BY_STORAGE_KEY, value);
   };
 
-  const handleViewChange = (value: CouponUsageView) => {
-    setView(value);
-    storeOption(VIEW_STORAGE_KEY, value);
-  };
-
-  const usages = useMemo(() => usage_response?.data ?? [], [usage_response]);
   const checkouts = useMemo(() => usage_response?.checkouts ?? [], [usage_response]);
-
-  const filtered_usages = useMemo(() => {
-    const matching = usages.filter(
-      (usage) =>
-        (product_filter === "all" || usage.product_type === product_filter) && matchesSearch(usage, search_term)
-    );
-    return sortUsages(matching, sort);
-  }, [usages, product_filter, search_term, sort]);
 
   const filtered_checkouts = useMemo(() => {
     const matching = checkouts.filter(
@@ -173,31 +148,21 @@ export default function CouponUsageContent({ coupon_id }: CouponUsageContentProp
     return sortCheckouts(matching, sort);
   }, [checkouts, product_filter, search_term, sort]);
 
-  const usage_groups = useMemo(() => groupUsages(filtered_usages, group_by), [filtered_usages, group_by]);
   const checkout_groups = useMemo(() => groupCheckouts(filtered_checkouts, group_by), [filtered_checkouts, group_by]);
 
-  // Chip counts follow the view: checkouts that include the product, or discounted orders of it.
-  const product_counts = useMemo(
-    () =>
-      view === "checkout"
-        ? countByProduct(checkouts)
-        : countByProduct(usages.map((usage) => ({ product_types: [usage.product_type] }))),
-    [view, checkouts, usages]
-  );
+  // Chip counts: checkouts that include each product.
+  const product_counts = useMemo(() => countByProduct(checkouts), [checkouts]);
 
-  const is_checkout_view = view === "checkout";
-  const listed_count = is_checkout_view ? filtered_checkouts.length : filtered_usages.length;
-  const total_count = is_checkout_view ? checkouts.length : usages.length;
-  const record_noun = `${is_checkout_view ? "checkout" : "product order"}${total_count === 1 ? "" : "s"}`;
+  const listed_count = filtered_checkouts.length;
+  const total_count = checkouts.length;
+  const record_noun = `checkout${total_count === 1 ? "" : "s"}`;
 
   const handleExport = () => {
     if (!usage_response) return;
     const is_gift_card_reward = usage_response.coupon.discount_type === "gift_card_reward";
     const code = usage_response.coupon.code.toLowerCase();
-    const { headers, rows } = is_checkout_view
-      ? buildCheckoutExport(filtered_checkouts, is_gift_card_reward)
-      : buildProductOrderExport(filtered_usages, is_gift_card_reward);
-    downloadCsv(`coupon-${code}-${is_checkout_view ? "checkouts" : "product-orders"}.csv`, headers, rows);
+    const { headers, rows } = buildCheckoutExport(filtered_checkouts, is_gift_card_reward);
+    downloadCsv(`coupon-${code}-checkouts.csv`, headers, rows);
   };
 
   if (is_loading && !usage_response) return <LoadingState />;
@@ -305,7 +270,7 @@ export default function CouponUsageContent({ coupon_id }: CouponUsageContentProp
         </div>
       </section>
 
-      {checkouts.length === 0 && usages.length === 0 ? (
+      {checkouts.length === 0 ? (
         <div className="mt-6">
           <EmptyState
             title="No orders yet"
@@ -316,21 +281,6 @@ export default function CouponUsageContent({ coupon_id }: CouponUsageContentProp
         <>
           {/* Toolbar */}
           <div className={styles.toolbar}>
-            <div className={styles.segmented} role="group" aria-label="View">
-              <span className={styles.segmentedLabel}>View</span>
-              {VIEW_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => handleViewChange(option.value)}
-                  className={`${styles.segment} ${view === option.value ? styles.segmentActive : ""}`}
-                  aria-pressed={view === option.value}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-
             <label className={styles.search}>
               <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
@@ -363,7 +313,7 @@ export default function CouponUsageContent({ coupon_id }: CouponUsageContentProp
               value={sort}
               onChange={(event) => setSort(event.target.value as CouponUsageSort)}
               className={styles.select}
-              aria-label={is_checkout_view ? "Sort checkouts" : "Sort orders"}
+              aria-label="Sort checkouts"
             >
               {SORT_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -400,20 +350,10 @@ export default function CouponUsageContent({ coupon_id }: CouponUsageContentProp
             </div>
           )}
 
-          {is_gift_card_reward && !is_checkout_view && listed_count > 0 && (
-            <p className="mb-3 rounded-lg border border-dashed border-brand-200 bg-brand-50/60 px-3 py-2 text-xs font-medium text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300">
-              Gift cards are earned once per order, never per product. Product orders bought together share the same
-              order gift card, so the amount shown on each row is the gift card of its whole order. Use the Checkouts
-              view to see each gift card once.
-            </p>
-          )}
-
           {listed_count === 0 ? (
             <EmptyState title={`No matching ${record_noun}`} text="Try a different search or clear the product filter." />
-          ) : is_checkout_view ? (
-            <CouponCheckoutBoard groups={checkout_groups} is_gift_card_reward={is_gift_card_reward} />
           ) : (
-            <CouponUsageBoard groups={usage_groups} is_gift_card_reward={is_gift_card_reward} />
+            <CouponCheckoutBoard groups={checkout_groups} is_gift_card_reward={is_gift_card_reward} />
           )}
         </>
       )}
