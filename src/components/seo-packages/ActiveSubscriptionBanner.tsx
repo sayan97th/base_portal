@@ -19,6 +19,11 @@ export default function ActiveSubscriptionBanner({ subscription }: Props) {
 
   const start_label = formatDate(subscription.starts_at);
   const end_label = formatDate(subscription.ends_at);
+  const next_billing_label = subscription.auto_renew
+    ? formatDate(subscription.next_billing_date ? `${subscription.next_billing_date}T12:00:00` : null)
+    : null;
+  const plan_name = subscription.plan_name || subscription.package?.name || "SEO Package";
+  const monthly_price = subscription.monthly_price ?? subscription.package?.price_per_month ?? 0;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-success-200 bg-gradient-to-br from-success-50 to-white shadow-sm dark:border-success-500/20 dark:from-success-500/5 dark:to-gray-900">
@@ -48,10 +53,10 @@ export default function ActiveSubscriptionBanner({ subscription }: Props) {
               </span>
             </div>
             <h3 className="mt-1.5 text-base font-semibold text-gray-900 dark:text-white">
-              {subscription.package.name}
+              {plan_name}
             </h3>
             <p className="mt-0.5 text-sm text-gray-600 dark:text-gray-400">
-              ${subscription.package.price_per_month.toLocaleString()}/month
+              ${monthly_price.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}/month
             </p>
           </div>
         </div>
@@ -68,10 +73,10 @@ export default function ActiveSubscriptionBanner({ subscription }: Props) {
           </div>
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
-              {end_label ? "Expires" : "Renewal"}
+              {end_label ? "Expires" : next_billing_label ? "Next renewal" : "Renewal"}
             </p>
             <p className="mt-0.5 text-sm font-medium text-gray-700 dark:text-gray-300">
-              {end_label ?? "Ongoing"}
+              {end_label ?? next_billing_label ?? "Ongoing"}
             </p>
           </div>
         </div>

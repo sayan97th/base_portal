@@ -72,9 +72,14 @@ export interface ActiveSeoSubscriptionPackage {
 
 export interface ActiveSeoSubscription {
   id: number;
-  package: ActiveSeoSubscriptionPackage;
+  package: ActiveSeoSubscriptionPackage | null;
   status: "active" | "cancelled" | "expired";
   starts_at: string;
   ends_at: string | null;
   created_at: string;
+  plan_name: string;
+  pricing_type: "package" | "custom";
+  monthly_price: number;
+  auto_renew: boolean;
+  next_billing_date: string | null;
 }
