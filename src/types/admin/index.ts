@@ -613,7 +613,8 @@ export type TransactionType =
 
 export type TransactionStatus = "success" | "failed";
 
-export type TransactionPaymentMethod = "credit_card" | "account_credits" | "hybrid";
+/** manual: paid outside the portal (bank transfer, check) and recorded by an admin. */
+export type TransactionPaymentMethod = "credit_card" | "account_credits" | "hybrid" | "manual";
 
 export type TransactionSortField =
   | "created_at"

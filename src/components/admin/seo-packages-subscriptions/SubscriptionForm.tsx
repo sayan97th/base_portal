@@ -25,7 +25,9 @@ import {
   ReminderControl,
   pluralDays,
 } from "./SubscriptionBillingControls";
+import FirstPaymentPlanner, { PaidMonthNotice, type FirstPaymentChoice } from "./FirstPaymentPlanner";
 import {
+  browserTimezone,
   buildChargeSchedule,
   clientName,
   dayOfMonth,
@@ -33,6 +35,7 @@ import {
   formatMoney,
   formatMoneyCompact,
   initials,
+  monthKey,
   monthName,
   ordinal,
   todayIsoDate,
@@ -157,7 +160,8 @@ export default function SubscriptionForm({ mode, subscription }: Props) {
   const [reminder_days, setReminderDays] = useState<number | null>(
     subscription ? (subscription.reminder_days_before || null) : DEFAULT_REMINDER_DAYS
   );
-  const [charge_now, setChargeNow] = useState(false);
+  const [first_payment_choice, setFirstPaymentChoice] = useState<FirstPaymentChoice>("schedule");
+  const [outside_reference, setOutsideReference] = useState("");
   const [notes, setNotes] = useState(subscription?.notes ?? "");
 
   const [is_submitting, setIsSubmitting] = useState(false);
@@ -261,11 +265,29 @@ export default function SubscriptionForm({ mode, subscription }: Props) {
   const advanced_count = (is_edit ? 0 : service_start_date ? 1 : 0) + (end_date ? 1 : 0);
   const is_first_billing_today = first_billing_date === today;
   const has_usable_card = cards.some((c) => !c.is_expired);
+  // "Charge now" falls back to the schedule once it no longer applies
+  // (the date moved off today, or the client has no valid card).
+  const can_charge_now = !is_edit && is_first_billing_today && has_usable_card && !cards_loading;
+  const effective_choice: FirstPaymentChoice =
+    first_payment_choice === "charge_now" && !can_charge_now ? "schedule" : first_payment_choice;
+  const charge_now = !is_edit && effective_choice === "charge_now";
+  const is_first_paid_outside = !is_edit && effective_choice === "paid_outside";
+  // Paid outside: nothing is charged until the following month.
+  const next_charge_date = is_first_paid_outside ? schedule[1] ?? null : first_billing_date;
+
+  // Edit mode: a month is billed once, so the schedule cannot move into a paid month.
+  const paid_period_label = useMemo(() => {
+    if (!is_edit || !subscription || next_billing_date === subscription.next_billing_date) return null;
+    const paid_charge = (subscription.charges ?? []).find(
+      (charge) => charge.status === "succeeded" && monthKey(charge.period_start) === monthKey(next_billing_date)
+    );
+    return paid_charge ? paid_charge.period_label : null;
+  }, [is_edit, subscription, next_billing_date]);
   const label_preview = `${monthName(first_billing_date)} - ${invoice_item_label.trim() || "SEO Services"}`;
   const price_difference =
     pricing_type === "custom" && selected_package && monthly_price > 0 ? monthly_price - selected_package.price_per_month : null;
   const client_for_display = is_edit ? subscription?.user ?? null : selected_user;
-  const needs_card = auto_renew || (charge_now && is_first_billing_today);
+  const needs_card = auto_renew || charge_now;
 
   const validation_message = (() => {
     if (!is_edit && !selected_user) return "Select a client.";
@@ -273,6 +295,7 @@ export default function SubscriptionForm({ mode, subscription }: Props) {
     if (pricing_type === "custom" && monthly_price < 0.5) return "Enter a monthly amount of at least $0.50.";
     if (!first_billing_date) return "Choose when the first payment happens.";
     if (first_billing_date < today) return "The first payment date cannot be in the past.";
+    if (paid_period_label) return `${paid_period_label} is already paid. Pick a date in a later month.`;
     if (ends_at && ends_at < first_billing_date) return "The end date must be after the first payment.";
     if (ends_at && !is_edit && ends_at <= starts_at) return "The end date must be after the service start date.";
     if (needs_card && !cards_loading && client_for_display && !has_usable_card)
@@ -328,6 +351,7 @@ export default function SubscriptionForm({ mode, subscription }: Props) {
         };
         if (next_billing_date !== subscription.next_billing_date) {
           payload.next_billing_date = next_billing_date;
+          payload.timezone = browserTimezone();
         }
         await adminSeoSubscriptionService.updateSubscription(subscription.id, payload);
         router.push(`/admin/seo-packages-subscriptions/${subscription.id}?notice=updated`);
@@ -344,11 +368,19 @@ export default function SubscriptionForm({ mode, subscription }: Props) {
         auto_renew,
         payment_profile_id: selected_card_id,
         reminder_days_before: auto_renew ? reminder_days : null,
-        charge_now: charge_now && is_first_billing_today,
+        charge_now,
+        first_period_paid_outside: is_first_paid_outside,
+        outside_payment_reference: is_first_paid_outside ? outside_reference.trim() || null : null,
+        timezone: browserTimezone(),
         notes: notes.trim() || undefined,
       };
       const result = await adminSeoSubscriptionService.activateSubscription(payload);
-      const notice = !result.charge_result ? "activated" : result.charge_result.success ? "activated_charged" : "activated_charge_failed";
+      const charge_result = result.charge_result;
+      const notice = !charge_result
+        ? "activated"
+        : charge_result.paid_outside
+          ? charge_result.success ? "activated_paid_outside" : "activated"
+          : charge_result.success ? "activated_charged" : "activated_charge_failed";
       router.push(`/admin/seo-packages-subscriptions/${result.data.id}?notice=${notice}`);
     } catch (err) {
       setError(extractApiError(err, is_edit ? "Failed to save the changes. Please try again." : "Failed to activate the subscription. Please try again."));
@@ -597,8 +629,17 @@ export default function SubscriptionForm({ mode, subscription }: Props) {
                   </svg>
                 </span>
                 <span>
-                  {auto_renew ? "Charged " : "First payment due "}
-                  <strong>{first_billing_date === today ? "today" : `on ${formatDate(first_billing_date, { month: "short", day: "numeric" })}`}</strong>
+                  {is_first_paid_outside ? (
+                    <>
+                      <strong>{monthName(first_billing_date)} is paid</strong>. Next {auto_renew ? "charge" : "payment due"}{" "}
+                      <strong>{next_charge_date ? `on ${formatDate(next_charge_date, { month: "short", day: "numeric" })}` : "never"}</strong>
+                    </>
+                  ) : (
+                    <>
+                      {auto_renew ? "Charged " : "First payment due "}
+                      <strong>{first_billing_date === today ? "today" : `on ${formatDate(first_billing_date, { month: "short", day: "numeric" })}`}</strong>
+                    </>
+                  )}
                   , then <strong>on the {ordinal(billing_day)} of every month</strong>{" "}
                   {ends_at ? (
                     <>
@@ -611,11 +652,7 @@ export default function SubscriptionForm({ mode, subscription }: Props) {
                 </span>
               </div>
             </div>
-            {!is_edit && (
-              <p className={styles.fieldHint}>
-                Client already paid this month? Pick next month&apos;s date as the first payment.
-              </p>
-            )}
+            {paid_period_label && <PaidMonthNotice period_label={paid_period_label} />}
 
             <button
               type="button"
@@ -702,27 +739,24 @@ export default function SubscriptionForm({ mode, subscription }: Props) {
               <ReminderControl
                 value={reminder_days}
                 is_auto_renew={auto_renew}
-                next_charge_date={first_billing_date}
+                next_charge_date={next_charge_date ?? first_billing_date}
                 last_reminder_sent_for={is_edit ? subscription?.last_reminder_sent_for : null}
                 onChange={setReminderDays}
               />
             </div>
 
-            {!is_edit && is_first_billing_today && has_usable_card && (
-              <div className="mt-4">
-                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 px-3.5 py-3 transition-colors hover:border-brand-300 dark:border-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={charge_now}
-                    onChange={(e) => setChargeNow(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
-                  />
-                  <span className="text-sm">
-                    <span className="block font-medium text-gray-900 dark:text-white">Charge the first payment now</span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">Otherwise it is charged later today by the billing run.</span>
-                  </span>
-                </label>
-              </div>
+            {!is_edit && (
+              <FirstPaymentPlanner
+                choice={effective_choice}
+                onChoiceChange={setFirstPaymentChoice}
+                schedule={schedule}
+                today={today}
+                monthly_price={monthly_price}
+                is_auto_renew={auto_renew}
+                has_usable_card={client_for_display && !cards_loading ? has_usable_card : null}
+                outside_reference={outside_reference}
+                onOutsideReferenceChange={setOutsideReference}
+              />
             )}
           </FormSection>
 
@@ -764,11 +798,23 @@ export default function SubscriptionForm({ mode, subscription }: Props) {
             {/* What happens, following the billing schedule choices */}
             <ol className={styles.previewSteps} aria-label="Billing timeline">
               <li>
-                <span className={styles.previewStepLabel}>{is_edit ? "Next charge" : "First charge"}</span>
+                <span className={styles.previewStepLabel}>
+                  {is_edit ? "Next charge" : is_first_paid_outside ? `${monthName(first_billing_date)}` : "First charge"}
+                </span>
                 <span className={styles.previewStepText}>
-                  {first_billing_date === today ? "Today" : formatDate(first_billing_date, { weekday: "short", month: "short", day: "numeric" })}
-                  {" · "}
-                  {formatMoneyCompact(monthly_price)}
+                  {is_first_paid_outside ? (
+                    <>
+                      Already paid · {formatMoneyCompact(monthly_price)}
+                      <br />
+                      <small>Recorded as paid, never charged</small>
+                    </>
+                  ) : (
+                    <>
+                      {first_billing_date === today ? "Today" : formatDate(first_billing_date, { weekday: "short", month: "short", day: "numeric" })}
+                      {" · "}
+                      {formatMoneyCompact(monthly_price)}
+                    </>
+                  )}
                 </span>
               </li>
               {payments_until_end !== 1 && (
@@ -857,8 +903,10 @@ export default function SubscriptionForm({ mode, subscription }: Props) {
                 </>
               ) : is_edit ? (
                 "Save changes"
-              ) : charge_now && is_first_billing_today ? (
+              ) : charge_now ? (
                 `Activate and charge ${formatMoneyCompact(monthly_price)}`
+              ) : is_first_paid_outside ? (
+                `Activate, ${monthName(first_billing_date)} paid`
               ) : (
                 "Activate subscription"
               )}

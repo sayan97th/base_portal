@@ -226,16 +226,24 @@ export interface ActivateSeoSubscriptionPayload {
   payment_profile_id?: string | null;
   reminder_days_before?: number | null;
   charge_now?: boolean;
+  /** The first period was already paid another way: recorded as paid, never charged. */
+  first_period_paid_outside?: boolean;
+  outside_payment_reference?: string | null;
+  /** Browser timezone, so "today" is the admin's own calendar day on the API. */
+  timezone?: string | null;
   notes?: string | null;
 }
 
 export interface ActivateSeoSubscriptionResult {
   data: AdminSeoSubscription;
-  charge_result: { success: boolean; message: string } | null;
+  charge_result: { success: boolean; message: string; paid_outside?: boolean } | null;
 }
 
 export type UpdateSeoSubscriptionPayload = Partial<
-  Omit<ActivateSeoSubscriptionPayload, "user_id" | "starts_at" | "first_billing_date" | "charge_now">
+  Omit<
+    ActivateSeoSubscriptionPayload,
+    "user_id" | "starts_at" | "first_billing_date" | "charge_now" | "first_period_paid_outside" | "outside_payment_reference"
+  >
 > & {
   next_billing_date?: string | null;
 };

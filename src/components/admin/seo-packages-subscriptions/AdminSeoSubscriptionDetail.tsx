@@ -43,6 +43,10 @@ interface Props {
 const NOTICES: Record<string, { tone: "success" | "error"; text: string }> = {
   activated: { tone: "success", text: "Subscription activated. The billing schedule is shown below." },
   activated_charged: { tone: "success", text: "Subscription activated and the first payment was collected." },
+  activated_paid_outside: {
+    tone: "success",
+    text: "Subscription activated. The first month was recorded as paid, so the client will not be charged for it.",
+  },
   activated_charge_failed: {
     tone: "error",
     text: "Subscription activated, but the first charge failed. See the payment history below for the reason.",
@@ -160,7 +164,7 @@ function ChargeTimeline({ charges }: { charges: AdminSeoSubscriptionCharge[] }) 
               </div>
 
               <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-gray-500 dark:text-gray-400">
-                <span>{TRIGGER_LABELS[charge.trigger]}{charge.charged_by ? ` (${charge.charged_by.name})` : ""}</span>
+                <span>{charge.trigger === "external" && charge.charged_by ? "Paid outside the portal" : TRIGGER_LABELS[charge.trigger]}{charge.charged_by ? ` (${charge.charged_by.name})` : ""}</span>
                 {charge.card_label && <span>{charge.card_label}</span>}
                 {charge.paid_at && <span>Paid {formatDate(charge.paid_at)}</span>}
                 {charge.attempt_count > 1 && <span>{charge.attempt_count} attempts</span>}

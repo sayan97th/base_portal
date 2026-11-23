@@ -1,0 +1,603 @@
+@use "sass:list";
+
+// First month planner on the activate subscription form: how the first
+// payment is handled (on schedule, charged now, or already paid outside the
+// portal), a short month ledger, and the "billed once per month" guard.
+
+$brand_500: var(--color-brand-500);
+$brand_600: var(--color-brand-600);
+$brand_50: var(--color-brand-50);
+$gray_900: var(--color-gray-900);
+$gray_700: var(--color-gray-700);
+$gray_600: var(--color-gray-600);
+$gray_500: var(--color-gray-500);
+$gray_400: var(--color-gray-400);
+$gray_300: var(--color-gray-300);
+$gray_200: var(--color-gray-200);
+$gray_100: var(--color-gray-100);
+$gray_50: var(--color-gray-50);
+$gray_800: var(--color-gray-800);
+
+$hero_from: #ec3c89;
+$hero_to: #8b5cf6;
+$success: #12b76a;
+$success_soft: #ecfdf3;
+$success_ink: #027a48;
+$warning: #f79009;
+$warning_soft: #fffaeb;
+$warning_ink: #b54708;
+
+$choice_tones: (
+  schedule: (#6366f1, rgba(99, 102, 241, 0.12)),
+  charge_now: ($hero_from, rgba(236, 60, 137, 0.12)),
+  paid_outside: ($success, rgba(18, 183, 106, 0.14)),
+);
+
+@mixin dark {
+  :global(.dark) & {
+    @content;
+  }
+}
+
+@mixin hover_device {
+  @media (hover: hover) and (pointer: fine) {
+    @content;
+  }
+}
+
+@mixin reduced_motion {
+  @media (prefers-reduced-motion: reduce) {
+    @content;
+  }
+}
+
+// ── Shell ────────────────────────────────────────────────────────────────────
+
+.planner {
+  position: relative;
+  margin-top: 20px;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid $gray_200;
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(139, 92, 246, 0.07) 0%, transparent 55%),
+    radial-gradient(90% 80% at 0% 100%, rgba(236, 60, 137, 0.06) 0%, transparent 60%),
+    #fff;
+
+  @include dark {
+    border-color: $gray_800;
+    background:
+      radial-gradient(120% 90% at 100% 0%, rgba(139, 92, 246, 0.14) 0%, transparent 55%),
+      radial-gradient(90% 80% at 0% 100%, rgba(236, 60, 137, 0.1) 0%, transparent 60%),
+      var(--color-gray-900);
+  }
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.eyebrow {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, $hero_from, $hero_to);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.title {
+  margin-top: 2px;
+  font-size: 14px;
+  font-weight: 600;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.amountPill {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: $gray_700;
+  background: $gray_100;
+
+  @include dark {
+    color: $gray_300;
+    background: $gray_800;
+  }
+}
+
+// ── Choice cards ─────────────────────────────────────────────────────────────
+
+.options {
+  display: grid;
+  gap: 10px;
+
+  @media (min-width: 768px) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.option {
+  --tone: #{$brand_500};
+  --tone_soft: rgba(236, 60, 137, 0.12);
+
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 12px;
+  text-align: left;
+  border-radius: 14px;
+  border: 1.5px solid $gray_200;
+  background: #fff;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease,
+    background-color 0.18s ease;
+
+  @each $name, $tone in $choice_tones {
+    &[data-choice="#{$name}"] {
+      --tone: #{list.nth($tone, 1)};
+      --tone_soft: #{list.nth($tone, 2)};
+    }
+  }
+
+  @include dark {
+    border-color: $gray_700;
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  @include hover_device {
+    &:not(:disabled):hover {
+      border-color: var(--tone);
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px -14px var(--tone);
+    }
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--tone_soft);
+    border-color: var(--tone);
+  }
+
+  &[data-selected] {
+    border-color: var(--tone);
+    background: linear-gradient(160deg, var(--tone_soft) 0%, transparent 70%), #fff;
+    box-shadow: 0 10px 24px -18px var(--tone);
+
+    @include dark {
+      background: linear-gradient(160deg, var(--tone_soft) 0%, transparent 70%), rgba(255, 255, 255, 0.03);
+    }
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+    background: $gray_50;
+
+    @include dark {
+      background: rgba(255, 255, 255, 0.01);
+    }
+  }
+
+  @include reduced_motion {
+    transition: none;
+
+    &:hover {
+      transform: none;
+    }
+  }
+}
+
+.optionIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: var(--tone);
+  background: var(--tone_soft);
+
+  svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .option[data-selected] & {
+    color: #fff;
+    background: var(--tone);
+  }
+}
+
+.optionBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.optionTitle {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.optionText {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: $gray_500;
+
+  @include dark {
+    color: $gray_400;
+  }
+}
+
+.optionRadio {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: 999px;
+  border: 1.5px solid $gray_300;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease;
+
+  svg {
+    width: 10px;
+    height: 10px;
+    color: #fff;
+  }
+
+  .option[data-selected] & {
+    border-color: var(--tone);
+    background: var(--tone);
+  }
+
+  @include dark {
+    border-color: $gray_600;
+  }
+}
+
+// ── Paid outside panel ───────────────────────────────────────────────────────
+
+.paidPanel {
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px dashed rgba(18, 183, 106, 0.45);
+  background: rgba(236, 253, 243, 0.65);
+  animation: panel-in 0.22s ease-out;
+
+  @include dark {
+    background: rgba(18, 183, 106, 0.07);
+    border-color: rgba(18, 183, 106, 0.35);
+  }
+
+  @include reduced_motion {
+    animation: none;
+  }
+}
+
+.paidLabel {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: $success_ink;
+
+  small {
+    margin-left: 4px;
+    font-weight: 400;
+    opacity: 0.75;
+  }
+
+  @include dark {
+    color: #6ce9a6;
+  }
+}
+
+.paidInput {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(18, 183, 106, 0.35);
+  background: #fff;
+  font-size: 13px;
+  color: $gray_900;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+
+  &::placeholder {
+    color: $gray_400;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: $success;
+    box-shadow: 0 0 0 3px rgba(18, 183, 106, 0.15);
+  }
+
+  @include dark {
+    background: var(--color-gray-800);
+    color: #fff;
+    border-color: rgba(18, 183, 106, 0.3);
+  }
+}
+
+.paidHint {
+  margin-top: 8px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: $gray_600;
+
+  strong {
+    color: $gray_900;
+  }
+
+  @include dark {
+    color: $gray_400;
+
+    strong {
+      color: #fff;
+    }
+  }
+}
+
+// ── Month ledger ─────────────────────────────────────────────────────────────
+
+.ledger {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+
+  @media (max-width: 480px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.ledgerItem {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 10px 11px;
+  border-radius: 12px;
+  border: 1px solid $gray_200;
+  background: $gray_50;
+  overflow: hidden;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 3px;
+    background: $gray_300;
+  }
+
+  @include dark {
+    border-color: $gray_800;
+    background: rgba(255, 255, 255, 0.03);
+
+    &::before {
+      background: $gray_700;
+    }
+  }
+
+  &[data-tone="due"]::before {
+    background: linear-gradient(90deg, #6366f1, $hero_to);
+  }
+
+  &[data-tone="now"]::before {
+    background: linear-gradient(90deg, $hero_from, $hero_to);
+  }
+
+  &[data-tone="paid"] {
+    border-color: rgba(18, 183, 106, 0.35);
+    background: $success_soft;
+
+    &::before {
+      background: $success;
+    }
+
+    @include dark {
+      background: rgba(18, 183, 106, 0.08);
+    }
+  }
+
+  &[data-tone="upcoming"] {
+    opacity: 0.8;
+  }
+}
+
+.ledgerMonth {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: $gray_500;
+}
+
+.ledgerDay {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.ledgerStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: $gray_600;
+
+  .ledgerItem[data-tone="paid"] & {
+    color: $success_ink;
+    font-weight: 600;
+  }
+
+  .ledgerItem[data-tone="now"] & {
+    color: $brand_600;
+    font-weight: 600;
+  }
+
+  @include dark {
+    color: $gray_400;
+
+    .ledgerItem[data-tone="paid"] & {
+      color: #6ce9a6;
+    }
+  }
+}
+
+.ledgerCheck {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: $success;
+
+  svg {
+    width: 8px;
+    height: 8px;
+    color: #fff;
+  }
+}
+
+// ── Guard note ───────────────────────────────────────────────────────────────
+
+.guard {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed $gray_200;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: $gray_500;
+
+  strong {
+    color: $gray_700;
+  }
+
+  @include dark {
+    border-top-color: $gray_800;
+    color: $gray_400;
+
+    strong {
+      color: $gray_300;
+    }
+  }
+}
+
+.guardIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  color: #fff;
+  background: linear-gradient(135deg, $hero_from, $hero_to);
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+// ── Edit mode: paid month notice ─────────────────────────────────────────────
+
+.paidNotice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(247, 144, 9, 0.35);
+  background: $warning_soft;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: $warning_ink;
+  animation: panel-in 0.22s ease-out;
+
+  strong {
+    font-weight: 600;
+  }
+
+  @include dark {
+    background: rgba(247, 144, 9, 0.08);
+    color: #fec84b;
+  }
+
+  @include reduced_motion {
+    animation: none;
+  }
+}
+
+.paidNoticeIcon {
+  display: flex;
+  flex-shrink: 0;
+  color: $warning;
+
+  svg {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

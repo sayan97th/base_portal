@@ -41,6 +41,20 @@ export function todayIsoDate(): string {
   return `${now.getFullYear()}-${month}-${day}`;
 }
 
+/** IANA timezone of the browser, sent so the API agrees on what "today" is. */
+export function browserTimezone(): string | null {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+  } catch {
+    return null;
+  }
+}
+
+/** "2026-11" for "2026-11-22", the month a billing date belongs to. */
+export function monthKey(date_str: string | null | undefined): string {
+  return (date_str ?? "").slice(0, 7);
+}
+
 export function monthName(date_str: string | null | undefined): string {
   if (!date_str) return "December";
   return formatDate(date_str, { month: "long" });

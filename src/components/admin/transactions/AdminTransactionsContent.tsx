@@ -43,6 +43,7 @@ const METHOD_LABELS: Record<TransactionPaymentMethod, string> = {
   credit_card:     "Credit Card",
   account_credits: "Account Credits",
   hybrid:          "Hybrid",
+  manual:          "Manual Payment",
 };
 
 function SortIcon({
@@ -301,6 +302,7 @@ export default function AdminTransactionsContent() {
           <option value="credit_card">Credit Card</option>
           <option value="account_credits">Account Credits</option>
           <option value="hybrid">Hybrid</option>
+          <option value="manual">Manual Payment</option>
         </select>
 
         {/* Date from */}
@@ -466,7 +468,7 @@ export default function AdminTransactionsContent() {
 
                     {/* Payment method */}
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-600 dark:text-gray-300">
-                      {METHOD_LABELS[tx.payment_method]}
+                      {METHOD_LABELS[tx.payment_method] ?? tx.payment_method}
                     </td>
 
                     {/* Amount */}
