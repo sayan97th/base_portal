@@ -56,7 +56,10 @@ export default function ActiveSubscriptionBanner({ subscription }: Props) {
               {plan_name}
             </h3>
             <p className="mt-0.5 text-sm text-gray-600 dark:text-gray-400">
-              ${monthly_price.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}/month
+              ${monthly_price.toLocaleString("en-US", {
+                minimumFractionDigits: Number.isInteger(monthly_price) ? 0 : 2,
+                maximumFractionDigits: 2,
+              })}/month
             </p>
           </div>
         </div>
