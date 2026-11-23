@@ -15,7 +15,7 @@ import type {
   UpdateSeoSubscriptionPayload,
 } from "@/services/admin/seo-packages-subscription.service";
 import DateField from "@/components/form/date-field/DateField";
-import { AutoRenewSwitch, PaymentCardPicker } from "./SubscriptionBillingControls";
+import { AutoRenewSwitch, PaymentCardPicker, ReminderControl } from "./SubscriptionBillingControls";
 import { CancelSubscriptionModal, ChargeNowModal } from "./SubscriptionModals";
 import {
   CHARGE_STATUS_CONFIG,
@@ -25,7 +25,6 @@ import {
   formatMoneyCompact,
   initials,
   ordinal,
-  REMINDER_OPTIONS,
   todayIsoDate,
 } from "./subscription-format";
 import styles from "./SeoSubscriptionBilling.module.scss";
@@ -451,7 +450,7 @@ export default function AdminSeoSubscriptionDetail({ subscription_id, notice }: 
                 )}
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+              <div>
                 <div>
                   <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-400">Next charge</label>
                   <div className="flex gap-2">
@@ -479,26 +478,20 @@ export default function AdminSeoSubscriptionDetail({ subscription_id, notice }: 
                     )}
                   </div>
                 </div>
-                <div>
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-400">Reminder email</label>
-                  <select
-                    value={String(subscription.reminder_days_before ?? 0)}
-                    disabled={!is_active || saving_field === "reminder_days_before"}
-                    onChange={(e) =>
-                      saveSettings(
-                        "reminder_days_before",
-                        { reminder_days_before: Number(e.target.value) || null },
-                        Number(e.target.value) ? "Renewal reminder updated." : "Renewal reminders turned off."
-                      )
-                    }
-                    className="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:border-brand-500 focus:outline-none disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                  >
-                    {REMINDER_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                </div>
               </div>
+
+              <ReminderControl
+                value={subscription.reminder_days_before || null}
+                is_auto_renew={subscription.auto_renew}
+                disabled={!is_active || saving_field === "reminder_days_before"}
+                onChange={(days) =>
+                  saveSettings(
+                    "reminder_days_before",
+                    { reminder_days_before: days },
+                    days ? `Renewal reminder set to ${days} day${days === 1 ? "" : "s"} before.` : "Renewal reminder email turned off."
+                  )
+                }
+              />
             </div>
           </Panel>
 

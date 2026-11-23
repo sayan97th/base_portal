@@ -18,26 +18,25 @@ import type {
 import { listAdminSeoPackages } from "@/services/admin/seo-packages.service";
 import type { AdminSeoPackage } from "@/types/admin/seo-packages";
 import DateField from "@/components/form/date-field/DateField";
-import { AutoRenewSwitch, PaymentCardPicker } from "./SubscriptionBillingControls";
+import {
+  AutoRenewSwitch,
+  DEFAULT_REMINDER_DAYS,
+  PaymentCardPicker,
+  ReminderControl,
+} from "./SubscriptionBillingControls";
 import {
   buildChargeSchedule,
   clientName,
   dayOfMonth,
-  endDateForPayments,
   formatDate,
   formatMoney,
   formatMoneyCompact,
   initials,
   monthName,
-  nextCycleOnOrAfterToday,
   ordinal,
-  REMINDER_OPTIONS,
   todayIsoDate,
 } from "./subscription-format";
 import styles from "./SeoSubscriptionBilling.module.scss";
-
-type FirstPaymentMode = "start_date" | "next_cycle" | "custom";
-type DurationMode = "until_cancelled" | "payments" | "end_date";
 
 interface Props {
   mode: "create" | "edit";
@@ -81,37 +80,6 @@ function FieldLabel({ html_for, children, optional = false }: { html_for?: strin
       {children}
       {optional && <small>(optional)</small>}
     </label>
-  );
-}
-
-function OptionCard({
-  is_checked,
-  is_disabled = false,
-  title,
-  description,
-  detail,
-  onSelect,
-}: {
-  is_checked: boolean;
-  is_disabled?: boolean;
-  title: string;
-  description: string;
-  detail?: string;
-  onSelect: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={is_checked}
-      aria-disabled={is_disabled}
-      onClick={() => !is_disabled && onSelect()}
-      className={`${styles.optionCard} ${is_checked ? styles.isChecked : ""} ${is_disabled ? styles.isDisabled : ""}`}
-    >
-      <strong>{title}</strong>
-      <span>{description}</span>
-      {detail && <em>{detail}</em>}
-    </button>
   );
 }
 
@@ -174,19 +142,20 @@ export default function SubscriptionForm({ mode, subscription }: Props) {
   const [invoice_item_label, setInvoiceItemLabel] = useState(subscription?.invoice_item_label ?? "SEO Services");
   const [invoice_item_description, setInvoiceItemDescription] = useState(subscription?.invoice_item_description ?? "");
 
-  // Schedule
-  const [starts_at, setStartsAt] = useState(today);
-  const [first_payment_mode, setFirstPaymentMode] = useState<FirstPaymentMode>("start_date");
-  const [custom_first_date, setCustomFirstDate] = useState(today);
+  // Schedule: like any subscription app, the first payment sets the billing
+  // day and it renews monthly until cancelled. The rest is advanced.
+  const [first_payment_date, setFirstPaymentDate] = useState(today);
+  const [service_start_date, setServiceStartDate] = useState("");
   const [next_billing_date, setNextBillingDate] = useState(subscription?.next_billing_date ?? today);
-  const [duration_mode, setDurationMode] = useState<DurationMode>(subscription?.ends_at ? "end_date" : "until_cancelled");
-  const [payment_count, setPaymentCount] = useState("12");
   const [end_date, setEndDate] = useState(subscription?.ends_at ? subscription.ends_at.slice(0, 10) : "");
+  const [show_advanced, setShowAdvanced] = useState(!!subscription?.ends_at);
 
   // Payment and renewals
   const [auto_renew, setAutoRenew] = useState(subscription?.auto_renew ?? true);
   const [selected_card_id, setSelectedCardId] = useState<string | null>(subscription?.payment_profile_id ?? null);
-  const [reminder_days, setReminderDays] = useState(String(subscription?.reminder_days_before ?? 3));
+  const [reminder_days, setReminderDays] = useState<number | null>(
+    subscription ? (subscription.reminder_days_before || null) : DEFAULT_REMINDER_DAYS
+  );
   const [charge_now, setChargeNow] = useState(false);
   const [notes, setNotes] = useState(subscription?.notes ?? "");
 
@@ -280,26 +249,15 @@ export default function SubscriptionForm({ mode, subscription }: Props) {
       ? custom_plan_name.trim() || selected_package?.name || "Custom SEO Package"
       : selected_package?.name ?? (is_edit ? subscription?.plan_name ?? "" : "Select a package");
 
-  const is_start_in_past = starts_at < today;
-  const next_cycle_date = nextCycleOnOrAfterToday(starts_at, today);
-  const first_billing_date = is_edit
-    ? next_billing_date
-    : first_payment_mode === "start_date"
-      ? starts_at
-      : first_payment_mode === "next_cycle"
-        ? next_cycle_date
-        : custom_first_date;
+  const first_billing_date = is_edit ? next_billing_date : first_payment_date;
+  const starts_at = service_start_date || first_payment_date;
+  const ends_at = end_date || null;
 
-  const parsed_payment_count = Math.max(1, Math.min(120, Number.parseInt(payment_count, 10) || 0));
-  const ends_at =
-    duration_mode === "until_cancelled"
-      ? null
-      : duration_mode === "payments"
-        ? endDateForPayments(first_billing_date, parsed_payment_count)
-        : end_date || null;
-
-  const schedule = buildChargeSchedule(first_billing_date, 4, ends_at);
   const billing_day = dayOfMonth(first_billing_date);
+  const schedule = buildChargeSchedule(first_billing_date, 4, ends_at);
+  // How many payments fit before the end date (capped, only shown as a count).
+  const payments_until_end = ends_at ? buildChargeSchedule(first_billing_date, 240, ends_at).length : null;
+  const advanced_count = (is_edit ? 0 : service_start_date ? 1 : 0) + (end_date ? 1 : 0);
   const is_first_billing_today = first_billing_date === today;
   const has_usable_card = cards.some((c) => !c.is_expired);
   const label_preview = `${monthName(first_billing_date)} - ${invoice_item_label.trim() || "SEO Services"}`;
@@ -314,8 +272,8 @@ export default function SubscriptionForm({ mode, subscription }: Props) {
     if (pricing_type === "custom" && monthly_price < 0.5) return "Enter a monthly amount of at least $0.50.";
     if (!first_billing_date) return "Choose when the first payment happens.";
     if (first_billing_date < today) return "The first payment date cannot be in the past.";
-    if (duration_mode === "end_date" && !end_date) return "Pick the end date or choose Until cancelled.";
     if (ends_at && ends_at < first_billing_date) return "The end date must be after the first payment.";
+    if (ends_at && !is_edit && ends_at <= starts_at) return "The end date must be after the service start date.";
     if (needs_card && !cards_loading && client_for_display && !has_usable_card)
       return "Auto renew needs a card on file. Turn it off to bill manually.";
     return null;
@@ -330,15 +288,6 @@ export default function SubscriptionForm({ mode, subscription }: Props) {
     setCards([]);
     setSelectedCardId(null);
     loadCards(user.id, false);
-  }
-
-  function handleStartDateChange(value: string) {
-    const next_value = value || today;
-    setStartsAt(next_value);
-    // A start date in the past means the first period was handled already.
-    if (next_value < today && first_payment_mode === "start_date") {
-      setFirstPaymentMode("next_cycle");
-    }
   }
 
   function handlePricingType(next: SeoSubscriptionPricingType) {
@@ -372,7 +321,7 @@ export default function SubscriptionForm({ mode, subscription }: Props) {
           ...pricing_fields,
           auto_renew,
           payment_profile_id: selected_card_id,
-          reminder_days_before: Number(reminder_days) || null,
+          reminder_days_before: auto_renew ? reminder_days : null,
           ends_at,
           notes: notes.trim() || null,
         };
@@ -393,7 +342,7 @@ export default function SubscriptionForm({ mode, subscription }: Props) {
         ends_at,
         auto_renew,
         payment_profile_id: selected_card_id,
-        reminder_days_before: Number(reminder_days) || null,
+        reminder_days_before: auto_renew ? reminder_days : null,
         charge_now: charge_now && is_first_billing_today,
         notes: notes.trim() || undefined,
       };
@@ -622,143 +571,104 @@ export default function SubscriptionForm({ mode, subscription }: Props) {
           <FormSection
             icon={ICONS.schedule}
             title="Billing schedule"
-            description="When the subscription starts, when the first payment happens and how long it runs."
+            description="Renews every month on the same day until cancelled, like any subscription."
           >
-            {is_edit && subscription ? (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <p className={styles.fieldLabel}>Started</p>
-                  <p className="flex h-[42px] items-center rounded-xl bg-gray-50 px-3 text-sm font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                    {formatDate(subscription.starts_at, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
-                  </p>
-                </div>
-                <div>
-                  <FieldLabel html_for="subscription-next-billing">Next payment</FieldLabel>
-                  <DateField
-                    id="subscription-next-billing"
-                    value={next_billing_date}
-                    onChange={(value) => setNextBillingDate(value || subscription.next_billing_date || today)}
-                    min={today}
-                    marked_dates={schedule}
-                    footer_hint="Later payments follow on the same day each month"
-                  />
-                </div>
+            <div className="grid gap-4 sm:grid-cols-[minmax(0,240px)_minmax(0,1fr)] sm:items-end">
+              <div>
+                <FieldLabel html_for="subscription-first-payment">{is_edit ? "Next payment" : "First payment"}</FieldLabel>
+                <DateField
+                  id="subscription-first-payment"
+                  value={first_billing_date}
+                  onChange={(value) =>
+                    is_edit
+                      ? setNextBillingDate(value || subscription?.next_billing_date || today)
+                      : setFirstPaymentDate(value || today)
+                  }
+                  min={today}
+                  marked_dates={schedule}
+                  footer_hint="Sets the billing day"
+                />
               </div>
-            ) : (
-              <>
-                <div className="grid gap-4 sm:grid-cols-2">
+              <div className={styles.scheduleSummary} aria-live="polite">
+                <span className={styles.scheduleSummaryIcon} aria-hidden>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                  </svg>
+                </span>
+                <span>
+                  {auto_renew ? "Charged " : "First payment due "}
+                  <strong>{first_billing_date === today ? "today" : `on ${formatDate(first_billing_date, { month: "short", day: "numeric" })}`}</strong>
+                  , then <strong>on the {ordinal(billing_day)} of every month</strong>{" "}
+                  {ends_at ? (
+                    <>
+                      until <strong>{formatDate(ends_at, { month: "short", day: "numeric", year: "numeric" })}</strong>.
+                    </>
+                  ) : (
+                    "until cancelled."
+                  )}
+                  {!auto_renew && " Each payment is charged manually."}
+                </span>
+              </div>
+            </div>
+            {!is_edit && (
+              <p className={styles.fieldHint}>
+                Client already paid this month? Pick next month&apos;s date as the first payment.
+              </p>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowAdvanced((v) => !v)}
+              aria-expanded={show_advanced}
+              className={`${styles.advancedToggle} ${show_advanced ? styles.isOpen : ""}`}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+              </svg>
+              Advanced options
+              {advanced_count > 0 && <span className={styles.advancedCount}>{advanced_count}</span>}
+            </button>
+
+            {show_advanced && (
+              <div className={styles.advancedPanel}>
+                {is_edit && subscription ? (
                   <div>
-                    <FieldLabel html_for="subscription-start">Start date</FieldLabel>
-                    <DateField id="subscription-start" value={starts_at} onChange={handleStartDateChange} footer_hint="When the SEO service begins" />
-                    <p className={styles.fieldHint}>
-                      {is_start_in_past ? "Started in the past, the first period is treated as already handled." : "When the SEO service begins."}
+                    <p className={styles.fieldLabel}>Service started</p>
+                    <p className="flex h-[42px] items-center rounded-xl bg-gray-50 px-3 text-sm font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                      {formatDate(subscription.starts_at, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
                     </p>
                   </div>
-                </div>
-
-                <p className={`${styles.fieldLabel} mt-5`}>First payment</p>
-                <div className={styles.optionGrid} role="radiogroup" aria-label="First payment">
-                  <OptionCard
-                    is_checked={first_payment_mode === "start_date"}
-                    is_disabled={is_start_in_past}
-                    title="On the start date"
-                    description={is_start_in_past ? "Not available, the start date is in the past." : "Bill the first month right when the service starts."}
-                    detail={is_start_in_past ? undefined : formatDate(starts_at, { month: "short", day: "numeric" })}
-                    onSelect={() => setFirstPaymentMode("start_date")}
-                  />
-                  <OptionCard
-                    is_checked={first_payment_mode === "next_cycle"}
-                    title="Next billing cycle"
-                    description="The current month is already paid, start billing next cycle."
-                    detail={formatDate(next_cycle_date, { month: "short", day: "numeric" })}
-                    onSelect={() => setFirstPaymentMode("next_cycle")}
-                  />
-                  <OptionCard
-                    is_checked={first_payment_mode === "custom"}
-                    title="Custom date"
-                    description="Pick any date. Later payments follow on the same day."
-                    detail={first_payment_mode === "custom" ? formatDate(custom_first_date, { month: "short", day: "numeric" }) : undefined}
-                    onSelect={() => setFirstPaymentMode("custom")}
-                  />
-                </div>
-                {first_payment_mode === "custom" && (
-                  <div className={`${styles.optionDetail} grid gap-4 sm:grid-cols-2`}>
-                    <div>
-                      <FieldLabel html_for="subscription-first-date">First payment date</FieldLabel>
-                      <DateField
-                        id="subscription-first-date"
-                        value={custom_first_date}
-                        onChange={(value) => setCustomFirstDate(value || today)}
-                        min={today}
-                        marked_dates={schedule}
-                        footer_hint="Later payments follow on this day"
-                      />
-                    </div>
+                ) : (
+                  <div>
+                    <FieldLabel html_for="subscription-service-start" optional>Service start date</FieldLabel>
+                    <DateField
+                      id="subscription-service-start"
+                      value={service_start_date}
+                      onChange={setServiceStartDate}
+                      clearable
+                      placeholder="Same as first payment"
+                      footer_hint="For your records only"
+                    />
+                    <p className={styles.fieldHint}>Only if the SEO work started on a different day.</p>
                   </div>
                 )}
-              </>
-            )}
-
-            <p className={`${styles.fieldLabel} mt-5`}>Duration</p>
-            <div className={styles.optionGrid} role="radiogroup" aria-label="Duration">
-              <OptionCard
-                is_checked={duration_mode === "until_cancelled"}
-                title="Until cancelled"
-                description="Renews every month until you cancel it. Most common."
-                onSelect={() => setDurationMode("until_cancelled")}
-              />
-              <OptionCard
-                is_checked={duration_mode === "payments"}
-                title="Fixed number of payments"
-                description={is_edit ? "Stops after a number of payments from the next one." : "Stops by itself after a set number of months."}
-                detail={duration_mode === "payments" ? `${parsed_payment_count} payment${parsed_payment_count === 1 ? "" : "s"}` : undefined}
-                onSelect={() => setDurationMode("payments")}
-              />
-              <OptionCard
-                is_checked={duration_mode === "end_date"}
-                title="Ends on a date"
-                description="No payments are made after this date."
-                detail={duration_mode === "end_date" && end_date ? formatDate(end_date, { month: "short", day: "numeric", year: "numeric" }) : undefined}
-                onSelect={() => setDurationMode("end_date")}
-              />
-            </div>
-            {duration_mode === "payments" && (
-              <div className={`${styles.optionDetail} grid items-end gap-4 sm:grid-cols-2`}>
                 <div>
-                  <FieldLabel html_for="subscription-payment-count">{is_edit ? "Remaining payments" : "Number of payments"}</FieldLabel>
-                  <input
-                    id="subscription-payment-count"
-                    type="number"
-                    min={1}
-                    max={120}
-                    value={payment_count}
-                    onChange={(e) => setPaymentCount(e.target.value)}
-                    className={INPUT_CLASS}
-                  />
-                </div>
-                <p className="pb-2 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
-                  Last payment on{" "}
-                  <strong className="text-gray-700 dark:text-gray-200">
-                    {formatDate(buildChargeSchedule(first_billing_date, parsed_payment_count).at(-1), { month: "long", day: "numeric", year: "numeric" })}
-                  </strong>
-                  , subscription ends {formatDate(ends_at, { month: "long", day: "numeric", year: "numeric" })}.
-                </p>
-              </div>
-            )}
-            {duration_mode === "end_date" && (
-              <div className={`${styles.optionDetail} grid gap-4 sm:grid-cols-2`}>
-                <div>
-                  <FieldLabel html_for="subscription-end-date">End date</FieldLabel>
+                  <FieldLabel html_for="subscription-end-date" optional>End date</FieldLabel>
                   <DateField
                     id="subscription-end-date"
                     value={end_date}
                     onChange={setEndDate}
                     min={first_billing_date}
                     clearable
-                    placeholder="Select the last day"
+                    placeholder="Never, until cancelled"
                     marked_dates={schedule}
                     footer_hint="Dots mark the payment days"
                   />
+                  <p className={styles.fieldHint}>
+                    {payments_until_end
+                      ? `${payments_until_end} payment${payments_until_end === 1 ? "" : "s"}, then it stops by itself.`
+                      : "Leave empty for a regular ongoing subscription."}
+                  </p>
                 </div>
               </div>
             )}
@@ -787,24 +697,13 @@ export default function SubscriptionForm({ mode, subscription }: Props) {
               </p>
             )}
 
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <div>
-                <FieldLabel html_for="subscription-reminder">Renewal reminder email</FieldLabel>
-                <select
-                  id="subscription-reminder"
-                  value={reminder_days}
-                  onChange={(e) => setReminderDays(e.target.value)}
-                  disabled={!auto_renew}
-                  className={INPUT_CLASS}
-                >
-                  {REMINDER_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-                <p className={styles.fieldHint}>Sent to the client before each automatic charge.</p>
-              </div>
-              {!is_edit && is_first_billing_today && has_usable_card && (
-                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 px-3.5 py-3 transition-colors hover:border-brand-300 sm:mt-6 dark:border-gray-700">
+            <div className="mt-5">
+              <ReminderControl value={reminder_days} is_auto_renew={auto_renew} onChange={setReminderDays} />
+            </div>
+
+            {!is_edit && is_first_billing_today && has_usable_card && (
+              <div className="mt-4">
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 px-3.5 py-3 transition-colors hover:border-brand-300 dark:border-gray-700">
                   <input
                     type="checkbox"
                     checked={charge_now}
@@ -816,8 +715,8 @@ export default function SubscriptionForm({ mode, subscription }: Props) {
                     <span className="text-xs text-gray-500 dark:text-gray-400">Otherwise it is charged later today by the billing run.</span>
                   </span>
                 </label>
-              )}
-            </div>
+              </div>
+            )}
           </FormSection>
 
           {/* Notes */}
@@ -855,11 +754,45 @@ export default function SubscriptionForm({ mode, subscription }: Props) {
 
             <div className={styles.previewDivider} />
 
+            {/* What happens, following the billing schedule choices */}
+            <ol className={styles.previewSteps} aria-label="Billing timeline">
+              <li>
+                <span className={styles.previewStepLabel}>{is_edit ? "Next charge" : "First charge"}</span>
+                <span className={styles.previewStepText}>
+                  {first_billing_date === today ? "Today" : formatDate(first_billing_date, { weekday: "short", month: "short", day: "numeric" })}
+                  {" · "}
+                  {formatMoneyCompact(monthly_price)}
+                </span>
+              </li>
+              {payments_until_end !== 1 && (
+                <li>
+                  <span className={styles.previewStepLabel}>Then</span>
+                  <span className={styles.previewStepText}>
+                    Every month on the {ordinal(billing_day)}
+                    <br />
+                    <small>{auto_renew ? "Charged automatically to the card on file" : "You charge each month manually"}</small>
+                  </span>
+                </li>
+              )}
+              <li className={styles.isEnd}>
+                <span className={styles.previewStepLabel}>Ends</span>
+                <span className={styles.previewStepText}>
+                  {ends_at ? formatDate(ends_at, { month: "short", day: "numeric", year: "numeric" }) : "When you cancel it"}
+                  {payments_until_end ? (
+                    <>
+                      <br />
+                      <small>
+                        After {payments_until_end} payment{payments_until_end === 1 ? "" : "s"}
+                      </small>
+                    </>
+                  ) : null}
+                </span>
+              </li>
+            </ol>
+
+            <div className={styles.previewDivider} />
+
             <dl className={styles.previewRows}>
-              <div className={styles.previewRow}>
-                <dt>Billing</dt>
-                <dd>{auto_renew ? `Auto, on the ${ordinal(billing_day)}` : "Manual each month"}</dd>
-              </div>
               <div className={styles.previewRow}>
                 <dt>Card</dt>
                 <dd>
@@ -873,26 +806,12 @@ export default function SubscriptionForm({ mode, subscription }: Props) {
                 </dd>
               </div>
               <div className={styles.previewRow}>
-                <dt>Reminder</dt>
-                <dd>{auto_renew && Number(reminder_days) > 0 ? `${reminder_days} day${reminder_days === "1" ? "" : "s"} before` : "Off"}</dd>
-              </div>
-              <div className={styles.previewRow}>
-                <dt>Ends</dt>
-                <dd>{ends_at ? formatDate(ends_at) : "When cancelled"}</dd>
+                <dt>Reminder email</dt>
+                <dd>
+                  {auto_renew && reminder_days ? `${reminder_days} day${reminder_days === 1 ? "" : "s"} before` : "Off"}
+                </dd>
               </div>
             </dl>
-
-            <ul className={styles.previewSchedule} aria-label="Upcoming payments">
-              {schedule.slice(0, 3).map((date, index) => (
-                <li key={date}>
-                  <span>{index === 0 ? "First payment" : formatDate(date, { month: "long", year: "numeric" })}</span>
-                  <b>
-                    {formatDate(date, { month: "short", day: "numeric" })} · {formatMoneyCompact(monthly_price)}
-                  </b>
-                </li>
-              ))}
-              {(ends_at === null || schedule.length > 3) && <li className={styles.previewScheduleMore}>and every month after</li>}
-            </ul>
 
             <div className={styles.previewInvoiceLine}>
               Invoice line the client sees

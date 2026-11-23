@@ -133,3 +133,76 @@ export function PaymentCardPicker({
     </div>
   );
 }
+
+// ── Renewal reminder (optional) ────────────────────────────────────────────────
+
+export const REMINDER_DAY_CHOICES = [1, 3, 5, 7] as const;
+export const DEFAULT_REMINDER_DAYS = 3;
+
+/**
+ * On/off switch for the "your subscription renews soon" email, with the
+ * number of days before the charge. `value` is the days, or null when off.
+ */
+export function ReminderControl({
+  value,
+  is_auto_renew,
+  disabled = false,
+  onChange,
+}: {
+  value: number | null;
+  is_auto_renew: boolean;
+  disabled?: boolean;
+  onChange: (value: number | null) => void;
+}) {
+  const is_on = value !== null && value > 0 && is_auto_renew;
+  const is_locked = disabled || !is_auto_renew;
+
+  return (
+    <div className={`${styles.reminderCard} ${is_on ? styles.isOn : ""} ${is_locked ? styles.isLocked : ""}`}>
+      <div className={styles.reminderHead}>
+        <span className={styles.reminderIcon} aria-hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+          </svg>
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-gray-900 dark:text-white">Renewal reminder email</span>
+          <span className="block text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+            {!is_auto_renew
+              ? "Only sent for subscriptions that renew automatically."
+              : is_on
+                ? `The client is emailed ${value} day${value === 1 ? "" : "s"} before each charge.`
+                : "Off. The client only gets the receipt after each payment."}
+          </span>
+        </span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={is_on}
+          aria-label="Send renewal reminder email"
+          disabled={is_locked}
+          onClick={() => onChange(is_on ? null : DEFAULT_REMINDER_DAYS)}
+          className={`${styles.switch} ${is_on ? styles.isOn : ""} shrink-0 disabled:cursor-not-allowed`}
+        />
+      </div>
+
+      {is_on && (
+        <div className={styles.chipGroup} role="radiogroup" aria-label="Days before the charge">
+          {REMINDER_DAY_CHOICES.map((days) => (
+            <button
+              key={days}
+              type="button"
+              role="radio"
+              aria-checked={value === days}
+              disabled={is_locked}
+              onClick={() => onChange(days)}
+              className={`${styles.chip} ${value === days ? styles.isActive : ""}`}
+            >
+              {days} day{days === 1 ? "" : "s"} before
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

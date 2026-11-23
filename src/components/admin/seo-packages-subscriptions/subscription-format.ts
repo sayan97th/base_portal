@@ -100,13 +100,6 @@ export const CHARGE_STATUS_CONFIG: Record<
   },
 };
 
-export const REMINDER_OPTIONS: { value: string; label: string }[] = [
-  { value: "0", label: "No reminder" },
-  { value: "1", label: "1 day before" },
-  { value: "3", label: "3 days before (recommended)" },
-  { value: "5", label: "5 days before" },
-  { value: "7", label: "7 days before" },
-];
 
 // ── Billing schedule math (mirrors SeoPackageSubscription::advanceByOneMonth) ──
 
@@ -144,26 +137,6 @@ export function addCalendarDays(iso: string, days: number): string {
 
 export function dayOfMonth(iso: string): number {
   return parseIso(iso)?.day ?? 1;
-}
-
-/**
- * First billing date when the current period is already paid: the start
- * date's next cycle, moved forward until it is today or later.
- */
-export function nextCycleOnOrAfterToday(start_iso: string, today_iso: string): string {
-  const anchor = dayOfMonth(start_iso);
-  let months = 1;
-  let candidate = addBillingMonths(start_iso, months, anchor);
-  while (candidate < today_iso && months < 600) {
-    months += 1;
-    candidate = addBillingMonths(start_iso, months, anchor);
-  }
-  return candidate;
-}
-
-/** Last day covered by `payment_count` monthly payments starting on first_iso. */
-export function endDateForPayments(first_iso: string, payment_count: number): string {
-  return addCalendarDays(addBillingMonths(first_iso, payment_count, dayOfMonth(first_iso)), -1);
 }
 
 /** Charge dates starting at first_iso, stopping after ends_iso when set. */

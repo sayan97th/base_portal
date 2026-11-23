@@ -903,120 +903,6 @@ $card_brands: (
   color: $gray_500;
 }
 
-// Radio option cards (first payment, duration)
-
-.optionGrid {
-  display: grid;
-  gap: 10px;
-
-  @media (min-width: 640px) {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-.optionCard {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-height: 86px;
-  border: 1.5px solid $gray_200;
-  border-radius: 14px;
-  padding: 12px 14px 12px 40px;
-  text-align: left;
-  background: #fff;
-  cursor: pointer;
-  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
-
-  strong {
-    font-size: 13.5px;
-    font-weight: 600;
-    color: $gray_900;
-  }
-
-  span {
-    font-size: 12px;
-    line-height: 1.45;
-    color: $gray_500;
-  }
-
-  em {
-    margin-top: auto;
-    padding-top: 4px;
-    font-style: normal;
-    font-size: 12px;
-    font-weight: 700;
-    color: $brand_500;
-  }
-
-  &::before {
-    content: "";
-    position: absolute;
-    top: 14px;
-    left: 14px;
-    width: 16px;
-    height: 16px;
-    border: 1.5px solid $gray_300;
-    border-radius: 50%;
-    background: #fff;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
-  }
-
-  &:hover:not(.isDisabled) {
-    border-color: rgba(236, 60, 137, 0.45);
-  }
-
-  &.isChecked {
-    border-color: $brand_500;
-    background: linear-gradient(135deg, rgba(236, 60, 137, 0.05), rgba(139, 92, 246, 0.04));
-    box-shadow: 0 0 0 3px rgba(236, 60, 137, 0.1);
-
-    &::before {
-      border-color: $brand_500;
-      box-shadow: inset 0 0 0 3.5px #fff, inset 0 0 0 10px $brand_500;
-    }
-  }
-
-  &.isDisabled {
-    cursor: not-allowed;
-    opacity: 0.5;
-  }
-
-  @include dark {
-    border-color: var(--color-gray-700);
-    background: var(--color-gray-900);
-
-    strong {
-      color: #fff;
-    }
-
-    &::before {
-      border-color: var(--color-gray-600);
-      background: var(--color-gray-900);
-    }
-
-    &.isChecked {
-      border-color: $brand_500;
-      background: rgba(236, 60, 137, 0.08);
-
-      &::before {
-        box-shadow: inset 0 0 0 3.5px var(--color-gray-900), inset 0 0 0 10px $brand_500;
-      }
-    }
-  }
-}
-
-.optionDetail {
-  margin-top: 12px;
-  border-radius: 14px;
-  padding: 14px;
-  background: $gray_50;
-
-  @include dark {
-    background: rgba(255, 255, 255, 0.03);
-  }
-}
-
 // Selected client
 
 .clientCard {
@@ -1047,40 +933,285 @@ $card_brands: (
   background: linear-gradient(135deg, $hero_from, $hero_to);
 }
 
-// Preview schedule
+// ── Renewal reminder control ─────────────────────────────────────────────────
 
-.previewSchedule {
-  margin-top: 14px;
-  display: grid;
-  gap: 6px;
+.reminderCard {
+  border: 1px solid $gray_200;
+  border-radius: 16px;
+  padding: 14px 16px;
+  background: #fff;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 
-  li {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    border-radius: 10px;
-    padding: 7px 10px;
-    font-size: 12.5px;
-    color: #e5e7eb;
-    background: rgba(255, 255, 255, 0.05);
+  &.isOn {
+    border-color: rgba(236, 60, 137, 0.35);
+    background: linear-gradient(135deg, rgba(236, 60, 137, 0.04), rgba(139, 92, 246, 0.03));
+  }
 
-    &:first-child {
-      color: #fff;
-      background: rgba(236, 60, 137, 0.22);
-      box-shadow: inset 0 0 0 1px rgba(236, 60, 137, 0.35);
-    }
+  &.isLocked {
+    opacity: 0.65;
+  }
 
-    b {
-      font-weight: 700;
-      font-variant-numeric: tabular-nums;
+  @include dark {
+    border-color: var(--color-gray-700);
+    background: var(--color-gray-900);
+
+    &.isOn {
+      background: rgba(236, 60, 137, 0.07);
     }
   }
 }
 
-.previewScheduleMore {
-  justify-content: center !important;
-  font-size: 11.5px !important;
-  color: #9ca3af !important;
-  background: transparent !important;
+.reminderHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.reminderIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: $brand_500;
+  background: $brand_50;
+
+  svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  @include dark {
+    background: rgba(236, 60, 137, 0.12);
+  }
+}
+
+.chipGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+  padding-left: 46px;
+
+  @media (max-width: 480px) {
+    padding-left: 0;
+  }
+}
+
+.chip {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid $gray_200;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: $gray_500;
+  background: #fff;
+  transition: all 0.12s ease;
+
+  &:hover:not(:disabled):not(.isActive) {
+    border-color: rgba(236, 60, 137, 0.45);
+    color: $brand_500;
+  }
+
+  &.isActive {
+    border-color: transparent;
+    color: #fff;
+    background: linear-gradient(90deg, $hero_from, $hero_to);
+    box-shadow: 0 4px 10px -4px rgba(236, 60, 137, 0.6);
+  }
+
+  @include dark {
+    border-color: var(--color-gray-700);
+    background: var(--color-gray-800);
+  }
+}
+
+// ── Billing schedule (simple, subscription style) ────────────────────────────
+
+.scheduleSummary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 100%;
+  min-height: 42px;
+  border-radius: 14px;
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: $gray_700;
+  background: $gray_50;
+
+  strong {
+    color: $gray_900;
+  }
+
+  @include dark {
+    color: var(--color-gray-300);
+    background: rgba(255, 255, 255, 0.04);
+
+    strong {
+      color: #fff;
+    }
+  }
+}
+
+.scheduleSummaryIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(135deg, $hero_from, $hero_to);
+  box-shadow: 0 4px 10px -4px rgba(236, 60, 137, 0.6);
+
+  svg {
+    width: 15px;
+    height: 15px;
+  }
+}
+
+.advancedToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+  border-radius: 8px;
+  padding: 4px 6px 4px 2px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: $gray_500;
+  transition: color 0.12s ease;
+
+  svg {
+    width: 14px;
+    height: 14px;
+    transition: transform 0.18s ease;
+  }
+
+  &.isOpen svg {
+    transform: rotate(90deg);
+  }
+
+  &:hover {
+    color: $brand_500;
+  }
+
+  .advancedCount {
+    margin-left: 2px;
+    border-radius: 999px;
+    padding: 1px 7px;
+    font-size: 10.5px;
+    color: #fff;
+    background: $brand_500;
+  }
+}
+
+.advancedPanel {
+  display: grid;
+  gap: 14px;
+  margin-top: 10px;
+  border: 1px dashed $gray_200;
+  border-radius: 14px;
+  padding: 14px;
+  animation: advanced-in 0.16s ease-out;
+
+  @media (min-width: 640px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @include dark {
+    border-color: var(--color-gray-700);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes advanced-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Preview: what happens, step by step
+
+.previewSteps {
+  position: relative;
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+  padding-left: 22px;
+
+  &::before {
+    content: "";
+    position: absolute;
+    top: 8px;
+    bottom: 8px;
+    left: 5px;
+    width: 2px;
+    border-radius: 2px;
+    background: linear-gradient(180deg, rgba($hero_from, 0.9), rgba($hero_to, 0.35));
+  }
+
+  li {
+    position: relative;
+
+    &::before {
+      content: "";
+      position: absolute;
+      top: 4px;
+      left: -22px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: $ink;
+      box-shadow: inset 0 0 0 2px $hero_from;
+    }
+
+    &:first-child::before {
+      background: $hero_from;
+      box-shadow: 0 0 0 4px rgba($hero_from, 0.25);
+    }
+
+    &.isEnd::before {
+      box-shadow: inset 0 0 0 2px #6b7280;
+    }
+  }
+}
+
+.previewStepLabel {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #9ca3af;
+}
+
+.previewStepText {
+  display: block;
+  margin-top: 2px;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #fff;
+
+  small {
+    font-size: 12px;
+    font-weight: 500;
+    color: #d1d5db;
+  }
 }
