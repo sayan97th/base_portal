@@ -313,6 +313,17 @@ $lg: 1024px;
     color: #fff;
     background: linear-gradient(90deg, $hero_from, $hero_to);
   }
+
+  // Payment failed, or several periods behind.
+  &[data-tone="error"] {
+    color: #b42318;
+    background: #fef3f2;
+
+    @include dark {
+      color: #fda29b;
+      background: rgba(240, 68, 56, 0.12);
+    }
+  }
 }
 
 .badgeDot {

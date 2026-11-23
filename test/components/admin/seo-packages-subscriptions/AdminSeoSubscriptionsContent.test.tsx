@@ -82,7 +82,8 @@ describe("AdminSeoSubscriptionsContent", () => {
     expect(screen.getByText("$4,498")).toBeInTheDocument();
     expect(screen.getByText("3 active subscriptions")).toBeInTheDocument();
     expect(screen.getByText("$2,999")).toBeInTheDocument();
-    expect(screen.getByText("Need attention")).toBeInTheDocument();
+    // KPI hint: declined renewals and unpaid billing dates.
+    expect(screen.getByText("1 failed, 0 pending")).toBeInTheDocument();
     expect(screen.getByText("1 renewing in 7 days")).toBeInTheDocument();
   });
 

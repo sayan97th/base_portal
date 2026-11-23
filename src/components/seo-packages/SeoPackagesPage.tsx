@@ -6,6 +6,7 @@ import SeoTrackingHighlights from "./SeoTrackingHighlights";
 import SeoPackageGrid from "./SeoPackageGrid";
 import SeoPackageOrderSummary from "./SeoPackageOrderSummary";
 import ActiveSubscriptionBanner from "./ActiveSubscriptionBanner";
+import SubscriptionPaymentAlert from "@/components/billing/SubscriptionPaymentAlert";
 import CalendlyWidget, {
   CalendlyEventPayload,
 } from "@/components/shared/CalendlyWidget";
@@ -119,7 +120,8 @@ const SeoPackagesPage: React.FC = () => {
       <div className="mx-auto max-w-screen-2xl">
         {/* Active subscription banner */}
         {active_subscription && (
-          <div className="mb-6">
+          <div className="mb-6 space-y-4">
+            <SubscriptionPaymentAlert subscription={active_subscription} />
             <ActiveSubscriptionBanner subscription={active_subscription} />
           </div>
         )}

@@ -7,7 +7,9 @@ import PaymentMethodForm from "./PaymentMethodForm";
 import { getStripe } from "@/lib/stripe";
 import { getToken } from "@/lib/api-client";
 import { paymentProfileService } from "@/services/client/payment-profile.service";
+import { seoPackagesService } from "@/services/client/seo-packages.service";
 import type { PaymentProfile } from "@/types/client/payment-profile";
+import type { ActiveSeoSubscription } from "@/types/client/seo-packages";
 
 // Re-export for backward compatibility with billing sub-components
 export type PaymentMethod = PaymentProfile;
@@ -20,6 +22,7 @@ const BillingPage: React.FC = () => {
   const [is_loading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [setup_client_secret, setSetupClientSecret] = useState<string | null>(null);
+  const [active_subscription, setActiveSubscription] = useState<ActiveSeoSubscription | null>(null);
 
   const fetchPaymentProfiles = useCallback(async () => {
     try {
@@ -34,9 +37,16 @@ const BillingPage: React.FC = () => {
     }
   }, []);
 
+  // The SEO subscription payment state depends on the saved cards, so it is
+  // reloaded after every card change. Failing to load it never blocks billing.
+  const fetchActiveSubscription = useCallback(async () => {
+    setActiveSubscription(await seoPackagesService.fetchActiveSubscription());
+  }, []);
+
   useEffect(() => {
     fetchPaymentProfiles();
-  }, [fetchPaymentProfiles]);
+    fetchActiveSubscription();
+  }, [fetchPaymentProfiles, fetchActiveSubscription]);
 
   // Requests a fresh SetupIntent client_secret. A SetupIntent can only be
   // confirmed once, so this is called both to open the "Add Payment Method"
@@ -79,7 +89,7 @@ const BillingPage: React.FC = () => {
 
   async function handlePaymentMethodAdded(profile: PaymentProfile) {
     // Re-fetch to ensure list reflects the latest backend state (including is_default logic)
-    await fetchPaymentProfiles();
+    await Promise.all([fetchPaymentProfiles(), fetchActiveSubscription()]);
     setCurrentView("list");
     setSetupClientSecret(null);
 
@@ -98,6 +108,7 @@ const BillingPage: React.FC = () => {
         }
         return filtered;
       });
+      fetchActiveSubscription();
     } catch {
       setError("Failed to remove the payment method. Please try again.");
     }
@@ -131,6 +142,7 @@ const BillingPage: React.FC = () => {
   return (
     <BillingInformation
       payment_methods={payment_methods}
+      active_subscription={active_subscription}
       is_loading={is_loading}
       error={error}
       onAddMethod={handleShowAddForm}

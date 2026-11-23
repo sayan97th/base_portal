@@ -7,7 +7,7 @@ import { adminSeoSubscriptionService } from "@/services/admin/seo-packages-subsc
 import type {
   AdminSeoSubscription,
   AdminSeoSubscriptionFilters,
-  SeoSubscriptionPaymentStatus,
+  SeoSubscriptionPaymentFilter,
   SeoSubscriptionStatus,
   SeoSubscriptionSortField,
   SortDirection,
@@ -15,6 +15,7 @@ import type {
 } from "@/services/admin/seo-packages-subscription.service";
 import { useDebounce } from "@/hooks/useDebounce";
 import { clientName, formatDate, formatMoney, formatMoneyCompact } from "./subscription-format";
+import { HEALTH_STATE_LABELS, needsAttention, pluralPeriods } from "./payment-health";
 import styles from "./SeoSubscriptionBilling.module.scss";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -86,6 +87,39 @@ function BillingCell({ subscription }: { subscription: AdminSeoSubscription }) {
     return <span className="text-xs text-gray-400">No upcoming charges</span>;
   }
 
+  const health = subscription.payment_health;
+
+  if (health && needsAttention(health)) {
+    const is_critical = health.severity === "critical";
+    const retry_at = health.failure?.next_retry_at;
+    const detail =
+      health.overdue_periods > 0
+        ? `${pluralPeriods(health.overdue_periods)} behind, ${formatMoneyCompact(health.overdue_amount)}`
+        : health.state === "no_payment_method"
+          ? `Renews ${formatDate(subscription.next_billing_date, { month: "short", day: "numeric" })}`
+          : "Needs attention";
+
+    return (
+      <div>
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
+            is_critical
+              ? "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400"
+              : "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400"
+          }`}
+        >
+          <span className={`h-1.5 w-1.5 animate-pulse rounded-full ${is_critical ? "bg-error-500" : "bg-warning-500"}`} />
+          {HEALTH_STATE_LABELS[health.state]}
+        </span>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{detail}</p>
+        {retry_at && (
+          <p className="text-xs text-gray-400">Retry {formatDate(retry_at, { month: "short", day: "numeric" })}</p>
+        )}
+      </div>
+    );
+  }
+
+  // Older API responses without payment_health.
   if (subscription.payment_status === "past_due") {
     const retry_at = subscription.last_charge?.next_retry_at;
     return (
@@ -156,7 +190,7 @@ export default function AdminSeoSubscriptionsContent() {
 
   const [search_input, setSearchInput] = useState("");
   const [status_filter, setStatusFilter] = useState<SeoSubscriptionStatus | "">("");
-  const [payment_filter, setPaymentFilter] = useState<SeoSubscriptionPaymentStatus | "">("");
+  const [payment_filter, setPaymentFilter] = useState<SeoSubscriptionPaymentFilter | "">("");
   const [sort_field, setSortField] = useState<SeoSubscriptionSortField>("created_at");
   const [sort_direction, setSortDirection] = useState<SortDirection>("desc");
 
@@ -263,7 +297,15 @@ export default function AdminSeoSubscriptionsContent() {
           </div>
           <KpiCard label="Auto renew" value={String(stats.auto_renew)} hint={`${stats.renewing_next_7_days} renewing in 7 days`} />
           <KpiCard label="Collected this month" value={formatMoneyCompact(stats.collected_this_month)} hint="Subscription payments" />
-          <KpiCard label="Past due" value={String(stats.past_due)} hint={stats.past_due > 0 ? "Need attention" : "All payments current"} />
+          <KpiCard
+            label="Needs attention"
+            value={String(stats.needs_attention ?? stats.past_due)}
+            hint={
+              (stats.needs_attention ?? stats.past_due) > 0
+                ? `${stats.past_due} failed, ${stats.payment_pending ?? 0} pending`
+                : "All payments current"
+            }
+          />
           <KpiCard label="Cancelled / expired" value={`${stats.cancelled} / ${stats.expired}`} hint={`${stats.total} total`} />
         </div>
       )}
@@ -301,13 +343,15 @@ export default function AdminSeoSubscriptionsContent() {
         <select
           value={payment_filter}
           onChange={(e) => {
-            setPaymentFilter(e.target.value as SeoSubscriptionPaymentStatus | "");
+            setPaymentFilter(e.target.value as SeoSubscriptionPaymentFilter | "");
             setPage(1);
           }}
           className="h-10 rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-700 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
         >
           <option value="">All Payments</option>
-          <option value="past_due">Past due</option>
+          <option value="attention">Needs attention</option>
+          <option value="past_due">Payment failed</option>
+          <option value="pending">Payment pending</option>
         </select>
         {has_active_filters && (
           <button

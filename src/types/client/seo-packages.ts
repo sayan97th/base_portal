@@ -70,6 +70,35 @@ export interface ActiveSeoSubscriptionPackage {
   price_per_month: number;
 }
 
+export type SeoSubscriptionPaymentState =
+  | "healthy"
+  | "no_payment_method"
+  | "retrying"
+  | "payment_pending"
+  | "payment_failed"
+  | "inactive";
+
+/** Client facing payment health: plain language reason, no processor details. */
+export interface SeoSubscriptionPaymentHealth {
+  state: SeoSubscriptionPaymentState;
+  severity: "ok" | "warning" | "critical";
+  overdue_periods: number;
+  overdue_amount: number;
+  days_overdue: number;
+  has_usable_card: boolean;
+  card_issue: "missing" | "expired" | null;
+  failure: {
+    period_label: string;
+    amount: number;
+    reason: string;
+    next_retry_at: string | null;
+  } | null;
+  open_invoice: {
+    unique_id: string;
+    invoice_number: string;
+  } | null;
+}
+
 export interface ActiveSeoSubscription {
   id: number;
   package: ActiveSeoSubscriptionPackage | null;
@@ -82,4 +111,6 @@ export interface ActiveSeoSubscription {
   monthly_price: number;
   auto_renew: boolean;
   next_billing_date: string | null;
+  payment_status?: "current" | "past_due";
+  payment_health?: SeoSubscriptionPaymentHealth;
 }

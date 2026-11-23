@@ -4,7 +4,9 @@ import React from "react";
 import Button from "../ui/button/Button";
 import { PlusIcon } from "@/icons/index";
 import PaymentMethodCard from "./PaymentMethodCard";
+import SubscriptionPaymentAlert from "./SubscriptionPaymentAlert";
 import type { PaymentMethod } from "./BillingPage";
+import type { ActiveSeoSubscription } from "@/types/client/seo-packages";
 
 // ─── Confirmation dialog ───────────────────────────────────────────────────────
 
@@ -13,7 +15,39 @@ type DialogAction = {
   method_id: string;
   card_brand: string;
   last_four: string;
+  /** Shown when removing this card leaves an auto renewing subscription without one. */
+  subscription_warning?: string | null;
 };
+
+function isCardExpired(method: PaymentMethod): boolean {
+  const month = Number(method.expiry_month);
+  const year = Number(method.expiry_year);
+  if (!month || !year) return false;
+  const now = new Date();
+  return year < now.getFullYear() || (year === now.getFullYear() && month < now.getMonth() + 1);
+}
+
+/**
+ * Warning for removing the last valid card while an SEO subscription still
+ * renews automatically. Removing is allowed, the client just knows first.
+ */
+function buildSubscriptionWarning(
+  method: PaymentMethod,
+  payment_methods: PaymentMethod[],
+  subscription: ActiveSeoSubscription | null | undefined
+): string | null {
+  if (!subscription || subscription.status !== "active" || !subscription.auto_renew) return null;
+
+  const other_valid_cards = payment_methods.filter((m) => m.id !== method.id && !isCardExpired(m));
+  if (other_valid_cards.length > 0) return null;
+
+  const plan = subscription.plan_name || subscription.package?.name || "SEO";
+  const renews_on = subscription.next_billing_date
+    ? new Date(`${subscription.next_billing_date}T12:00:00`).toLocaleDateString("en-US", { month: "long", day: "numeric" })
+    : "its next billing date";
+
+  return `This is the only valid card on your account. Your ${plan} subscription renews automatically on ${renews_on}, and that payment will fail unless you add another card before then.`;
+}
 
 const brand_labels_map: Record<string, string> = {
   visa: "Visa",
@@ -116,6 +150,25 @@ function ConfirmationDialog({
           </p>
         </div>
 
+        {is_remove && action.subscription_warning && (
+          <div
+            role="alert"
+            className="mt-4 flex gap-3 rounded-xl border border-warning-200 bg-warning-50 p-3.5 text-left text-sm text-warning-800 dark:border-warning-500/25 dark:bg-warning-500/10 dark:text-warning-300"
+          >
+            <svg className="mt-0.5 h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+              />
+            </svg>
+            <p>
+              <span className="font-semibold">Your SEO subscription uses this card. </span>
+              {action.subscription_warning}
+            </p>
+          </div>
+        )}
+
         {/* Actions */}
         <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-center">
           <button
@@ -138,6 +191,8 @@ function ConfirmationDialog({
 
 interface BillingInformationProps {
   payment_methods: PaymentMethod[];
+  /** Active SEO subscription, used for the payment alert and removal warning. */
+  active_subscription?: ActiveSeoSubscription | null;
   is_loading?: boolean;
   error?: string | null;
   onAddMethod: () => void;
@@ -308,6 +363,7 @@ function EmptyState({ onAddMethod }: { onAddMethod: () => void }) {
 
 const BillingInformation: React.FC<BillingInformationProps> = ({
   payment_methods,
+  active_subscription = null,
   is_loading = false,
   error = null,
   onAddMethod,
@@ -370,6 +426,11 @@ const BillingInformation: React.FC<BillingInformationProps> = ({
             </button>
           )}
         </div>
+      )}
+
+      {/* SEO subscription payment problem: declined renewal, pending payment or no card */}
+      {active_subscription && (
+        <SubscriptionPaymentAlert subscription={active_subscription} onAddCard={onAddMethod} />
       )}
 
       {/* Header */}
@@ -438,6 +499,7 @@ const BillingInformation: React.FC<BillingInformationProps> = ({
                     method_id: method.id,
                     card_brand: method.card_brand,
                     last_four: method.last_four,
+                    subscription_warning: buildSubscriptionWarning(method, payment_methods, active_subscription),
                   })
                 }
                 onSetDefault={() =>

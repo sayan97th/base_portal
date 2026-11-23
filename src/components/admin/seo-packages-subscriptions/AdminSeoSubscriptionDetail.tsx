@@ -17,6 +17,8 @@ import type {
 import DateField from "@/components/form/date-field/DateField";
 import { AutoRenewSwitch, PaymentCardPicker, ReminderControl, pluralDays } from "./SubscriptionBillingControls";
 import { CancelSubscriptionModal } from "./SubscriptionModals";
+import SubscriptionPaymentHealthCard from "./SubscriptionPaymentHealthCard";
+import { HEALTH_STATE_LABELS, needsAttention } from "./payment-health";
 import {
   CHARGE_STATUS_CONFIG,
   billingCycleProgress,
@@ -210,10 +212,17 @@ function SubscriptionSummary({
   const cycle = is_active ? billingCycleProgress(subscription.next_billing_date, subscription.billing_anchor_day) : null;
   const plan_class = !is_active
     ? detail_styles.isInactive
-    : is_past_due
+    : is_past_due || subscription.payment_health?.severity === "critical"
       ? detail_styles.isPastDue
       : "";
-  const status_tone = !is_active ? "neutral" : is_past_due ? "warning" : "success";
+  const health = subscription.payment_health;
+  const has_payment_issue = is_active && needsAttention(health);
+  const status_tone = !is_active
+    ? "neutral"
+    : has_payment_issue
+      ? health?.severity === "critical" ? "error" : "warning"
+      : "success";
+  const status_label = has_payment_issue && health ? HEALTH_STATE_LABELS[health.state] : is_past_due ? "Past due" : subscription.status;
 
   return (
     <section className={detail_styles.summary} aria-label="Subscription summary">
@@ -249,7 +258,7 @@ function SubscriptionSummary({
           <div className={detail_styles.badges}>
             <span className={detail_styles.badge} data-tone={status_tone}>
               <span className={detail_styles.badgeDot} />
-              {is_past_due ? "Past due" : subscription.status}
+              {status_label}
             </span>
             {is_active && (
               <span className={detail_styles.badge}>{subscription.auto_renew ? "Auto renew on" : "Manual billing"}</span>
@@ -303,8 +312,12 @@ function SubscriptionSummary({
           <div className={detail_styles.stat}>
             <dt>Renewal card</dt>
             <dd>{card ? `${cardBrandLabel(card.card_brand)} •••• ${card.last_four}` : "Default card"}</dd>
-            <span className={detail_styles.statHint}>
-              {summary.card_on_file ? "Card on file" : "No card on file"}
+            <span className={detail_styles.statHint} data-tone={summary.card_on_file ? undefined : "error"}>
+              {summary.card_on_file
+                ? "Card on file"
+                : subscription.payment_health?.card_issue === "expired"
+                  ? "Saved cards expired"
+                  : "No card on file"}
             </span>
           </div>
         </dl>
@@ -417,7 +430,6 @@ export default function AdminSeoSubscriptionDetail({ subscription_id, notice }: 
   const is_active = subscription.status === "active";
   const is_past_due = is_active && subscription.payment_status === "past_due";
   const charges = subscription.charges ?? [];
-  const failed_charge = charges.find((c) => c.status === "failed");
   const card = subscription.payment_profile;
   const has_date_change = Boolean(next_date_draft) && next_date_draft !== subscription.next_billing_date;
 
@@ -487,28 +499,13 @@ export default function AdminSeoSubscriptionDetail({ subscription_id, notice }: 
         is_past_due={is_past_due}
       />
 
-      {/* Past due alert */}
-      {is_past_due && failed_charge && (
-        <div className="flex flex-col gap-3 rounded-2xl border border-warning-200 bg-warning-50 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-warning-500/20 dark:bg-warning-500/10">
-          <div className="text-sm text-warning-800 dark:text-warning-300">
-            <p className="font-semibold">The {failed_charge.period_label} payment failed.</p>
-            <p className="mt-0.5">
-              {failed_charge.failure_message}{" "}
-              {failed_charge.next_retry_at
-                ? `It will be retried automatically on ${formatDate(failed_charge.next_retry_at, { month: "long", day: "numeric" })}.`
-                : "Automatic retries have stopped."}{" "}
-              The client was emailed a link to pay the invoice.
-            </p>
-          </div>
-          {failed_charge.invoice && (
-            <Link
-              href={`/admin/invoices/${failed_charge.invoice.id}`}
-              className="shrink-0 rounded-xl border border-warning-300 bg-white px-3.5 py-2 text-center text-sm font-medium text-warning-800 hover:bg-warning-100 dark:border-warning-500/30 dark:bg-transparent dark:text-warning-300"
-            >
-              View invoice #{failed_charge.invoice.invoice_number}
-            </Link>
-          )}
-        </div>
+      {/* Payment health: declined renewals, pending payments, missing card */}
+      {is_active && subscription.payment_health && (
+        <SubscriptionPaymentHealthCard
+          subscription={subscription}
+          health={subscription.payment_health}
+          onCancel={() => setShowCancel(true)}
+        />
       )}
 
       {/* Row 1: how billing works (left) and which card pays (right) */}
@@ -681,6 +678,7 @@ export default function AdminSeoSubscriptionDetail({ subscription_id, notice }: 
       {show_cancel && (
         <CancelSubscriptionModal
           subscription={subscription}
+          open_invoices={summary.open_invoices ?? []}
           onClose={() => setShowCancel(false)}
           onCancelled={() => {
             setShowCancel(false);

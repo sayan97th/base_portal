@@ -18,7 +18,9 @@ import type {
   AdminClientPaymentProfile,
   AdminSeoSubscription,
   AdminSeoSubscriptionDetail,
+  AdminSeoSubscriptionOpenInvoice,
 } from "@/services/admin/seo-packages-subscription.service";
+import { needsAttention, pluralPeriods } from "./payment-health";
 import {
   cardBrandLabel,
   clientName,
@@ -330,26 +332,44 @@ function KeyboardHint({ show_enter = true }: { show_enter?: boolean }) {
 
 export function CancelSubscriptionModal({
   subscription,
+  open_invoices = [],
   onClose,
   onCancelled,
 }: {
   subscription: AdminSeoSubscription;
+  /** Unpaid invoices of periods that were never collected. */
+  open_invoices?: AdminSeoSubscriptionOpenInvoice[];
   onClose: () => void;
   onCancelled: () => void;
 }) {
   const [notes, setNotes] = useState("");
+  const [void_open_invoices, setVoidOpenInvoices] = useState(false);
   const [is_cancelling, setIsCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const keep_ref = useRef<HTMLButtonElement>(null);
   const notes_id = useId();
   const notes_hint_id = useId();
+  const invoices_label_id = useId();
 
   const notes_length = notes.length;
   const is_near_limit = notes_length >= NOTES_MAX_LENGTH * 0.9;
 
+  const health = subscription.payment_health;
+  const has_payment_issue = needsAttention(health);
+  const open_count = open_invoices.length;
+  const open_total = open_invoices.reduce((total, invoice) => total + Number(invoice.total_amount ?? 0), 0);
+  const invoices_text = `${open_count} unpaid invoice${open_count === 1 ? "" : "s"} (${formatMoney(open_total)})`;
+
   const consequences: Array<{ kind: "stop" | "keep"; text: string }> = [
     { kind: "stop", text: `${clientName(subscription)} will not be charged again for this plan.` },
     { kind: "stop", text: "Any pending payment retries stop immediately." },
+    ...(open_count > 0
+      ? [
+          void_open_invoices
+            ? { kind: "stop" as const, text: `${invoices_text} will be voided and can no longer be paid.` }
+            : { kind: "keep" as const, text: `${invoices_text} stay open, so the client can still pay them.` },
+        ]
+      : []),
     { kind: "keep", text: "Past invoices and the payment history are kept." },
   ];
 
@@ -359,6 +379,7 @@ export function CancelSubscriptionModal({
     try {
       await adminSeoSubscriptionService.cancelSubscription(subscription.id, {
         notes: notes.trim() || undefined,
+        void_open_invoices: open_count > 0 ? void_open_invoices : undefined,
       });
       onCancelled();
     } catch (err) {
@@ -417,6 +438,54 @@ export function CancelSubscriptionModal({
           { label: "Next charge", value: formatDate(subscription.next_billing_date) },
         ]}
       />
+
+      {has_payment_issue && health && health.overdue_periods > 0 && (
+        <Notice tone="warning">
+          This client is {pluralPeriods(health.overdue_periods)} behind with {formatMoney(health.overdue_amount)}{" "}
+          outstanding. Cancelling is a reasonable step when the client is not going to pay.
+        </Notice>
+      )}
+
+      {open_count > 0 && (
+        <fieldset className={styles.choice} aria-labelledby={invoices_label_id}>
+          <legend id={invoices_label_id} className={styles.field_label}>
+            Open invoices
+            <span className={styles.field_optional}>{invoices_text}</span>
+          </legend>
+          <div className={styles.choice_grid}>
+            <label className={joinClasses(styles.choice_option, !void_open_invoices && styles.choice_option_selected)}>
+              <input
+                type="radio"
+                name="open_invoices"
+                checked={!void_open_invoices}
+                onChange={() => setVoidOpenInvoices(false)}
+                disabled={is_cancelling}
+                className={styles.choice_input}
+              />
+              <span className={styles.choice_title}>Keep them open</span>
+              <span className={styles.choice_hint}>The balance can still be collected.</span>
+            </label>
+            <label
+              className={joinClasses(
+                styles.choice_option,
+                styles.choice_option_danger,
+                void_open_invoices && styles.choice_option_selected
+              )}
+            >
+              <input
+                type="radio"
+                name="open_invoices"
+                checked={void_open_invoices}
+                onChange={() => setVoidOpenInvoices(true)}
+                disabled={is_cancelling}
+                className={styles.choice_input}
+              />
+              <span className={styles.choice_title}>Void them</span>
+              <span className={styles.choice_hint}>Write off the balance, nothing is owed.</span>
+            </label>
+          </div>
+        </fieldset>
+      )}
 
       <ul className={styles.consequences}>
         {consequences.map((consequence) => (

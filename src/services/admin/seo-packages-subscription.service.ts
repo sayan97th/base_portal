@@ -15,6 +15,17 @@ export type SeoSubscriptionPricingType = "package" | "custom";
 export type SeoSubscriptionPaymentStatus = "current" | "past_due";
 export type SeoSubscriptionChargeStatus = "pending" | "succeeded" | "failed";
 export type SeoSubscriptionChargeTrigger = "automatic" | "manual" | "external";
+/** List filter: declined renewals, unpaid billing dates, or either. */
+export type SeoSubscriptionPaymentFilter = "past_due" | "pending" | "attention";
+export type SeoSubscriptionHealthState =
+  | "healthy"
+  | "no_payment_method"
+  | "retrying"
+  | "payment_pending"
+  | "payment_failed"
+  | "inactive";
+export type SeoSubscriptionHealthSeverity = "ok" | "warning" | "critical";
+export type SeoSubscriptionCardIssue = "missing" | "expired";
 
 export interface AdminSeoSubscriptionUser {
   id: number;
@@ -67,6 +78,50 @@ export interface AdminSeoSubscriptionCharge {
   created_at: string;
 }
 
+export interface AdminSeoSubscriptionFailure {
+  charge_id: number;
+  period_label: string;
+  period_start: string | null;
+  amount: number;
+  /** Processor decline code, e.g. "insufficient_funds" or "no_payment_method". */
+  code: string | null;
+  /** Raw decline message, admin only. */
+  message: string | null;
+  /** Plain language reason the client was given. */
+  client_reason: string;
+  attempt_count: number;
+  max_attempts: number;
+  last_attempt_at: string | null;
+  next_retry_at: string | null;
+  is_retryable: boolean;
+  card_label: string | null;
+}
+
+export interface AdminSeoSubscriptionOpenInvoice {
+  id: string;
+  unique_id: string;
+  invoice_number: string;
+  status: string;
+  total_amount?: number;
+}
+
+/** Derived on every read by the API, never stored. */
+export interface AdminSeoSubscriptionPaymentHealth {
+  state: SeoSubscriptionHealthState;
+  severity: SeoSubscriptionHealthSeverity;
+  /** Billing periods owed: passed billing dates plus declined periods. */
+  overdue_periods: number;
+  overdue_amount: number;
+  oldest_due_date: string | null;
+  days_overdue: number;
+  /** True once the client is two or more periods behind. */
+  suggest_cancellation: boolean;
+  has_usable_card: boolean;
+  card_issue: SeoSubscriptionCardIssue | null;
+  failure: AdminSeoSubscriptionFailure | null;
+  open_invoice: AdminSeoSubscriptionOpenInvoice | null;
+}
+
 export interface AdminSeoSubscription {
   id: number;
   user: AdminSeoSubscriptionUser;
@@ -91,6 +146,7 @@ export interface AdminSeoSubscription {
   /** Charge date (YYYY-MM-DD) the last reminder email was sent for. */
   last_reminder_sent_for?: string | null;
   payment_status: SeoSubscriptionPaymentStatus;
+  payment_health?: AdminSeoSubscriptionPaymentHealth;
   payment_profile_id: string | null;
   payment_profile?: AdminSeoSubscriptionCard | null;
   last_charge?: AdminSeoSubscriptionCharge | null;
@@ -109,6 +165,8 @@ export interface AdminSeoSubscriptionSummary {
   failed_count: number;
   upcoming: AdminSeoSubscriptionUpcomingCharge[];
   card_on_file: boolean;
+  /** Unpaid invoices that can be kept open or voided when cancelling. */
+  open_invoices?: AdminSeoSubscriptionOpenInvoice[];
 }
 
 export interface AdminSeoSubscriptionDetail {
@@ -127,7 +185,7 @@ export interface AdminSeoSubscriptionFilters {
   sort_field?: SeoSubscriptionSortField;
   sort_direction?: SortDirection;
   package_id?: string;
-  payment_status?: SeoSubscriptionPaymentStatus;
+  payment_status?: SeoSubscriptionPaymentFilter;
 }
 
 export interface AdminSeoSubscriptionListResponse {
@@ -144,6 +202,9 @@ export interface SeoSubscriptionStats {
   cancelled: number;
   expired: number;
   past_due: number;
+  /** Active, a billing date passed and nothing was charged. */
+  payment_pending: number;
+  needs_attention: number;
   auto_renew: number;
   monthly_recurring: number;
   renewing_next_7_days: number;
@@ -181,6 +242,8 @@ export type UpdateSeoSubscriptionPayload = Partial<
 
 export interface CancelSeoSubscriptionPayload {
   notes?: string;
+  /** Void the unpaid invoices of periods that were never collected. */
+  void_open_invoices?: boolean;
 }
 
 export interface AdminUserSearchResult {

@@ -8,6 +8,7 @@ import type {
   AdminSeoSubscription,
   AdminSeoSubscriptionCharge,
   AdminSeoSubscriptionDetail,
+  AdminSeoSubscriptionPaymentHealth,
   SeoSubscriptionStats,
 } from "@/services/admin/seo-packages-subscription.service";
 
@@ -99,6 +100,25 @@ export function makeCard(overrides: Partial<AdminClientPaymentProfile> = {}): Ad
   };
 }
 
+export function makeHealth(
+  overrides: Partial<AdminSeoSubscriptionPaymentHealth> = {}
+): AdminSeoSubscriptionPaymentHealth {
+  return {
+    state: "healthy",
+    severity: "ok",
+    overdue_periods: 0,
+    overdue_amount: 0,
+    oldest_due_date: null,
+    days_overdue: 0,
+    suggest_cancellation: false,
+    has_usable_card: true,
+    card_issue: null,
+    failure: null,
+    open_invoice: null,
+    ...overrides,
+  };
+}
+
 export function makeStats(overrides: Partial<SeoSubscriptionStats> = {}): SeoSubscriptionStats {
   return {
     total: 5,
@@ -106,6 +126,8 @@ export function makeStats(overrides: Partial<SeoSubscriptionStats> = {}): SeoSub
     cancelled: 1,
     expired: 1,
     past_due: 1,
+    payment_pending: 0,
+    needs_attention: 1,
     auto_renew: 2,
     monthly_recurring: 4498,
     renewing_next_7_days: 1,

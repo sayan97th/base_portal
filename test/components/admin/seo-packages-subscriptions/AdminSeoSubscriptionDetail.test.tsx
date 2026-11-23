@@ -8,7 +8,7 @@
 import React from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import AdminSeoSubscriptionDetail from "@/components/admin/seo-packages-subscriptions/AdminSeoSubscriptionDetail";
-import { freezeToday, makeCard, makeCharge, makeDetail } from "./fixtures";
+import { freezeToday, makeCard, makeCharge, makeDetail, makeHealth } from "./fixtures";
 
 jest.mock("next/link", () => ({
   __esModule: true,
@@ -104,27 +104,108 @@ describe("AdminSeoSubscriptionDetail", () => {
     expect(screen.getByText("No payments yet")).toBeInTheDocument();
   });
 
-  it("warns about a past due payment and offers to retry it", async () => {
+  it("explains a failed renewal with the decline reason, the balance and every way to resolve it", async () => {
+    const invoice = { id: "inv-1", unique_id: "ABC123", invoice_number: "BSM-1042", status: "unpaid" };
     service.fetchSubscriptionDetail.mockResolvedValue(
       makeDetail({
         payment_status: "past_due",
-        charges: [
-          makeCharge({
+        payment_health: makeHealth({
+          state: "payment_failed",
+          severity: "critical",
+          overdue_periods: 2,
+          overdue_amount: 4000,
+          oldest_due_date: "2026-10-01",
+          days_overdue: 52,
+          suggest_cancellation: true,
+          open_invoice: invoice,
+          failure: {
+            charge_id: 1,
             period_label: "November 2026",
-            status: "failed",
-            failure_message: "The card was declined.",
+            period_start: "2026-11-01",
+            amount: 2000,
+            code: "insufficient_funds",
+            message: "Your card has insufficient funds.",
+            client_reason: "Your bank declined the payment due to insufficient funds.",
+            attempt_count: 4,
+            max_attempts: 4,
+            last_attempt_at: "2026-11-16T15:00:00Z",
             next_retry_at: null,
-            invoice: { id: "inv-1", unique_id: "ABC123", invoice_number: "BSM-1042", status: "unpaid", total_amount: 2000 },
-          }),
-        ],
+            is_retryable: true,
+            card_label: "Visa ending in 4242",
+          },
+        }),
+        charges: [makeCharge({ period_label: "November 2026", status: "failed", next_retry_at: null })],
       })
     );
     await renderPage();
 
-    expect(screen.getByText("The November 2026 payment failed.")).toBeInTheDocument();
-    expect(screen.getByText(/Automatic retries have stopped/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "View invoice #BSM-1042" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Retry payment now/ })).toBeInTheDocument();
+    const card = screen.getByRole("alert", { name: "Automatic renewal failed, action needed" });
+    expect(within(card).getByText(/Automatic retries stopped after 4 attempts/)).toBeInTheDocument();
+    expect(within(card).getByText("$4,000.00")).toBeInTheDocument();
+    expect(within(card).getByText("Insufficient funds")).toBeInTheDocument();
+    expect(within(card).getByText("Your card has insufficient funds.")).toBeInTheDocument();
+    expect(within(card).getByText("Your bank declined the payment due to insufficient funds.")).toBeInTheDocument();
+    expect(within(card).getByText(/You can keep trying to collect, or cancel the subscription now/)).toBeInTheDocument();
+    expect(within(card).getByRole("link", { name: /Invoice #BSM-1042/ })).toHaveAttribute("href", "/admin/invoices/inv-1");
+    expect(within(card).getByRole("link", { name: /Retry payment now/ })).toHaveAttribute(
+      "href",
+      "/admin/seo-packages-subscriptions/7/charge"
+    );
+
+    fireEvent.click(within(card).getByRole("button", { name: /Cancel subscription/ }));
+    expect(await screen.findByRole("alertdialog", { name: "Cancel subscription?" })).toBeInTheDocument();
+    expect(screen.getByText(/2 months behind with \$4,000.00 outstanding/)).toBeInTheDocument();
+  });
+
+  it("shows a pending payment when billing dates passed without a charge", async () => {
+    service.fetchSubscriptionDetail.mockResolvedValue(
+      makeDetail({
+        auto_renew: false,
+        payment_health: makeHealth({
+          state: "payment_pending",
+          severity: "warning",
+          overdue_periods: 1,
+          overdue_amount: 2000,
+          oldest_due_date: "2026-11-01",
+          days_overdue: 21,
+        }),
+      })
+    );
+    await renderPage();
+
+    expect(screen.getByRole("status", { name: "Payment pending for 1 month" })).toBeInTheDocument();
+    expect(screen.getByText(/Billing is manual and no charge was made since November 1, 2026/)).toBeInTheDocument();
+  });
+
+  it("does not show the payment health card while payments are up to date", async () => {
+    service.fetchSubscriptionDetail.mockResolvedValue(makeDetail({ payment_health: makeHealth() }));
+    await renderPage();
+
+    expect(screen.queryByText(/Why it failed/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: /Payment pending/ })).not.toBeInTheDocument();
+  });
+
+  it("lets the admin void the open invoices when cancelling", async () => {
+    service.fetchSubscriptionDetail.mockResolvedValue(
+      makeDetail(
+        { payment_health: makeHealth() },
+        { open_invoices: [{ id: "inv-1", unique_id: "ABC123", invoice_number: "BSM-1042", status: "unpaid", total_amount: 2000 }] }
+      )
+    );
+    service.cancelSubscription.mockResolvedValue(makeDetail().data);
+    await renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: /Cancel subscription/ }));
+    const dialog = await screen.findByRole("alertdialog", { name: "Cancel subscription?" });
+    expect(within(dialog).getByText(/1 unpaid invoice \(\$2,000.00\) stay open/)).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole("radio", { name: /Void them/ }));
+    expect(within(dialog).getByText(/will be voided and can no longer be paid/)).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: /Yes, cancel/ }));
+    await waitFor(() =>
+      expect(service.cancelSubscription).toHaveBeenCalledWith(7, { notes: undefined, void_open_invoices: true })
+    );
   });
 
   it("links to the edit page", async () => {
