@@ -300,7 +300,7 @@ export default function AdminSeoSubscriptionDetail({ subscription_id }: Props) {
               <p className="truncate text-lg font-semibold">{name}</p>
               <p className="truncate text-sm opacity-80">
                 {subscription.user.email}
-                {subscription.user.organization ? ` · ${subscription.user.organization}` : ""}
+                {subscription.user.company ? ` · ${subscription.user.company}` : ""}
               </p>
             </div>
           </div>

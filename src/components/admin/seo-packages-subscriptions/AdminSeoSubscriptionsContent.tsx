@@ -333,7 +333,7 @@ export default function AdminSeoSubscriptionsContent() {
               setSearchInput(e.target.value);
               setPage(1);
             }}
-            placeholder="Search by client, email, or plan…"
+            placeholder="Search by client, company, email, or plan…"
             className="h-10 w-full rounded-xl border border-gray-200 bg-white pl-10 pr-4 text-sm text-gray-900 placeholder-gray-400 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:placeholder-gray-500"
           />
         </div>
@@ -449,6 +449,9 @@ export default function AdminSeoSubscriptionsContent() {
                     >
                       <td className="px-5 py-4">
                         <p className="font-medium text-gray-900 dark:text-white">{clientName(sub)}</p>
+                        {sub.user.company && (
+                          <p className="text-xs font-medium text-gray-600 dark:text-gray-300">{sub.user.company}</p>
+                        )}
                         <p className="text-xs text-gray-500 dark:text-gray-400">{sub.user.email}</p>
                       </td>
                       <td className="px-5 py-4">

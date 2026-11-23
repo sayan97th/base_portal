@@ -126,7 +126,7 @@ export default function ActivateSubscriptionModal({ onSuccess, onCancel }: Props
       (c) =>
         `${c.first_name} ${c.last_name}`.toLowerCase().includes(query) ||
         c.email.toLowerCase().includes(query) ||
-        (c.organization ?? "").toLowerCase().includes(query)
+        (c.company ?? "").toLowerCase().includes(query)
     );
   }, [all_clients, client_filter]);
 
@@ -286,7 +286,9 @@ export default function ActivateSubscriptionModal({ onSuccess, onCancel }: Props
                         </span>
                         <span className="truncate text-gray-900 dark:text-white">
                           {selected_user.first_name} {selected_user.last_name}
-                          <span className="ml-1.5 text-gray-400">{selected_user.email}</span>
+                          <span className="ml-1.5 text-gray-400">
+                            {selected_user.company || selected_user.email}
+                          </span>
                         </span>
                       </span>
                     ) : (
@@ -307,7 +309,7 @@ export default function ActivateSubscriptionModal({ onSuccess, onCancel }: Props
                           type="text"
                           value={client_filter}
                           onChange={(e) => setClientFilter(e.target.value)}
-                          placeholder="Search by name, email or organization…"
+                          placeholder="Search by name, email or company…"
                           autoFocus
                           autoComplete="off"
                           className="h-9 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 text-sm text-gray-900 placeholder-gray-400 focus:border-brand-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
@@ -329,7 +331,7 @@ export default function ActivateSubscriptionModal({ onSuccess, onCancel }: Props
                               </span>
                               <span className="text-xs text-gray-500 dark:text-gray-400">
                                 {client.email}
-                                {client.organization ? ` · ${client.organization}` : ""}
+                                {client.company ? ` · ${client.company}` : ""}
                               </span>
                             </button>
                           ))

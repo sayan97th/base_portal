@@ -21,7 +21,8 @@ export interface AdminSeoSubscriptionUser {
   first_name: string;
   last_name: string;
   email: string;
-  organization?: string;
+  company?: string | null;
+  organization?: string | null;
 }
 
 export interface AdminSeoSubscriptionPackage {
@@ -183,7 +184,10 @@ export interface AdminUserSearchResult {
   first_name: string;
   last_name: string;
   email: string;
-  organization?: string;
+  /** Free text company name, the easiest way to identify a client. */
+  company?: string | null;
+  /** /api/admin/users returns the organization relation as an object. */
+  organization?: { id: number; name: string } | null;
 }
 
 export interface AdminClientPaymentProfile {
