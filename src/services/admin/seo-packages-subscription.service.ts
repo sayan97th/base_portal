@@ -88,6 +88,8 @@ export interface AdminSeoSubscription {
   billing_anchor_day: number | null;
   next_billing_date: string | null;
   reminder_days_before: number | null;
+  /** Charge date (YYYY-MM-DD) the last reminder email was sent for. */
+  last_reminder_sent_for?: string | null;
   payment_status: SeoSubscriptionPaymentStatus;
   payment_profile_id: string | null;
   payment_profile?: AdminSeoSubscriptionCard | null;

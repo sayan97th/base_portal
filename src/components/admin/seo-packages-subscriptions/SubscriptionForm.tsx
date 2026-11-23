@@ -23,6 +23,7 @@ import {
   DEFAULT_REMINDER_DAYS,
   PaymentCardPicker,
   ReminderControl,
+  pluralDays,
 } from "./SubscriptionBillingControls";
 import {
   buildChargeSchedule,
@@ -698,7 +699,13 @@ export default function SubscriptionForm({ mode, subscription }: Props) {
             )}
 
             <div className="mt-5">
-              <ReminderControl value={reminder_days} is_auto_renew={auto_renew} onChange={setReminderDays} />
+              <ReminderControl
+                value={reminder_days}
+                is_auto_renew={auto_renew}
+                next_charge_date={first_billing_date}
+                last_reminder_sent_for={is_edit ? subscription?.last_reminder_sent_for : null}
+                onChange={setReminderDays}
+              />
             </div>
 
             {!is_edit && is_first_billing_today && has_usable_card && (
@@ -808,7 +815,7 @@ export default function SubscriptionForm({ mode, subscription }: Props) {
               <div className={styles.previewRow}>
                 <dt>Reminder email</dt>
                 <dd>
-                  {auto_renew && reminder_days ? `${reminder_days} day${reminder_days === 1 ? "" : "s"} before` : "Off"}
+                  {auto_renew && reminder_days ? `${pluralDays(reminder_days)} before` : "Off"}
                 </dd>
               </div>
             </dl>

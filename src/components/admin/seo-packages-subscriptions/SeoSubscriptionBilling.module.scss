@@ -797,16 +797,19 @@ $card_brands: (
   }
 }
 
-.chipGroup {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+.reminderBody {
   margin-top: 12px;
   padding-left: 46px;
 
   @media (max-width: 480px) {
     padding-left: 0;
   }
+}
+
+.chipGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .chip {
@@ -835,6 +838,459 @@ $card_brands: (
   @include dark {
     border-color: var(--color-gray-700);
     background: var(--color-gray-800);
+  }
+}
+
+// Custom chip: dashed outline until chosen, so it reads as "make your own".
+.chipCustom {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-style: dashed;
+
+  svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  &.isActive {
+    border-style: solid;
+  }
+}
+
+// ── Custom reminder editor ───────────────────────────────────────────────────
+
+@keyframes reminderPanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.customPanel {
+  position: relative;
+  margin-top: 12px;
+  border: 1px solid rgba(236, 60, 137, 0.22);
+  border-radius: 16px;
+  padding: 16px;
+  background:
+    radial-gradient(120% 140% at 100% 0%, rgba(139, 92, 246, 0.1), transparent 55%),
+    radial-gradient(120% 140% at 0% 100%, rgba(236, 60, 137, 0.08), transparent 55%),
+    #fff;
+  box-shadow: 0 12px 28px -18px rgba(139, 92, 246, 0.55), 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+  animation: reminderPanelIn 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+
+  @include dark {
+    border-color: rgba(236, 60, 137, 0.28);
+    background:
+      radial-gradient(120% 140% at 100% 0%, rgba(139, 92, 246, 0.16), transparent 55%),
+      radial-gradient(120% 140% at 0% 100%, rgba(236, 60, 137, 0.12), transparent 55%),
+      var(--color-gray-900);
+    box-shadow: none;
+  }
+}
+
+.customTop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+// Stepper: minus, big number, plus
+
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid $gray_200;
+  border-radius: 14px;
+  padding: 4px;
+  background: #fff;
+  box-shadow: 0 2px 6px -3px rgba(16, 24, 40, 0.12);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  &:focus-within {
+    border-color: rgba(236, 60, 137, 0.55);
+    box-shadow: 0 0 0 4px rgba(236, 60, 137, 0.12);
+  }
+
+  @include dark {
+    border-color: var(--color-gray-700);
+    background: var(--color-gray-800);
+  }
+}
+
+.stepperButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: $gray_500;
+  background: $gray_50;
+  transition: color 0.12s ease, background-color 0.12s ease, transform 0.12s ease;
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  &:hover:not(:disabled) {
+    color: $brand_500;
+    background: $brand_50;
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.92);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+  }
+
+  @include dark {
+    color: var(--color-gray-400);
+    background: rgba(255, 255, 255, 0.05);
+
+    &:hover:not(:disabled) {
+      background: rgba(236, 60, 137, 0.15);
+    }
+  }
+}
+
+.stepperField {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  min-width: 84px;
+  padding: 0 6px;
+  cursor: text;
+}
+
+.stepperInput {
+  width: 2.2ch;
+  border: 0;
+  padding: 0;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: $gray_900;
+  background: transparent;
+  outline: none;
+  -moz-appearance: textfield;
+  appearance: textfield;
+
+  &::-webkit-outer-spin-button,
+  &::-webkit-inner-spin-button {
+    margin: 0;
+    -webkit-appearance: none;
+  }
+
+  &[aria-invalid="true"] {
+    color: $error_500;
+  }
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.stepperUnit {
+  font-size: 12px;
+  font-weight: 600;
+  color: $gray_400;
+}
+
+// Mini timeline: reminder email, gap in days, charge
+
+.customTimeline {
+  display: flex;
+  flex: 1 1 180px;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.timelineDot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  &[data-kind="reminder"] {
+    color: $brand_500;
+    background: $brand_50;
+    box-shadow: 0 0 0 4px rgba(236, 60, 137, 0.08);
+  }
+
+  &[data-kind="charge"] {
+    color: #fff;
+    background: linear-gradient(135deg, $hero_from, $hero_to);
+    box-shadow: 0 4px 10px -4px rgba(139, 92, 246, 0.7);
+  }
+
+  @include dark {
+    &[data-kind="reminder"] {
+      background: rgba(236, 60, 137, 0.15);
+    }
+  }
+}
+
+.timelineLine {
+  position: relative;
+  display: flex;
+  flex: 1;
+  justify-content: center;
+  height: 2px;
+  border-radius: 2px;
+  background: repeating-linear-gradient(90deg, rgba(236, 60, 137, 0.55) 0 6px, transparent 6px 11px);
+
+  span {
+    position: absolute;
+    top: 50%;
+    border-radius: 999px;
+    padding: 2px 9px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+    color: $brand_600;
+    background: #fff;
+    box-shadow: 0 0 0 1px rgba(236, 60, 137, 0.25);
+    transform: translateY(-50%);
+  }
+
+  @include dark {
+    span {
+      color: var(--color-brand-300);
+      background: var(--color-gray-900);
+    }
+  }
+}
+
+// Gradient range slider with clickable ticks
+
+.rangeWrap {
+  position: relative;
+  margin-top: 18px;
+  padding-bottom: 20px;
+}
+
+@mixin rangeThumb {
+  width: 20px;
+  height: 20px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: linear-gradient(135deg, $hero_from, $hero_to);
+  box-shadow: 0 2px 8px -1px rgba(139, 92, 246, 0.6);
+  cursor: grab;
+  transition: transform 0.12s ease;
+}
+
+.range {
+  display: block;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, $hero_from, $hero_to) 0 / var(--range_fill, 0%) 100% no-repeat, $gray_200;
+  cursor: pointer;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    @include rangeThumb;
+  }
+
+  &::-moz-range-thumb {
+    @include rangeThumb;
+  }
+
+  &:active::-webkit-slider-thumb {
+    cursor: grabbing;
+    transform: scale(1.15);
+  }
+
+  &:active::-moz-range-thumb {
+    cursor: grabbing;
+    transform: scale(1.15);
+  }
+
+  &:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 5px rgba(236, 60, 137, 0.22);
+  }
+
+  &:focus-visible::-moz-range-thumb {
+    box-shadow: 0 0 0 5px rgba(236, 60, 137, 0.22);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+  }
+
+  @include dark {
+    background: linear-gradient(90deg, $hero_from, $hero_to) 0 / var(--range_fill, 0%) 100% no-repeat, var(--color-gray-700);
+
+    &::-webkit-slider-thumb {
+      border-color: var(--color-gray-900);
+    }
+
+    &::-moz-range-thumb {
+      border-color: var(--color-gray-900);
+    }
+  }
+}
+
+// The ticks sit under the slider track. Offsets keep 1d and 28d aligned
+// with the thumb at both ends of the track.
+.rangeTicks {
+  position: absolute;
+  right: 10px;
+  bottom: 0;
+  left: 10px;
+  height: 16px;
+
+  button {
+    position: absolute;
+    top: 0;
+    border-radius: 6px;
+    padding: 0 4px;
+    font-size: 10.5px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: $gray_400;
+    transform: translateX(-50%);
+    transition: color 0.12s ease;
+
+    &:hover:not(:disabled),
+    &.isActive {
+      color: $brand_500;
+    }
+  }
+}
+
+.customFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-top: 14px;
+  border-top: 1px dashed $gray_200;
+  padding-top: 12px;
+
+  @include dark {
+    border-top-color: var(--color-gray-700);
+  }
+}
+
+.customHint {
+  flex: 1 1 200px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: $gray_500;
+
+  &.isError {
+    font-weight: 600;
+    color: $error_500;
+  }
+}
+
+.customActions {
+  display: flex;
+  gap: 8px;
+}
+
+.customCancel,
+.customApply {
+  height: 32px;
+  border-radius: 10px;
+  padding: 0 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  transition: all 0.12s ease;
+}
+
+.customCancel {
+  color: $gray_500;
+
+  &:hover {
+    color: $gray_900;
+    background: $gray_100;
+  }
+
+  @include dark {
+    &:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.06);
+    }
+  }
+}
+
+.customApply {
+  color: #fff;
+  background: linear-gradient(90deg, $hero_from, $hero_to);
+  box-shadow: 0 6px 14px -6px rgba(236, 60, 137, 0.7);
+
+  &:hover:not(:disabled) {
+    filter: brightness(1.06);
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+    box-shadow: none;
+  }
+}
+
+// "Next reminder goes out on ..." line under the chips
+
+.reminderPreview {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  border-radius: 999px;
+  padding: 4px 10px 4px 8px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: $gray_700;
+  background: rgba(139, 92, 246, 0.07);
+
+  svg {
+    flex-shrink: 0;
+    width: 13px;
+    height: 13px;
+    color: $hero_to;
+  }
+
+  @include dark {
+    color: var(--color-gray-300);
+    background: rgba(139, 92, 246, 0.14);
   }
 }
 

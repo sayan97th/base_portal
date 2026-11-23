@@ -15,7 +15,7 @@ import type {
   UpdateSeoSubscriptionPayload,
 } from "@/services/admin/seo-packages-subscription.service";
 import DateField from "@/components/form/date-field/DateField";
-import { AutoRenewSwitch, PaymentCardPicker, ReminderControl } from "./SubscriptionBillingControls";
+import { AutoRenewSwitch, PaymentCardPicker, ReminderControl, pluralDays } from "./SubscriptionBillingControls";
 import { CancelSubscriptionModal, ChargeNowModal } from "./SubscriptionModals";
 import {
   CHARGE_STATUS_CONFIG,
@@ -577,11 +577,13 @@ export default function AdminSeoSubscriptionDetail({ subscription_id, notice }: 
                 value={subscription.reminder_days_before || null}
                 is_auto_renew={subscription.auto_renew}
                 disabled={!is_active || saving_field === "reminder_days_before"}
+                next_charge_date={subscription.next_billing_date}
+                last_reminder_sent_for={subscription.last_reminder_sent_for}
                 onChange={(days) =>
                   saveSettings(
                     "reminder_days_before",
                     { reminder_days_before: days },
-                    days ? `Renewal reminder set to ${days} day${days === 1 ? "" : "s"} before.` : "Renewal reminder email turned off."
+                    days ? `Renewal reminder set to ${pluralDays(days)} before.` : "Renewal reminder email turned off."
                   )
                 }
               />
