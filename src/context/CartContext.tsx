@@ -166,7 +166,15 @@ const CartContext = createContext<CartContextType | null>(null);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
-  const [applied_coupons, setAppliedCoupons] = useState<CartAppliedCoupon[]>([]);
+  const [applied_coupons, setAppliedCouponsState] = useState<CartAppliedCoupon[]>([]);
+
+  // Only one promo code per order: every write goes through this setter, so
+  // no caller can ever stack promo codes in the cart.
+  const setAppliedCoupons = useCallback<Dispatch<SetStateAction<CartAppliedCoupon[]>>>((action) => {
+    setAppliedCouponsState((prev) =>
+      limitToSinglePromoCode(typeof action === "function" ? action(prev) : action)
+    );
+  }, []);
   const [coupon_input_code, setCouponInputCode] = useState("");
   const [order_title, setOrderTitle] = useState("");
   const [order_notes, setOrderNotes] = useState("");
