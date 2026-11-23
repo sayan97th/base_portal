@@ -211,6 +211,62 @@ describe("AdminSeoSubscriptionDetail", () => {
     );
   });
 
+  it("labels the summary badge with the payment state", async () => {
+    service.fetchSubscriptionDetail.mockResolvedValue(
+      makeDetail({
+        payment_health: makeHealth({ state: "payment_pending", severity: "warning", overdue_periods: 1, overdue_amount: 2000 }),
+      })
+    );
+    await renderPage();
+
+    // Badge in the summary plus the chip in the health card.
+    expect(screen.getAllByText("Payment pending").length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("says when every saved card has expired", async () => {
+    service.fetchSubscriptionDetail.mockResolvedValue(
+      makeDetail(
+        { payment_health: makeHealth({ state: "no_payment_method", severity: "warning", has_usable_card: false, card_issue: "expired" }) },
+        { card_on_file: false }
+      )
+    );
+    await renderPage();
+
+    expect(screen.getByText("Saved cards expired")).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "The client's saved cards have expired" })).toBeInTheDocument();
+  });
+
+  it("removes the payment health card once the subscription is cancelled from it", async () => {
+    service.fetchSubscriptionDetail.mockResolvedValue(
+      makeDetail({
+        payment_status: "past_due",
+        payment_health: makeHealth({
+          state: "payment_pending",
+          severity: "critical",
+          overdue_periods: 2,
+          overdue_amount: 4000,
+          suggest_cancellation: true,
+        }),
+      })
+    );
+    service.cancelSubscription.mockResolvedValue(makeDetail().data);
+    await renderPage();
+
+    const card = screen.getByRole("alert", { name: "Payment pending for 2 months" });
+    service.fetchSubscriptionDetail.mockResolvedValue(
+      makeDetail({ status: "cancelled", auto_renew: false, payment_health: makeHealth({ state: "inactive" }) })
+    );
+
+    fireEvent.click(within(card).getByRole("button", { name: /Cancel subscription/ }));
+    const dialog = await screen.findByRole("alertdialog", { name: "Cancel subscription?" });
+    fireEvent.click(within(dialog).getByRole("button", { name: /Yes, cancel/ }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("alert", { name: "Payment pending for 2 months" })).not.toBeInTheDocument()
+    );
+    expect(service.fetchSubscriptionDetail).toHaveBeenCalledTimes(2);
+  });
+
   it("links to the edit page", async () => {
     await renderPage();
 

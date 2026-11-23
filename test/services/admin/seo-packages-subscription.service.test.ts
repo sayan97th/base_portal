@@ -119,6 +119,33 @@ describe("admin SEO subscription service", () => {
     expect(mocked.patch).toHaveBeenCalledWith(`${BASE_URL}/9`, { next_billing_date: "2026-11-22", timezone: "America/Denver" });
   });
 
+  it.each(["past_due", "pending", "attention"] as const)("sends the %s payment filter", async (payment_status) => {
+    await adminSeoSubscriptionService.fetchSubscriptions({ payment_status });
+
+    expect(mocked.get).toHaveBeenCalledWith(`${BASE_URL}?payment_status=${payment_status}`);
+  });
+
+  it("asks to void the open invoices only when the admin chose to", async () => {
+    await adminSeoSubscriptionService.cancelSubscription(7, { notes: "Stopped paying", void_open_invoices: true });
+    expect(mocked.patch).toHaveBeenLastCalledWith(`${BASE_URL}/7/cancel`, {
+      notes: "Stopped paying",
+      void_open_invoices: true,
+    });
+
+    await adminSeoSubscriptionService.cancelSubscription(7);
+    expect(mocked.patch).toHaveBeenLastCalledWith(`${BASE_URL}/7/cancel`, {});
+  });
+
+  it("returns the detail with its payment health and open invoices untouched", async () => {
+    const detail = {
+      data: { id: 7, payment_health: { state: "retrying", overdue_periods: 1 } },
+      summary: { open_invoices: [{ id: "inv-1", total_amount: 2000 }] },
+    };
+    mocked.get.mockResolvedValueOnce(detail);
+
+    await expect(adminSeoSubscriptionService.fetchSubscriptionDetail(7)).resolves.toEqual(detail);
+  });
+
   it("loads the cards on file of a client", async () => {
     mocked.get.mockResolvedValueOnce({ data: [{ id: "card-1" }] });
 

@@ -6,7 +6,7 @@
 import React from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import AdminSeoSubscriptionsContent from "@/components/admin/seo-packages-subscriptions/AdminSeoSubscriptionsContent";
-import { freezeToday, makeCharge, makeStats, makeSubscription } from "./fixtures";
+import { freezeToday, makeCharge, makeHealth, makeStats, makeSubscription } from "./fixtures";
 
 const mock_push = jest.fn();
 
@@ -213,5 +213,104 @@ describe("AdminSeoSubscriptionsContent", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     await waitFor(() => expect(service.fetchSubscriptions).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 })));
+  });
+});
+
+describe("AdminSeoSubscriptionsContent payment health", () => {
+  function healthRow(id: number, name: string, health: Parameters<typeof makeHealth>[0], extra = {}) {
+    return makeSubscription({
+      id,
+      user: { id: id + 100, first_name: name, last_name: "Client", email: `${name.toLowerCase()}@example.com`, company: null },
+      payment_health: makeHealth(health),
+      ...extra,
+    });
+  }
+
+  it("labels each row with its payment state and how far behind it is", async () => {
+    service.fetchSubscriptions.mockResolvedValue(
+      listResponse([
+        healthRow(21, "Pending", { state: "payment_pending", severity: "critical", overdue_periods: 2, overdue_amount: 4000 }),
+        healthRow(22, "Retrying", {
+          state: "retrying",
+          severity: "warning",
+          overdue_periods: 1,
+          overdue_amount: 2000,
+          failure: {
+            charge_id: 1,
+            period_label: "November 2026",
+            period_start: "2026-11-01",
+            amount: 2000,
+            code: "card_declined",
+            message: "Declined",
+            client_reason: "Your bank declined the payment.",
+            attempt_count: 1,
+            max_attempts: 4,
+            last_attempt_at: null,
+            next_retry_at: "2026-11-25T15:00:00Z",
+            is_retryable: true,
+            card_label: null,
+          },
+        }),
+        healthRow(23, "Nocard", { state: "no_payment_method", severity: "warning", card_issue: "missing" }, { next_billing_date: "2026-12-20" }),
+        healthRow(24, "Healthy", { state: "healthy" }, { next_billing_date: "2026-12-01" }),
+      ])
+    );
+    render(<AdminSeoSubscriptionsContent />);
+    await screen.findByText("Pending Client");
+
+    const pending = rowOf("Pending Client");
+    expect(within(pending).getByText("Payment pending")).toBeInTheDocument();
+    expect(within(pending).getByText("2 months behind, $4,000")).toBeInTheDocument();
+
+    const retrying = rowOf("Retrying Client");
+    expect(within(retrying).getByText("Retry scheduled")).toBeInTheDocument();
+    expect(within(retrying).getByText("1 month behind, $2,000")).toBeInTheDocument();
+    expect(within(retrying).getByText("Retry Nov 25")).toBeInTheDocument();
+
+    const no_card = rowOf("Nocard Client");
+    expect(within(no_card).getByText("No card on file")).toBeInTheDocument();
+    expect(within(no_card).getByText("Renews Dec 20")).toBeInTheDocument();
+
+    const healthy = rowOf("Healthy Client");
+    expect(within(healthy).queryByText("Payment pending")).not.toBeInTheDocument();
+    expect(within(healthy).getByText("Dec 1, 2026")).toBeInTheDocument();
+  });
+
+  it("falls back to the past due badge when the API sends no payment health", async () => {
+    render(<AdminSeoSubscriptionsContent />);
+    await screen.findByText("Kevin Martinez");
+
+    expect(within(rowOf("Kevin Martinez")).getByText("Past due")).toBeInTheDocument();
+  });
+
+  it.each([
+    ["Needs attention", "attention"],
+    ["Payment failed", "past_due"],
+    ["Payment pending", "pending"],
+  ])("filters by %s", async (label, value) => {
+    render(<AdminSeoSubscriptionsContent />);
+    await screen.findByText("Cathleen Siech");
+
+    fireEvent.change(screen.getByDisplayValue("All Payments"), { target: { value } });
+
+    await waitFor(() =>
+      expect(service.fetchSubscriptions).toHaveBeenLastCalledWith(expect.objectContaining({ payment_status: value, page: 1 }))
+    );
+    expect(screen.getByRole("option", { name: label })).toBeInTheDocument();
+  });
+
+  it("shows how many subscriptions need attention and why", async () => {
+    service.fetchStats.mockResolvedValue(makeStats({ past_due: 2, payment_pending: 3, needs_attention: 5 }));
+    render(<AdminSeoSubscriptionsContent />);
+
+    expect(await screen.findByText("2 failed, 3 pending")).toBeInTheDocument();
+    expect(screen.getByText("5")).toBeInTheDocument();
+  });
+
+  it("says all payments are current when nothing needs attention", async () => {
+    service.fetchStats.mockResolvedValue(makeStats({ past_due: 0, payment_pending: 0, needs_attention: 0 }));
+    render(<AdminSeoSubscriptionsContent />);
+
+    expect(await screen.findByText("All payments current")).toBeInTheDocument();
   });
 });

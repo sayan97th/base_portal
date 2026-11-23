@@ -130,6 +130,85 @@ describe("SubscriptionPaymentAlert", () => {
     expect(onAddCard).toHaveBeenCalledTimes(1);
   });
 
+  it("renders nothing for an inactive subscription or one without health data", () => {
+    const { container, rerender } = render(
+      <SubscriptionPaymentAlert subscription={makeSubscription({ payment_health: makeHealth({ state: "inactive" }) })} />
+    );
+    expect(container).toBeEmptyDOMElement();
+
+    rerender(<SubscriptionPaymentAlert subscription={makeSubscription({ payment_health: undefined })} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("asks the client to pay a pending invoice, without offering a card change", () => {
+    render(
+      <SubscriptionPaymentAlert
+        subscription={makeSubscription({
+          payment_health: makeHealth({
+            state: "payment_pending",
+            severity: "warning",
+            overdue_periods: 1,
+            overdue_amount: 2000,
+            open_invoice: { unique_id: "ABC123", invoice_number: "BSM-1042" },
+          }),
+        })}
+      />
+    );
+
+    const alert = screen.getByRole("status", { name: "You have a pending payment for your Custom SEO Package subscription" });
+    expect(within(alert).getByText("1 month")).toBeInTheDocument();
+    expect(within(alert).getByRole("link", { name: /Pay invoice #BSM-1042/ })).toHaveAttribute("href", "/invoices/ABC123");
+    expect(within(alert).queryByRole("link", { name: /Update payment method|Add a card/ })).not.toBeInTheDocument();
+  });
+
+  it("points to support when a payment is pending without an invoice", () => {
+    render(
+      <SubscriptionPaymentAlert
+        subscription={makeSubscription({
+          payment_health: makeHealth({ state: "payment_pending", severity: "warning", overdue_periods: 1, overdue_amount: 2000 }),
+        })}
+      />
+    );
+
+    expect(screen.getByText(/Our team will send you the invoice/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Contact support/ })).toHaveAttribute("href", "/support");
+  });
+
+  it("uses an urgent alert when a payment failed for good", () => {
+    render(
+      <SubscriptionPaymentAlert
+        subscription={makeSubscription({
+          payment_status: "past_due",
+          payment_health: makeHealth({
+            state: "payment_failed",
+            severity: "critical",
+            overdue_periods: 1,
+            overdue_amount: 2000,
+            failure: { period_label: "December 2026", amount: 2000, reason: "The card on file has expired.", next_retry_at: null },
+          }),
+        })}
+      />
+    );
+
+    const alert = screen.getByRole("alert", { name: "Your SEO subscription payment failed" });
+    expect(within(alert).getByText(/The card on file has expired. Add a valid card/)).toBeInTheDocument();
+    expect(within(alert).getByText("December 2026")).toBeInTheDocument();
+    expect(within(alert).getByRole("link", { name: /Update payment method/ })).toHaveAttribute("href", "/billing");
+  });
+
+  it("tells the client their card expired before the renewal", () => {
+    render(
+      <SubscriptionPaymentAlert
+        subscription={makeSubscription({
+          payment_health: makeHealth({ state: "no_payment_method", severity: "warning", has_usable_card: false, card_issue: "expired" }),
+        })}
+      />
+    );
+
+    expect(screen.getByText(/The card on your account has expired/)).toBeInTheDocument();
+    expect(screen.queryByText("Amount due")).not.toBeInTheDocument();
+  });
+
   it("never uses an em dash", () => {
     const { container } = render(
       <SubscriptionPaymentAlert
