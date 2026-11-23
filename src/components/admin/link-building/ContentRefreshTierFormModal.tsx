@@ -14,7 +14,6 @@ interface ContentRefreshTierFormModalProps {
 }
 
 const EMPTY_FORM: CreateContentRefreshTierPayload = {
-  id: "",
   label: "",
   word_count_range: "",
   turnaround_days: 5,
@@ -41,7 +40,6 @@ export default function ContentRefreshTierFormModal({
   useEffect(() => {
     if (tier) {
       setFormData({
-        id: tier.id,
         label: tier.label,
         word_count_range: tier.word_count_range,
         turnaround_days: tier.turnaround_days,
