@@ -50,6 +50,8 @@ export interface CartAppliedCoupon {
   applies_to?: string;
   product_types?: string[];
   minimum_purchase_amount?: number | null;
+  /** Highest discount (or gift card value) one order can get, null when unlimited. */
+  max_discount_amount?: number | null;
   dr_tier_id?: string | null;
   /** Money back promo: discount_value is the reward percentage, discount_amount stays 0. */
   is_gift_card_reward?: boolean;

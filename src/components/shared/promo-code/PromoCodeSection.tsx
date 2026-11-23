@@ -5,7 +5,12 @@ import styles from "./PromoCodeSection.module.scss";
 import { useCart } from "@/context/CartContext";
 import { validateCoupon } from "@/services/client/coupons.service";
 import { GiftIcon } from "@/components/gift-card-rewards/GiftCardIcons";
-import { formatRewardPercentage, isGiftCardRewardCoupon } from "@/types/client/gift-card-rewards";
+import {
+  formatRewardLimit,
+  formatRewardPercentage,
+  isGiftCardRewardCoupon,
+  normalizeMaxDiscountAmount,
+} from "@/types/client/gift-card-rewards";
 import type { CartAppliedCoupon } from "@/types/client/unified-cart";
 import { MAX_PROMO_CODES_PER_ORDER, PROMO_COMBINATION_ERROR_MESSAGE } from "@/lib/promo-codes";
 
@@ -49,6 +54,7 @@ function AppliedPromoTicket({
   onRemove: (code: string) => void;
 }) {
   const is_reward = isGiftCardRewardCoupon(coupon);
+  const max_discount_amount = normalizeMaxDiscountAmount(coupon.max_discount_amount);
 
   return (
     <div className={`${styles.ticket} ${is_reward ? styles.ticketReward : ""}`}>
@@ -58,6 +64,13 @@ function AppliedPromoTicket({
       <div className={styles.ticketBody}>
         <p className={styles.ticketCode}>{coupon.code}</p>
         <p className={styles.ticketName}>{coupon.coupon_name}</p>
+        {max_discount_amount !== null && (
+          <p className={styles.ticketName}>
+            {is_reward
+              ? `Gift card up to ${formatRewardLimit(max_discount_amount)} per order`
+              : `Saves up to ${formatRewardLimit(max_discount_amount)} per order`}
+          </p>
+        )}
       </div>
       <div className={styles.ticketValue}>
         {is_reward ? (
@@ -186,6 +199,7 @@ export default function PromoCodeSection() {
           applies_to: response.applies_to,
           product_types: response.product_types ?? [],
           minimum_purchase_amount: response.minimum_purchase_amount,
+          max_discount_amount: response.max_discount_amount ?? null,
           dr_tier_id: response.dr_tier_id,
           is_gift_card_reward: response.is_gift_card_reward === true,
         },

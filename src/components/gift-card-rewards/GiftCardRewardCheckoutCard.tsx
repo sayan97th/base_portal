@@ -9,9 +9,11 @@ import { useOptionalAuth } from "@/context/auth-context-store";
 import {
   GIFT_CARD_BRAND_OPTIONS,
   describeOrderGiftCardCoverage,
+  formatRewardLimit,
   formatRewardPercentage,
   isGiftCardRewardDetailsComplete,
   isValidGiftCardEmail,
+  normalizeMaxDiscountAmount,
 } from "@/types/client/gift-card-rewards";
 
 function formatMoney(value: number): string {
@@ -35,6 +37,7 @@ const STATUS_LABELS: Record<ClaimStatus, string> = {
  *
  * The gift card is earned per order, never per product: a cart with several
  * items or products still earns one single gift card for the whole order.
+ * When the promo has a limit (HAPPYHOLIDAYS: $1,000) the card never exceeds it.
  */
 export default function GiftCardRewardCheckoutCard() {
   const {
@@ -62,6 +65,9 @@ export default function GiftCardRewardCheckoutCard() {
     (option) => option.value === gift_card_reward_details.gift_card_brand
   );
   const reward_percentage = formatRewardPercentage(gift_card_reward_coupon.discount_value);
+  const max_reward_amount = normalizeMaxDiscountAmount(gift_card_reward_coupon.max_discount_amount);
+  const max_reward_label = max_reward_amount !== null ? formatRewardLimit(max_reward_amount) : null;
+  const is_reward_at_limit = max_reward_amount !== null && gift_card_reward_amount >= max_reward_amount;
   const show_summary = is_complete && is_collapsed;
 
   // Items the gift card is calculated on. They all share one gift card.
@@ -87,9 +93,15 @@ export default function GiftCardRewardCheckoutCard() {
           <p className={styles.checkoutTitle}>Claim your holiday gift card</p>
           <p className={styles.muted}>
             Thanks for using {gift_card_reward_coupon.code}. We will send you one gift card worth{" "}
-            {reward_percentage} of this order total.
+            {reward_percentage} of this order total
+            {max_reward_label ? `, up to ${max_reward_label}.` : "."}
           </p>
           <p className={styles.coverageNote}>{coverage_text}</p>
+          {is_reward_at_limit && max_reward_label && (
+            <p className={styles.coverageNote}>
+              Your gift card reached the {max_reward_label} maximum for this promo.
+            </p>
+          )}
         </div>
         <div className={styles.rewardBadge}>
           <span className={styles.amount}>{formatMoney(gift_card_reward_amount)}</span>

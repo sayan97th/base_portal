@@ -32,6 +32,11 @@ export interface Coupon {
   dr_tier_ids: string[];
   dr_tiers: CouponDrTier[];
   minimum_purchase_amount: number | null;
+  /**
+   * Highest discount one order can get, in USD. For gift card coupons it is the
+   * highest gift card value. Null means no limit. Never set on fixed amount coupons.
+   */
+  max_discount_amount: number | null;
   /** First day the coupon works (Y-m-d, promotion timezone). The whole day is included. */
   starts_at: string | null;
   /** Last day the coupon works (Y-m-d, promotion timezone). The whole day is included. */
@@ -63,6 +68,7 @@ export interface CreateCouponPayload {
   product_types?: ProductType[];
   dr_tier_ids?: string[];
   minimum_purchase_amount?: number | null;
+  max_discount_amount?: number | null;
   starts_at?: string | null;
   expires_at: string | null;
   usage_limit?: number | null;
@@ -95,6 +101,10 @@ export interface AdminGiftCardClaim {
   promotion_name: string;
   order_total: number;
   reward_percentage: number;
+  /** Promo gift card limit when the order was placed, null when unlimited. */
+  max_reward_amount?: number | null;
+  /** True when the limit lowered this gift card below the reward percentage. */
+  is_reward_capped?: boolean;
   reward_amount: number;
   recipient_email: string | null;
   gift_card_brand: "amazon" | "visa" | "target" | null;

@@ -23,6 +23,7 @@ function buildHolidayPromo(overrides: Partial<Coupon> = {}): Coupon {
     dr_tier_ids: [],
     dr_tiers: [],
     minimum_purchase_amount: null,
+    max_discount_amount: null,
     starts_at: "2026-11-27",
     expires_at: "2026-12-18",
     usage_limit: null,

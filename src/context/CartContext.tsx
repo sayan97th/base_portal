@@ -24,7 +24,11 @@ import { unifiedCartService } from "@/services/client/unified-cart.service";
 import { getActiveDiscounts } from "@/services/client/discounts.service";
 import { getToken } from "@/lib/api-client";
 import type { Discount, BulkDiscountDetail } from "@/types/admin/discounts";
-import { isGiftCardRewardCoupon, type GiftCardRewardDetails } from "@/types/client/gift-card-rewards";
+import {
+  applyMaxDiscountAmount,
+  isGiftCardRewardCoupon,
+  type GiftCardRewardDetails,
+} from "@/types/client/gift-card-rewards";
 import { limitToSinglePromoCode } from "@/lib/promo-codes";
 
 const EMPTY_GIFT_CARD_REWARD_DETAILS: GiftCardRewardDetails = {
@@ -554,7 +558,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const total = Math.max(0, subtotal - effective_discount_amount);
 
   // Estimated gift card value: reward percentage of what the client pays for
-  // the qualifying products (after the bulk discount on those products).
+  // the qualifying products (after the bulk discount on those products),
+  // limited by the coupon max_discount_amount (HAPPYHOLIDAYS: $1,000).
   const gift_card_reward_amount = useMemo(() => {
     if (!gift_card_reward_coupon) return 0;
 
@@ -571,7 +576,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       eligible_total = Math.max(0, qualifying_subtotal - qualifying_bulk);
     }
 
-    return Math.round(eligible_total * (gift_card_reward_coupon.discount_value / 100) * 100) / 100;
+    return applyMaxDiscountAmount(
+      eligible_total * (gift_card_reward_coupon.discount_value / 100),
+      gift_card_reward_coupon.max_discount_amount
+    );
   }, [gift_card_reward_coupon, total, items, bulk_discount_details]);
 
   const item_count = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -649,7 +657,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       const new_discount = isGiftCardRewardCoupon(coupon)
         ? 0
         : coupon.discount_type === "percentage"
-          ? Math.round(applicable_subtotal * (coupon.discount_value / 100) * 100) / 100
+          ? applyMaxDiscountAmount(applicable_subtotal * (coupon.discount_value / 100), coupon.max_discount_amount)
           : Math.min(coupon.discount_value, applicable_subtotal);
 
       if (new_discount !== coupon.discount_amount) changed = true;

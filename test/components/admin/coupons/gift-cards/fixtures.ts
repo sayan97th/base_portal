@@ -73,6 +73,7 @@ export function makeRewardCoupon(overrides: Partial<Coupon> = {}): Coupon {
     dr_tier_ids: [],
     dr_tiers: [],
     minimum_purchase_amount: null,
+    max_discount_amount: null,
     starts_at: null,
     expires_at: null,
     usage_limit: null,

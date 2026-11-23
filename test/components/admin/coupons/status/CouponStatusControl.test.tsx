@@ -38,6 +38,7 @@ function makeCoupon(overrides: Partial<Coupon> = {}): Coupon {
     dr_tier_ids: [],
     dr_tiers: [],
     minimum_purchase_amount: 800,
+    max_discount_amount: null,
     starts_at: null,
     expires_at: null,
     usage_limit: 50,

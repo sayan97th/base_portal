@@ -313,11 +313,15 @@ export interface ValidateCouponResponse {
   product_types?: string[];
   dr_tier_id: string | null;
   minimum_purchase_amount: number | null;
+  /** Highest discount (or gift card value) one order can get, null when unlimited. */
+  max_discount_amount?: number | null;
   discount_amount: number;
   /** Money back promo (for example HAPPYHOLIDAYS): no discount, a gift card is sent instead. */
   is_gift_card_reward?: boolean;
   reward_percentage?: number | null;
   reward_amount?: number;
+  /** True when the gift card limit lowered the reward for this order amount. */
+  is_reward_capped?: boolean;
   gift_card_brands?: { value: "amazon" | "visa" | "target"; label: string }[];
   message: string;
 }

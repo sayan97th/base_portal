@@ -36,6 +36,10 @@ export interface GiftCardReward {
   promotion_name: string;
   order_total: number;
   reward_percentage: number;
+  /** Highest gift card value of the promo when the order was placed, null when unlimited. */
+  max_reward_amount?: number | null;
+  /** True when the promo limit lowered this gift card below the reward percentage. */
+  is_reward_capped?: boolean;
   reward_amount: number;
   recipient_email: string | null;
   gift_card_brand: GiftCardBrand | null;
@@ -84,6 +88,32 @@ export function isGiftCardRewardDetailsComplete(
     isValidGiftCardEmail(details.recipient_email) &&
     GIFT_CARD_BRAND_OPTIONS.some((option) => option.value === details.gift_card_brand)
   );
+}
+
+/** A usable coupon limit, or null when the coupon has none. */
+export function normalizeMaxDiscountAmount(value: number | string | null | undefined): number | null {
+  const amount = typeof value === "string" ? parseFloat(value) : value;
+  return typeof amount === "number" && Number.isFinite(amount) && amount > 0 ? amount : null;
+}
+
+/**
+ * Applies the coupon limit (max_discount_amount) to a calculated discount or
+ * gift card value. Mirrors Coupon::applyMaxDiscount in the API.
+ */
+export function applyMaxDiscountAmount(amount: number, max_discount_amount: number | null | undefined): number {
+  const limit = normalizeMaxDiscountAmount(max_discount_amount);
+  const rounded_amount = Math.round(amount * 100) / 100;
+  return limit === null ? rounded_amount : Math.min(rounded_amount, limit);
+}
+
+/** Whole dollars without cents, for example 1000 becomes "$1,000" and 999.5 becomes "$999.50". */
+export function formatRewardLimit(value: number): string {
+  return value.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 export function formatRewardPercentage(value: number): string {

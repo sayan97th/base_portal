@@ -1,6 +1,7 @@
 import type { Coupon } from "@/types/admin/coupons";
 import {
   countExpiringSoon,
+  formatMaxDiscount,
   getCouponStatus,
   sumRedemptions,
 } from "@/components/admin/coupons/list/coupon-list";
@@ -20,6 +21,7 @@ function buildCoupon(overrides: Partial<Coupon> = {}): Coupon {
     dr_tier_ids: [],
     dr_tiers: [],
     minimum_purchase_amount: null,
+    max_discount_amount: null,
     starts_at: null,
     expires_at: null,
     usage_limit: null,
@@ -55,5 +57,24 @@ describe("coupon list helpers", () => {
     const coupons = [buildCoupon({ times_used: 3 }), buildCoupon({ times_used: 12 })];
     expect(sumRedemptions(coupons)).toBe(15);
     expect(sumRedemptions([])).toBe(0);
+  });
+});
+
+describe("formatMaxDiscount", () => {
+  it("describes the gift card limit of HAPPYHOLIDAYS", () => {
+    expect(formatMaxDiscount({ discount_type: "gift_card_reward", max_discount_amount: 1000 })).toBe(
+      "Up to $1,000 per order"
+    );
+  });
+
+  it("describes the limit of a percentage coupon with cents", () => {
+    expect(formatMaxDiscount({ discount_type: "percentage", max_discount_amount: 250.5 })).toBe(
+      "Max $250.50 per order"
+    );
+  });
+
+  it("returns null without a limit or for fixed amount coupons", () => {
+    expect(formatMaxDiscount({ discount_type: "gift_card_reward", max_discount_amount: null })).toBeNull();
+    expect(formatMaxDiscount({ discount_type: "fixed_amount", max_discount_amount: 100 })).toBeNull();
   });
 });

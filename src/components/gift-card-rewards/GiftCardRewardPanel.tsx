@@ -9,8 +9,10 @@ import { Modal } from "@/components/ui/modal";
 import { giftCardRewardsService } from "@/services/client/gift-card-rewards.service";
 import {
   describeOrderGiftCardCoverage,
+  formatRewardLimit,
   formatRewardPercentage,
   isValidGiftCardEmail,
+  normalizeMaxDiscountAmount,
   type GiftCardReward,
   type GiftCardRewardDetails,
 } from "@/types/client/gift-card-rewards";
@@ -166,6 +168,9 @@ export default function GiftCardRewardPanel({ session_id, order_id, auto_open = 
   if (!reward) return null;
 
   const percentage = formatRewardPercentage(reward.reward_percentage);
+  // Promo limit (HAPPYHOLIDAYS: $1,000), only mentioned when it lowered this gift card.
+  const max_reward_amount = normalizeMaxDiscountAmount(reward.max_reward_amount);
+  const capped_limit_label = reward.is_reward_capped && max_reward_amount !== null ? formatRewardLimit(max_reward_amount) : null;
   const deadline = formatDeadline(reward);
   const is_pending = reward.status === "pending_details" && reward.is_claimable;
   const is_fulfilled = reward.status === "fulfilled";
@@ -210,6 +215,7 @@ export default function GiftCardRewardPanel({ session_id, order_id, auto_open = 
                 <p className={styles.panelDescription}>
                   Thanks for ordering with {reward.coupon_code}. Choose Amazon, Visa or Target and tell us where to
                   send your {percentage} back on the {formatMoney(reward.order_total)} order total.
+                  {capped_limit_label && ` This promo gives up to ${capped_limit_label} per order, the maximum gift card value.`}
                 </p>
                 {coverage_line}
               </>
@@ -287,6 +293,7 @@ export default function GiftCardRewardPanel({ session_id, order_id, auto_open = 
                   </span>
                   <p className={styles.modalHeroText} style={{ marginTop: 8 }}>
                     {percentage} back on your {formatMoney(reward.order_total)} order
+                    {capped_limit_label && `, up to ${capped_limit_label}`}
                   </p>
                 </div>
                 <span className={styles.amount}>{formatMoney(reward.reward_amount)}</span>

@@ -88,6 +88,21 @@ export function formatDiscount(coupon: Coupon): string {
   return `$${amount} off`;
 }
 
+/**
+ * Limit per order, for example "Up to $1,000 per order" (gift card) or
+ * "Max $300 per order" (percentage discount). Null when the coupon has no limit.
+ */
+export function formatMaxDiscount(coupon: Pick<Coupon, "discount_type" | "max_discount_amount">): string | null {
+  const limit = coupon.max_discount_amount;
+  if (coupon.discount_type === "fixed_amount" || limit == null || limit <= 0) return null;
+
+  const amount = limit.toLocaleString("en-US", {
+    minimumFractionDigits: limit % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  });
+  return coupon.discount_type === "gift_card_reward" ? `Up to $${amount} per order` : `Max $${amount} per order`;
+}
+
 export function getDiscountTypeLabel(coupon: Coupon): string {
   if (coupon.discount_type === "gift_card_reward") return "Gift card";
   if (coupon.discount_type === "percentage") return "Percentage";

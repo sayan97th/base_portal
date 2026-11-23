@@ -8,6 +8,7 @@ import {
   STATUS_META,
   daysUntil,
   formatDiscount,
+  formatMaxDiscount,
   formatShortDate,
   getAppliesToLabel,
   getAppliesToTitle,
@@ -171,6 +172,7 @@ function CouponRow({
   const usage_href = `/admin/coupons/${coupon.id}/usage`;
   const gift_cards_href = `/admin/coupons/${coupon.id}/gift-cards`;
   const is_gift_card_reward = coupon.discount_type === "gift_card_reward";
+  const max_discount_label = formatMaxDiscount(coupon);
   const usage_pct = getUsagePercent(coupon);
   const date_hint = getDateHint(coupon, status);
   const awaiting_gift_cards = coupon.gift_card_claims_awaiting_count ?? 0;
@@ -247,6 +249,11 @@ function CouponRow({
           {coupon.discount_type === "gift_card_reward" && <GiftIcon />}
           {formatDiscount(coupon)}
         </span>
+        {max_discount_label && (
+          <span className="mt-1 block text-[11px] font-medium text-gray-500 dark:text-gray-400">
+            {max_discount_label}
+          </span>
+        )}
       </div>
 
       {/* Applies to */}

@@ -34,6 +34,7 @@ interface FormData {
   product_types: ProductType[];
   dr_tier_ids: string[];
   minimum_purchase_amount: string;
+  max_discount_amount: string;
   starts_at: string;
   expires_at: string;
   usage_limit: string;
@@ -42,6 +43,7 @@ interface FormData {
 }
 
 interface Toggles {
+  has_max_discount: boolean;
   has_start_date: boolean;
   has_expiry_date: boolean;
   has_usage_limit: boolean;
@@ -55,6 +57,18 @@ function generateCode(): string {
   return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 }
 
+/** Fixed amount coupons already define the exact discount, so they never get a limit. */
+function supportsMaxDiscount(discount_type: DiscountType): boolean {
+  return discount_type === "percentage" || discount_type === "gift_card_reward";
+}
+
+function formatUsd(value: number): string {
+  return `$${value.toLocaleString("en-US", {
+    minimumFractionDigits: value % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
 function getEmptyForm(): FormData {
   return {
     code: "",
@@ -66,6 +80,7 @@ function getEmptyForm(): FormData {
     product_types: [],
     dr_tier_ids: [],
     minimum_purchase_amount: "",
+    max_discount_amount: "",
     starts_at: "",
     expires_at: "",
     usage_limit: "100",
@@ -87,6 +102,7 @@ function couponFromRecord(coupon: Coupon): FormData {
     minimum_purchase_amount: coupon.minimum_purchase_amount
       ? String(coupon.minimum_purchase_amount)
       : "",
+    max_discount_amount: coupon.max_discount_amount ? String(coupon.max_discount_amount) : "",
     starts_at: coupon.starts_at ? coupon.starts_at.slice(0, 10) : "",
     expires_at: coupon.expires_at ? coupon.expires_at.slice(0, 10) : "",
     usage_limit: coupon.usage_limit ? String(coupon.usage_limit) : "100",
@@ -470,6 +486,14 @@ function PreviewCard({ form, dr_tiers, toggles }: PreviewCardProps) {
           ? `On ${product_type_label}`
           : "On all products";
 
+  const max_discount = parseFloat(form.max_discount_amount);
+  const max_discount_label =
+    toggles.has_max_discount && supportsMaxDiscount(form.discount_type) && !isNaN(max_discount) && max_discount > 0
+      ? is_reward
+        ? `Gift card up to ${formatUsd(max_discount)} per order`
+        : `Up to ${formatUsd(max_discount)} off per order`
+      : null;
+
   const expiry_label =
     toggles.has_expiry_date && form.expires_at
       ? formatShortDate(form.expires_at)
@@ -506,9 +530,15 @@ function PreviewCard({ form, dr_tiers, toggles }: PreviewCardProps) {
         <span className="ml-2 text-lg font-medium text-brand-200">{is_reward ? "BACK" : "OFF"}</span>
       </div>
 
-      <p className="mb-6 text-sm text-brand-200">
+      <p className={`${max_discount_label ? "mb-2" : "mb-6"} text-sm text-brand-200`}>
         {is_reward ? `As an Amazon, Visa or Target gift card. ${applies_label}` : applies_label}
       </p>
+
+      {max_discount_label && (
+        <p className="mb-6 inline-flex rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold text-white">
+          {max_discount_label}
+        </p>
+      )}
 
       {/* Selected tiers preview */}
       {form.applies_to === "specific_product" && selected_tiers.length > 1 && (
@@ -596,13 +626,18 @@ function FormSection({
 function Toggle({
   enabled,
   onChange,
+  label,
 }: {
   enabled: boolean;
   onChange: (v: boolean) => void;
+  /** Accessible name, read by screen readers. */
+  label?: string;
 }) {
   return (
     <button
       type="button"
+      aria-label={label}
+      aria-pressed={label ? enabled : undefined}
       onClick={() => onChange(!enabled)}
       className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
         enabled ? "bg-brand-500" : "bg-gray-300 dark:bg-gray-600"
@@ -645,6 +680,88 @@ const input_base =
 const input_normal = `${input_base} border-gray-200 dark:border-gray-700`;
 const input_error = `${input_base} border-red-400 dark:border-red-500`;
 
+// ── Maximum per order ─────────────────────────────────────────────────────────
+
+/** Order total used in the live example under the maximum field. */
+const MAX_DISCOUNT_EXAMPLE_ORDER = 50000;
+
+interface MaxDiscountFieldProps {
+  discount_type: DiscountType;
+  discount_value: string;
+  value: string;
+  enabled: boolean;
+  error?: string;
+  onToggle: (enabled: boolean) => void;
+  onChange: (value: string) => void;
+}
+
+/**
+ * Optional limit for what one order can get from the coupon. For gift card
+ * coupons it is the highest gift card value (HAPPYHOLIDAYS: $1,000), for
+ * percentage coupons the biggest discount.
+ */
+function MaxDiscountField({
+  discount_type,
+  discount_value,
+  value,
+  enabled,
+  error,
+  onToggle,
+  onChange,
+}: MaxDiscountFieldProps) {
+  const is_reward = discount_type === "gift_card_reward";
+  const percentage = parseFloat(discount_value) || 0;
+  const limit = parseFloat(value);
+  const has_valid_limit = enabled && !isNaN(limit) && limit > 0;
+
+  const example_uncapped = Math.round(MAX_DISCOUNT_EXAMPLE_ORDER * (percentage / 100) * 100) / 100;
+  const example_final = has_valid_limit ? Math.min(example_uncapped, limit) : example_uncapped;
+  const example_noun = is_reward ? "gift card" : "discount";
+
+  return (
+    <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50/60 p-4 dark:border-gray-800 dark:bg-gray-800/40">
+      <div className="mb-1.5 flex items-center justify-between gap-3">
+        <FieldLabel>{is_reward ? "Maximum Gift Card Value (USD)" : "Maximum Discount (USD)"}</FieldLabel>
+        <Toggle
+          enabled={enabled}
+          onChange={onToggle}
+          label={is_reward ? "Limit the gift card value" : "Limit the discount"}
+        />
+      </div>
+      <div className="relative">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-400">$</span>
+        <input
+          type="number"
+          min="0.01"
+          step="0.01"
+          disabled={!enabled}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="1000.00"
+          aria-label={is_reward ? "Maximum gift card value" : "Maximum discount"}
+          className={`${error ? input_error : input_normal} pl-8 disabled:cursor-not-allowed disabled:opacity-40`}
+        />
+      </div>
+      <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
+        {enabled
+          ? is_reward
+            ? "Clients can order as much as they want, but one order never earns a gift card worth more than this amount."
+            : "The discount on one order never goes above this amount."
+          : `No limit. The ${example_noun} always grows with the order total.`}
+      </p>
+      {percentage > 0 && (
+        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+          Example: a {formatUsd(MAX_DISCOUNT_EXAMPLE_ORDER)} order gets {percentage}% = {formatUsd(example_uncapped)}
+          {has_valid_limit && example_uncapped > limit
+            ? `, limited to a ${formatUsd(example_final)} ${example_noun}.`
+            : ` ${example_noun}.`}
+        </p>
+      )}
+      <FieldError message={error} />
+    </div>
+  );
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps) {
@@ -652,6 +769,7 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
 
   const [form, setForm] = useState<FormData>(getEmptyForm());
   const [toggles, setToggles] = useState<Toggles>({
+    has_max_discount: false,
     has_start_date: false,
     has_expiry_date: false,
     has_usage_limit: false,
@@ -676,6 +794,7 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
         setSavedCoupon(coupon);
         setForm(couponFromRecord(coupon));
         setToggles({
+          has_max_discount: coupon.max_discount_amount != null && supportsMaxDiscount(coupon.discount_type),
           has_start_date: coupon.starts_at !== null,
           has_expiry_date: coupon.expires_at !== null,
           has_usage_limit: coupon.usage_limit !== null,
@@ -725,6 +844,11 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
       e.discount_value = "Value must be greater than 0.";
     if ((form.discount_type === "percentage" || form.discount_type === "gift_card_reward") && val > 100)
       e.discount_value = "Percentage cannot exceed 100.";
+    if (toggles.has_max_discount && supportsMaxDiscount(form.discount_type)) {
+      const max_discount = parseFloat(form.max_discount_amount);
+      if (!form.max_discount_amount || isNaN(max_discount) || max_discount <= 0)
+        e.max_discount_amount = "Enter a maximum amount greater than 0.";
+    }
     if (toggles.has_expiry_date && !form.expires_at) e.expires_at = "Expiry date is required.";
     if (form.applies_to === "specific_product" && form.dr_tier_ids.length === 0)
       e.dr_tier_ids = "Select at least one DR tier.";
@@ -768,6 +892,10 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
         minimum_purchase_amount:
           form.applies_to === "minimum_purchase"
             ? parseFloat(form.minimum_purchase_amount) || null
+            : null,
+        max_discount_amount:
+          toggles.has_max_discount && supportsMaxDiscount(form.discount_type)
+            ? parseFloat(form.max_discount_amount) || null
             : null,
         starts_at: toggles.has_start_date && form.starts_at ? form.starts_at : null,
         expires_at: toggles.has_expiry_date && form.expires_at ? form.expires_at : null,
@@ -1097,6 +1225,21 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
                   <FieldError message={errors.discount_value} />
                 </div>
               </div>
+
+              {supportsMaxDiscount(form.discount_type) && (
+                <MaxDiscountField
+                  discount_type={form.discount_type}
+                  discount_value={form.discount_value}
+                  value={form.max_discount_amount}
+                  enabled={toggles.has_max_discount}
+                  error={errors.max_discount_amount}
+                  onToggle={(v) => {
+                    setToggles((prev) => ({ ...prev, has_max_discount: v }));
+                    if (!v) updateField("max_discount_amount", "");
+                  }}
+                  onChange={(v) => updateField("max_discount_amount", v)}
+                />
+              )}
 
               {form.discount_type === "gift_card_reward" && (
                 <div className="mt-4 flex items-start gap-3 rounded-xl border border-brand-100 bg-brand-50/70 px-4 py-3 dark:border-brand-500/20 dark:bg-brand-500/10">
@@ -1494,6 +1637,10 @@ export default function CouponFormPage({ mode, coupon_id }: CouponFormPageProps)
                     {
                       icon: "🎁",
                       text: "Gift Card coupons do not lower the price. Clients earn a gift card worth the % of their order and admins are notified to send it.",
+                    },
+                    {
+                      icon: "🔒",
+                      text: "Turn on Maximum Gift Card Value (or Maximum Discount) to cap what one order can get. For example 10% back up to $1,000 sends at most $1,000, even on a $50,000 order.",
                     },
                   ].map((tip, i) => (
                     <li key={i} className="flex items-start gap-2.5">
