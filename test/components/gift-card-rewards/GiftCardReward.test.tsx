@@ -4,6 +4,8 @@ import GiftCardRewardForm from "@/components/gift-card-rewards/GiftCardRewardFor
 import GiftCardRewardPanel from "@/components/gift-card-rewards/GiftCardRewardPanel";
 import { giftCardRewardsService } from "@/services/client/gift-card-rewards.service";
 import {
+  ORDER_GIFT_CARD_NOTE,
+  describeOrderGiftCardCoverage,
   formatRewardPercentage,
   isGiftCardRewardCoupon,
   isGiftCardRewardDetailsComplete,
@@ -62,6 +64,20 @@ describe("gift card reward helpers", () => {
   it("formats reward percentages without trailing zeros", () => {
     expect(formatRewardPercentage(10)).toBe("10%");
     expect(formatRewardPercentage(12.5)).toBe("12.5%");
+  });
+
+  it("describes the order coverage as one single gift card", () => {
+    expect(describeOrderGiftCardCoverage(0)).toBe("One gift card for this order.");
+    expect(describeOrderGiftCardCoverage(1)).toBe("One gift card for this order.");
+    expect(describeOrderGiftCardCoverage(3)).toBe("One gift card for this whole order, covering all 3 items.");
+    expect(describeOrderGiftCardCoverage(2, "product")).toBe(
+      "One gift card for this whole order, covering all 2 products."
+    );
+  });
+
+  it("keeps the shared per order note free of em dashes", () => {
+    expect(ORDER_GIFT_CARD_NOTE).toBe("One gift card per order, never one per product or item.");
+    expect(ORDER_GIFT_CARD_NOTE).not.toContain("—");
   });
 });
 

@@ -653,7 +653,7 @@ describe("UnifiedCartSummary", () => {
       expect(screen.getByText("10% back")).toBeInTheDocument();
       expect(screen.getByText(/claim your holiday gift card/i)).toBeInTheDocument();
       expect(screen.getByText("Not started")).toBeInTheDocument();
-      expect(screen.getByText(/your gift card details are not complete yet/i)).toBeInTheDocument();
+      expect(screen.getByText(/your order gift card details are not complete yet/i)).toBeInTheDocument();
     });
 
     it("hides the reminder and names the brand once the gift card details are complete", () => {
@@ -688,8 +688,9 @@ describe("UnifiedCartSummary", () => {
       );
 
       expect(screen.getByText("Ready")).toBeInTheDocument();
-      expect(screen.getByText(/amazon gift card you will receive/i)).toBeInTheDocument();
-      expect(screen.queryByText(/your gift card details are not complete yet/i)).not.toBeInTheDocument();
+      expect(screen.getByText(/amazon gift card for this order/i)).toBeInTheDocument();
+      expect(screen.getByText(/one gift card per order, never one per product or item/i)).toBeInTheDocument();
+      expect(screen.queryByText(/your order gift card details are not complete yet/i)).not.toBeInTheDocument();
 
       // Done collapses the form into a compact summary that can be edited again
       fireEvent.click(screen.getByRole("button", { name: /^done$/i }));

@@ -1,7 +1,7 @@
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import GiftCardRewardCheckoutCard from "@/components/gift-card-rewards/GiftCardRewardCheckoutCard";
-import type { CartAppliedCoupon } from "@/types/client/unified-cart";
+import type { CartAppliedCoupon, CartItem } from "@/types/client/unified-cart";
 import type { GiftCardRewardDetails } from "@/types/client/gift-card-rewards";
 
 jest.mock("@/context/CartContext", () => ({
@@ -28,12 +28,28 @@ const reward_coupon: CartAppliedCoupon = {
   is_gift_card_reward: true,
 };
 
+function makeCartItem(overrides: Partial<CartItem> = {}): CartItem {
+  return {
+    cart_item_id: "item-1",
+    product_type: "link_building",
+    tier_id: "dr50",
+    tier_name: "DR 50+",
+    quantity: 1,
+    unit_price: 800,
+    ...overrides,
+  };
+}
+
+const default_items: CartItem[] = [makeCartItem()];
+
 function setupCart(
   details: GiftCardRewardDetails = { recipient_email: "", gift_card_brand: "" },
-  coupon: CartAppliedCoupon | null = reward_coupon
+  coupon: CartAppliedCoupon | null = reward_coupon,
+  items: CartItem[] = default_items
 ) {
   const setGiftCardRewardDetails = jest.fn();
   mockUseCart.mockReturnValue({
+    items,
     gift_card_reward_coupon: coupon,
     gift_card_reward_amount: 80,
     gift_card_reward_details: details,
@@ -67,7 +83,8 @@ describe("GiftCardRewardCheckoutCard", () => {
 
     expect(screen.getByText(/claim your holiday gift card/i)).toBeInTheDocument();
     expect(screen.getByText("$80.00")).toBeInTheDocument();
-    expect(screen.getByText(/thanks for using HAPPYHOLIDAYS/i)).toHaveTextContent("10% of this order");
+    expect(screen.getByText("Order gift card")).toBeInTheDocument();
+    expect(screen.getByText(/thanks for using HAPPYHOLIDAYS/i)).toHaveTextContent("one gift card worth 10% of this order total");
     expect(screen.getByRole("radio", { name: /amazon/i })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /visa/i })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /target/i })).toBeInTheDocument();
@@ -91,6 +108,35 @@ describe("GiftCardRewardCheckoutCard", () => {
       expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", String(steps_done));
     }
   );
+
+  describe("one gift card per order", () => {
+    it("explains a single item order earns one gift card", () => {
+      setupCart();
+      render(<GiftCardRewardCheckoutCard />);
+
+      expect(screen.getByText("One gift card for this order.")).toBeInTheDocument();
+    });
+
+    it("counts every unit across products and still promises a single gift card", () => {
+      setupCart(undefined, reward_coupon, [
+        makeCartItem({ cart_item_id: "lb", quantity: 3 }),
+        makeCartItem({ cart_item_id: "co", product_type: "content_optimization", tier_id: "co", quantity: 2 }),
+      ]);
+      render(<GiftCardRewardCheckoutCard />);
+
+      expect(screen.getByText("One gift card for this whole order, covering all 5 items.")).toBeInTheDocument();
+    });
+
+    it("only counts the items of the product types the promo is limited to", () => {
+      setupCart(undefined, { ...reward_coupon, product_types: ["link_building"] }, [
+        makeCartItem({ cart_item_id: "lb", quantity: 3 }),
+        makeCartItem({ cart_item_id: "co", product_type: "content_optimization", tier_id: "co", quantity: 2 }),
+      ]);
+      render(<GiftCardRewardCheckoutCard />);
+
+      expect(screen.getByText("One gift card for this whole order, covering all 3 items.")).toBeInTheDocument();
+    });
+  });
 
   it("passes brand choices up to the cart", () => {
     const setDetails = setupCart();
@@ -149,7 +195,7 @@ describe("GiftCardRewardCheckoutCard", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^done$/i }));
 
-    expect(screen.getByText("Visa gift card, $80.00")).toBeInTheDocument();
+    expect(screen.getByText("One Visa gift card for this order, $80.00")).toBeInTheDocument();
     expect(screen.getByText("Sent to me@example.com")).toBeInTheDocument();
     expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
