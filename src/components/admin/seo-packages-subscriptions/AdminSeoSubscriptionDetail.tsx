@@ -16,7 +16,7 @@ import type {
 } from "@/services/admin/seo-packages-subscription.service";
 import DateField from "@/components/form/date-field/DateField";
 import { AutoRenewSwitch, PaymentCardPicker, ReminderControl, pluralDays } from "./SubscriptionBillingControls";
-import { CancelSubscriptionModal, ChargeNowModal } from "./SubscriptionModals";
+import { CancelSubscriptionModal } from "./SubscriptionModals";
 import {
   CHARGE_STATUS_CONFIG,
   billingCycleProgress,
@@ -46,6 +46,7 @@ const NOTICES: Record<string, { tone: "success" | "error"; text: string }> = {
     text: "Subscription activated, but the first charge failed. See the payment history below for the reason.",
   },
   updated: { tone: "success", text: "Subscription updated. Changes apply from the next payment." },
+  charged: { tone: "success", text: "Payment collected. The invoice was created and marked as paid." },
 };
 
 const TRIGGER_LABELS: Record<AdminSeoSubscriptionCharge["trigger"], string> = {
@@ -339,7 +340,6 @@ export default function AdminSeoSubscriptionDetail({ subscription_id, notice }: 
   const [saving_field, setSavingField] = useState<string | null>(null);
   const [next_date_draft, setNextDateDraft] = useState("");
 
-  const [show_charge, setShowCharge] = useState(false);
   const [show_cancel, setShowCancel] = useState(false);
 
   const applyDetail = useCallback((detail: AdminSeoSubscriptionDetail) => {
@@ -453,15 +453,15 @@ export default function AdminSeoSubscriptionDetail({ subscription_id, notice }: 
               Cancel
               <span className="ml-1 hidden sm:inline">subscription</span>
             </button>
-            <button
-              onClick={() => setShowCharge(true)}
+            <Link
+              href={`/admin/seo-packages-subscriptions/${subscription.id}/charge`}
               className="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-600 sm:py-2"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
               </svg>
               {is_past_due ? "Retry payment now" : "Charge now"}
-            </button>
+            </Link>
           </div>
         )}
       </div>
@@ -678,19 +678,6 @@ export default function AdminSeoSubscriptionDetail({ subscription_id, notice }: 
         </div>
       </div>
 
-      {show_charge && (
-        <ChargeNowModal
-          subscription={subscription}
-          cards={cards}
-          onClose={() => setShowCharge(false)}
-          onFailed={() => loadDetail()}
-          onCharged={(detail) => {
-            applyDetail(detail);
-            setShowCharge(false);
-            setToast({ tone: "success", text: detail.message ?? "Payment collected." });
-          }}
-        />
-      )}
       {show_cancel && (
         <CancelSubscriptionModal
           subscription={subscription}

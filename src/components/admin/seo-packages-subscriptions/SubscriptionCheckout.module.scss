@@ -1,0 +1,1879 @@
+// Manual subscription checkout page.
+// A three step flow (payment method, review, confirmation) next to a sticky
+// order summary. Shares the visual language of SubscriptionModals: brand
+// gradient accents, soft toned shadows and rounded cards.
+
+$brand_50: var(--color-brand-50, #fdeef5);
+$brand_100: var(--color-brand-100, #fcdceb);
+$brand_200: var(--color-brand-200, #f9b8d5);
+$brand_400: var(--color-brand-400, #f066a1);
+$brand_500: var(--color-brand-500, #ec3c89);
+$brand_600: var(--color-brand-600, #d4316f);
+$brand_solid: #ec3c89;
+$brand_rgb: 236, 60, 137;
+
+$success_50: var(--color-success-50, #ecfdf3);
+$success_100: var(--color-success-100, #d1fadf);
+$success_500: var(--color-success-500, #12b76a);
+$success_600: var(--color-success-600, #039855);
+$success_700: var(--color-success-700, #027a48);
+$success_solid: #12b76a;
+$success_rgb: 18, 183, 106;
+
+$error_50: var(--color-error-50, #fef3f2);
+$error_100: var(--color-error-100, #fee4e2);
+$error_200: var(--color-error-200, #fecdca);
+$error_500: var(--color-error-500, #f04438);
+$error_600: var(--color-error-600, #d92d20);
+$error_700: var(--color-error-700, #b42318);
+$error_solid: #f04438;
+$error_rgb: 240, 68, 56;
+
+$warning_50: var(--color-warning-50, #fffaeb);
+$warning_100: var(--color-warning-100, #fef0c7);
+$warning_200: var(--color-warning-200, #fedf89);
+$warning_500: var(--color-warning-500, #f79009);
+$warning_700: var(--color-warning-700, #b54708);
+$warning_solid: #f79009;
+$warning_rgb: 247, 144, 9;
+
+$info_50: var(--color-blue-light-50, #f0f9ff);
+$info_200: var(--color-blue-light-200, #b9e6fe);
+$info_600: var(--color-blue-light-600, #0086c9);
+$info_800: var(--color-blue-light-800, #065986);
+
+$gray_900: var(--color-gray-900, #101828);
+$gray_800: var(--color-gray-800, #1d2939);
+$gray_700: var(--color-gray-700, #344054);
+$gray_600: var(--color-gray-600, #475467);
+$gray_500: var(--color-gray-500, #667085);
+$gray_400: var(--color-gray-400, #98a2b3);
+$gray_300: var(--color-gray-300, #d0d5dd);
+$gray_200: var(--color-gray-200, #e4e7ec);
+$gray_100: var(--color-gray-100, #f2f4f7);
+$gray_50: var(--color-gray-50, #f9fafb);
+
+$hero_from: #ec3c89;
+$hero_to: #8b5cf6;
+
+$radius_panel: 20px;
+$radius_inner: 14px;
+$ease_out: cubic-bezier(0.16, 1, 0.3, 1);
+$mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+$sm: 640px;
+$lg: 1024px;
+
+@mixin dark {
+  :global(.dark) & {
+    @content;
+  }
+}
+
+@mixin from($width) {
+  @media (min-width: $width) {
+    @content;
+  }
+}
+
+@mixin focus_ring($color) {
+  outline: none;
+  box-shadow:
+    0 0 0 2px #fff,
+    0 0 0 4px $color;
+
+  @include dark {
+    box-shadow:
+      0 0 0 2px $gray_900,
+      0 0 0 4px $color;
+  }
+}
+
+@mixin icon_size($size) {
+  > svg {
+    width: $size;
+    height: $size;
+    flex-shrink: 0;
+  }
+}
+
+@mixin reduced_motion {
+  @media (prefers-reduced-motion: reduce) {
+    @content;
+  }
+}
+
+// ── Page and header ──────────────────────────────────────────────────────────
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  scroll-margin-top: 24px;
+
+  @include from($sm) {
+    gap: 24px;
+  }
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.back_link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: $gray_500;
+  transition: color 0.15s ease;
+  @include icon_size(16px);
+
+  &:hover {
+    color: $brand_500;
+  }
+
+  &:focus-visible {
+    border-radius: 6px;
+    @include focus_ring($brand_400);
+  }
+
+  @include dark {
+    color: $gray_400;
+  }
+}
+
+.back_link_disabled {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.secure_badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid $success_100;
+  border-radius: 999px;
+  background: $success_50;
+  font-size: 12px;
+  font-weight: 600;
+  color: $success_700;
+  @include icon_size(13px);
+
+  @include dark {
+    border-color: rgba($success_solid, 0.25);
+    background: rgba($success_solid, 0.1);
+    color: #6ce9a6;
+  }
+}
+
+.heading {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: $brand_500;
+  @include icon_size(14px);
+}
+
+.title {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: $gray_900;
+  overflow-wrap: anywhere;
+
+  @include from($sm) {
+    font-size: 28px;
+  }
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.subtitle {
+  max-width: 640px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: $gray_500;
+
+  strong {
+    font-weight: 600;
+    color: $gray_700;
+  }
+
+  @include dark {
+    color: $gray_400;
+
+    strong {
+      color: $gray_200;
+    }
+  }
+}
+
+// ── Stepper ──────────────────────────────────────────────────────────────────
+
+.stepper {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.step {
+  --step-color: #{$gray_300};
+  --step-text: #{$gray_400};
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 3px solid var(--step-color);
+  transition: border-color 0.3s ease;
+
+  @include from($sm) {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  @include dark {
+    --step-color: #{$gray_700};
+    --step-text: #{$gray_500};
+  }
+
+  &[data-state="current"] {
+    --step-color: #{$brand_500};
+    --step-text: #{$gray_900};
+
+    @include dark {
+      --step-text: #fff;
+    }
+  }
+
+  &[data-state="done"] {
+    --step-color: #{$success_500};
+    --step-text: #{$gray_700};
+
+    @include dark {
+      --step-text: #{$gray_200};
+    }
+  }
+
+  &[data-state="failed"] {
+    --step-color: #{$error_500};
+    --step-text: #{$error_700};
+
+    @include dark {
+      --step-text: #fda29b;
+    }
+  }
+}
+
+.step_marker {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1.5px solid var(--step-color);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--step-text);
+  background: #fff;
+  transition:
+    background 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease;
+  @include icon_size(14px);
+
+  @include dark {
+    background: $gray_900;
+  }
+
+  [data-state="current"] > &,
+  [data-state="done"] > &,
+  [data-state="failed"] > & {
+    border-color: transparent;
+    background: var(--step-color);
+    color: #fff;
+  }
+
+  [data-state="current"] > & {
+    box-shadow: 0 0 0 4px rgba($brand_solid, 0.15);
+  }
+}
+
+.step_text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.step_label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--step-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.step_hint {
+  display: none;
+  font-size: 12px;
+  color: $gray_400;
+
+  @include from($sm) {
+    display: block;
+  }
+
+  @include dark {
+    color: $gray_500;
+  }
+}
+
+// ── Layout ───────────────────────────────────────────────────────────────────
+
+.layout {
+  display: grid;
+  gap: 20px;
+  align-items: start;
+
+  @include from($lg) {
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 24px;
+  }
+}
+
+.main {
+  min-width: 0;
+}
+
+// ── Panel ────────────────────────────────────────────────────────────────────
+
+.panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px;
+  overflow: hidden;
+  border: 1px solid $gray_100;
+  border-radius: $radius_panel;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  animation: panel_in 0.4s $ease_out both;
+
+  @include from($sm) {
+    padding: 28px;
+  }
+
+  @include dark {
+    border-color: $gray_800;
+    background: $gray_900;
+  }
+
+  @include reduced_motion {
+    animation: none;
+  }
+}
+
+.panel_header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.panel_icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: linear-gradient(145deg, $brand_50, $brand_100);
+  color: $brand_600;
+  box-shadow: inset 0 0 0 1px rgba($brand_solid, 0.12);
+  @include icon_size(22px);
+
+  @include dark {
+    background: rgba($brand_solid, 0.14);
+    color: $brand_400;
+  }
+}
+
+.panel_title {
+  font-size: 17px;
+  font-weight: 700;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.panel_subtitle {
+  margin-top: 2px;
+  font-size: 13px;
+  color: $gray_500;
+
+  @include dark {
+    color: $gray_400;
+  }
+}
+
+.panel_actions {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 10px;
+  padding-top: 4px;
+
+  @include from($sm) {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+}
+
+.section_label {
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: $gray_500;
+
+  @include dark {
+    color: $gray_400;
+  }
+}
+
+// ── Notices ──────────────────────────────────────────────────────────────────
+
+.privacy_note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: $gray_50;
+  font-size: 13px;
+  line-height: 1.5;
+  color: $gray_600;
+  @include icon_size(18px);
+
+  > svg {
+    margin-top: 1px;
+    color: $success_600;
+  }
+
+  strong {
+    font-weight: 600;
+    color: $gray_900;
+  }
+
+  @include dark {
+    background: rgba(255, 255, 255, 0.04);
+    color: $gray_400;
+
+    strong {
+      color: #fff;
+    }
+  }
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  @include icon_size(18px);
+
+  > svg {
+    margin-top: 1px;
+  }
+}
+
+.notice_info {
+  border-color: $info_200;
+  background: $info_50;
+  color: $info_800;
+
+  > svg {
+    color: $info_600;
+  }
+
+  @include dark {
+    border-color: rgba(54, 191, 250, 0.2);
+    background: rgba(54, 191, 250, 0.08);
+    color: #7cd4fd;
+  }
+}
+
+.notice_warning {
+  border-color: $warning_200;
+  background: $warning_50;
+  color: $warning_700;
+
+  @include dark {
+    border-color: rgba($warning_solid, 0.25);
+    background: rgba($warning_solid, 0.08);
+    color: #fec84b;
+  }
+}
+
+.notice_error {
+  border-color: $error_200;
+  background: $error_50;
+  color: $error_700;
+
+  @include dark {
+    border-color: rgba($error_solid, 0.25);
+    background: rgba($error_solid, 0.08);
+    color: #fda29b;
+  }
+}
+
+// ── Card selection ───────────────────────────────────────────────────────────
+
+.card_grid {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.visually_hidden_input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+// Compact row: thumbnail, card details, tags and the radio mark.
+.card_option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 60px;
+  padding: 10px 14px;
+  border: 1.5px solid $gray_200;
+  border-radius: 14px;
+  background: #fff;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+
+  &:hover {
+    border-color: $gray_300;
+    background: $gray_50;
+  }
+
+  &:has(input:focus-visible) {
+    @include focus_ring($brand_400);
+  }
+
+  @include dark {
+    border-color: $gray_700;
+    background: rgba(255, 255, 255, 0.02);
+
+    &:hover {
+      border-color: $gray_600;
+      background: rgba(255, 255, 255, 0.04);
+    }
+  }
+
+  @include reduced_motion {
+    transition: none;
+  }
+}
+
+.card_option_selected {
+  border-color: $brand_500;
+  background: rgba($brand_solid, 0.04);
+  box-shadow: 0 0 0 3px rgba($brand_solid, 0.12);
+
+  &:hover {
+    border-color: $brand_500;
+    background: rgba($brand_solid, 0.06);
+  }
+
+  @include dark {
+    border-color: $brand_400;
+    background: rgba($brand_solid, 0.08);
+
+    &:hover {
+      border-color: $brand_400;
+      background: rgba($brand_solid, 0.1);
+    }
+  }
+}
+
+// Mini card: brand gradient, a chip and the brand name.
+.card_thumb {
+  --face-from: #475467;
+  --face-to: #1d2939;
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 52px;
+  height: 34px;
+  padding: 5px 6px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: linear-gradient(135deg, var(--face-from), var(--face-to));
+  color: #fff;
+  box-shadow:
+    0 2px 6px -2px rgba(16, 24, 40, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+
+  &[data-brand="visa"] {
+    --face-from: #2e5bff;
+    --face-to: #1a237e;
+  }
+
+  &[data-brand="mastercard"] {
+    --face-from: #3a3a4a;
+    --face-to: #111118;
+  }
+
+  &[data-brand="amex"] {
+    --face-from: #1ba3a3;
+    --face-to: #0b5e6b;
+  }
+
+  &[data-brand="discover"] {
+    --face-from: #ff8a3d;
+    --face-to: #c2410c;
+  }
+}
+
+.card_thumb_chip {
+  width: 10px;
+  height: 7px;
+  border-radius: 2px;
+  background: linear-gradient(135deg, #f6e27a, #cfa93c);
+}
+
+.card_thumb_brand {
+  align-self: flex-end;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 8px;
+  font-weight: 800;
+  font-style: italic;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card_option_body {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+}
+
+.card_option_text {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.card_option_title {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  color: $gray_900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.card_digits {
+  margin-left: 2px;
+  font-family: $mono;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: $gray_600;
+
+  @include dark {
+    color: $gray_300;
+  }
+}
+
+.card_option_meta {
+  overflow: hidden;
+  font-size: 12px;
+  color: $gray_500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  @include dark {
+    color: $gray_400;
+  }
+}
+
+// Tags drop below the text on narrow screens.
+.card_option_tags {
+  display: none;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+
+  @include from($sm) {
+    display: flex;
+  }
+}
+
+.tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: $gray_100;
+  font-size: 11px;
+  font-weight: 600;
+  color: $gray_600;
+  white-space: nowrap;
+
+  @include dark {
+    background: rgba(255, 255, 255, 0.08);
+    color: $gray_300;
+  }
+}
+
+.tag_brand {
+  background: $brand_50;
+  color: $brand_600;
+
+  @include dark {
+    background: rgba($brand_solid, 0.15);
+    color: $brand_400;
+  }
+}
+
+.tag_warning {
+  background: $warning_100;
+  color: $warning_700;
+
+  @include dark {
+    background: rgba($warning_solid, 0.15);
+    color: #fec84b;
+  }
+}
+
+.radio_mark {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid $gray_300;
+  border-radius: 999px;
+  color: transparent;
+  transition: all 0.15s ease;
+  @include icon_size(11px);
+
+  .card_option_selected & {
+    border-color: $brand_500;
+    background: $brand_500;
+    color: #fff;
+  }
+
+  @include dark {
+    border-color: $gray_600;
+  }
+}
+
+// ── Empty state ──────────────────────────────────────────────────────────────
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 32px 16px;
+  border: 1.5px dashed $gray_200;
+  border-radius: 16px;
+  text-align: center;
+
+  @include dark {
+    border-color: $gray_700;
+  }
+}
+
+.empty_icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 4px;
+  border-radius: 999px;
+  background: $gray_100;
+  color: $gray_400;
+  @include icon_size(24px);
+
+  @include dark {
+    background: $gray_800;
+  }
+}
+
+.empty_title {
+  font-size: 15px;
+  font-weight: 600;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.empty_text {
+  max-width: 380px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: $gray_500;
+
+  @include dark {
+    color: $gray_400;
+  }
+}
+
+// ── Review ───────────────────────────────────────────────────────────────────
+
+.review_card {
+  border: 1px solid $gray_100;
+  border-radius: 16px;
+  background: $gray_50;
+
+  @include dark {
+    border-color: $gray_800;
+    background: rgba(255, 255, 255, 0.03);
+  }
+}
+
+.review_row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 16px;
+  padding: 14px 16px;
+
+  & + & {
+    border-top: 1px dashed $gray_200;
+
+    @include dark {
+      border-top-color: $gray_700;
+    }
+  }
+}
+
+.review_label {
+  font-size: 13px;
+  color: $gray_500;
+
+  @include dark {
+    color: $gray_400;
+  }
+}
+
+.review_value {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: $gray_900;
+  text-align: right;
+  overflow-wrap: anywhere;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.review_value_big {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.brand_dot {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  border-radius: 3px;
+  background: $gray_500;
+
+  &[data-brand="visa"] {
+    background: #2e5bff;
+  }
+
+  &[data-brand="mastercard"] {
+    background: linear-gradient(90deg, #eb001b 50%, #f79e1b 50%);
+  }
+
+  &[data-brand="amex"] {
+    background: #1ba3a3;
+  }
+
+  &[data-brand="discover"] {
+    background: #ff8a3d;
+  }
+}
+
+.link_button {
+  padding: 2px 4px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: $brand_500;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    text-decoration: underline;
+  }
+
+  &:focus-visible {
+    @include focus_ring($brand_400);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}
+
+.outcomes {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+    color: $gray_700;
+
+    @include dark {
+      color: $gray_300;
+    }
+  }
+}
+
+.outcome_icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: $gray_100;
+  color: $gray_600;
+  @include icon_size(16px);
+
+  @include dark {
+    background: rgba(255, 255, 255, 0.06);
+    color: $gray_300;
+  }
+}
+
+.consent {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1.5px solid $gray_200;
+  border-radius: 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: $gray_700;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
+
+  input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  strong {
+    font-weight: 700;
+    color: $gray_900;
+  }
+
+  &:has(input:focus-visible) {
+    @include focus_ring($brand_400);
+  }
+
+  &:has(input:disabled) {
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+
+  @include dark {
+    border-color: $gray_700;
+    color: $gray_300;
+
+    strong {
+      color: #fff;
+    }
+  }
+}
+
+.consent_checked {
+  border-color: rgba($brand_solid, 0.5);
+  background: rgba($brand_solid, 0.04);
+
+  @include dark {
+    background: rgba($brand_solid, 0.08);
+  }
+}
+
+.consent_box {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border: 1.5px solid $gray_300;
+  border-radius: 6px;
+  color: transparent;
+  transition: all 0.15s ease;
+  @include icon_size(12px);
+
+  .consent_checked & {
+    border-color: $brand_500;
+    background: $brand_500;
+    color: #fff;
+  }
+
+  @include dark {
+    border-color: $gray_600;
+  }
+}
+
+// ── Processing overlay ───────────────────────────────────────────────────────
+
+.processing {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(4px);
+  text-align: center;
+  animation: fade_in 0.2s ease-out both;
+
+  @include dark {
+    background: rgba(16, 24, 40, 0.88);
+  }
+}
+
+.processing_orb {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  margin-bottom: 12px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, $hero_from, $hero_to);
+  color: #fff;
+  box-shadow: 0 12px 28px -10px rgba($brand_solid, 0.6);
+  @include icon_size(30px);
+
+  > span {
+    position: absolute;
+    inset: 0;
+    border: 2px solid rgba($brand_solid, 0.45);
+    border-radius: inherit;
+    animation: pulse_ring 1.8s $ease_out infinite;
+
+    &:nth-child(2) {
+      animation-delay: 0.6s;
+    }
+  }
+
+  @include reduced_motion {
+    > span {
+      animation: none;
+      opacity: 0;
+    }
+  }
+}
+
+.processing_title {
+  font-size: 16px;
+  font-weight: 700;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.processing_text {
+  font-size: 13px;
+  color: $gray_500;
+
+  @include dark {
+    color: $gray_400;
+  }
+}
+
+// ── Result ───────────────────────────────────────────────────────────────────
+
+.result {
+  --result-color: #{$success_500};
+  --result-rgb: #{$success_rgb};
+  align-items: center;
+  text-align: center;
+
+  // Toned glow along the top edge.
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 160px;
+    background: radial-gradient(ellipse at 50% -20%, rgba(var(--result-rgb), 0.16), transparent 70%);
+    pointer-events: none;
+  }
+
+  &[data-tone="error"] {
+    --result-color: #{$error_500};
+    --result-rgb: #{$error_rgb};
+  }
+
+  &[data-tone="warning"] {
+    --result-color: #{$warning_500};
+    --result-rgb: #{$warning_rgb};
+  }
+
+  > * {
+    position: relative;
+  }
+}
+
+.result_badge {
+  width: 76px;
+  height: 76px;
+  padding: 10px;
+  border-radius: 999px;
+  background: rgba(var(--result-rgb), 0.12);
+  animation: badge_pop 0.5s $ease_out both;
+
+  svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  @include reduced_motion {
+    animation: none;
+  }
+}
+
+.result_circle {
+  stroke: var(--result-color);
+  stroke-width: 3;
+  stroke-dasharray: 151;
+  stroke-dashoffset: 151;
+  animation: draw 0.6s 0.1s $ease_out forwards;
+
+  @include reduced_motion {
+    stroke-dashoffset: 0;
+    animation: none;
+  }
+}
+
+.result_check {
+  stroke: var(--result-color);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  animation: draw 0.4s 0.55s $ease_out forwards;
+
+  @include reduced_motion {
+    stroke-dashoffset: 0;
+    animation: none;
+  }
+}
+
+.result_eyebrow {
+  margin-top: -6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--result-color);
+}
+
+.result_title {
+  margin-top: -12px;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: $gray_900;
+
+  &:focus {
+    outline: none;
+  }
+
+  @include from($sm) {
+    font-size: 28px;
+  }
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.result_text {
+  max-width: 460px;
+  margin-top: -8px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: $gray_500;
+
+  @include dark {
+    color: $gray_400;
+  }
+}
+
+.receipt {
+  display: grid;
+  width: 100%;
+  max-width: 520px;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid $gray_100;
+  border-radius: 16px;
+  text-align: left;
+
+  > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 16px;
+
+    & + div {
+      border-top: 1px dashed $gray_200;
+    }
+  }
+
+  dt {
+    font-size: 13px;
+    color: $gray_500;
+  }
+
+  dd {
+    min-width: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: $gray_900;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+
+  @include dark {
+    border-color: $gray_800;
+
+    > div + div {
+      border-top-color: $gray_700;
+    }
+
+    dt {
+      color: $gray_400;
+    }
+
+    dd {
+      color: #fff;
+    }
+  }
+}
+
+.mono {
+  font-family: $mono;
+  font-size: 12px !important;
+}
+
+.failure_box {
+  width: 100%;
+  max-width: 520px;
+  padding: 14px 16px;
+  border: 1px solid rgba(var(--result-rgb), 0.25);
+  border-radius: 16px;
+  background: rgba(var(--result-rgb), 0.05);
+  text-align: left;
+}
+
+.failure_meta {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+
+  @include from($sm) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  dt {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: $gray_500;
+  }
+
+  dd {
+    margin-top: 2px;
+    font-size: 13px;
+    font-weight: 600;
+    color: $gray_900;
+    overflow-wrap: anywhere;
+  }
+
+  @include dark {
+    dt {
+      color: $gray_400;
+    }
+
+    dd {
+      color: #fff;
+    }
+  }
+}
+
+.failure_message {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(var(--result-rgb), 0.3);
+  font-size: 13px;
+  line-height: 1.5;
+  color: $gray_700;
+
+  span {
+    font-weight: 600;
+  }
+
+  @include dark {
+    color: $gray_300;
+  }
+}
+
+.next_steps {
+  width: 100%;
+  max-width: 520px;
+  text-align: left;
+
+  ol {
+    display: grid;
+    gap: 8px;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+    counter-reset: next_step;
+  }
+
+  li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: $gray_700;
+    counter-increment: next_step;
+
+    &::before {
+      content: counter(next_step);
+      display: flex;
+      flex-shrink: 0;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      background: $gray_100;
+      font-size: 11px;
+      font-weight: 700;
+      color: $gray_600;
+    }
+
+    @include dark {
+      color: $gray_300;
+
+      &::before {
+        background: rgba(255, 255, 255, 0.08);
+        color: $gray_300;
+      }
+    }
+  }
+}
+
+.result_footnote {
+  max-width: 520px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: $gray_400;
+
+  @include dark {
+    color: $gray_500;
+  }
+}
+
+.result_actions {
+  display: flex;
+  width: 100%;
+  flex-direction: column-reverse;
+  gap: 10px;
+
+  @include from($sm) {
+    flex-direction: row;
+    justify-content: center;
+  }
+}
+
+// ── Order summary ────────────────────────────────────────────────────────────
+
+.summary {
+  overflow: hidden;
+  border: 1px solid $gray_100;
+  border-radius: $radius_panel;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+
+  @include from($lg) {
+    position: sticky;
+    top: 96px;
+  }
+
+  @include dark {
+    border-color: $gray_800;
+    background: $gray_900;
+  }
+}
+
+.summary_hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 22px 22px 20px;
+  overflow: hidden;
+  background: linear-gradient(135deg, $hero_from, $hero_to);
+  color: #fff;
+  isolation: isolate;
+
+  &::after {
+    content: "";
+    position: absolute;
+    top: -60%;
+    right: -25%;
+    z-index: -1;
+    width: 70%;
+    aspect-ratio: 1;
+    border-radius: 999px;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.25), transparent 65%);
+  }
+}
+
+.summary_hero_label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.summary_hero_amount {
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.summary_hero_caption {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.summary_body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 22px 22px;
+}
+
+.summary_client {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(145deg, $brand_400, $brand_600);
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  box-shadow: 0 4px 10px -4px rgba($brand_solid, 0.6);
+}
+
+.summary_client_text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.summary_client_name,
+.summary_client_meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summary_client_name {
+  font-size: 14px;
+  font-weight: 600;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.summary_client_meta {
+  font-size: 12px;
+  color: $gray_500;
+
+  @include dark {
+    color: $gray_400;
+  }
+}
+
+.summary_lines {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 16px 0;
+  border-block: 1px solid $gray_100;
+
+  > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  dt {
+    flex-shrink: 0;
+    font-size: 13px;
+    color: $gray_500;
+  }
+
+  dd {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 13px;
+    font-weight: 600;
+    color: $gray_900;
+    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  @include dark {
+    border-color: $gray_800;
+
+    dt {
+      color: $gray_400;
+    }
+
+    dd {
+      color: #fff;
+    }
+  }
+}
+
+.summary_total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 15px;
+  font-weight: 700;
+  color: $gray_900;
+  font-variant-numeric: tabular-nums;
+
+  > span:last-child {
+    font-size: 18px;
+  }
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.summary_secure {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: $gray_400;
+  @include icon_size(14px);
+
+  > svg {
+    margin-top: 2px;
+  }
+
+  @include dark {
+    color: $gray_500;
+  }
+}
+
+// ── Buttons ──────────────────────────────────────────────────────────────────
+
+%button_base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0 20px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.1s ease,
+    opacity 0.15s ease;
+  @include icon_size(16px);
+
+  &:active:not(:disabled) {
+    transform: translateY(1px) scale(0.99);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+}
+
+.button_primary {
+  @extend %button_base;
+  border: 0;
+  background: $brand_500;
+  color: #fff;
+  box-shadow:
+    0 8px 18px -8px rgba($brand_solid, 0.65),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+
+  &:hover:not(:disabled) {
+    background: $brand_600;
+  }
+
+  &:focus-visible {
+    @include focus_ring($brand_400);
+  }
+}
+
+.button_pay {
+  background: linear-gradient(135deg, $hero_from, $hero_to);
+
+  &:hover:not(:disabled) {
+    background: linear-gradient(135deg, $brand_600, #7c3aed);
+  }
+
+  @include from($sm) {
+    min-width: 200px;
+  }
+}
+
+.button_secondary {
+  @extend %button_base;
+  border: 1px solid $gray_200;
+  background: #fff;
+  color: $gray_700;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+
+  &:hover:not(:disabled) {
+    border-color: $gray_400;
+    background: $gray_50;
+  }
+
+  &:focus-visible {
+    @include focus_ring($gray_400);
+  }
+
+  @include dark {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+    color: $gray_200;
+
+    &:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.08);
+    }
+  }
+}
+
+.button_ghost {
+  @extend %button_base;
+  border: 0;
+  background: transparent;
+  color: $gray_600;
+
+  &:hover:not(:disabled) {
+    background: $gray_100;
+    color: $gray_900;
+  }
+
+  &:focus-visible {
+    @include focus_ring($gray_400);
+  }
+
+  @include dark {
+    color: $gray_300;
+
+    &:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.06);
+      color: #fff;
+    }
+  }
+}
+
+.spinner {
+  animation: spin 0.8s linear infinite;
+}
+
+// ── Animations ───────────────────────────────────────────────────────────────
+
+@keyframes panel_in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade_in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse_ring {
+  from {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.7);
+  }
+}
+
+@keyframes badge_pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

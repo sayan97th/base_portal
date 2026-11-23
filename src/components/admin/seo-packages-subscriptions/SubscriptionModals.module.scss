@@ -1,4 +1,5 @@
-// Subscription action dialogs (charge now, cancel subscription).
+// Subscription action dialogs (cancel subscription). Manual charges use the
+// full page checkout in SubscriptionCheckout instead of a dialog.
 // Shares the visual language of ui/modal/ConfirmDeleteDialog: frosted backdrop,
 // a card with a toned glow, an animated icon badge with halo rings and a
 // high contrast primary action. Each dialog sets a tone ("brand" or "danger")
@@ -501,30 +502,6 @@ $mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   }
 }
 
-.section_label {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 0 0 8px;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: $gray_500;
-
-  @include dark {
-    color: $gray_400;
-  }
-}
-
-.section_hint {
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0;
-  text-transform: none;
-  color: $gray_400;
-}
-
 // Subscription summary (client, plan, amount).
 .summary {
   overflow: hidden;
@@ -747,232 +724,6 @@ $mono: ui-monospace, SFMono-Regular, Menlo, monospace;
     border-color: rgba(240, 68, 56, 0.25);
     background: rgba(240, 68, 56, 0.08);
     color: $danger_400;
-  }
-}
-
-// ── Card picker ──────────────────────────────────────────────────────────────
-
-.card_list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-.card_option {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 11px 14px;
-  border: 1px solid $gray_200;
-  border-radius: $radius_inner;
-  background: #fff;
-  cursor: pointer;
-  transition:
-    border-color 0.15s ease,
-    background-color 0.15s ease,
-    box-shadow 0.15s ease,
-    transform 0.15s ease;
-
-  @include dark {
-    border-color: rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.02);
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    &:hover {
-      border-color: $gray_300;
-      transform: translateY(-1px);
-
-      @include dark {
-        border-color: rgba(255, 255, 255, 0.16);
-      }
-    }
-  }
-
-  // Native radio stays accessible but visually hidden.
-  input {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    opacity: 0;
-    pointer-events: none;
-  }
-
-  &:has(input:focus-visible) {
-    @include focus_ring(var(--tone-500));
-  }
-}
-
-.card_option_selected {
-  border-color: var(--tone-400);
-  background: linear-gradient(135deg, rgba(var(--tone-rgb), 0.06), rgba(var(--tone-rgb), 0.02));
-  box-shadow: 0 0 0 3px rgba(var(--tone-rgb), 0.12);
-
-  @include dark {
-    border-color: rgba(var(--tone-rgb), 0.55);
-    background: rgba(var(--tone-rgb), 0.08);
-  }
-
-  &:hover {
-    border-color: var(--tone-500);
-  }
-}
-
-// Miniature credit card illustration.
-.card_chip {
-  position: relative;
-  display: flex;
-  flex-shrink: 0;
-  flex-direction: column;
-  justify-content: space-between;
-  width: 46px;
-  height: 31px;
-  padding: 4px 5px;
-  overflow: hidden;
-  border-radius: 6px;
-  background: linear-gradient(135deg, $gray_700, $gray_900);
-  color: #fff;
-  box-shadow: 0 3px 8px -3px rgba(16, 24, 40, 0.45);
-
-  &::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-      110deg,
-      transparent 30%,
-      rgba(255, 255, 255, 0.18) 45%,
-      transparent 60%
-    );
-    background-size: 200% 100%;
-    animation: shimmer 3.2s linear infinite;
-  }
-
-  .card_option_selected & {
-    background: linear-gradient(135deg, var(--tone-500), var(--tone-700));
-    box-shadow: 0 4px 10px -3px rgba(var(--tone-rgb), 0.55);
-  }
-}
-
-.card_chip_contact {
-  width: 9px;
-  height: 7px;
-  border-radius: 2px;
-  background: linear-gradient(135deg, #fde68a, #d97706);
-}
-
-.card_chip_brand {
-  align-self: flex-end;
-  font-size: 7px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  opacity: 0.9;
-}
-
-.card_text {
-  min-width: 0;
-  flex: 1;
-}
-
-.card_number {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  color: $gray_900;
-
-  @include dark {
-    color: #fff;
-  }
-}
-
-.card_digits {
-  font-family: $mono;
-  font-size: 13px;
-  letter-spacing: 0.06em;
-}
-
-.card_meta {
-  display: block;
-  margin-top: 2px;
-  font-size: 12px;
-  color: $gray_500;
-
-  @include dark {
-    color: $gray_400;
-  }
-}
-
-.pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: $gray_100;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: $gray_600;
-
-  @include dark {
-    background: rgba(255, 255, 255, 0.08);
-    color: $gray_300;
-  }
-}
-
-.pill_tone {
-  background: rgba(var(--tone-rgb), 0.12);
-  color: var(--tone-700);
-
-  @include dark {
-    color: var(--tone-400);
-  }
-}
-
-.radio_dot {
-  position: relative;
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border: 2px solid $gray_300;
-  border-radius: 50%;
-  transition:
-    border-color 0.15s ease,
-    background-color 0.15s ease;
-
-  @include dark {
-    border-color: rgba(255, 255, 255, 0.2);
-  }
-
-  svg {
-    width: 12px;
-    height: 12px;
-    color: #fff;
-    opacity: 0;
-    transform: scale(0.4);
-    transition:
-      opacity 0.15s ease,
-      transform 0.2s $ease_out;
-  }
-
-  .card_option_selected & {
-    border-color: var(--tone-500);
-    background: var(--tone-500);
-
-    svg {
-      opacity: 1;
-      transform: scale(1);
-    }
   }
 }
 
@@ -1275,21 +1026,6 @@ $mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   animation: spin 0.8s linear infinite;
 }
 
-.secure_note {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  margin: 0;
-  font-size: 11px;
-  color: $gray_400;
-
-  svg {
-    width: 13px;
-    height: 13px;
-  }
-}
-
 .kbd_hint {
   display: none;
   justify-content: center;
@@ -1332,9 +1068,7 @@ $mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   .icon_badge,
   .icon_halo,
   .close_button,
-  .body > *,
-  .card_chip::after,
-  .card_option {
+  .body > * {
     animation: none !important;
     transition: none !important;
   }

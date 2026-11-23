@@ -115,6 +115,8 @@ export interface AdminSeoSubscriptionDetail {
   data: AdminSeoSubscription;
   summary: AdminSeoSubscriptionSummary;
   message?: string;
+  /** Returned by the charge endpoint: the period that was just billed. */
+  charge?: AdminSeoSubscriptionCharge;
 }
 
 export interface AdminSeoSubscriptionFilters {
@@ -209,6 +211,18 @@ export interface ApiErrorShape {
   status_code?: number;
 }
 
+/** Error body of POST /subscriptions/{id}/charge. */
+export interface ChargeErrorShape extends ApiErrorShape {
+  error_code?: string | null;
+  charge?: AdminSeoSubscriptionCharge | null;
+}
+
+export interface SubscriptionPaymentProfilesResult {
+  cards: AdminClientPaymentProfile[];
+  /** Owner the server resolved from the subscription. */
+  owner_user_id: number | null;
+}
+
 /** First readable message from an apiClient error. */
 export function extractApiError(error: unknown, fallback: string): string {
   const api_error = error as ApiErrorShape | undefined;
@@ -236,6 +250,11 @@ interface AdminUserSearchApiResponse {
 
 interface PaymentProfilesApiResponse {
   data: AdminClientPaymentProfile[];
+}
+
+interface SubscriptionPaymentProfilesApiResponse {
+  data: AdminClientPaymentProfile[];
+  meta?: { subscription_id: number; user_id: number };
 }
 
 const BASE_URL = "/api/admin/seo-packages/subscriptions";
@@ -310,6 +329,17 @@ export const adminSeoSubscriptionService = {
       `${BASE_URL}/payment-profiles?user_id=${user_id}`
     );
     return response.data;
+  },
+
+  /**
+   * Cards of the subscription owner only. The owner is resolved on the
+   * server from the subscription id, never from a user id sent by the page.
+   */
+  async listSubscriptionPaymentProfiles(subscription_id: number): Promise<SubscriptionPaymentProfilesResult> {
+    const response = await apiClient.get<SubscriptionPaymentProfilesApiResponse>(
+      `${BASE_URL}/${subscription_id}/payment-profiles`
+    );
+    return { cards: response.data, owner_user_id: response.meta?.user_id ?? null };
   },
 
   async searchUsers(query: string): Promise<AdminUserSearchResult[]> {
