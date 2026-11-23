@@ -37,6 +37,20 @@ $card_brands: (
   }
 }
 
+// Phones only.
+@mixin phone {
+  @media (max-width: 480px) {
+    @content;
+  }
+}
+
+// Hover effects only on devices with a real pointer, so taps do not leave cards lifted.
+@mixin hover_device {
+  @media (hover: hover) and (pointer: fine) {
+    @content;
+  }
+}
+
 // ── Billing preview (activate modal) ─────────────────────────────────────────
 
 .preview {
@@ -324,8 +338,15 @@ $card_brands: (
   background: #fff;
   transition: border-color 0.15s ease, background-color 0.15s ease;
 
-  &:hover {
-    border-color: rgba(236, 60, 137, 0.4);
+  @include phone {
+    gap: 12px;
+    padding: 12px 14px;
+  }
+
+  @include hover_device {
+    &:hover {
+      border-color: rgba(236, 60, 137, 0.4);
+    }
   }
 
   &.isOn {
@@ -413,9 +434,11 @@ $card_brands: (
     }
   }
 
-  &:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 20px -12px rgba(17, 24, 39, 0.6);
+  @include hover_device {
+    &:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px -12px rgba(17, 24, 39, 0.6);
+    }
   }
 
   &.isSelected {
@@ -480,6 +503,11 @@ $card_brands: (
   gap: 14px;
   padding-bottom: 18px;
 
+  @include phone {
+    gap: 10px;
+    padding-bottom: 14px;
+  }
+
   &:last-child {
     padding-bottom: 0;
 
@@ -529,15 +557,23 @@ $card_brands: (
 }
 
 .timelineCard {
+  min-width: 0;
   border: 1px solid $gray_100;
   border-radius: 14px;
   padding: 12px 14px;
   background: #fff;
+  overflow-wrap: anywhere;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 
-  &:hover {
-    border-color: $gray_200;
-    box-shadow: 0 4px 14px -8px rgba(16, 24, 40, 0.18);
+  @include phone {
+    padding: 10px 12px;
+  }
+
+  @include hover_device {
+    &:hover {
+      border-color: $gray_200;
+      box-shadow: 0 4px 14px -8px rgba(16, 24, 40, 0.18);
+    }
   }
 
   @include dark {
@@ -751,6 +787,10 @@ $card_brands: (
   background: #fff;
   transition: border-color 0.15s ease, background-color 0.15s ease;
 
+  @include phone {
+    padding: 12px 14px;
+  }
+
   &.isOn {
     border-color: rgba(236, 60, 137, 0.35);
     background: linear-gradient(135deg, rgba(236, 60, 137, 0.04), rgba(139, 92, 246, 0.03));
@@ -774,6 +814,10 @@ $card_brands: (
   display: flex;
   align-items: center;
   gap: 12px;
+
+  @include phone {
+    align-items: flex-start;
+  }
 }
 
 .reminderIcon {
@@ -801,15 +845,23 @@ $card_brands: (
   margin-top: 12px;
   padding-left: 46px;
 
-  @media (max-width: 480px) {
+  @include phone {
+    margin-top: 14px;
     padding-left: 0;
   }
 }
 
+// Phones get a two column grid of larger, thumb friendly chips.
 .chipGroup {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+
+  @include phone {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
 }
 
 .chip {
@@ -822,6 +874,12 @@ $card_brands: (
   color: $gray_500;
   background: #fff;
   transition: all 0.12s ease;
+
+  @include phone {
+    height: 38px;
+    padding: 0 10px;
+    font-size: 12.5px;
+  }
 
   &:hover:not(:disabled):not(.isActive) {
     border-color: rgba(236, 60, 137, 0.45);
@@ -856,6 +914,11 @@ $card_brands: (
   &.isActive {
     border-style: solid;
   }
+
+  @include phone {
+    grid-column: 1 / -1;
+    justify-content: center;
+  }
 }
 
 // ── Custom reminder editor ───────────────────────────────────────────────────
@@ -885,6 +948,10 @@ $card_brands: (
   box-shadow: 0 12px 28px -18px rgba(139, 92, 246, 0.55), 0 1px 0 rgba(255, 255, 255, 0.8) inset;
   animation: reminderPanelIn 0.22s cubic-bezier(0.22, 1, 0.36, 1);
 
+  @include phone {
+    padding: 14px 12px;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     animation: none;
   }
@@ -904,6 +971,12 @@ $card_brands: (
   flex-wrap: wrap;
   align-items: center;
   gap: 16px;
+
+  @include phone {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
 }
 
 // Stepper: minus, big number, plus
@@ -918,6 +991,11 @@ $card_brands: (
   background: #fff;
   box-shadow: 0 2px 6px -3px rgba(16, 24, 40, 0.12);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  @include phone {
+    display: flex;
+    justify-content: space-between;
+  }
 
   &:focus-within {
     border-color: rgba(236, 60, 137, 0.55);
@@ -940,6 +1018,11 @@ $card_brands: (
   color: $gray_500;
   background: $gray_50;
   transition: color 0.12s ease, background-color 0.12s ease, transform 0.12s ease;
+
+  @include phone {
+    width: 44px;
+    height: 44px;
+  }
 
   svg {
     width: 14px;
@@ -1016,17 +1099,24 @@ $card_brands: (
   color: $gray_400;
 }
 
-// Mini timeline: reminder email, gap in days, charge
+// Mini timeline: reminder email, gap in days, charge.
+// Uses its own class name so it never collides with the charge history .timelineDot.
 
 .customTimeline {
   display: flex;
   flex: 1 1 180px;
+
+  @include phone {
+    flex-basis: auto;
+    padding: 0 4px;
+  }
+
   align-items: center;
   gap: 8px;
   min-width: 0;
 }
 
-.timelineDot {
+.reminderTimelineDot {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1096,6 +1186,10 @@ $card_brands: (
   position: relative;
   margin-top: 18px;
   padding-bottom: 20px;
+
+  @include phone {
+    padding-bottom: 26px;
+  }
 }
 
 @mixin rangeThumb {
@@ -1113,6 +1207,7 @@ $card_brands: (
   display: block;
   width: 100%;
   height: 6px;
+  touch-action: pan-y;
   border-radius: 999px;
   background: linear-gradient(90deg, $hero_from, $hero_to) 0 / var(--range_fill, 0%) 100% no-repeat, $gray_200;
   cursor: pointer;
@@ -1185,6 +1280,11 @@ $card_brands: (
     transform: translateX(-50%);
     transition: color 0.12s ease;
 
+    @include phone {
+      padding: 4px 6px;
+      font-size: 11px;
+    }
+
     &:hover:not(:disabled),
     &.isActive {
       color: $brand_500;
@@ -1222,6 +1322,14 @@ $card_brands: (
 .customActions {
   display: flex;
   gap: 8px;
+
+  @include phone {
+    width: 100%;
+
+    > * {
+      flex: 1;
+    }
+  }
 }
 
 .customCancel,
@@ -1232,6 +1340,11 @@ $card_brands: (
   font-size: 12.5px;
   font-weight: 600;
   transition: all 0.12s ease;
+
+  @include phone {
+    height: 40px;
+    font-size: 13px;
+  }
 }
 
 .customCancel {
@@ -1280,6 +1393,19 @@ $card_brands: (
   font-weight: 500;
   color: $gray_700;
   background: rgba(139, 92, 246, 0.07);
+
+  // Long sentences wrap on phones, so the pill becomes a rounded box.
+  @include phone {
+    display: flex;
+    align-items: flex-start;
+    border-radius: 10px;
+    padding: 8px 10px;
+    line-height: 1.45;
+
+    svg {
+      margin-top: 2px;
+    }
+  }
 
   svg {
     flex-shrink: 0;

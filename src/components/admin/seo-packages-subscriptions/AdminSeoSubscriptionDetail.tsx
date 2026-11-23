@@ -147,7 +147,7 @@ function ChargeTimeline({ charges }: { charges: AdminSeoSubscriptionCharge[] }) 
                     {formatDate(charge.period_start)} to {formatDate(charge.period_end)}
                   </p>
                 </div>
-                <div className="flex items-center gap-2 sm:flex-col sm:items-end sm:gap-0.5">
+                <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:flex-col sm:items-end sm:justify-start sm:gap-0.5">
                   <p className="text-sm font-bold text-gray-900 tabular-nums dark:text-white">{formatMoney(charge.amount)}</p>
                   <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${cfg.badge}`}>
                     <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
@@ -156,7 +156,7 @@ function ChargeTimeline({ charges }: { charges: AdminSeoSubscriptionCharge[] }) 
                 </div>
               </div>
 
-              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-gray-500 dark:text-gray-400">
                 <span>{TRIGGER_LABELS[charge.trigger]}{charge.charged_by ? ` (${charge.charged_by.name})` : ""}</span>
                 {charge.card_label && <span>{charge.card_label}</span>}
                 {charge.paid_at && <span>Paid {formatDate(charge.paid_at)}</span>}
@@ -315,10 +315,10 @@ function SubscriptionSummary({
 function DetailSkeleton() {
   const block = "animate-pulse bg-gray-100 dark:bg-gray-800";
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       <div className={`h-5 w-48 rounded ${block}`} />
       <div className={`h-36 rounded-2xl ${block}`} />
-      <div className="grid gap-6 lg:grid-cols-12">
+      <div className="grid gap-5 sm:gap-6 lg:grid-cols-12">
         <div className={`h-72 rounded-2xl lg:col-span-7 ${block}`} />
         <div className={`h-72 rounded-2xl lg:col-span-5 ${block}`} />
       </div>
@@ -466,11 +466,11 @@ export default function AdminSeoSubscriptionDetail({ subscription_id, notice }: 
         )}
       </div>
 
-      {/* Toast */}
+      {/* Toast: pinned above the bottom edge on phones so it is visible after closing a modal */}
       {toast && (
         <div
           role="status"
-          className={`rounded-xl border px-4 py-3 text-sm ${
+          className={`fixed inset-x-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-50 rounded-xl border px-4 py-3 text-sm shadow-lg sm:static sm:inset-auto sm:z-auto sm:shadow-none ${
             toast.tone === "success"
               ? "border-success-200 bg-success-50 text-success-700 dark:border-success-500/20 dark:bg-success-500/10 dark:text-success-400"
               : "border-error-200 bg-error-50 text-error-700 dark:border-error-500/20 dark:bg-error-500/10 dark:text-error-400"
@@ -561,7 +561,7 @@ export default function AdminSeoSubscriptionDetail({ subscription_id, notice }: 
                       saveSettings("next_billing_date", { next_billing_date: next_date_draft }, "Billing date updated.")
                     }
                     disabled={saving_field === "next_billing_date"}
-                    className="rounded-xl bg-brand-500 px-4 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
+                    className="min-h-11 shrink-0 rounded-xl bg-brand-500 px-4 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
                   >
                     Save
                   </button>

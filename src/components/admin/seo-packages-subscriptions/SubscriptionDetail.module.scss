@@ -33,6 +33,12 @@ $lg: 1024px;
   }
 }
 
+@mixin below($width) {
+  @media (max-width: #{$width - 1px}) {
+    @content;
+  }
+}
+
 // ── Toolbar (back link and actions) ──────────────────────────────────────────
 
 .toolbar {
@@ -60,6 +66,12 @@ $lg: 1024px;
 
   > * {
     justify-content: center;
+  }
+
+  @include below($sm) {
+    > * {
+      min-height: 44px;
+    }
   }
 
   @include from($sm) {
@@ -133,6 +145,15 @@ $lg: 1024px;
     --plan_from: #4b5563;
     --plan_to: #1f2937;
   }
+
+  @include below($sm) {
+    padding: 14px 16px;
+
+    &::after {
+      top: -90px;
+      right: -70px;
+    }
+  }
 }
 
 .summaryPlanName {
@@ -153,6 +174,10 @@ $lg: 1024px;
   font-weight: 800;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
+
+  @include below($sm) {
+    font-size: 26px;
+  }
 
   span {
     font-size: 13px;
@@ -185,6 +210,12 @@ $lg: 1024px;
   align-items: center;
   justify-content: space-between;
   gap: 10px 16px;
+
+  // Identity on top, badges underneath, both full width.
+  @include below($sm) {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 .summaryIdentity {
@@ -192,6 +223,7 @@ $lg: 1024px;
   align-items: center;
   gap: 12px;
   min-width: 0;
+  max-width: 100%;
 }
 
 .avatar {
@@ -297,6 +329,11 @@ $lg: 1024px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 
+  // Very narrow phones (320px) stack the figures.
+  @media (max-width: 359px) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   @include from($md) {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
@@ -333,6 +370,13 @@ $lg: 1024px;
     @include dark {
       color: #fff;
     }
+
+    // Let values like "Mastercard •••• 4242" wrap instead of being cut on phones.
+    @include below($sm) {
+      font-size: 13.5px;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
   }
 }
 
@@ -345,6 +389,10 @@ $lg: 1024px;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: $gray_500;
+
+  @include below($sm) {
+    white-space: normal;
+  }
 
   &[data-tone="error"] {
     color: var(--color-error-500);
@@ -399,6 +447,11 @@ $lg: 1024px;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 16px;
+
+  @include below($sm) {
+    gap: 8px;
+    margin-bottom: 14px;
+  }
 }
 
 .panelHeading {
@@ -450,6 +503,20 @@ $lg: 1024px;
   flex-shrink: 0;
   font-size: 12px;
   color: $gray_400;
+
+  // Compact pill on phones so it does not squeeze the title.
+  @include below($sm) {
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    background: $gray_50;
+
+    @include dark {
+      background: rgba(255, 255, 255, 0.05);
+    }
+  }
 }
 
 .fieldLabel {
@@ -476,6 +543,11 @@ $lg: 1024px;
   border-radius: 14px;
   padding: 8px 12px 8px 8px;
   background: $gray_50;
+
+  @include below($sm) {
+    gap: 10px;
+    padding-right: 10px;
+  }
 
   @include dark {
     background: rgba(255, 255, 255, 0.03);

@@ -1,0 +1,1341 @@
+// Subscription action dialogs (charge now, cancel subscription).
+// Shares the visual language of ui/modal/ConfirmDeleteDialog: frosted backdrop,
+// a card with a toned glow, an animated icon badge with halo rings and a
+// high contrast primary action. Each dialog sets a tone ("brand" or "danger")
+// that drives every accent color through local CSS custom properties.
+
+$brand_50: var(--color-brand-50, #fdeef5);
+$brand_100: var(--color-brand-100, #fcdceb);
+$brand_200: var(--color-brand-200, #f9b8d5);
+$brand_400: var(--color-brand-400, #f066a1);
+$brand_500: var(--color-brand-500, #ec3c89);
+$brand_600: var(--color-brand-600, #d4316f);
+$brand_700: var(--color-brand-700, #b02659);
+
+$danger_50: var(--color-error-50, #fef3f2);
+$danger_100: var(--color-error-100, #fee4e2);
+$danger_200: var(--color-error-200, #fecdca);
+$danger_400: var(--color-error-400, #f97066);
+$danger_500: var(--color-error-500, #f04438);
+$danger_600: var(--color-error-600, #d92d20);
+$danger_700: var(--color-error-700, #b42318);
+
+$info_50: var(--color-blue-light-50, #f0f9ff);
+$info_200: var(--color-blue-light-200, #b9e6fe);
+$info_400: var(--color-blue-light-400, #36bffa);
+$info_600: var(--color-blue-light-600, #0086c9);
+$info_800: var(--color-blue-light-800, #065986);
+
+$warning_50: var(--color-warning-50, #fffaeb);
+$warning_200: var(--color-warning-200, #fedf89);
+$warning_400: var(--color-warning-400, #fdb022);
+$warning_800: var(--color-warning-800, #93370d);
+
+$gray_900: var(--color-gray-900, #101828);
+$gray_800: var(--color-gray-800, #1d2939);
+$gray_700: var(--color-gray-700, #344054);
+$gray_600: var(--color-gray-600, #475467);
+$gray_500: var(--color-gray-500, #667085);
+$gray_400: var(--color-gray-400, #98a2b3);
+$gray_300: var(--color-gray-300, #d0d5dd);
+$gray_200: var(--color-gray-200, #e4e7ec);
+$gray_100: var(--color-gray-100, #f2f4f7);
+$gray_50: var(--color-gray-50, #f9fafb);
+
+$radius_card: 22px;
+$radius_inner: 14px;
+$ease_out: cubic-bezier(0.16, 1, 0.3, 1);
+$mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+@mixin dark {
+  :global(.dark) & {
+    @content;
+  }
+}
+
+@mixin focus_ring($color) {
+  outline: none;
+  box-shadow:
+    0 0 0 2px #fff,
+    0 0 0 4px $color;
+
+  @include dark {
+    box-shadow:
+      0 0 0 2px $gray_900,
+      0 0 0 4px $color;
+  }
+}
+
+// ── Keyframes ────────────────────────────────────────────────────────────────
+
+@keyframes backdrop_in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes card_in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes sheet_in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes icon_pop {
+  0% {
+    transform: scale(0.4) rotate(-12deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.08) rotate(4deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0);
+  }
+}
+
+@keyframes halo_pulse {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(1.55);
+    opacity: 0;
+  }
+}
+
+@keyframes rise_in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-4px);
+  }
+  40%,
+  80% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+// ── Layout ───────────────────────────────────────────────────────────────────
+
+.root {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow-y: auto;
+
+  @media (min-width: 640px) {
+    align-items: center;
+    padding: 16px;
+  }
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 40%, var(--tone-glow), transparent 60%),
+    rgba(16, 24, 40, 0.55);
+  backdrop-filter: blur(6px) saturate(120%);
+  animation: backdrop_in 0.2s ease-out both;
+
+  @include dark {
+    background:
+      radial-gradient(circle at 50% 40%, var(--tone-glow-dark), transparent 60%),
+      rgba(0, 0, 0, 0.7);
+  }
+}
+
+// Tone tokens live on the root so the backdrop and the card share them.
+.tone_brand {
+  --tone-50: #{$brand_50};
+  --tone-100: #{$brand_100};
+  --tone-200: #{$brand_200};
+  --tone-400: #{$brand_400};
+  --tone-500: #{$brand_500};
+  --tone-600: #{$brand_600};
+  --tone-700: #{$brand_700};
+  --tone-rgb: 236, 60, 137;
+  --tone-glow: rgba(236, 60, 137, 0.12);
+  --tone-glow-dark: rgba(236, 60, 137, 0.16);
+}
+
+.tone_danger {
+  --tone-50: #{$danger_50};
+  --tone-100: #{$danger_100};
+  --tone-200: #{$danger_200};
+  --tone-400: #{$danger_400};
+  --tone-500: #{$danger_500};
+  --tone-600: #{$danger_600};
+  --tone-700: #{$danger_700};
+  --tone-rgb: 240, 68, 56;
+  --tone-glow: rgba(240, 68, 56, 0.12);
+  --tone-glow-dark: rgba(240, 68, 56, 0.16);
+}
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: 94vh;
+  max-height: 94dvh;
+  overflow: hidden;
+  border: 1px solid rgba(16, 24, 40, 0.06);
+  border-radius: $radius_card $radius_card 0 0;
+  background: #fff;
+  box-shadow:
+    0 1px 2px rgba(16, 24, 40, 0.04),
+    0 24px 48px -12px rgba(16, 24, 40, 0.28),
+    0 0 0 1px rgba(var(--tone-rgb), 0.04);
+  animation: sheet_in 0.36s $ease_out both;
+
+  @include dark {
+    border-color: rgba(255, 255, 255, 0.08);
+    background: $gray_900;
+    box-shadow:
+      0 24px 64px -12px rgba(0, 0, 0, 0.7),
+      0 0 0 1px rgba(var(--tone-rgb), 0.08);
+  }
+
+  @media (min-width: 640px) {
+    border-radius: $radius_card;
+    animation: card_in 0.32s $ease_out both;
+  }
+
+  // Soft tone wash behind the header.
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 160px;
+    background: linear-gradient(180deg, rgba(var(--tone-rgb), 0.08), rgba(var(--tone-rgb), 0));
+    pointer-events: none;
+
+    @include dark {
+      background: linear-gradient(180deg, rgba(var(--tone-rgb), 0.14), rgba(var(--tone-rgb), 0));
+    }
+  }
+
+  // Thin accent bar on top.
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 3px;
+    background: linear-gradient(90deg, var(--tone-400), var(--tone-600), var(--tone-400));
+  }
+}
+
+.card_sm {
+  @media (min-width: 640px) {
+    max-width: 440px;
+  }
+}
+
+.card_md {
+  @media (min-width: 640px) {
+    max-width: 480px;
+  }
+}
+
+.card_shake {
+  animation: shake 0.36s ease-in-out;
+}
+
+.form {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.scroll_area {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+// ── Header ───────────────────────────────────────────────────────────────────
+
+.close_button {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: $gray_400;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s ease;
+
+  &:hover:not(:disabled) {
+    background: $gray_100;
+    color: $gray_700;
+    transform: rotate(90deg);
+
+    @include dark {
+      background: rgba(255, 255, 255, 0.06);
+      color: #fff;
+    }
+  }
+
+  &:focus-visible {
+    @include focus_ring($gray_400);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.header {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 28px 0;
+  text-align: center;
+
+  @media (max-width: 479px) {
+    padding: 28px 20px 0;
+  }
+}
+
+.icon_wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 18px;
+}
+
+.icon_halo {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--tone-200);
+  animation: halo_pulse 2.4s ease-out infinite;
+
+  @include dark {
+    background: rgba(var(--tone-rgb), 0.35);
+  }
+
+  &:nth-child(2) {
+    animation-delay: 1.2s;
+  }
+}
+
+.icon_badge {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border: 6px solid var(--tone-50);
+  border-radius: 50%;
+  background: linear-gradient(145deg, var(--tone-100), var(--tone-200));
+  color: var(--tone-600);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  animation: icon_pop 0.5s $ease_out 0.08s both;
+
+  @include dark {
+    border-color: rgba(var(--tone-rgb), 0.12);
+    background: linear-gradient(145deg, rgba(var(--tone-rgb), 0.28), rgba(var(--tone-rgb), 0.14));
+    color: var(--tone-400);
+    box-shadow: none;
+  }
+
+  svg {
+    width: 26px;
+    height: 26px;
+  }
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tone-600);
+
+  @include dark {
+    color: var(--tone-400);
+  }
+}
+
+.title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.description {
+  max-width: 360px;
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: $gray_500;
+
+  @include dark {
+    color: $gray_400;
+  }
+
+  strong {
+    font-weight: 600;
+    color: $gray_800;
+
+    @include dark {
+      color: $gray_200;
+    }
+  }
+}
+
+// ── Body ─────────────────────────────────────────────────────────────────────
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px 28px 4px;
+
+  @media (max-width: 479px) {
+    padding: 18px 20px 4px;
+  }
+
+  > * {
+    animation: rise_in 0.36s $ease_out both;
+  }
+
+  > :nth-child(2) {
+    animation-delay: 0.05s;
+  }
+
+  > :nth-child(3) {
+    animation-delay: 0.1s;
+  }
+
+  > :nth-child(4) {
+    animation-delay: 0.15s;
+  }
+
+  > :nth-child(n + 5) {
+    animation-delay: 0.2s;
+  }
+}
+
+.section_label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: $gray_500;
+
+  @include dark {
+    color: $gray_400;
+  }
+}
+
+.section_hint {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: $gray_400;
+}
+
+// Subscription summary (client, plan, amount).
+.summary {
+  overflow: hidden;
+  border: 1px solid $gray_200;
+  border-radius: $radius_inner;
+  background: $gray_50;
+
+  @include dark {
+    border-color: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+  }
+}
+
+.summary_head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+}
+
+.avatar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(145deg, var(--tone-400), var(--tone-600));
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff;
+  box-shadow:
+    0 4px 10px -4px rgba(var(--tone-rgb), 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.summary_text {
+  min-width: 0;
+  flex: 1;
+  text-align: left;
+}
+
+.summary_label {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: $gray_400;
+
+  @include dark {
+    color: $gray_500;
+  }
+}
+
+.summary_name {
+  display: block;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.summary_meta {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: $gray_500;
+
+  @include dark {
+    color: $gray_400;
+  }
+}
+
+.summary_amount {
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.summary_amount_value {
+  display: block;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.summary_amount_caption {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 500;
+  color: $gray_400;
+}
+
+.summary_grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px dashed $gray_200;
+
+  @include dark {
+    border-top-color: rgba(255, 255, 255, 0.08);
+  }
+}
+
+.summary_cell {
+  min-width: 0;
+  padding: 10px 14px;
+  text-align: left;
+
+  & + & {
+    border-left: 1px dashed $gray_200;
+
+    @include dark {
+      border-left-color: rgba(255, 255, 255, 0.08);
+    }
+  }
+
+  dt {
+    font-size: 11px;
+    font-weight: 500;
+    color: $gray_400;
+  }
+
+  dd {
+    margin: 2px 0 0;
+    overflow: hidden;
+    font-size: 13px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: $gray_800;
+
+    @include dark {
+      color: $gray_200;
+    }
+  }
+}
+
+// Inline notices (info, warning, error).
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 14px;
+  border: 1px solid;
+  border-radius: $radius_inner;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: left;
+
+  svg {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    margin-top: 2px;
+  }
+}
+
+.notice_info {
+  border-color: $info_200;
+  background: $info_50;
+  color: $info_800;
+
+  svg {
+    color: $info_600;
+  }
+
+  @include dark {
+    border-color: rgba(11, 165, 236, 0.22);
+    background: rgba(11, 165, 236, 0.08);
+    color: $info_200;
+
+    svg {
+      color: $info_400;
+    }
+  }
+}
+
+.notice_warning {
+  border-color: $warning_200;
+  background: $warning_50;
+  color: $warning_800;
+
+  @include dark {
+    border-color: rgba(247, 144, 9, 0.22);
+    background: rgba(247, 144, 9, 0.08);
+    color: $warning_200;
+
+    svg {
+      color: $warning_400;
+    }
+  }
+}
+
+.notice_error {
+  border-color: $danger_200;
+  background: $danger_50;
+  color: $danger_700;
+
+  @include dark {
+    border-color: rgba(240, 68, 56, 0.25);
+    background: rgba(240, 68, 56, 0.08);
+    color: $danger_400;
+  }
+}
+
+// ── Card picker ──────────────────────────────────────────────────────────────
+
+.card_list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.card_option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border: 1px solid $gray_200;
+  border-radius: $radius_inner;
+  background: #fff;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+
+  @include dark {
+    border-color: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      border-color: $gray_300;
+      transform: translateY(-1px);
+
+      @include dark {
+        border-color: rgba(255, 255, 255, 0.16);
+      }
+    }
+  }
+
+  // Native radio stays accessible but visually hidden.
+  input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  &:has(input:focus-visible) {
+    @include focus_ring(var(--tone-500));
+  }
+}
+
+.card_option_selected {
+  border-color: var(--tone-400);
+  background: linear-gradient(135deg, rgba(var(--tone-rgb), 0.06), rgba(var(--tone-rgb), 0.02));
+  box-shadow: 0 0 0 3px rgba(var(--tone-rgb), 0.12);
+
+  @include dark {
+    border-color: rgba(var(--tone-rgb), 0.55);
+    background: rgba(var(--tone-rgb), 0.08);
+  }
+
+  &:hover {
+    border-color: var(--tone-500);
+  }
+}
+
+// Miniature credit card illustration.
+.card_chip {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 46px;
+  height: 31px;
+  padding: 4px 5px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: linear-gradient(135deg, $gray_700, $gray_900);
+  color: #fff;
+  box-shadow: 0 3px 8px -3px rgba(16, 24, 40, 0.45);
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      110deg,
+      transparent 30%,
+      rgba(255, 255, 255, 0.18) 45%,
+      transparent 60%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 3.2s linear infinite;
+  }
+
+  .card_option_selected & {
+    background: linear-gradient(135deg, var(--tone-500), var(--tone-700));
+    box-shadow: 0 4px 10px -3px rgba(var(--tone-rgb), 0.55);
+  }
+}
+
+.card_chip_contact {
+  width: 9px;
+  height: 7px;
+  border-radius: 2px;
+  background: linear-gradient(135deg, #fde68a, #d97706);
+}
+
+.card_chip_brand {
+  align-self: flex-end;
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+
+.card_text {
+  min-width: 0;
+  flex: 1;
+}
+
+.card_number {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.card_digits {
+  font-family: $mono;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+}
+
+.card_meta {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: $gray_500;
+
+  @include dark {
+    color: $gray_400;
+  }
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: $gray_100;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: $gray_600;
+
+  @include dark {
+    background: rgba(255, 255, 255, 0.08);
+    color: $gray_300;
+  }
+}
+
+.pill_tone {
+  background: rgba(var(--tone-rgb), 0.12);
+  color: var(--tone-700);
+
+  @include dark {
+    color: var(--tone-400);
+  }
+}
+
+.radio_dot {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 2px solid $gray_300;
+  border-radius: 50%;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+
+  @include dark {
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  svg {
+    width: 12px;
+    height: 12px;
+    color: #fff;
+    opacity: 0;
+    transform: scale(0.4);
+    transition:
+      opacity 0.15s ease,
+      transform 0.2s $ease_out;
+  }
+
+  .card_option_selected & {
+    border-color: var(--tone-500);
+    background: var(--tone-500);
+
+    svg {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+}
+
+// ── Cancel specific ──────────────────────────────────────────────────────────
+
+.consequences {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid $gray_200;
+  border-radius: $radius_inner;
+  list-style: none;
+
+  @include dark {
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+}
+
+.consequence {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: left;
+  color: $gray_700;
+
+  @include dark {
+    color: $gray_300;
+  }
+}
+
+.consequence_icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-top: -1px;
+  border-radius: 50%;
+
+  svg {
+    width: 12px;
+    height: 12px;
+  }
+}
+
+.consequence_icon_stop {
+  background: $danger_100;
+  color: $danger_600;
+
+  @include dark {
+    background: rgba(240, 68, 56, 0.16);
+    color: $danger_400;
+  }
+}
+
+.consequence_icon_keep {
+  background: var(--color-success-100, #d1fadf);
+  color: var(--color-success-600, #039855);
+
+  @include dark {
+    background: rgba(18, 183, 106, 0.16);
+    color: var(--color-success-400, #32d583);
+  }
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+.field_label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 500;
+  color: $gray_700;
+
+  @include dark {
+    color: $gray_300;
+  }
+}
+
+.field_optional {
+  font-size: 11px;
+  font-weight: 500;
+  color: $gray_400;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 76px;
+  padding: 10px 14px;
+  border: 1px solid $gray_200;
+  border-radius: 12px;
+  background: #fff;
+  font-size: 14px;
+  line-height: 1.5;
+  color: $gray_900;
+  resize: vertical;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+
+  @include dark {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.03);
+    color: #fff;
+  }
+
+  &::placeholder {
+    color: $gray_400;
+  }
+
+  &:focus {
+    border-color: var(--tone-400);
+    outline: none;
+    box-shadow: 0 0 0 4px rgba(var(--tone-rgb), 0.12);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+}
+
+.field_footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: $gray_400;
+}
+
+.counter {
+  font-variant-numeric: tabular-nums;
+}
+
+.counter_near_limit {
+  color: $warning_800;
+  font-weight: 600;
+
+  @include dark {
+    color: $warning_400;
+  }
+}
+
+.irreversible {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 2px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: $gray_400;
+
+  @include dark {
+    color: $gray_500;
+  }
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+// ── Footer ───────────────────────────────────────────────────────────────────
+
+.footer {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: 10px;
+
+  @media (max-width: 479px) {
+    margin-top: 16px;
+    padding-right: 20px;
+    padding-left: 20px;
+  }
+
+  margin-top: 20px;
+  padding: 16px 28px 20px;
+  // Keeps the actions above the home indicator on notched phones.
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+  border-top: 1px solid $gray_100;
+  background: $gray_50;
+
+  @include dark {
+    border-color: rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.02);
+  }
+}
+
+.actions {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 10px;
+
+  @media (min-width: 480px) {
+    flex-direction: row;
+  }
+}
+
+.button {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.1s ease,
+    opacity 0.15s ease;
+
+  &:active:not(:disabled) {
+    transform: translateY(1px) scale(0.99);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.button_secondary {
+  border: 1px solid $gray_200;
+  background: #fff;
+  color: $gray_700;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+
+  @include dark {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+    color: $gray_200;
+  }
+
+  &:hover:not(:disabled) {
+    border-color: $gray_400;
+    background: $gray_50;
+
+    @include dark {
+      background: rgba(255, 255, 255, 0.08);
+    }
+  }
+
+  &:focus-visible {
+    @include focus_ring($gray_400);
+  }
+}
+
+.button_primary {
+  border: 1px solid var(--tone-600);
+  background: linear-gradient(180deg, var(--tone-500), var(--tone-600));
+  color: #fff;
+  box-shadow:
+    0 1px 2px rgba(16, 24, 40, 0.08),
+    0 8px 20px -6px rgba(var(--tone-rgb), 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+
+  &:hover:not(:disabled) {
+    background: linear-gradient(180deg, var(--tone-600), var(--tone-700));
+    box-shadow:
+      0 1px 2px rgba(16, 24, 40, 0.08),
+      0 10px 24px -6px rgba(var(--tone-rgb), 0.65),
+      inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  }
+
+  &:focus-visible {
+    @include focus_ring(var(--tone-500));
+  }
+
+  &:disabled {
+    box-shadow: none;
+  }
+}
+
+.spinner {
+  animation: spin 0.8s linear infinite;
+}
+
+.secure_note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 11px;
+  color: $gray_400;
+
+  svg {
+    width: 13px;
+    height: 13px;
+  }
+}
+
+.kbd_hint {
+  display: none;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 11px;
+  color: $gray_400;
+
+  @include dark {
+    color: $gray_500;
+  }
+
+  @media (min-width: 640px) {
+    display: flex;
+  }
+
+  kbd {
+    padding: 1px 6px;
+    border: 1px solid $gray_200;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    background: #fff;
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    color: $gray_500;
+
+    @include dark {
+      border-color: rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.04);
+      color: $gray_400;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop,
+  .card,
+  .card_shake,
+  .icon_badge,
+  .icon_halo,
+  .close_button,
+  .body > *,
+  .card_chip::after,
+  .card_option {
+    animation: none !important;
+    transition: none !important;
+  }
+}
