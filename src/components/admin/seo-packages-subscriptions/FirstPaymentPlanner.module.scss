@@ -1,8 +1,7 @@
 @use "sass:list";
 
-// First month planner on the activate subscription form: how the first
-// payment is handled (on schedule, charged now, or already paid outside the
-// portal), a short month ledger, and the "billed once per month" guard.
+// First payment choice on the activate subscription form: charged on
+// schedule, charged now, or already paid outside the portal.
 
 $brand_500: var(--color-brand-500);
 $brand_600: var(--color-brand-600);
@@ -75,25 +74,13 @@ $choice_tones: (
 
 .header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 14px;
 }
 
-.eyebrow {
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  background: linear-gradient(90deg, $hero_from, $hero_to);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
 .title {
-  margin-top: 2px;
   font-size: 14px;
   font-weight: 600;
   color: $gray_900;
@@ -371,181 +358,6 @@ $choice_tones: (
     strong {
       color: #fff;
     }
-  }
-}
-
-// ── Month ledger ─────────────────────────────────────────────────────────────
-
-.ledger {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 14px;
-
-  @media (max-width: 480px) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-.ledgerItem {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  padding: 10px 11px;
-  border-radius: 12px;
-  border: 1px solid $gray_200;
-  background: $gray_50;
-  overflow: hidden;
-
-  &::before {
-    content: "";
-    position: absolute;
-    inset: 0 0 auto 0;
-    height: 3px;
-    background: $gray_300;
-  }
-
-  @include dark {
-    border-color: $gray_800;
-    background: rgba(255, 255, 255, 0.03);
-
-    &::before {
-      background: $gray_700;
-    }
-  }
-
-  &[data-tone="due"]::before {
-    background: linear-gradient(90deg, #6366f1, $hero_to);
-  }
-
-  &[data-tone="now"]::before {
-    background: linear-gradient(90deg, $hero_from, $hero_to);
-  }
-
-  &[data-tone="paid"] {
-    border-color: rgba(18, 183, 106, 0.35);
-    background: $success_soft;
-
-    &::before {
-      background: $success;
-    }
-
-    @include dark {
-      background: rgba(18, 183, 106, 0.08);
-    }
-  }
-
-  &[data-tone="upcoming"] {
-    opacity: 0.8;
-  }
-}
-
-.ledgerMonth {
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: $gray_500;
-}
-
-.ledgerDay {
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.15;
-  font-variant-numeric: tabular-nums;
-  color: $gray_900;
-
-  @include dark {
-    color: #fff;
-  }
-}
-
-.ledgerStatus {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 4px;
-  font-size: 11px;
-  font-weight: 500;
-  color: $gray_600;
-
-  .ledgerItem[data-tone="paid"] & {
-    color: $success_ink;
-    font-weight: 600;
-  }
-
-  .ledgerItem[data-tone="now"] & {
-    color: $brand_600;
-    font-weight: 600;
-  }
-
-  @include dark {
-    color: $gray_400;
-
-    .ledgerItem[data-tone="paid"] & {
-      color: #6ce9a6;
-    }
-  }
-}
-
-.ledgerCheck {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 14px;
-  border-radius: 999px;
-  background: $success;
-
-  svg {
-    width: 8px;
-    height: 8px;
-    color: #fff;
-  }
-}
-
-// ── Guard note ───────────────────────────────────────────────────────────────
-
-.guard {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px dashed $gray_200;
-  font-size: 11.5px;
-  line-height: 1.5;
-  color: $gray_500;
-
-  strong {
-    color: $gray_700;
-  }
-
-  @include dark {
-    border-top-color: $gray_800;
-    color: $gray_400;
-
-    strong {
-      color: $gray_300;
-    }
-  }
-}
-
-.guardIcon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  border-radius: 8px;
-  color: #fff;
-  background: linear-gradient(135deg, $hero_from, $hero_to);
-
-  svg {
-    width: 14px;
-    height: 14px;
   }
 }
 

@@ -414,8 +414,8 @@ describe("SubscriptionForm in create mode", () => {
 
     const charge_now = screen.getByRole("radio", { name: /Charge now/ });
     expect(charge_now).toBeDisabled();
-    expect(charge_now).toHaveTextContent("Only when the first payment is today");
-    expect(screen.getByRole("radio", { name: /Bill on Dec 1/ })).toHaveAttribute("aria-checked", "true");
+    expect(charge_now).toHaveTextContent("Only available when the first payment is today.");
+    expect(screen.getByRole("radio", { name: /Charge on Dec 1/ })).toHaveAttribute("aria-checked", "true");
   });
 
   it("falls back to the schedule when the date moves off today after choosing charge now", async () => {
@@ -442,7 +442,7 @@ describe("SubscriptionForm in create mode", () => {
     await screen.findByRole("button", { name: /Visa.*4242.*Expired/ });
 
     expect(screen.getByRole("radio", { name: /Charge now/ })).toBeDisabled();
-    expect(screen.getByRole("radio", { name: /Charge now/ })).toHaveTextContent("No valid card on file");
+    expect(screen.getByRole("radio", { name: /Charge now/ })).toHaveTextContent("No valid card on file.");
   });
 
   it("asks for a client before charging now", async () => {
@@ -463,13 +463,11 @@ describe("SubscriptionForm in create mode", () => {
     await pickPackage("Starter");
 
     fireEvent.click(screen.getByRole("radio", { name: /November already paid/ }));
-    fireEvent.change(screen.getByLabelText(/Payment reference/), { target: { value: "  Bank transfer 8812  " } });
+    fireEvent.change(screen.getByLabelText(/^Note \(optional\)/), { target: { value: "  Bank transfer 8812  " } });
 
     // Nothing is charged this month: the summary, ledger and preview follow.
     expect(screen.getByText("November is paid")).toBeInTheDocument();
     expect(screen.getByText("on Dec 22")).toBeInTheDocument();
-    const ledger = screen.getByRole("list", { name: "Upcoming months" });
-    expect(within(ledger).getByText("Paid, not charged")).toBeInTheDocument();
     const timeline = screen.getByRole("list", { name: "Billing timeline" });
     expect(within(timeline).getByText(/Already paid/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Activate, November paid" })).toBeInTheDocument();
@@ -493,10 +491,10 @@ describe("SubscriptionForm in create mode", () => {
     await pickPackage("Starter");
 
     fireEvent.click(screen.getByRole("radio", { name: /November already paid/ }));
-    fireEvent.change(screen.getByLabelText(/Payment reference/), { target: { value: "Check 1042" } });
-    fireEvent.click(screen.getByRole("radio", { name: /Bill on schedule/ }));
+    fireEvent.change(screen.getByLabelText(/^Note \(optional\)/), { target: { value: "Check 1042" } });
+    fireEvent.click(screen.getByRole("radio", { name: /Charge on schedule/ }));
 
-    expect(screen.queryByLabelText(/Payment reference/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Note/)).not.toBeInTheDocument();
     fireEvent.click(submitButton());
     await waitFor(() => expect(service.activateSubscription).toHaveBeenCalled());
     expect(lastActivatePayload()).toMatchObject({ first_period_paid_outside: false, outside_payment_reference: null });

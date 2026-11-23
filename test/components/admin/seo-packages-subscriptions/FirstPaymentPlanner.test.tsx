@@ -2,14 +2,13 @@
  * Tests for the first month planner on the activate subscription form
  * (src/components/admin/seo-packages-subscriptions/FirstPaymentPlanner.tsx).
  *
- * The planner decides how the first month is handled: billed on schedule,
- * charged right away, or recorded as already paid outside the portal. It
- * also shows a short ledger of the next months and the "billed once per
- * month" guard. PaidMonthNotice is the edit mode warning for a paid month.
+ * The planner decides how the first payment is handled: charged on schedule,
+ * charged right away, or recorded as already paid outside the portal.
+ * PaidMonthNotice is the edit mode warning for a paid month.
  */
 
 import React from "react";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import FirstPaymentPlanner, {
   PaidMonthNotice,
   type FirstPaymentChoice,
@@ -42,29 +41,25 @@ function option(name: RegExp) {
   return screen.getByRole("radio", { name });
 }
 
-function ledgerItems() {
-  return within(screen.getByRole("list", { name: "Upcoming months" })).getAllByRole("listitem");
-}
-
 describe("FirstPaymentPlanner", () => {
   it("names the first month and the monthly amount", () => {
     renderPlanner();
 
-    expect(screen.getByText("How is November handled?")).toBeInTheDocument();
-    expect(screen.getByText("$999 / month")).toBeInTheDocument();
+    expect(screen.getByText("First payment (November)")).toBeInTheDocument();
+    expect(screen.getByText("$999")).toBeInTheDocument();
     expect(screen.getByRole("radiogroup", { name: "First payment" })).toBeInTheDocument();
   });
 
   it("offers the three choices with the selected one checked", () => {
     renderPlanner({ choice: "schedule" });
 
-    expect(option(/Bill on schedule/)).toHaveAttribute("aria-checked", "true");
+    expect(option(/Charge on schedule/)).toHaveAttribute("aria-checked", "true");
     expect(option(/Charge now/)).toHaveAttribute("aria-checked", "false");
     expect(option(/November already paid/)).toHaveAttribute("aria-checked", "false");
   });
 
   it.each<[RegExp, FirstPaymentChoice]>([
-    [/Bill on schedule/, "schedule"],
+    [/Charge on schedule/, "schedule"],
     [/Charge now/, "charge_now"],
     [/November already paid/, "paid_outside"],
   ])("reports %s as %s", (name, value) => {
@@ -80,13 +75,13 @@ describe("FirstPaymentPlanner", () => {
       renderPlanner();
 
       expect(option(/Charge now/)).toBeEnabled();
-      expect(option(/Charge now/)).toHaveTextContent("Collect $999 right away when you activate.");
+      expect(option(/Charge now/)).toHaveTextContent("Charge $999 to the card on file as soon as you activate");
     });
 
     it.each([
-      ["the first payment is later", { schedule: SCHEDULE_FROM_DEC }, "Only when the first payment is today"],
-      ["the client has no valid card", { has_usable_card: false }, "No valid card on file"],
-      ["no client is selected yet", { has_usable_card: null }, "Select a client first"],
+      ["the first payment is later", { schedule: SCHEDULE_FROM_DEC }, "Only available when the first payment is today."],
+      ["the client has no valid card", { has_usable_card: false }, "No valid card on file."],
+      ["no client is selected yet", { has_usable_card: null }, "Select a client first."],
     ])("is disabled when %s", (_case, overrides, reason) => {
       const props = renderPlanner(overrides as Partial<PlannerProps>);
 
@@ -99,94 +94,63 @@ describe("FirstPaymentPlanner", () => {
     });
   });
 
-  describe("bill on schedule", () => {
+  describe("charge on schedule", () => {
     it("explains the billing run charges it later today", () => {
       renderPlanner();
 
-      expect(option(/Bill on schedule/)).toHaveTextContent("The billing run charges the card on file later today.");
+      expect(option(/Charge on schedule/)).toHaveTextContent(
+        "Charged to the card on file later today, by the automatic billing run."
+      );
     });
 
     it("names the date when the first payment is later", () => {
       renderPlanner({ schedule: SCHEDULE_FROM_DEC });
 
-      expect(option(/Bill on Dec 1/)).toHaveTextContent("The card on file is charged automatically on that day.");
-      expect(screen.getByText("How is December handled?")).toBeInTheDocument();
+      expect(option(/Charge on Dec 1/)).toHaveTextContent("Charged to the card on file automatically on Dec 1.");
+      expect(screen.getByText("First payment (December)")).toBeInTheDocument();
     });
 
     it("says the admin charges it by hand when auto renew is off", () => {
       renderPlanner({ is_auto_renew: false });
 
-      expect(option(/Bill on schedule/)).toHaveTextContent("You charge it from the subscription page when ready.");
+      expect(option(/Charge on schedule/)).toHaveTextContent(
+        "Nothing is charged automatically. You charge it from the subscription page."
+      );
     });
   });
 
   describe("already paid outside the portal", () => {
-    it("asks for an optional payment reference and says when the first charge happens", () => {
+    it("says when the first charge happens", () => {
+      renderPlanner();
+
+      expect(option(/November already paid/)).toHaveTextContent(
+        "The client paid another way. Nothing is charged until Dec 22."
+      );
+    });
+
+    it("asks for an optional note", () => {
       const props = renderPlanner({ choice: "paid_outside", outside_reference: "Check 1042" });
 
-      const reference = screen.getByLabelText(/Payment reference/);
-      expect(reference).toHaveValue("Check 1042");
-      expect(reference).toHaveAttribute("maxLength", "120");
-      expect(screen.getByText(/A paid invoice is added to the client's portal and the payment is listed in Transactions/)).toBeInTheDocument();
-      expect(screen.getByText("Dec 22, 2026")).toBeInTheDocument();
+      const note = screen.getByLabelText(/Note/);
+      expect(note).toHaveValue("Check 1042");
+      expect(note).toHaveAttribute("maxLength", "120");
+      expect(screen.getByText(/November is marked as paid on the client's invoice and in Transactions/)).toBeInTheDocument();
 
-      fireEvent.change(reference, { target: { value: "Bank transfer" } });
+      fireEvent.change(note, { target: { value: "Bank transfer" } });
       expect(props.onOutsideReferenceChange).toHaveBeenCalledWith("Bank transfer");
     });
 
-    it("hides the reference field for the other choices", () => {
+    it("hides the note field for the other choices", () => {
       renderPlanner({ choice: "schedule" });
 
-      expect(screen.queryByLabelText(/Payment reference/)).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/Note/)).not.toBeInTheDocument();
     });
   });
 
-  describe("month ledger", () => {
-    it("shows the next four months with what happens on each", () => {
-      renderPlanner();
-
-      const items = ledgerItems();
-      expect(items).toHaveLength(4);
-      expect(items[0]).toHaveTextContent("Nov22Billing run today");
-      expect(items[0]).toHaveAttribute("data-tone", "due");
-      expect(items[1]).toHaveTextContent("Dec22Auto charge");
-      expect(items[1]).toHaveAttribute("data-tone", "upcoming");
-    });
-
-    it("marks the first month as paid when it was paid outside", () => {
-      renderPlanner({ choice: "paid_outside" });
-
-      expect(ledgerItems()[0]).toHaveTextContent("Paid, not charged");
-      expect(ledgerItems()[0]).toHaveAttribute("data-tone", "paid");
-      expect(ledgerItems()[1]).toHaveTextContent("Auto charge");
-    });
-
-    it("marks the first month as charged now", () => {
-      renderPlanner({ choice: "charge_now" });
-
-      expect(ledgerItems()[0]).toHaveTextContent("Charged now");
-      expect(ledgerItems()[0]).toHaveAttribute("data-tone", "now");
-    });
-
-    it("shows manual charges when auto renew is off", () => {
-      renderPlanner({ is_auto_renew: false, schedule: SCHEDULE_FROM_DEC });
-
-      expect(ledgerItems()[0]).toHaveTextContent("Charge by hand");
-      expect(ledgerItems()[1]).toHaveTextContent("Charge by hand");
-    });
-
-    it("only lists the months left before the end date", () => {
-      renderPlanner({ schedule: ["2026-11-22", "2026-12-22"] });
-
-      expect(ledgerItems()).toHaveLength(2);
-    });
-  });
-
-  it("always explains that a month is billed only once", () => {
+  it("no longer shows a month ledger", () => {
     renderPlanner();
 
-    expect(screen.getByText("Billed once per month.")).toBeInTheDocument();
-    expect(screen.getByText(/renewals skip it automatically/)).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Upcoming months" })).not.toBeInTheDocument();
   });
 });
 

@@ -5,7 +5,7 @@ import { formatDate, formatMoneyCompact } from "./subscription-format";
 import styles from "./FirstPaymentPlanner.module.scss";
 
 /**
- * How the first month of a new subscription is handled:
+ * How the first payment of a new subscription is handled:
  *   schedule      charged on the first billing date (by the billing run, or by hand)
  *   charge_now    charged right away when the subscription is activated
  *   paid_outside  already paid another way, recorded as paid and never charged
@@ -22,6 +22,7 @@ interface FirstPaymentPlannerProps {
   is_auto_renew: boolean;
   /** Charging now needs a valid card; null while a client is not selected yet. */
   has_usable_card: boolean | null;
+  /** Optional note saved with a payment made outside the portal. */
   outside_reference: string;
   onOutsideReferenceChange: (value: string) => void;
 }
@@ -44,11 +45,6 @@ const ICONS = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z" />
     </svg>
   ),
-  shield: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} aria-hidden>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
-    </svg>
-  ),
   check: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} aria-hidden>
       <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
@@ -60,33 +56,6 @@ const ICONS = {
     </svg>
   ),
 };
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-type LedgerTone = "paid" | "now" | "due" | "upcoming";
-
-interface LedgerEntry {
-  date: string;
-  tone: LedgerTone;
-  status: string;
-}
-
-function buildLedger(
-  schedule: string[],
-  choice: FirstPaymentChoice,
-  today: string,
-  is_auto_renew: boolean
-): LedgerEntry[] {
-  return schedule.map((date, index) => {
-    if (index === 0) {
-      if (choice === "paid_outside") return { date, tone: "paid", status: "Paid, not charged" };
-      if (choice === "charge_now") return { date, tone: "now", status: "Charged now" };
-      if (date === today) return { date, tone: "due", status: is_auto_renew ? "Billing run today" : "Due today" };
-      return { date, tone: "due", status: is_auto_renew ? "Auto charge" : "Charge by hand" };
-    }
-    return { date, tone: "upcoming", status: is_auto_renew ? "Auto charge" : "Charge by hand" };
-  });
-}
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -101,19 +70,27 @@ export default function FirstPaymentPlanner({
   outside_reference,
   onOutsideReferenceChange,
 }: FirstPaymentPlannerProps) {
-  const reference_id = useId();
+  const note_id = useId();
   const first_date = schedule[0] ?? today;
   const is_first_today = first_date === today;
   const first_month = formatDate(first_date, { month: "long" });
+  const first_day = formatDate(first_date, { month: "short", day: "numeric" });
   const second_date = schedule[1] ?? null;
+  const amount = formatMoneyCompact(monthly_price);
 
   const charge_now_blocker = !is_first_today
-    ? "Only when the first payment is today"
+    ? "Only available when the first payment is today."
     : has_usable_card === false
-      ? "No valid card on file"
+      ? "No valid card on file."
       : has_usable_card === null
-        ? "Select a client first"
+        ? "Select a client first."
         : null;
+
+  const schedule_text = !is_auto_renew
+    ? "Nothing is charged automatically. You charge it from the subscription page."
+    : is_first_today
+      ? "Charged to the card on file later today, by the automatic billing run."
+      : `Charged to the card on file automatically on ${first_day}.`;
 
   const options: {
     value: FirstPaymentChoice;
@@ -123,38 +100,31 @@ export default function FirstPaymentPlanner({
   }[] = [
     {
       value: "schedule",
-      title: is_first_today ? "Bill on schedule" : `Bill on ${formatDate(first_date, { month: "short", day: "numeric" })}`,
-      text: is_auto_renew
-        ? is_first_today
-          ? "The billing run charges the card on file later today."
-          : "The card on file is charged automatically on that day."
-        : "You charge it from the subscription page when ready.",
+      title: is_first_today ? "Charge on schedule" : `Charge on ${first_day}`,
+      text: schedule_text,
       disabled_reason: null,
     },
     {
       value: "charge_now",
       title: "Charge now",
-      text: `Collect ${formatMoneyCompact(monthly_price)} right away when you activate.`,
+      text: `Charge ${amount} to the card on file as soon as you activate, so you know right away if it went through.`,
       disabled_reason: charge_now_blocker,
     },
     {
       value: "paid_outside",
       title: `${first_month} already paid`,
-      text: "Paid another way. Recorded as paid and never charged.",
+      text: second_date
+        ? `The client paid another way. Nothing is charged until ${formatDate(second_date, { month: "short", day: "numeric" })}.`
+        : "The client paid another way. Nothing is charged.",
       disabled_reason: null,
     },
   ];
 
-  const ledger = buildLedger(schedule.slice(0, 4), choice, today, is_auto_renew);
-
   return (
     <div className={styles.planner}>
       <div className={styles.header}>
-        <div>
-          <p className={styles.eyebrow}>First month</p>
-          <p className={styles.title}>How is {first_month} handled?</p>
-        </div>
-        <span className={styles.amountPill}>{formatMoneyCompact(monthly_price)} / month</span>
+        <p className={styles.title}>First payment ({first_month})</p>
+        <span className={styles.amountPill}>{amount}</span>
       </div>
 
       <div className={styles.options} role="radiogroup" aria-label="First payment">
@@ -189,52 +159,23 @@ export default function FirstPaymentPlanner({
 
       {choice === "paid_outside" && (
         <div className={styles.paidPanel}>
-          <label htmlFor={reference_id} className={styles.paidLabel}>
-            Payment reference <small>(optional)</small>
+          <label htmlFor={note_id} className={styles.paidLabel}>
+            Note <small>(optional)</small>
           </label>
           <input
-            id={reference_id}
+            id={note_id}
             type="text"
             value={outside_reference}
             onChange={(e) => onOutsideReferenceChange(e.target.value)}
             maxLength={120}
-            placeholder="e.g. Bank transfer on Nov 20, check #1042"
+            placeholder="e.g. Paid by bank transfer"
             className={styles.paidInput}
           />
           <p className={styles.paidHint}>
-            A paid invoice is added to the client&apos;s portal and the payment is listed in Transactions.
-            {second_date && (
-              <>
-                {" "}
-                The first charge will be on <strong>{formatDate(second_date, { month: "short", day: "numeric", year: "numeric" })}</strong>.
-              </>
-            )}
+            {first_month} is marked as paid on the client&apos;s invoice and in Transactions.
           </p>
         </div>
       )}
-
-      {ledger.length > 0 && (
-        <ol className={styles.ledger} aria-label="Upcoming months">
-          {ledger.map((entry) => (
-            <li key={entry.date} className={styles.ledgerItem} data-tone={entry.tone}>
-              <span className={styles.ledgerMonth}>{formatDate(entry.date, { month: "short" })}</span>
-              <span className={styles.ledgerDay}>{formatDate(entry.date, { day: "numeric" })}</span>
-              <span className={styles.ledgerStatus}>
-                {entry.tone === "paid" && <span className={styles.ledgerCheck}>{ICONS.check}</span>}
-                {entry.status}
-              </span>
-            </li>
-          ))}
-        </ol>
-      )}
-
-      <p className={styles.guard}>
-        <span className={styles.guardIcon}>{ICONS.shield}</span>
-        <span>
-          <strong>Billed once per month.</strong> If a month is already paid, by card, from the client portal or
-          recorded here, renewals skip it automatically.
-        </span>
-      </p>
     </div>
   );
 }
