@@ -19,6 +19,8 @@ import { AutoRenewSwitch, PaymentCardPicker, ReminderControl } from "./Subscript
 import { CancelSubscriptionModal, ChargeNowModal } from "./SubscriptionModals";
 import {
   CHARGE_STATUS_CONFIG,
+  billingCycleProgress,
+  cardBrandLabel,
   clientName,
   formatDate,
   formatMoney,
@@ -28,6 +30,7 @@ import {
   todayIsoDate,
 } from "./subscription-format";
 import styles from "./SeoSubscriptionBilling.module.scss";
+import detail_styles from "./SubscriptionDetail.module.scss";
 
 interface Props {
   subscription_id: number;
@@ -51,13 +54,49 @@ const TRIGGER_LABELS: Record<AdminSeoSubscriptionCharge["trigger"], string> = {
   external: "Paid by client",
 };
 
-function Panel({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
+// Heroicons outline paths used by the panel headers.
+const ICON_PATHS = {
+  settings:
+    "M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75",
+  card: "M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z",
+  history: "M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z",
+  calendar:
+    "M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5",
+  details:
+    "M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z",
+} as const;
+
+function Panel({
+  title,
+  subtitle,
+  icon,
+  action,
+  className = "",
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  icon: keyof typeof ICON_PATHS;
+  action?: React.ReactNode;
+  className?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h2>
-        {action}
-      </div>
+    <section className={`${detail_styles.panel} ${className}`}>
+      <header className={detail_styles.panelHeader}>
+        <div className={detail_styles.panelHeading}>
+          <span className={detail_styles.panelIcon} aria-hidden>
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round" d={ICON_PATHS[icon]} />
+            </svg>
+          </span>
+          <div className="min-w-0">
+            <h2 className={detail_styles.panelTitle}>{title}</h2>
+            {subtitle && <p className={detail_styles.panelSubtitle}>{subtitle}</p>}
+          </div>
+        </div>
+        {action && <div className={detail_styles.panelAction}>{action}</div>}
+      </header>
       {children}
     </section>
   );
@@ -66,10 +105,10 @@ function Panel({ title, action, children }: { title: string; action?: React.Reac
 function ChargeTimeline({ charges }: { charges: AdminSeoSubscriptionCharge[] }) {
   if (charges.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-2 py-10 text-center">
+      <div className="flex flex-col items-center gap-2 py-8 text-center">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
           <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d={ICON_PATHS.history} />
           </svg>
         </div>
         <p className="text-sm font-medium text-gray-600 dark:text-gray-300">No payments yet</p>
@@ -102,15 +141,15 @@ function ChargeTimeline({ charges }: { charges: AdminSeoSubscriptionCharge[] }) 
             </span>
             <div className={styles.timelineCard}>
               <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm font-semibold text-gray-900 dark:text-white">{charge.period_label}</p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     {formatDate(charge.period_start)} to {formatDate(charge.period_end)}
                   </p>
                 </div>
-                <div className="text-right">
+                <div className="flex items-center gap-2 sm:flex-col sm:items-end sm:gap-0.5">
                   <p className="text-sm font-bold text-gray-900 tabular-nums dark:text-white">{formatMoney(charge.amount)}</p>
-                  <span className={`mt-0.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${cfg.badge}`}>
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${cfg.badge}`}>
                     <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
                     {cfg.label}
                   </span>
@@ -143,6 +182,147 @@ function ChargeTimeline({ charges }: { charges: AdminSeoSubscriptionCharge[] }) 
         );
       })}
     </ol>
+  );
+}
+
+function daysLeftLabel(days_left: number): string {
+  if (days_left < 0) return `Overdue by ${Math.abs(days_left)} day${days_left === -1 ? "" : "s"}`;
+  if (days_left === 0) return "Due today";
+  if (days_left === 1) return "Tomorrow";
+  return `In ${days_left} days`;
+}
+
+/** Compact header: plan and price on the left, client and key figures on the right. */
+function SubscriptionSummary({
+  subscription,
+  summary,
+  is_active,
+  is_past_due,
+}: {
+  subscription: AdminSeoSubscription;
+  summary: AdminSeoSubscriptionSummary;
+  is_active: boolean;
+  is_past_due: boolean;
+}) {
+  const name = clientName(subscription);
+  const card = subscription.payment_profile;
+  const cycle = is_active ? billingCycleProgress(subscription.next_billing_date, subscription.billing_anchor_day) : null;
+  const plan_class = !is_active
+    ? detail_styles.isInactive
+    : is_past_due
+      ? detail_styles.isPastDue
+      : "";
+  const status_tone = !is_active ? "neutral" : is_past_due ? "warning" : "success";
+
+  return (
+    <section className={detail_styles.summary} aria-label="Subscription summary">
+      <div className={`${detail_styles.summaryPlan} ${plan_class}`}>
+        <p className={detail_styles.summaryPlanName} title={subscription.plan_name}>
+          {subscription.plan_name}
+        </p>
+        <p className={detail_styles.summaryPrice}>
+          {formatMoneyCompact(subscription.monthly_price)}
+          <span>/ month</span>
+        </p>
+        {subscription.pricing_type === "custom" && subscription.package && (
+          <p className={detail_styles.summaryCompare}>
+            Listed {subscription.package.name} price: {formatMoneyCompact(subscription.package.price_per_month)}/mo
+          </p>
+        )}
+      </div>
+
+      <div className={detail_styles.summaryBody}>
+        <div className={detail_styles.summaryClient}>
+          <div className={detail_styles.summaryIdentity}>
+            <span className={detail_styles.avatar} aria-hidden>
+              {initials(name)}
+            </span>
+            <div className="min-w-0">
+              <p className={detail_styles.identityName}>{name}</p>
+              <p className={detail_styles.identityMeta}>
+                {subscription.user.email}
+                {subscription.user.company ? `, ${subscription.user.company}` : ""}
+              </p>
+            </div>
+          </div>
+          <div className={detail_styles.badges}>
+            <span className={detail_styles.badge} data-tone={status_tone}>
+              <span className={detail_styles.badgeDot} />
+              {is_past_due ? "Past due" : subscription.status}
+            </span>
+            {is_active && (
+              <span className={detail_styles.badge}>{subscription.auto_renew ? "Auto renew on" : "Manual billing"}</span>
+            )}
+            {subscription.pricing_type === "custom" && (
+              <span className={detail_styles.badge} data-tone="brand">
+                Custom price
+              </span>
+            )}
+          </div>
+        </div>
+
+        <dl className={detail_styles.stats}>
+          <div className={detail_styles.stat}>
+            <dt>{is_active ? "Next charge" : "Ended"}</dt>
+            <dd>
+              {is_active
+                ? formatDate(subscription.next_billing_date)
+                : formatDate(subscription.cancelled_at ?? subscription.ends_at)}
+            </dd>
+            {cycle && (
+              <>
+                <span className={detail_styles.statHint} data-tone={cycle.days_left < 0 ? "error" : undefined}>
+                  {daysLeftLabel(cycle.days_left)}
+                </span>
+                <div
+                  className={detail_styles.cycle}
+                  role="progressbar"
+                  aria-label="Current billing period"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(cycle.percent)}
+                >
+                  <span style={{ width: `${cycle.percent}%` }} />
+                </div>
+              </>
+            )}
+          </div>
+          <div className={detail_styles.stat}>
+            <dt>Total collected</dt>
+            <dd>{formatMoney(summary.total_collected)}</dd>
+            <span className={detail_styles.statHint}>Since {formatDate(subscription.starts_at)}</span>
+          </div>
+          <div className={detail_styles.stat}>
+            <dt>Payments</dt>
+            <dd>{summary.successful_count} paid</dd>
+            <span className={detail_styles.statHint} data-tone={summary.failed_count > 0 ? "error" : undefined}>
+              {summary.failed_count > 0 ? `${summary.failed_count} failed` : "No failed payments"}
+            </span>
+          </div>
+          <div className={detail_styles.stat}>
+            <dt>Renewal card</dt>
+            <dd>{card ? `${cardBrandLabel(card.card_brand)} •••• ${card.last_four}` : "Default card"}</dd>
+            <span className={detail_styles.statHint}>
+              {summary.card_on_file ? "Card on file" : "No card on file"}
+            </span>
+          </div>
+        </dl>
+      </div>
+    </section>
+  );
+}
+
+function DetailSkeleton() {
+  const block = "animate-pulse bg-gray-100 dark:bg-gray-800";
+  return (
+    <div className="space-y-6">
+      <div className={`h-5 w-48 rounded ${block}`} />
+      <div className={`h-36 rounded-2xl ${block}`} />
+      <div className="grid gap-6 lg:grid-cols-12">
+        <div className={`h-72 rounded-2xl lg:col-span-7 ${block}`} />
+        <div className={`h-72 rounded-2xl lg:col-span-5 ${block}`} />
+      </div>
+    </div>
   );
 }
 
@@ -221,18 +401,7 @@ export default function AdminSeoSubscriptionDetail({ subscription_id, notice }: 
     }
   }
 
-  if (is_loading) {
-    return (
-      <div className="space-y-6">
-        <div className="h-5 w-48 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
-        <div className="h-56 animate-pulse rounded-3xl bg-gray-100 dark:bg-gray-800" />
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="h-80 animate-pulse rounded-2xl bg-gray-100 lg:col-span-2 dark:bg-gray-800" />
-          <div className="h-80 animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-800" />
-        </div>
-      </div>
-    );
-  }
+  if (is_loading) return <DetailSkeleton />;
 
   if (!subscription || !summary) {
     return (
@@ -247,16 +416,15 @@ export default function AdminSeoSubscriptionDetail({ subscription_id, notice }: 
 
   const is_active = subscription.status === "active";
   const is_past_due = is_active && subscription.payment_status === "past_due";
-  const name = clientName(subscription);
   const charges = subscription.charges ?? [];
   const failed_charge = charges.find((c) => c.status === "failed");
   const card = subscription.payment_profile;
-  const hero_class = !is_active ? styles.isInactive : is_past_due ? styles.isPastDue : "";
+  const has_date_change = Boolean(next_date_draft) && next_date_draft !== subscription.next_billing_date;
 
   return (
-    <div className="space-y-6">
-      {/* Breadcrumb and actions */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-5 sm:space-y-6">
+      {/* Back link and actions */}
+      <div className={detail_styles.toolbar}>
         <Link
           href="/admin/seo-packages-subscriptions"
           className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 transition-colors hover:text-brand-500 dark:text-gray-400"
@@ -267,7 +435,7 @@ export default function AdminSeoSubscriptionDetail({ subscription_id, notice }: 
           All subscriptions
         </Link>
         {is_active && (
-          <div className="flex flex-wrap gap-2">
+          <div className={detail_styles.toolbarActions}>
             <Link
               href={`/admin/seo-packages-subscriptions/${subscription.id}/edit`}
               className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-brand-300 hover:text-brand-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
@@ -275,17 +443,19 @@ export default function AdminSeoSubscriptionDetail({ subscription_id, notice }: 
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
               </svg>
-              Edit subscription
+              Edit
+              <span className="hidden sm:inline">subscription</span>
             </Link>
             <button
               onClick={() => setShowCancel(true)}
-              className="rounded-xl border border-error-200 bg-white px-4 py-2 text-sm font-medium text-error-600 transition-colors hover:bg-error-50 dark:border-error-500/30 dark:bg-gray-800 dark:text-error-400"
+              className="inline-flex items-center rounded-xl border border-error-200 bg-white px-4 py-2 text-sm font-medium text-error-600 transition-colors hover:bg-error-50 dark:border-error-500/30 dark:bg-gray-800 dark:text-error-400"
             >
-              Cancel subscription
+              Cancel
+              <span className="ml-1 hidden sm:inline">subscription</span>
             </button>
             <button
               onClick={() => setShowCharge(true)}
-              className="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-600"
+              className="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-600 sm:py-2"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
@@ -310,68 +480,12 @@ export default function AdminSeoSubscriptionDetail({ subscription_id, notice }: 
         </div>
       )}
 
-      {/* Hero */}
-      <section className={`${styles.hero} ${hero_class}`}>
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex items-center gap-3.5">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-base font-bold backdrop-blur">
-              {initials(name)}
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-lg font-semibold">{name}</p>
-              <p className="truncate text-sm opacity-80">
-                {subscription.user.email}
-                {subscription.user.company ? ` · ${subscription.user.company}` : ""}
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <span className={styles.heroPill}>
-              <span className="h-1.5 w-1.5 rounded-full bg-white" />
-              {is_past_due ? "Past due" : subscription.status}
-            </span>
-            {is_active && (
-              <span className={styles.heroPill}>{subscription.auto_renew ? "Auto renew on" : "Manual billing"}</span>
-            )}
-            {subscription.pricing_type === "custom" && <span className={styles.heroPill}>Custom price</span>}
-          </div>
-        </div>
-
-        <div className="mt-6">
-          <p className="text-sm font-medium opacity-85">{subscription.plan_name}</p>
-          <p className={`${styles.heroAmount} mt-1`}>
-            {formatMoneyCompact(subscription.monthly_price)}
-            <span>/ month</span>
-          </p>
-          {subscription.pricing_type === "custom" && subscription.package && (
-            <p className="mt-1.5 text-xs opacity-75">
-              Listed {subscription.package.name} price: {formatMoneyCompact(subscription.package.price_per_month)}/mo
-            </p>
-          )}
-        </div>
-
-        <div className={styles.heroStats}>
-          <div className={styles.heroStat}>
-            <p>{is_active ? "Next charge" : "Ended"}</p>
-            <p>
-              {is_active
-                ? formatDate(subscription.next_billing_date, { month: "long", day: "numeric", year: "numeric" })
-                : formatDate(subscription.cancelled_at ?? subscription.ends_at)}
-            </p>
-          </div>
-          <div className={styles.heroStat}>
-            <p>Total collected</p>
-            <p>{formatMoney(summary.total_collected)}</p>
-          </div>
-          <div className={styles.heroStat}>
-            <p>Payments</p>
-            <p>
-              {summary.successful_count} paid
-              {summary.failed_count > 0 ? ` · ${summary.failed_count} failed` : ""}
-            </p>
-          </div>
-        </div>
-      </section>
+      <SubscriptionSummary
+        subscription={subscription}
+        summary={summary}
+        is_active={is_active}
+        is_past_due={is_past_due}
+      />
 
       {/* Past due alert */}
       {is_past_due && failed_charge && (
@@ -389,7 +503,7 @@ export default function AdminSeoSubscriptionDetail({ subscription_id, notice }: 
           {failed_charge.invoice && (
             <Link
               href={`/admin/invoices/${failed_charge.invoice.id}`}
-              className="shrink-0 rounded-xl border border-warning-300 bg-white px-3.5 py-2 text-sm font-medium text-warning-800 hover:bg-warning-100 dark:border-warning-500/30 dark:bg-transparent dark:text-warning-300"
+              className="shrink-0 rounded-xl border border-warning-300 bg-white px-3.5 py-2 text-center text-sm font-medium text-warning-800 hover:bg-warning-100 dark:border-warning-500/30 dark:bg-transparent dark:text-warning-300"
             >
               View invoice #{failed_charge.invoice.invoice_number}
             </Link>
@@ -397,89 +511,68 @@ export default function AdminSeoSubscriptionDetail({ subscription_id, notice }: 
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Payment history */}
-        <div className="lg:col-span-2">
-          <Panel
-            title="Payment history"
-            action={<span className="text-xs text-gray-400">{charges.length} billing period{charges.length === 1 ? "" : "s"}</span>}
-          >
-            <ChargeTimeline charges={charges} />
-          </Panel>
-        </div>
-
-        {/* Billing settings */}
-        <div className="space-y-6">
-          <Panel title="Billing settings">
-            <div className="space-y-5">
-              <AutoRenewSwitch
-                is_on={subscription.auto_renew}
-                disabled={!is_active || saving_field === "auto_renew"}
-                onToggle={() =>
-                  saveSettings(
-                    "auto_renew",
-                    { auto_renew: !subscription.auto_renew },
-                    subscription.auto_renew
-                      ? "Auto renew turned off. The client will not be charged automatically."
-                      : "Auto renew turned on. The card on file will be charged every month."
-                  )
-                }
-                description={
+      {/* Row 1: how billing works (left) and which card pays (right) */}
+      <div className="grid gap-5 sm:gap-6 lg:grid-cols-12">
+        <Panel
+          title="Billing settings"
+          subtitle="Renewal, next charge date and client reminders."
+          icon="settings"
+          className="lg:col-span-7"
+        >
+          <div className="grid gap-4 md:grid-cols-2">
+            <AutoRenewSwitch
+              is_on={subscription.auto_renew}
+              disabled={!is_active || saving_field === "auto_renew"}
+              onToggle={() =>
+                saveSettings(
+                  "auto_renew",
+                  { auto_renew: !subscription.auto_renew },
                   subscription.auto_renew
-                    ? `Charges ${formatMoneyCompact(subscription.monthly_price)} on the ${ordinal(subscription.billing_anchor_day ?? 1)} of every month.`
-                    : subscription.auto_renew_disabled_at
-                      ? `Turned off on ${formatDate(subscription.auto_renew_disabled_at)}. Charge manually with Charge now.`
-                      : "Off. Charge each month manually with Charge now."
-                }
-              />
+                    ? "Auto renew turned off. The client will not be charged automatically."
+                    : "Auto renew turned on. The card on file will be charged every month."
+                )
+              }
+              description={
+                subscription.auto_renew
+                  ? `Charges ${formatMoneyCompact(subscription.monthly_price)} on the ${ordinal(subscription.billing_anchor_day ?? 1)} of every month.`
+                  : subscription.auto_renew_disabled_at
+                    ? `Turned off on ${formatDate(subscription.auto_renew_disabled_at)}. Charge manually with Charge now.`
+                    : "Off. Charge each month manually with Charge now."
+              }
+            />
 
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Card used for renewals</p>
-                <PaymentCardPicker
-                  cards={cards}
-                  is_loading={cards_loading}
-                  selected_id={subscription.payment_profile_id}
-                  onSelect={(card_id) =>
-                    is_active &&
-                    card_id !== subscription.payment_profile_id &&
-                    saveSettings("payment_profile_id", { payment_profile_id: card_id }, "Renewal card updated.")
-                  }
-                />
-                {!card && cards.length > 0 && (
-                  <p className="mt-1.5 text-xs text-gray-400">Using the client&apos;s default card.</p>
+            <div>
+              <label className={detail_styles.fieldLabel}>Next charge</label>
+              <div className="flex gap-2">
+                <div className="min-w-0 flex-1">
+                  <DateField
+                    value={next_date_draft}
+                    min={todayIsoDate()}
+                    disabled={!is_active}
+                    aria_label="Next charge date"
+                    onChange={(value) => setNextDateDraft(value || subscription.next_billing_date || "")}
+                    marked_dates={summary.upcoming.map((item) => item.date)}
+                    footer_hint="Later charges follow on the same day"
+                  />
+                </div>
+                {has_date_change && (
+                  <button
+                    onClick={() =>
+                      saveSettings("next_billing_date", { next_billing_date: next_date_draft }, "Billing date updated.")
+                    }
+                    disabled={saving_field === "next_billing_date"}
+                    className="rounded-xl bg-brand-500 px-4 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
+                  >
+                    Save
+                  </button>
                 )}
               </div>
+              <p className="mt-1.5 text-xs text-gray-400">
+                Moving this date shifts every later charge to the same day of the month.
+              </p>
+            </div>
 
-              <div>
-                <div>
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-400">Next charge</label>
-                  <div className="flex gap-2">
-                    <div className="min-w-0 flex-1">
-                      <DateField
-                        value={next_date_draft}
-                        min={todayIsoDate()}
-                        disabled={!is_active}
-                        aria_label="Next charge date"
-                        onChange={(value) => setNextDateDraft(value || subscription.next_billing_date || "")}
-                        marked_dates={summary.upcoming.map((item) => item.date)}
-                        footer_hint="Later charges follow on the same day"
-                      />
-                    </div>
-                    {next_date_draft && next_date_draft !== subscription.next_billing_date && (
-                      <button
-                        onClick={() =>
-                          saveSettings("next_billing_date", { next_billing_date: next_date_draft }, "Billing date updated.")
-                        }
-                        disabled={saving_field === "next_billing_date"}
-                        className="rounded-xl bg-brand-500 px-3 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
-                      >
-                        Save
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
+            <div className="md:col-span-2">
               <ReminderControl
                 value={subscription.reminder_days_before || null}
                 is_auto_renew={subscription.auto_renew}
@@ -493,19 +586,53 @@ export default function AdminSeoSubscriptionDetail({ subscription_id, notice }: 
                 }
               />
             </div>
-          </Panel>
+          </div>
+        </Panel>
 
+        <Panel
+          title="Card used for renewals"
+          subtitle={card ? "Charged on every renewal and on Charge now." : "Using the client's default card."}
+          icon="card"
+          action={!cards_loading && cards.length > 0 ? `${cards.length} saved` : undefined}
+          className="lg:col-span-5"
+        >
+          <PaymentCardPicker
+            cards={cards}
+            is_loading={cards_loading}
+            selected_id={subscription.payment_profile_id}
+            onSelect={(card_id) =>
+              is_active &&
+              card_id !== subscription.payment_profile_id &&
+              saveSettings("payment_profile_id", { payment_profile_id: card_id }, "Renewal card updated.")
+            }
+          />
+        </Panel>
+      </div>
+
+      {/* Row 2: what happened (left) and what comes next (right) */}
+      <div className="grid items-start gap-5 sm:gap-6 lg:grid-cols-12">
+        <Panel
+          title="Payment history"
+          subtitle="Every billing period with its invoice and result."
+          icon="history"
+          action={`${charges.length} period${charges.length === 1 ? "" : "s"}`}
+          className="lg:col-span-7"
+        >
+          <ChargeTimeline charges={charges} />
+        </Panel>
+
+        <div className="space-y-5 sm:space-y-6 lg:col-span-5">
           {is_active && summary.upcoming.length > 0 && (
-            <Panel title="Upcoming charges">
-              <ul className={styles.upcoming}>
+            <Panel title="Upcoming charges" subtitle="The next scheduled payments." icon="calendar">
+              <ul className={detail_styles.upcoming}>
                 {summary.upcoming.map((item, index) => (
-                  <li key={item.date} className={styles.upcomingItem}>
-                    <span className={styles.calendarTile}>
+                  <li key={item.date} className={detail_styles.upcomingItem}>
+                    <span className={detail_styles.calendarTile} aria-hidden>
                       <span>{formatDate(item.date, { month: "short" })}</span>
                       <span>{formatDate(item.date, { day: "numeric" })}</span>
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-semibold text-gray-900 dark:text-white">{item.period_label}</span>
+                      <span className="block truncate text-sm font-semibold text-gray-900 dark:text-white">{item.period_label}</span>
                       <span className="block text-xs text-gray-500 dark:text-gray-400">
                         {index === 0
                           ? subscription.auto_renew ? "Charged automatically" : "Waiting for a manual charge"
@@ -521,25 +648,30 @@ export default function AdminSeoSubscriptionDetail({ subscription_id, notice }: 
             </Panel>
           )}
 
-          <Panel title="Details">
-            <dl className="space-y-3 text-sm">
-              {[
-                ["Started", formatDate(subscription.starts_at)],
-                ["Ends", subscription.ends_at ? formatDate(subscription.ends_at) : "Ongoing"],
-                ["Invoice line", `Month - ${subscription.invoice_item_label}`],
-                ["Activated", formatDate(subscription.created_at)],
-              ].map(([label, value]) => (
-                <div key={label} className="flex justify-between gap-4">
-                  <dt className="text-gray-500 dark:text-gray-400">{label}</dt>
-                  <dd className="text-right font-medium text-gray-900 dark:text-white">{value}</dd>
-                </div>
-              ))}
-              {subscription.notes && (
-                <div className="rounded-xl bg-gray-50 px-3 py-2.5 text-xs leading-relaxed text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-                  {subscription.notes}
-                </div>
-              )}
+          <Panel title="Details" icon="details">
+            <dl className={detail_styles.details}>
+              <div className={detail_styles.detailItem}>
+                <dt>Started</dt>
+                <dd>{formatDate(subscription.starts_at)}</dd>
+              </div>
+              <div className={detail_styles.detailItem}>
+                <dt>Ends</dt>
+                <dd>{subscription.ends_at ? formatDate(subscription.ends_at) : "Ongoing"}</dd>
+              </div>
+              <div className={detail_styles.detailItem}>
+                <dt>Activated</dt>
+                <dd>{formatDate(subscription.created_at)}</dd>
+              </div>
+              <div className={detail_styles.detailItem}>
+                <dt>Billing day</dt>
+                <dd>{subscription.billing_anchor_day ? `${ordinal(subscription.billing_anchor_day)} of the month` : "Not set"}</dd>
+              </div>
+              <div className={`${detail_styles.detailItem} ${detail_styles.isWide}`}>
+                <dt>Invoice line</dt>
+                <dd>Month - {subscription.invoice_item_label}</dd>
+              </div>
             </dl>
+            {subscription.notes && <p className={detail_styles.notes}>{subscription.notes}</p>}
           </Panel>
         </div>
       </div>

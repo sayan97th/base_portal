@@ -1,0 +1,601 @@
+// SEO subscription detail page: compact summary header, panels, billing
+// cycle progress, upcoming schedule and details list. Shared billing widgets
+// (switches, card chips, timeline) live in SeoSubscriptionBilling.module.scss.
+
+$brand_500: var(--color-brand-500);
+$brand_50: var(--color-brand-50);
+$gray_900: var(--color-gray-900);
+$gray_800: var(--color-gray-800);
+$gray_700: var(--color-gray-700);
+$gray_500: var(--color-gray-500);
+$gray_400: var(--color-gray-400);
+$gray_200: var(--color-gray-200);
+$gray_100: var(--color-gray-100);
+$gray_50: var(--color-gray-50);
+
+$hero_from: #ec3c89;
+$hero_to: #8b5cf6;
+$past_due_from: #f97316;
+
+$sm: 640px;
+$md: 768px;
+$lg: 1024px;
+
+@mixin dark {
+  :global(.dark) & {
+    @content;
+  }
+}
+
+@mixin from($width) {
+  @media (min-width: $width) {
+    @content;
+  }
+}
+
+// ── Toolbar (back link and actions) ──────────────────────────────────────────
+
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  @include from($sm) {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.toolbarActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+
+  // The primary action takes the full first row on phones.
+  > :last-child {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  > * {
+    justify-content: center;
+  }
+
+  @include from($sm) {
+    display: flex;
+    flex-wrap: wrap;
+
+    > :last-child {
+      grid-column: auto;
+      grid-row: auto;
+    }
+  }
+}
+
+// ── Compact summary ──────────────────────────────────────────────────────────
+
+.summary {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid $gray_100;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 12px 32px -24px rgba(190, 24, 93, 0.35);
+
+  @include from($lg) {
+    grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
+  }
+
+  @include dark {
+    border-color: rgba(255, 255, 255, 0.06);
+    background: var(--color-gray-900);
+  }
+}
+
+.summaryPlan {
+  --plan_from: #{$hero_from};
+  --plan_to: #{$hero_to};
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  overflow: hidden;
+  padding: 16px 20px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--plan_from) 0%, var(--plan_to) 100%);
+
+  &::after {
+    content: "";
+    position: absolute;
+    top: -70px;
+    right: -50px;
+    width: 170px;
+    height: 170px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12);
+    pointer-events: none;
+  }
+
+  > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  &.isPastDue {
+    --plan_from: #{$past_due_from};
+    --plan_to: #{$hero_from};
+  }
+
+  &.isInactive {
+    --plan_from: #4b5563;
+    --plan_to: #1f2937;
+  }
+}
+
+.summaryPlanName {
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.9;
+}
+
+.summaryPrice {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 30px;
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+
+  span {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0;
+    opacity: 0.8;
+  }
+}
+
+.summaryCompare {
+  font-size: 11.5px;
+  opacity: 0.78;
+}
+
+.summaryBody {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+
+  @include from($sm) {
+    padding: 16px 20px;
+  }
+}
+
+.summaryClient {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+
+.summaryIdentity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, $hero_from, $hero_to);
+}
+
+.identityName {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.identityMeta {
+  overflow: hidden;
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: $gray_500;
+
+  @include dark {
+    color: $gray_400;
+  }
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: $gray_700;
+  background: $gray_100;
+
+  @include dark {
+    color: var(--color-gray-300);
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  &[data-tone="success"] {
+    color: #027a48;
+    background: #ecfdf3;
+
+    @include dark {
+      color: #6ce9a6;
+      background: rgba(18, 183, 106, 0.12);
+    }
+  }
+
+  &[data-tone="warning"] {
+    color: #b54708;
+    background: #fffaeb;
+
+    @include dark {
+      color: #fec84b;
+      background: rgba(247, 144, 9, 0.12);
+    }
+  }
+
+  &[data-tone="brand"] {
+    color: #fff;
+    background: linear-gradient(90deg, $hero_from, $hero_to);
+  }
+}
+
+.badgeDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+// Key figures
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+
+  @include from($md) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.stat {
+  min-width: 0;
+  border-radius: 12px;
+  padding: 9px 12px;
+  background: $gray_50;
+
+  @include dark {
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  dt {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: $gray_400;
+  }
+
+  dd {
+    margin-top: 2px;
+    overflow: hidden;
+    font-size: 14px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    color: $gray_900;
+
+    @include dark {
+      color: #fff;
+    }
+  }
+}
+
+.statHint {
+  display: block;
+  margin-top: 1px;
+  overflow: hidden;
+  font-size: 11.5px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: $gray_500;
+
+  &[data-tone="error"] {
+    color: var(--color-error-500);
+  }
+}
+
+// Billing cycle progress (lives in the "Next charge" stat)
+
+.cycle {
+  margin-top: 6px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: $gray_200;
+
+  @include dark {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, $hero_from, $hero_to);
+    transition: width 0.4s ease;
+  }
+}
+
+// ── Panels ───────────────────────────────────────────────────────────────────
+
+.panel {
+  min-width: 0;
+  border: 1px solid $gray_100;
+  border-radius: 20px;
+  padding: 16px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+
+  @include from($sm) {
+    padding: 20px;
+  }
+
+  @include dark {
+    border-color: rgba(255, 255, 255, 0.06);
+    background: var(--color-gray-900);
+  }
+}
+
+.panelHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.panelHeading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.panelIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: $brand_500;
+  background: linear-gradient(135deg, rgba(236, 60, 137, 0.12), rgba(139, 92, 246, 0.12));
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.panelTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.panelSubtitle {
+  margin-top: 1px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: $gray_500;
+
+  @include dark {
+    color: $gray_400;
+  }
+}
+
+.panelAction {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: $gray_400;
+}
+
+.fieldLabel {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: $gray_400;
+}
+
+// ── Upcoming charges ─────────────────────────────────────────────────────────
+
+.upcoming {
+  display: grid;
+  gap: 8px;
+}
+
+.upcomingItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 14px;
+  padding: 8px 12px 8px 8px;
+  background: $gray_50;
+
+  @include dark {
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  &:first-child {
+    background: $brand_50;
+    box-shadow: inset 0 0 0 1px rgba(236, 60, 137, 0.2);
+
+    @include dark {
+      background: rgba(236, 60, 137, 0.08);
+    }
+  }
+}
+
+.calendarTile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  width: 42px;
+  height: 44px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.08);
+
+  span:first-child {
+    width: 100%;
+    padding: 2px 0;
+    text-align: center;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #fff;
+    background: $brand_500;
+  }
+
+  span:last-child {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    font-size: 16px;
+    font-weight: 800;
+    color: $gray_900;
+  }
+
+  @include dark {
+    background: $gray_800;
+
+    span:last-child {
+      color: #fff;
+    }
+  }
+}
+
+// ── Details list ─────────────────────────────────────────────────────────────
+
+.details {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  border-radius: 14px;
+  background: $gray_100;
+
+  @include from($sm) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @include dark {
+    background: rgba(255, 255, 255, 0.06);
+  }
+}
+
+.detailItem {
+  min-width: 0;
+  padding: 10px 12px;
+  background: #fff;
+
+  @include dark {
+    background: var(--color-gray-900);
+  }
+
+  dt {
+    font-size: 11px;
+    font-weight: 600;
+    color: $gray_400;
+  }
+
+  dd {
+    margin-top: 2px;
+    font-size: 13px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+    color: $gray_900;
+
+    @include dark {
+      color: #fff;
+    }
+  }
+
+  &.isWide {
+    grid-column: 1 / -1;
+  }
+}
+
+.notes {
+  margin-top: 12px;
+  border-left: 3px solid rgba(236, 60, 137, 0.5);
+  border-radius: 4px 12px 12px 4px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  white-space: pre-line;
+  color: $gray_700;
+  background: $gray_50;
+
+  @include dark {
+    color: var(--color-gray-300);
+    background: rgba(255, 255, 255, 0.04);
+  }
+}

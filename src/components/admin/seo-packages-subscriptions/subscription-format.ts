@@ -150,3 +150,31 @@ export function buildChargeSchedule(first_iso: string, count: number, ends_iso?:
   }
   return dates;
 }
+
+function isoToNoonTime(iso: string): number {
+  const parts = parseIso(iso);
+  if (!parts) return Number.NaN;
+  return new Date(parts.year, parts.month, parts.day, 12).getTime();
+}
+
+/** Whole calendar days from from_iso to to_iso (negative when to_iso is earlier). */
+export function daysBetween(from_iso: string, to_iso: string): number {
+  return Math.round((isoToNoonTime(to_iso) - isoToNoonTime(from_iso)) / 86_400_000);
+}
+
+/**
+ * Where today sits inside the current billing period, which runs from one
+ * month before the next charge up to the next charge.
+ */
+export function billingCycleProgress(
+  next_iso: string | null | undefined,
+  anchor_day?: number | null
+): { percent: number; days_left: number } | null {
+  if (!next_iso || !parseIso(next_iso)) return null;
+  const today = todayIsoDate();
+  const cycle_start = addBillingMonths(next_iso, -1, anchor_day ?? undefined);
+  const total_days = Math.max(daysBetween(cycle_start, next_iso), 1);
+  const elapsed_days = daysBetween(cycle_start, today);
+  const percent = Math.min(Math.max((elapsed_days / total_days) * 100, 0), 100);
+  return { percent, days_left: daysBetween(today, next_iso) };
+}
