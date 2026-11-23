@@ -4,7 +4,9 @@
  *
  * Covers the simplified, subscription style billing schedule (first payment
  * plus advanced options), custom pricing, the optional reminder email, the
- * live preview and the exact payload sent to the API.
+ * first month planner (bill on schedule, charge now, already paid outside the
+ * portal), the paid month guard in edit mode, the live preview and the exact
+ * payload sent to the API (including the browser timezone).
  *
  * Only Date is faked ("today" is Sunday, November 22, 2026) so React Testing
  * Library's waitFor keeps working with real timers.
@@ -51,6 +53,8 @@ jest.mock("@/services/admin/seo-packages.service", () => ({
 
 import { adminSeoSubscriptionService } from "@/services/admin/seo-packages-subscription.service";
 import { listAdminSeoPackages } from "@/services/admin/seo-packages.service";
+
+const BROWSER_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 const service = adminSeoSubscriptionService as jest.Mocked<typeof adminSeoSubscriptionService>;
 const mock_list_packages = listAdminSeoPackages as jest.MockedFunction<typeof listAdminSeoPackages>;
@@ -234,6 +238,9 @@ describe("SubscriptionForm in create mode", () => {
       payment_profile_id: "card-1",
       reminder_days_before: 3,
       charge_now: false,
+      first_period_paid_outside: false,
+      outside_payment_reference: null,
+      timezone: BROWSER_TIMEZONE,
       notes: undefined,
     });
     expect(mock_push).toHaveBeenCalledWith("/admin/seo-packages-subscriptions/9?notice=activated");
@@ -389,22 +396,134 @@ describe("SubscriptionForm in create mode", () => {
     await pickClient();
     await pickPackage("Starter");
 
-    fireEvent.click(screen.getByRole("checkbox", { name: /Charge the first payment now/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /Charge now/ }));
+    expect(screen.getByRole("radio", { name: /Charge now/ })).toHaveAttribute("aria-checked", "true");
     expect(screen.getByRole("button", { name: "Activate and charge $999" })).toBeInTheDocument();
 
     fireEvent.click(submitButton());
     await waitFor(() => expect(mock_push).toHaveBeenCalledWith("/admin/seo-packages-subscriptions/9?notice=activated_charged"));
-    expect(lastActivatePayload()).toMatchObject({ charge_now: true });
+    expect(lastActivatePayload()).toMatchObject({ charge_now: true, first_period_paid_outside: false });
   });
 
-  it("hides the charge now option when the first payment is later", async () => {
+  it("only allows charging now when the first payment is today", async () => {
     render(<SubscriptionForm mode="create" />);
     await pickClient();
     await pickPackage("Starter");
 
     pickDate(/First payment/, "Tuesday, December 1, 2026", 1);
 
-    expect(screen.queryByRole("checkbox", { name: /Charge the first payment now/ })).not.toBeInTheDocument();
+    const charge_now = screen.getByRole("radio", { name: /Charge now/ });
+    expect(charge_now).toBeDisabled();
+    expect(charge_now).toHaveTextContent("Only when the first payment is today");
+    expect(screen.getByRole("radio", { name: /Bill on Dec 1/ })).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("falls back to the schedule when the date moves off today after choosing charge now", async () => {
+    render(<SubscriptionForm mode="create" />);
+    await pickClient();
+    await pickPackage("Starter");
+
+    fireEvent.click(screen.getByRole("radio", { name: /Charge now/ }));
+    pickDate(/First payment/, "Tuesday, December 1, 2026", 1);
+
+    expect(screen.getByRole("button", { name: "Activate subscription" })).toBeInTheDocument();
+    fireEvent.click(submitButton());
+    await waitFor(() => expect(service.activateSubscription).toHaveBeenCalled());
+    expect(lastActivatePayload()).toMatchObject({ first_billing_date: "2026-12-01", charge_now: false });
+  });
+
+  it("cannot charge now without a valid card", async () => {
+    service.listClientPaymentProfiles.mockResolvedValue([{ ...CARD, is_expired: true }]);
+    render(<SubscriptionForm mode="create" />);
+
+    const search = await screen.findByPlaceholderText("Search by name, email or company…");
+    fireEvent.focus(search);
+    fireEvent.click(screen.getByRole("button", { name: /Cathleen Siech/ }));
+    await screen.findByRole("button", { name: /Visa.*4242.*Expired/ });
+
+    expect(screen.getByRole("radio", { name: /Charge now/ })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: /Charge now/ })).toHaveTextContent("No valid card on file");
+  });
+
+  it("asks for a client before charging now", async () => {
+    render(<SubscriptionForm mode="create" />);
+
+    const charge_now = await screen.findByRole("radio", { name: /Charge now/ });
+    expect(charge_now).toBeDisabled();
+    expect(charge_now).toHaveTextContent("Select a client first");
+  });
+
+  it("records the first month as paid outside the portal instead of charging it", async () => {
+    service.activateSubscription.mockResolvedValue({
+      data: makeSubscription({ id: 9 }),
+      charge_result: { success: true, message: "November 2026 was recorded as paid.", paid_outside: true },
+    });
+    render(<SubscriptionForm mode="create" />);
+    await pickClient();
+    await pickPackage("Starter");
+
+    fireEvent.click(screen.getByRole("radio", { name: /November already paid/ }));
+    fireEvent.change(screen.getByLabelText(/Payment reference/), { target: { value: "  Bank transfer 8812  " } });
+
+    // Nothing is charged this month: the summary, ledger and preview follow.
+    expect(screen.getByText("November is paid")).toBeInTheDocument();
+    expect(screen.getByText("on Dec 22")).toBeInTheDocument();
+    const ledger = screen.getByRole("list", { name: "Upcoming months" });
+    expect(within(ledger).getByText("Paid, not charged")).toBeInTheDocument();
+    const timeline = screen.getByRole("list", { name: "Billing timeline" });
+    expect(within(timeline).getByText(/Already paid/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Activate, November paid" })).toBeInTheDocument();
+
+    fireEvent.click(submitButton());
+
+    await waitFor(() => expect(service.activateSubscription).toHaveBeenCalled());
+    expect(lastActivatePayload()).toMatchObject({
+      first_billing_date: "2026-11-22",
+      charge_now: false,
+      first_period_paid_outside: true,
+      outside_payment_reference: "Bank transfer 8812",
+      timezone: BROWSER_TIMEZONE,
+    });
+    expect(mock_push).toHaveBeenCalledWith("/admin/seo-packages-subscriptions/9?notice=activated_paid_outside");
+  });
+
+  it("does not send the payment reference when the month is billed on schedule", async () => {
+    render(<SubscriptionForm mode="create" />);
+    await pickClient();
+    await pickPackage("Starter");
+
+    fireEvent.click(screen.getByRole("radio", { name: /November already paid/ }));
+    fireEvent.change(screen.getByLabelText(/Payment reference/), { target: { value: "Check 1042" } });
+    fireEvent.click(screen.getByRole("radio", { name: /Bill on schedule/ }));
+
+    expect(screen.queryByLabelText(/Payment reference/)).not.toBeInTheDocument();
+    fireEvent.click(submitButton());
+    await waitFor(() => expect(service.activateSubscription).toHaveBeenCalled());
+    expect(lastActivatePayload()).toMatchObject({ first_period_paid_outside: false, outside_payment_reference: null });
+  });
+
+  it("falls back to the plain notice if recording the outside payment fails", async () => {
+    service.activateSubscription.mockResolvedValue({
+      data: makeSubscription({ id: 9 }),
+      charge_result: { success: false, message: "A charge for this subscription is already in progress.", paid_outside: true },
+    });
+    render(<SubscriptionForm mode="create" />);
+    await pickClient();
+    await pickPackage("Starter");
+
+    fireEvent.click(screen.getByRole("radio", { name: /November already paid/ }));
+    fireEvent.click(submitButton());
+
+    await waitFor(() => expect(mock_push).toHaveBeenCalledWith("/admin/seo-packages-subscriptions/9?notice=activated"));
+  });
+
+  it("allows today as the first payment date", async () => {
+    render(<SubscriptionForm mode="create" />);
+    await pickClient();
+    await pickPackage("Starter");
+
+    expect(screen.queryByText(/cannot be in the past/)).not.toBeInTheDocument();
+    expect(submitButton()).toBeEnabled();
   });
 
   it("still opens the subscription when the first charge is declined", async () => {
@@ -415,7 +534,7 @@ describe("SubscriptionForm in create mode", () => {
     render(<SubscriptionForm mode="create" />);
     await pickClient();
     await pickPackage("Starter");
-    fireEvent.click(screen.getByRole("checkbox", { name: /Charge the first payment now/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /Charge now/ }));
 
     fireEvent.click(submitButton());
 
@@ -501,7 +620,55 @@ describe("SubscriptionForm in edit mode", () => {
     fireEvent.click(submitButton());
 
     await waitFor(() => expect(service.updateSubscription).toHaveBeenCalled());
-    expect(service.updateSubscription.mock.calls[0][1]).toMatchObject({ next_billing_date: "2026-12-15" });
+    expect(service.updateSubscription.mock.calls[0][1]).toMatchObject({
+      next_billing_date: "2026-12-15",
+      timezone: BROWSER_TIMEZONE,
+    });
+  });
+
+  it("does not show the first month planner", async () => {
+    render(<SubscriptionForm mode="edit" subscription={makeSubscription()} />);
+    await screen.findByRole("button", { name: /Visa.*4242/ });
+
+    expect(screen.queryByRole("radiogroup", { name: "First payment" })).not.toBeInTheDocument();
+  });
+
+  it("blocks moving the next payment into a month that is already paid", async () => {
+    const paid_november = {
+      id: 1,
+      period_start: "2026-11-01",
+      period_end: "2026-11-30",
+      period_label: "November 2026",
+      amount: 2000,
+      status: "succeeded" as const,
+      trigger: "automatic" as const,
+      attempt_count: 1,
+      last_attempt_at: null,
+      next_retry_at: null,
+      paid_at: "2026-11-01T15:00:00+00:00",
+      card_label: null,
+      failure_code: null,
+      failure_message: null,
+      payment_intent_id: null,
+      created_at: "2026-11-01T15:00:00+00:00",
+    };
+    render(<SubscriptionForm mode="edit" subscription={makeSubscription({ charges: [paid_november] })} />);
+    await screen.findByRole("button", { name: /Visa.*4242/ });
+
+    // From Dec 1 back to Nov 28: November was already paid.
+    fireEvent.click(screen.getByRole("button", { name: /Next payment/ }));
+    const dialog = screen.getByRole("dialog", { name: "Choose a date" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Previous month" }));
+    fireEvent.click(within(dialog).getByRole("gridcell", { name: "Saturday, November 28, 2026" }));
+
+    expect(screen.getByRole("status")).toHaveTextContent("November 2026 is already paid.");
+    expect(screen.getByText("November 2026 is already paid. Pick a date in a later month.")).toBeInTheDocument();
+    expect(submitButton()).toBeDisabled();
+
+    // A later month is fine again.
+    pickDate(/Next payment/, "Saturday, December 5, 2026");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(submitButton()).toBeEnabled();
   });
 
   it("opens the advanced options when the subscription has an end date", async () => {

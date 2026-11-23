@@ -95,6 +95,30 @@ describe("admin SEO subscription service", () => {
     expect(mocked.patch).toHaveBeenNthCalledWith(2, `${BASE_URL}/9/cancel`, { notes: "Client left" });
   });
 
+  it("sends the first month choice and the browser timezone when activating", async () => {
+    const result = { data: { id: 9 }, charge_result: { success: true, message: "Recorded.", paid_outside: true } };
+    mocked.post.mockResolvedValueOnce(result);
+    const payload = {
+      user_id: 4,
+      pricing_type: "custom" as const,
+      custom_price: 100,
+      starts_at: "2026-11-22",
+      first_billing_date: "2026-11-22",
+      first_period_paid_outside: true,
+      outside_payment_reference: "Bank transfer 8812",
+      timezone: "America/Denver",
+    };
+
+    await expect(adminSeoSubscriptionService.activateSubscription(payload)).resolves.toBe(result);
+    expect(mocked.post).toHaveBeenCalledWith(BASE_URL, payload);
+  });
+
+  it("sends the timezone with a moved billing date", async () => {
+    await adminSeoSubscriptionService.updateSubscription(9, { next_billing_date: "2026-11-22", timezone: "America/Denver" });
+
+    expect(mocked.patch).toHaveBeenCalledWith(`${BASE_URL}/9`, { next_billing_date: "2026-11-22", timezone: "America/Denver" });
+  });
+
   it("loads the cards on file of a client", async () => {
     mocked.get.mockResolvedValueOnce({ data: [{ id: "card-1" }] });
 

@@ -8,6 +8,7 @@
 
 import {
   addBillingMonths,
+  browserTimezone,
   addCalendarDays,
   buildChargeSchedule,
   cardBrandLabel,
@@ -17,6 +18,7 @@ import {
   formatMoney,
   formatMoneyCompact,
   initials,
+  monthKey,
   monthName,
   ordinal,
   todayIsoDate,
@@ -131,5 +133,48 @@ describe("billing calendar", () => {
   it("stops at the end date", () => {
     expect(buildChargeSchedule("2026-12-01", 12, "2027-02-15")).toEqual(["2026-12-01", "2027-01-01", "2027-02-01"]);
     expect(buildChargeSchedule("2026-12-01", 12, "2026-11-30")).toEqual([]);
+  });
+});
+
+describe("browserTimezone", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("returns the IANA timezone the API uses to decide what today is", () => {
+    expect(browserTimezone()).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  });
+
+  it("returns null when the browser does not expose a timezone", () => {
+    jest.spyOn(Intl, "DateTimeFormat").mockImplementation(
+      () => ({ resolvedOptions: () => ({ timeZone: "" }) }) as unknown as Intl.DateTimeFormat
+    );
+
+    expect(browserTimezone()).toBeNull();
+  });
+
+  it("returns null instead of throwing when Intl fails", () => {
+    jest.spyOn(Intl, "DateTimeFormat").mockImplementation(() => {
+      throw new Error("Intl is not available");
+    });
+
+    expect(browserTimezone()).toBeNull();
+  });
+});
+
+describe("monthKey", () => {
+  it("groups billing dates by calendar month, the unit a client pays once", () => {
+    expect(monthKey("2026-11-22")).toBe("2026-11");
+    expect(monthKey("2026-11-01")).toBe(monthKey("2026-11-30"));
+    expect(monthKey("2026-11-30")).not.toBe(monthKey("2026-12-01"));
+  });
+
+  it("keeps the year, so the same month of another year is different", () => {
+    expect(monthKey("2026-11-01")).not.toBe(monthKey("2027-11-01"));
+  });
+
+  it("returns an empty key for a missing date", () => {
+    expect(monthKey(null)).toBe("");
+    expect(monthKey(undefined)).toBe("");
   });
 });

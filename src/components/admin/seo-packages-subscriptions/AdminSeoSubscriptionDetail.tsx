@@ -20,6 +20,7 @@ import { CancelSubscriptionModal } from "./SubscriptionModals";
 import SubscriptionPaymentHealthCard from "./SubscriptionPaymentHealthCard";
 import { HEALTH_STATE_LABELS, needsAttention } from "./payment-health";
 import {
+  browserTimezone,
   CHARGE_STATUS_CONFIG,
   billingCycleProgress,
   cardBrandLabel,
@@ -559,7 +560,11 @@ export default function AdminSeoSubscriptionDetail({ subscription_id, notice }: 
                 {has_date_change && (
                   <button
                     onClick={() =>
-                      saveSettings("next_billing_date", { next_billing_date: next_date_draft }, "Billing date updated.")
+                      saveSettings(
+                        "next_billing_date",
+                        { next_billing_date: next_date_draft, timezone: browserTimezone() },
+                        "Billing date updated."
+                      )
                     }
                     disabled={saving_field === "next_billing_date"}
                     className="min-h-11 shrink-0 rounded-xl bg-brand-500 px-4 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-60"

@@ -98,6 +98,8 @@ export function PaymentCardPicker({
               </span>
               <span className={styles.cardChipBody}>
                 <span className={styles.cardChipNumber}>
+                  {/* The brand swatch is decorative, screen readers still need the brand. */}
+                  <span className="sr-only">{cardBrandLabel(card.card_brand)} </span>
                   •••• {card.last_four}
                   {card.is_default && <span className={styles.cardChipDefault}>Default</span>}
                 </span>

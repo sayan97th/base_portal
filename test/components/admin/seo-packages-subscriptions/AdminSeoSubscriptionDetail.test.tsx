@@ -1,14 +1,17 @@
 /**
  * Tests for the SEO subscription page
  * (src/components/admin/seo-packages-subscriptions/AdminSeoSubscriptionDetail.tsx):
- * payment history, billing settings that save instantly, manual charge,
- * cancellation and the messages shown after creating or editing.
+ * payment history, billing settings that save instantly, the link to the
+ * manual charge page, cancellation and the messages shown after creating or
+ * editing (including a first month recorded as paid outside the portal).
  */
 
 import React from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import AdminSeoSubscriptionDetail from "@/components/admin/seo-packages-subscriptions/AdminSeoSubscriptionDetail";
 import { freezeToday, makeCard, makeCharge, makeDetail, makeHealth } from "./fixtures";
+
+const BROWSER_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 jest.mock("next/link", () => ({
   __esModule: true,
@@ -57,12 +60,12 @@ describe("AdminSeoSubscriptionDetail", () => {
 
     expect(service.fetchSubscriptionDetail).toHaveBeenCalledWith(7);
     // The hero shows the client and company (the name also appears on the card chip).
-    expect(screen.getByText("cathleen@example.com · Printed Image")).toBeInTheDocument();
+    expect(screen.getByText("cathleen@example.com, Printed Image")).toBeInTheDocument();
     expect(screen.getAllByText("Cathleen Siech").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Custom SEO Package").length).toBeGreaterThan(0);
     expect(screen.getByText("Auto renew on")).toBeInTheDocument();
     expect(screen.getByText("Custom price")).toBeInTheDocument();
-    expect(screen.getByText("December 1, 2026")).toBeInTheDocument();
+    expect(screen.getAllByText("Dec 1, 2026").length).toBeGreaterThan(0);
     expect(screen.getAllByText("$2,000.00").length).toBeGreaterThan(0);
   });
 
@@ -88,7 +91,7 @@ describe("AdminSeoSubscriptionDetail", () => {
     );
     await renderPage();
 
-    expect(screen.getByText("2 billing periods")).toBeInTheDocument();
+    expect(screen.getByText("2 periods")).toBeInTheDocument();
     expect(screen.getByText("Failed")).toBeInTheDocument();
     expect(screen.getByText("Paid")).toBeInTheDocument();
     expect(screen.getByText("2 attempts")).toBeInTheDocument();
@@ -220,6 +223,10 @@ describe("AdminSeoSubscriptionDetail", () => {
   it.each([
     ["activated", "Subscription activated. The billing schedule is shown below."],
     ["activated_charged", "Subscription activated and the first payment was collected."],
+    [
+      "activated_paid_outside",
+      "Subscription activated. The first month was recorded as paid, so the client will not be charged for it.",
+    ],
     ["updated", "Subscription updated. Changes apply from the next payment."],
   ])("shows the %s notice after a redirect", async (notice, text) => {
     await renderPage(notice);
@@ -286,52 +293,66 @@ describe("AdminSeoSubscriptionDetail", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
-    await waitFor(() => expect(service.updateSubscription).toHaveBeenCalledWith(7, { next_billing_date: "2026-12-15" }));
+    // The browser timezone goes along, so "today" is never rejected as a past date.
+    await waitFor(() =>
+      expect(service.updateSubscription).toHaveBeenCalledWith(7, {
+        next_billing_date: "2026-12-15",
+        timezone: BROWSER_TIMEZONE,
+      })
+    );
   });
 
-  it("charges the card on file manually", async () => {
-    service.chargeNow.mockResolvedValue({
-      ...makeDetail({ next_billing_date: "2027-01-01" }),
-      message: "Charged $2000.00 for December 2026.",
+  it("shows the API error when the date is moved into a month that is already paid", async () => {
+    service.updateSubscription.mockRejectedValue({
+      errors: { next_billing_date: ["December 2026 is already paid. Pick a date in a later month so the client is not charged twice."] },
     });
     await renderPage();
 
-    fireEvent.click(screen.getByRole("button", { name: /^Charge now$/ }));
-    const dialog_heading = screen.getByRole("heading", { name: "Charge $2,000 now?" });
-    const dialog = dialog_heading.closest("div.relative") as HTMLElement;
+    fireEvent.click(screen.getByRole("button", { name: "Next charge date" }));
+    fireEvent.click(screen.getByRole("gridcell", { name: "Tuesday, December 15, 2026" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
-    // December is not due yet: the admin is told the schedule moves forward.
-    expect(within(dialog).getByText(/This period is not due until December 1/)).toBeInTheDocument();
-    expect(within(dialog).getByRole("radio", { name: /Visa •••• 4242/ })).toBeChecked();
-
-    fireEvent.click(within(dialog).getByRole("button", { name: "Charge $2,000.00" }));
-
-    await waitFor(() => expect(service.chargeNow).toHaveBeenCalledWith(7, "card-1"));
-    expect(await screen.findByRole("status")).toHaveTextContent("Charged $2000.00 for December 2026.");
-    expect(screen.queryByRole("heading", { name: "Charge $2,000 now?" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("status")).toHaveTextContent("December 2026 is already paid.");
   });
 
-  it("keeps the charge dialog open with the decline reason and refreshes the history", async () => {
-    service.chargeNow.mockRejectedValue({ message: "The card was declined." });
+  it("labels a month recorded as paid outside the portal", async () => {
+    service.fetchSubscriptionDetail.mockResolvedValue(
+      makeDetail({
+        charges: [makeCharge({ trigger: "external", charged_by: { id: 1, name: "Abigail Admin" }, card_label: null })],
+      })
+    );
     await renderPage();
-    expect(service.fetchSubscriptionDetail).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByRole("button", { name: /^Charge now$/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Charge $2,000.00" }));
-
-    expect(await screen.findByText("The card was declined.")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Charge $2,000 now?" })).toBeInTheDocument();
-    await waitFor(() => expect(service.fetchSubscriptionDetail).toHaveBeenCalledTimes(2));
+    expect(screen.getByText("Paid outside the portal (Abigail Admin)")).toBeInTheDocument();
   });
 
-  it("cannot charge when the client has no valid card", async () => {
-    service.listClientPaymentProfiles.mockResolvedValue([makeCard({ is_expired: true })]);
+  it("keeps the label for an invoice the client paid from the portal", async () => {
+    service.fetchSubscriptionDetail.mockResolvedValue(
+      makeDetail({ charges: [makeCharge({ trigger: "external", charged_by: null })] })
+    );
     await renderPage();
 
-    fireEvent.click(screen.getByRole("button", { name: /^Charge now$/ }));
+    expect(screen.getByText("Paid by client")).toBeInTheDocument();
+  });
 
-    expect(screen.getByText(/No valid card on file/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Charge $2,000.00" })).toBeDisabled();
+  it("opens the charge page from Charge now", async () => {
+    await renderPage();
+
+    expect(screen.getByRole("link", { name: /^Charge now$/ })).toHaveAttribute(
+      "href",
+      "/admin/seo-packages-subscriptions/7/charge"
+    );
+  });
+
+  it("offers a retry instead when the subscription is past due", async () => {
+    service.fetchSubscriptionDetail.mockResolvedValue(makeDetail({ payment_status: "past_due", payment_health: makeHealth() }));
+    await renderPage();
+
+    expect(screen.getAllByRole("link", { name: /Retry payment now/ })[0]).toHaveAttribute(
+      "href",
+      "/admin/seo-packages-subscriptions/7/charge"
+    );
+    expect(screen.queryByRole("link", { name: /^Charge now$/ })).not.toBeInTheDocument();
   });
 
   it("cancels the subscription with an internal reason", async () => {
@@ -339,14 +360,15 @@ describe("AdminSeoSubscriptionDetail", () => {
     await renderPage();
 
     service.fetchSubscriptionDetail.mockResolvedValue(makeDetail({ status: "cancelled", auto_renew: false, cancelled_at: "2026-11-22T10:00:00+00:00" }));
-    fireEvent.click(screen.getByRole("button", { name: "Cancel subscription" }));
-    fireEvent.change(screen.getByPlaceholderText("Reason (optional, internal)"), { target: { value: "Client paused SEO" } });
-    fireEvent.click(screen.getByRole("button", { name: "Yes, cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: /Cancel subscription/ }));
+    const dialog = await screen.findByRole("alertdialog", { name: "Cancel subscription?" });
+    fireEvent.change(within(dialog).getByLabelText(/Cancellation reason/), { target: { value: "Client paused SEO" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Yes, cancel" }));
 
     await waitFor(() => expect(service.cancelSubscription).toHaveBeenCalledWith(7, { notes: "Client paused SEO" }));
     expect(await screen.findByRole("status")).toHaveTextContent("Subscription cancelled. No further charges will be made.");
     // Inactive subscriptions have no billing actions.
-    await waitFor(() => expect(screen.queryByRole("button", { name: /^Charge now$/ })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("link", { name: /^Charge now$/ })).not.toBeInTheDocument());
     expect(screen.queryByRole("link", { name: /Edit subscription/ })).not.toBeInTheDocument();
   });
 

@@ -27,7 +27,6 @@ export interface AdminContentRefreshTier {
 }
 
 export interface CreateContentRefreshTierPayload {
-  id: string;
   label: string;
   word_count_range: string;
   turnaround_days: number;
