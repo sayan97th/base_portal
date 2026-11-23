@@ -107,3 +107,73 @@ export const REMINDER_OPTIONS: { value: string; label: string }[] = [
   { value: "5", label: "5 days before" },
   { value: "7", label: "7 days before" },
 ];
+
+// ── Billing schedule math (mirrors SeoPackageSubscription::advanceByOneMonth) ──
+
+function parseIso(iso: string): { year: number; month: number; day: number } | null {
+  const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+  return { year: Number(match[1]), month: Number(match[2]) - 1, day: Number(match[3]) };
+}
+
+function toIso(year: number, month: number, day: number): string {
+  return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/**
+ * Same anchor day `months` months later, clamped to shorter months: a plan
+ * anchored on the 31st bills Feb 28 and then Mar 31 again.
+ */
+export function addBillingMonths(iso: string, months: number, anchor_day?: number): string {
+  const parts = parseIso(iso);
+  if (!parts) return iso;
+  const anchor = anchor_day ?? parts.day;
+  const total = parts.year * 12 + parts.month + months;
+  const year = Math.floor(total / 12);
+  const month = ((total % 12) + 12) % 12;
+  const days_in_month = new Date(year, month + 1, 0).getDate();
+  return toIso(year, month, Math.min(anchor, days_in_month));
+}
+
+export function addCalendarDays(iso: string, days: number): string {
+  const parts = parseIso(iso);
+  if (!parts) return iso;
+  const date = new Date(parts.year, parts.month, parts.day + days);
+  return toIso(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+export function dayOfMonth(iso: string): number {
+  return parseIso(iso)?.day ?? 1;
+}
+
+/**
+ * First billing date when the current period is already paid: the start
+ * date's next cycle, moved forward until it is today or later.
+ */
+export function nextCycleOnOrAfterToday(start_iso: string, today_iso: string): string {
+  const anchor = dayOfMonth(start_iso);
+  let months = 1;
+  let candidate = addBillingMonths(start_iso, months, anchor);
+  while (candidate < today_iso && months < 600) {
+    months += 1;
+    candidate = addBillingMonths(start_iso, months, anchor);
+  }
+  return candidate;
+}
+
+/** Last day covered by `payment_count` monthly payments starting on first_iso. */
+export function endDateForPayments(first_iso: string, payment_count: number): string {
+  return addCalendarDays(addBillingMonths(first_iso, payment_count, dayOfMonth(first_iso)), -1);
+}
+
+/** Charge dates starting at first_iso, stopping after ends_iso when set. */
+export function buildChargeSchedule(first_iso: string, count: number, ends_iso?: string | null): string[] {
+  const anchor = dayOfMonth(first_iso);
+  const dates: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const date = addBillingMonths(first_iso, i, anchor);
+    if (ends_iso && date > ends_iso) break;
+    dates.push(date);
+  }
+  return dates;
+}

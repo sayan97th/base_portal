@@ -3,6 +3,7 @@ import AdminSeoSubscriptionDetail from "@/components/admin/seo-packages-subscrip
 
 interface PageProps {
   params: Promise<{ subscription_id: string }>;
+  searchParams: Promise<{ notice?: string }>;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -12,7 +13,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-export default async function AdminSeoSubscriptionDetailPage({ params }: PageProps) {
+export default async function AdminSeoSubscriptionDetailPage({ params, searchParams }: PageProps) {
   const { subscription_id } = await params;
-  return <AdminSeoSubscriptionDetail subscription_id={Number(subscription_id)} />;
+  const { notice } = await searchParams;
+  return <AdminSeoSubscriptionDetail subscription_id={Number(subscription_id)} notice={notice} />;
 }

@@ -1,0 +1,495 @@
+// Compact calendar date field. Sized for quick picking (296px wide, 36px
+// days) so it never covers half the screen the way browser pickers can.
+
+$brand_500: var(--color-brand-500);
+$brand_600: var(--color-brand-600);
+$brand_50: var(--color-brand-50);
+$gray_900: var(--color-gray-900);
+$gray_700: var(--color-gray-700);
+$gray_500: var(--color-gray-500);
+$gray_400: var(--color-gray-400);
+$gray_300: var(--color-gray-300);
+$gray_200: var(--color-gray-200);
+$gray_100: var(--color-gray-100);
+$gray_50: var(--color-gray-50);
+$error_500: var(--color-error-500);
+
+$hero_from: #ec3c89;
+$hero_to: #8b5cf6;
+
+$popover_width: 296px;
+$day_size: 36px;
+$radius: 16px;
+
+@mixin dark {
+  :global(.dark) & {
+    @content;
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes pop-in-above {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.root {
+  position: relative;
+  width: 100%;
+}
+
+// ── Trigger ──────────────────────────────────────────────────────────────────
+
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 42px;
+  padding: 0 10px 0 8px;
+  border: 1px solid $gray_200;
+  border-radius: 12px;
+  background: #fff;
+  text-align: left;
+  font-size: 14px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+
+  &:hover:not(:disabled) {
+    border-color: $gray_300;
+  }
+
+  &:focus-visible,
+  &.isOpen {
+    outline: none;
+    border-color: $brand_500;
+    box-shadow: 0 0 0 4px rgba(236, 60, 137, 0.1);
+  }
+
+  &.hasError {
+    border-color: $error_500;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+    background: $gray_50;
+  }
+
+  @include dark {
+    border-color: var(--color-gray-700);
+    background: var(--color-gray-800);
+
+    &:disabled {
+      background: var(--color-gray-900);
+    }
+  }
+}
+
+.triggerIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: $brand_500;
+  background: $brand_50;
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  @include dark {
+    background: rgba(236, 60, 137, 0.12);
+  }
+}
+
+.triggerValue,
+.triggerPlaceholder {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.triggerValue {
+  font-weight: 500;
+  color: $gray_900;
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.triggerPlaceholder {
+  color: $gray_400;
+}
+
+.chevron,
+.clearButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: $gray_400;
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+.clearButton {
+  cursor: pointer;
+
+  &:hover {
+    color: $gray_700;
+    background: $gray_100;
+  }
+
+  @include dark {
+    &:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.08);
+    }
+  }
+}
+
+// ── Popover ──────────────────────────────────────────────────────────────────
+
+.popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 60;
+  width: $popover_width;
+  max-width: calc(100vw - 24px);
+  padding: 12px;
+  border: 1px solid $gray_200;
+  border-radius: $radius;
+  background: #fff;
+  box-shadow:
+    0 20px 40px -16px rgba(16, 24, 40, 0.22),
+    0 4px 10px -4px rgba(16, 24, 40, 0.08);
+  animation: pop-in 0.14s ease-out;
+  transform-origin: top left;
+
+  &.isAbove {
+    top: auto;
+    bottom: calc(100% + 6px);
+    animation-name: pop-in-above;
+    transform-origin: bottom left;
+  }
+
+  &.isRight {
+    left: auto;
+    right: 0;
+    transform-origin: top right;
+  }
+
+  @include dark {
+    border-color: var(--color-gray-700);
+    background: var(--color-gray-900);
+    box-shadow: 0 20px 40px -16px rgba(0, 0, 0, 0.6);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.navButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: $gray_500;
+  transition: background-color 0.12s ease, color 0.12s ease;
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  &:hover:not(:disabled) {
+    color: $brand_500;
+    background: $brand_50;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.3;
+  }
+
+  @include dark {
+    &:hover:not(:disabled) {
+      background: rgba(236, 60, 137, 0.12);
+    }
+  }
+}
+
+.titleButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: $gray_900;
+  transition: background-color 0.12s ease;
+
+  span {
+    font-weight: 500;
+    color: $gray_500;
+  }
+
+  svg {
+    width: 12px;
+    height: 12px;
+    color: $gray_400;
+    transition: transform 0.15s ease;
+
+    &.isFlipped {
+      transform: rotate(180deg);
+    }
+  }
+
+  &:hover {
+    background: $gray_100;
+  }
+
+  @include dark {
+    color: #fff;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+  }
+}
+
+.weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, $day_size);
+  justify-content: space-between;
+  margin-bottom: 2px;
+
+  span {
+    height: 24px;
+    line-height: 24px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: $gray_400;
+  }
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, $day_size);
+  justify-content: space-between;
+  row-gap: 2px;
+}
+
+.day {
+  position: relative;
+  width: $day_size;
+  height: $day_size;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: $gray_700;
+  transition: background-color 0.1s ease, color 0.1s ease;
+
+  &:hover:not(:disabled):not(.isSelected) {
+    color: $brand_600;
+    background: $brand_50;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $brand_500;
+    outline-offset: 1px;
+  }
+
+  &.isOutside {
+    color: $gray_300;
+  }
+
+  &.isToday:not(.isSelected) {
+    font-weight: 700;
+    color: $brand_500;
+    box-shadow: inset 0 0 0 1.5px rgba(236, 60, 137, 0.45);
+  }
+
+  &.isSelected {
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(135deg, $hero_from 0%, $hero_to 100%);
+    box-shadow: 0 6px 14px -6px rgba(236, 60, 137, 0.7);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    color: $gray_300;
+    text-decoration: line-through;
+    text-decoration-color: rgba(152, 162, 179, 0.5);
+  }
+
+  @include dark {
+    color: var(--color-gray-200);
+
+    &.isOutside,
+    &:disabled {
+      color: var(--color-gray-600);
+    }
+
+    &:hover:not(:disabled):not(.isSelected) {
+      color: #fff;
+      background: rgba(236, 60, 137, 0.18);
+    }
+  }
+}
+
+.marker {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background: $brand_500;
+}
+
+.monthGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.monthCell {
+  height: 44px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: $gray_700;
+  background: $gray_50;
+  transition: background-color 0.12s ease, color 0.12s ease;
+
+  &:hover:not(:disabled):not(.isSelected) {
+    color: $brand_600;
+    background: $brand_50;
+  }
+
+  &.isSelected {
+    color: #fff;
+    background: linear-gradient(135deg, $hero_from 0%, $hero_to 100%);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.35;
+  }
+
+  @include dark {
+    color: var(--color-gray-200);
+    background: rgba(255, 255, 255, 0.04);
+  }
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid $gray_100;
+
+  @include dark {
+    border-color: rgba(255, 255, 255, 0.06);
+  }
+}
+
+.footerHint {
+  min-width: 0;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: $gray_500;
+}
+
+.footerActions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 4px;
+}
+
+.footerButton {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: $gray_500;
+  transition: background-color 0.12s ease, color 0.12s ease;
+
+  &:hover {
+    color: $gray_900;
+    background: $gray_100;
+  }
+
+  &.isPrimary {
+    color: $brand_500;
+
+    &:hover {
+      color: $brand_600;
+      background: $brand_50;
+    }
+  }
+
+  @include dark {
+    &:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.06);
+    }
+  }
+}

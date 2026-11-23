@@ -161,7 +161,7 @@ export interface ActivateSeoSubscriptionPayload {
   payment_profile_id?: string | null;
   reminder_days_before?: number | null;
   charge_now?: boolean;
-  notes?: string;
+  notes?: string | null;
 }
 
 export interface ActivateSeoSubscriptionResult {

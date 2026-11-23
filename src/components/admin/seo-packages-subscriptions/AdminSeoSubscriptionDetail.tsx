@@ -14,8 +14,9 @@ import type {
   AdminSeoSubscriptionSummary,
   UpdateSeoSubscriptionPayload,
 } from "@/services/admin/seo-packages-subscription.service";
+import DateField from "@/components/form/date-field/DateField";
 import { AutoRenewSwitch, PaymentCardPicker } from "./SubscriptionBillingControls";
-import { CancelSubscriptionModal, ChargeNowModal, EditPricingModal } from "./SubscriptionModals";
+import { CancelSubscriptionModal, ChargeNowModal } from "./SubscriptionModals";
 import {
   CHARGE_STATUS_CONFIG,
   clientName,
@@ -31,7 +32,19 @@ import styles from "./SeoSubscriptionBilling.module.scss";
 
 interface Props {
   subscription_id: number;
+  /** Set by the create and edit pages after a redirect. */
+  notice?: string;
 }
+
+const NOTICES: Record<string, { tone: "success" | "error"; text: string }> = {
+  activated: { tone: "success", text: "Subscription activated. The billing schedule is shown below." },
+  activated_charged: { tone: "success", text: "Subscription activated and the first payment was collected." },
+  activated_charge_failed: {
+    tone: "error",
+    text: "Subscription activated, but the first charge failed. See the payment history below for the reason.",
+  },
+  updated: { tone: "success", text: "Subscription updated. Changes apply from the next payment." },
+};
 
 const TRIGGER_LABELS: Record<AdminSeoSubscriptionCharge["trigger"], string> = {
   automatic: "Auto renewal",
@@ -134,19 +147,20 @@ function ChargeTimeline({ charges }: { charges: AdminSeoSubscriptionCharge[] }) 
   );
 }
 
-export default function AdminSeoSubscriptionDetail({ subscription_id }: Props) {
+export default function AdminSeoSubscriptionDetail({ subscription_id, notice }: Props) {
   const [subscription, setSubscription] = useState<AdminSeoSubscription | null>(null);
   const [summary, setSummary] = useState<AdminSeoSubscriptionSummary | null>(null);
   const [cards, setCards] = useState<AdminClientPaymentProfile[]>([]);
   const [cards_loading, setCardsLoading] = useState(true);
   const [is_loading, setIsLoading] = useState(true);
   const [load_error, setLoadError] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const [toast, setToast] = useState<{ tone: "success" | "error"; text: string } | null>(
+    () => (notice ? NOTICES[notice] ?? null : null)
+  );
   const [saving_field, setSavingField] = useState<string | null>(null);
   const [next_date_draft, setNextDateDraft] = useState("");
 
   const [show_charge, setShowCharge] = useState(false);
-  const [show_edit, setShowEdit] = useState(false);
   const [show_cancel, setShowCancel] = useState(false);
 
   const applyDetail = useCallback((detail: AdminSeoSubscriptionDetail) => {
@@ -183,6 +197,11 @@ export default function AdminSeoSubscriptionDetail({ subscription_id }: Props) {
       is_current = false;
     };
   }, [subscription_id, applyDetail]);
+
+  // Drop ?notice= from the URL so a refresh does not repeat the message.
+  useEffect(() => {
+    if (notice) window.history.replaceState(null, "", window.location.pathname);
+  }, [notice]);
 
   useEffect(() => {
     if (!toast) return;
@@ -250,12 +269,15 @@ export default function AdminSeoSubscriptionDetail({ subscription_id }: Props) {
         </Link>
         {is_active && (
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setShowEdit(true)}
-              className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-brand-300 hover:text-brand-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+            <Link
+              href={`/admin/seo-packages-subscriptions/${subscription.id}/edit`}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-brand-300 hover:text-brand-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
             >
-              Edit pricing
-            </button>
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+              </svg>
+              Edit subscription
+            </Link>
             <button
               onClick={() => setShowCancel(true)}
               className="rounded-xl border border-error-200 bg-white px-4 py-2 text-sm font-medium text-error-600 transition-colors hover:bg-error-50 dark:border-error-500/30 dark:bg-gray-800 dark:text-error-400"
@@ -433,14 +455,17 @@ export default function AdminSeoSubscriptionDetail({ subscription_id }: Props) {
                 <div>
                   <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-400">Next charge</label>
                   <div className="flex gap-2">
-                    <input
-                      type="date"
-                      value={next_date_draft}
-                      min={todayIsoDate()}
-                      disabled={!is_active}
-                      onChange={(e) => setNextDateDraft(e.target.value)}
-                      className="h-10 min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:border-brand-500 focus:outline-none disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                    />
+                    <div className="min-w-0 flex-1">
+                      <DateField
+                        value={next_date_draft}
+                        min={todayIsoDate()}
+                        disabled={!is_active}
+                        aria_label="Next charge date"
+                        onChange={(value) => setNextDateDraft(value || subscription.next_billing_date || "")}
+                        marked_dates={summary.upcoming.map((item) => item.date)}
+                        footer_hint="Later charges follow on the same day"
+                      />
+                    </div>
                     {next_date_draft && next_date_draft !== subscription.next_billing_date && (
                       <button
                         onClick={() =>
@@ -536,17 +561,6 @@ export default function AdminSeoSubscriptionDetail({ subscription_id }: Props) {
             applyDetail(detail);
             setShowCharge(false);
             setToast({ tone: "success", text: detail.message ?? "Payment collected." });
-          }}
-        />
-      )}
-      {show_edit && (
-        <EditPricingModal
-          subscription={subscription}
-          onClose={() => setShowEdit(false)}
-          onSaved={(detail) => {
-            applyDetail(detail);
-            setShowEdit(false);
-            setToast({ tone: "success", text: "Plan and pricing updated." });
           }}
         />
       )}

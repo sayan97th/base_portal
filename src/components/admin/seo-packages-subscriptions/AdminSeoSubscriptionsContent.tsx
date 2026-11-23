@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { adminSeoSubscriptionService } from "@/services/admin/seo-packages-subscription.service";
 import type {
-  ActivateSeoSubscriptionResult,
   AdminSeoSubscription,
   AdminSeoSubscriptionFilters,
   SeoSubscriptionPaymentStatus,
@@ -15,7 +14,6 @@ import type {
   SeoSubscriptionStats,
 } from "@/services/admin/seo-packages-subscription.service";
 import { useDebounce } from "@/hooks/useDebounce";
-import ActivateSubscriptionModal from "./ActivateSubscriptionModal";
 import { clientName, formatDate, formatMoney, formatMoneyCompact } from "./subscription-format";
 import styles from "./SeoSubscriptionBilling.module.scss";
 
@@ -150,20 +148,17 @@ export default function AdminSeoSubscriptionsContent() {
   const router = useRouter();
   const [subscriptions, setSubscriptions] = useState<AdminSeoSubscription[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<{ tone: "success" | "warning"; text: string; subscription_id: number } | null>(null);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [last_page, setLastPage] = useState(1);
   const [stats, setStats] = useState<SeoSubscriptionStats | null>(null);
   const [loaded_key, setLoadedKey] = useState<string | null>(null);
-  const [refresh_token, setRefreshToken] = useState(0);
 
   const [search_input, setSearchInput] = useState("");
   const [status_filter, setStatusFilter] = useState<SeoSubscriptionStatus | "">("");
   const [payment_filter, setPaymentFilter] = useState<SeoSubscriptionPaymentStatus | "">("");
   const [sort_field, setSortField] = useState<SeoSubscriptionSortField>("created_at");
   const [sort_direction, setSortDirection] = useState<SortDirection>("desc");
-  const [show_activate_modal, setShowActivateModal] = useState(false);
 
   const debounced_search = useDebounce(search_input, 450);
 
@@ -179,7 +174,7 @@ export default function AdminSeoSubscriptionsContent() {
     }),
     [page, debounced_search, status_filter, payment_filter, sort_field, sort_direction]
   );
-  const query_key = `${JSON.stringify(filters)}#${refresh_token}`;
+  const query_key = JSON.stringify(filters);
   const is_loading = loaded_key !== query_key;
 
   useEffect(() => {
@@ -211,7 +206,7 @@ export default function AdminSeoSubscriptionsContent() {
     return () => {
       is_current = false;
     };
-  }, [refresh_token]);
+  }, []);
 
   function handleColumnSort(field: SeoSubscriptionSortField) {
     if (sort_field === field) {
@@ -232,30 +227,6 @@ export default function AdminSeoSubscriptionsContent() {
     setPage(1);
   }
 
-  function handleActivateSuccess(result: ActivateSeoSubscriptionResult) {
-    setShowActivateModal(false);
-    const name = clientName(result.data);
-
-    if (result.charge_result && !result.charge_result.success) {
-      setNotice({
-        tone: "warning",
-        text: `Subscription activated for ${name}, but the first charge failed: ${result.charge_result.message}`,
-        subscription_id: result.data.id,
-      });
-    } else {
-      setNotice({
-        tone: "success",
-        text: result.charge_result?.success
-          ? `Subscription activated for ${name}. ${result.charge_result.message}`
-          : `Subscription activated for ${name} at ${formatMoneyCompact(result.data.monthly_price)}/month.`,
-        subscription_id: result.data.id,
-      });
-    }
-
-    setPage(1);
-    setRefreshToken((token) => token + 1);
-  }
-
   const has_active_filters = !!search_input || !!status_filter || !!payment_filter;
 
   return (
@@ -268,15 +239,15 @@ export default function AdminSeoSubscriptionsContent() {
             Custom pricing, automatic monthly renewals and payment history for every client
           </p>
         </div>
-        <button
-          onClick={() => setShowActivateModal(true)}
+        <Link
+          href="/admin/seo-packages-subscriptions/create"
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-brand-600"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
           Activate Subscription
-        </button>
+        </Link>
       </div>
 
       {/* KPIs */}
@@ -294,29 +265,6 @@ export default function AdminSeoSubscriptionsContent() {
           <KpiCard label="Collected this month" value={formatMoneyCompact(stats.collected_this_month)} hint="Subscription payments" />
           <KpiCard label="Past due" value={String(stats.past_due)} hint={stats.past_due > 0 ? "Need attention" : "All payments current"} />
           <KpiCard label="Cancelled / expired" value={`${stats.cancelled} / ${stats.expired}`} hint={`${stats.total} total`} />
-        </div>
-      )}
-
-      {/* Notice */}
-      {notice && (
-        <div
-          className={`flex flex-col gap-2 rounded-xl border px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between ${
-            notice.tone === "success"
-              ? "border-success-200 bg-success-50 text-success-700 dark:border-success-500/20 dark:bg-success-500/10 dark:text-success-400"
-              : "border-warning-200 bg-warning-50 text-warning-800 dark:border-warning-500/20 dark:bg-warning-500/10 dark:text-warning-400"
-          }`}
-        >
-          <span>{notice.text}</span>
-          <div className="flex shrink-0 items-center gap-3">
-            <Link href={`/admin/seo-packages-subscriptions/${notice.subscription_id}`} className="font-semibold underline-offset-2 hover:underline">
-              Manage subscription
-            </Link>
-            <button onClick={() => setNotice(null)} aria-label="Dismiss" className="opacity-60 hover:opacity-100">
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
         </div>
       )}
 
@@ -430,9 +378,9 @@ export default function AdminSeoSubscriptionsContent() {
                         {has_active_filters ? "No subscriptions match your filters." : "No subscriptions yet."}
                       </p>
                       {!has_active_filters && (
-                        <button onClick={() => setShowActivateModal(true)} className="text-sm font-medium text-brand-500 hover:underline">
+                        <Link href="/admin/seo-packages-subscriptions/create" className="text-sm font-medium text-brand-500 hover:underline">
                           Activate the first subscription
-                        </button>
+                        </Link>
                       )}
                     </div>
                   </td>
@@ -486,6 +434,20 @@ export default function AdminSeoSubscriptionsContent() {
                         )}
                       </td>
                       <td className="px-5 py-4 text-right">
+                        <div className="inline-flex items-center gap-1.5">
+                        {sub.status === "active" && (
+                          <Link
+                            href={`${detail_href}/edit`}
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label={`Edit subscription for ${clientName(sub)}`}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:border-brand-300 hover:text-brand-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                          >
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                            </svg>
+                            Edit
+                          </Link>
+                        )}
                         <Link
                           href={detail_href}
                           onClick={(e) => e.stopPropagation()}
@@ -496,6 +458,7 @@ export default function AdminSeoSubscriptionsContent() {
                             <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                           </svg>
                         </Link>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -531,9 +494,6 @@ export default function AdminSeoSubscriptionsContent() {
         )}
       </div>
 
-      {show_activate_modal && (
-        <ActivateSubscriptionModal onSuccess={handleActivateSuccess} onCancel={() => setShowActivateModal(false)} />
-      )}
     </div>
   );
 }
