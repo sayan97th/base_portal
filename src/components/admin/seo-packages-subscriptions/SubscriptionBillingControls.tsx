@@ -59,7 +59,7 @@ export function PaymentCardPicker({
     return (
       <div className={styles.cardGrid}>
         {[0, 1].map((i) => (
-          <div key={i} className="h-[92px] animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-800" />
+          <div key={i} className="h-[52px] animate-pulse rounded-xl bg-gray-100 dark:bg-gray-800" />
         ))}
       </div>
     );
@@ -89,29 +89,32 @@ export function PaymentCardPicker({
               key={card.id}
               type="button"
               disabled={card.is_expired}
-              data-brand={card.card_brand?.toLowerCase()}
               onClick={() => onSelect(card.id)}
               className={`${styles.cardChip} ${is_selected ? styles.isSelected : ""}`}
               aria-pressed={is_selected}
             >
-              <span className={styles.cardChipTop}>
+              <span className={styles.cardChipSwatch} data-brand={card.card_brand?.toLowerCase()} aria-hidden>
                 {cardBrandLabel(card.card_brand)}
-                {is_selected ? (
-                  <span className={styles.cardChipCheck}>
-                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                    </svg>
-                  </span>
-                ) : card.is_default ? (
-                  <span className="rounded-full bg-white/20 px-2 py-0.5 text-[9px] tracking-wider">Default</span>
-                ) : null}
               </span>
-              <span className={styles.cardChipNumber}>•••• {card.last_four}</span>
-              <span className={styles.cardChipMeta}>
-                <span className="truncate">{card.cardholder_name || "Card on file"}</span>
-                <span>
-                  {card.is_expired ? "Expired" : `${card.expiry_month}/${String(card.expiry_year).slice(-2)}`}
+              <span className={styles.cardChipBody}>
+                <span className={styles.cardChipNumber}>
+                  •••• {card.last_four}
+                  {card.is_default && <span className={styles.cardChipDefault}>Default</span>}
                 </span>
+                <span className={styles.cardChipMeta}>
+                  <span className="truncate">{card.cardholder_name || "Card on file"}</span>
+                  <span className="shrink-0">
+                    {" · "}
+                    {card.is_expired ? "Expired" : `${card.expiry_month}/${String(card.expiry_year).slice(-2)}`}
+                  </span>
+                </span>
+              </span>
+              <span className={styles.cardChipCheck} aria-hidden>
+                {is_selected && (
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                  </svg>
+                )}
               </span>
             </button>
           );

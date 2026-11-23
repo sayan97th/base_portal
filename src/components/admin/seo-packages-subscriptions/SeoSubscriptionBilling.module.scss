@@ -409,41 +409,47 @@ $card_brands: (
 
 .cardGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 160px), 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+  gap: 8px;
 }
 
 .cardChip {
-  position: relative;
   display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  min-height: 92px;
-  overflow: hidden;
-  border-radius: 14px;
-  padding: 12px 14px;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  border-radius: 12px;
+  padding: 8px 10px;
   text-align: left;
-  color: #fff;
-  background: linear-gradient(135deg, #374151, #4b5563);
-  border: 2px solid transparent;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  background: #fff;
+  border: 1px solid var(--color-gray-200);
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 
-  @each $brand, $colors in $card_brands {
-    &[data-brand="#{$brand}"] {
-      background: linear-gradient(135deg, list.nth($colors, 1), list.nth($colors, 2));
-    }
+  @include dark {
+    background: transparent;
+    border-color: var(--color-gray-800);
   }
 
   @include hover_device {
-    &:hover:not(:disabled) {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 20px -12px rgba(17, 24, 39, 0.6);
+    &:hover:not(:disabled):not(.isSelected) {
+      border-color: var(--color-gray-300);
+      background: var(--color-gray-50);
+
+      @include dark {
+        border-color: var(--color-gray-700);
+        background: rgba(255, 255, 255, 0.03);
+      }
     }
   }
 
   &.isSelected {
     border-color: $brand_500;
-    box-shadow: 0 0 0 4px rgba(236, 60, 137, 0.18);
+    background: rgba(236, 60, 137, 0.05);
+    box-shadow: 0 0 0 3px rgba(236, 60, 137, 0.12);
+
+    @include dark {
+      background: rgba(236, 60, 137, 0.08);
+    }
   }
 
   &:disabled {
@@ -453,39 +459,103 @@ $card_brands: (
   }
 }
 
-.cardChipTop {
+.cardChipSwatch {
+  display: flex;
+  align-items: flex-end;
+  flex-shrink: 0;
+  width: 36px;
+  height: 24px;
+  border-radius: 5px;
+  padding: 0 4px 3px;
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+  color: #fff;
+  overflow: hidden;
+  white-space: nowrap;
+  background: linear-gradient(135deg, #374151, #4b5563);
+
+  @each $brand, $colors in $card_brands {
+    &[data-brand="#{$brand}"] {
+      background: linear-gradient(135deg, list.nth($colors, 1), list.nth($colors, 2));
+    }
+  }
+}
+
+.cardChipBody {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.cardChipNumber {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-gray-900);
+
+  @include dark {
+    color: #fff;
+  }
+}
+
+.cardChipDefault {
+  border-radius: 999px;
+  padding: 1px 6px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
+  color: var(--color-gray-500);
+  background: var(--color-gray-100);
+
+  @include dark {
+    color: var(--color-gray-400);
+    background: var(--color-gray-800);
+  }
+}
+
+.cardChipMeta {
+  display: flex;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--color-gray-500);
+
+  @include dark {
+    color: var(--color-gray-400);
+  }
 }
 
 .cardChipCheck {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  background: $brand_500;
-}
+  border: 1.5px solid var(--color-gray-300);
+  color: #fff;
 
-.cardChipNumber {
-  margin-top: 14px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 15px;
-  letter-spacing: 0.14em;
-}
+  svg {
+    width: 9px;
+    height: 9px;
+  }
 
-.cardChipMeta {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 4px;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.75);
+  @include dark {
+    border-color: var(--color-gray-600);
+  }
+
+  .isSelected & {
+    border-color: $brand_500;
+    background: $brand_500;
+  }
 }
 
 // ── Charge history timeline ──────────────────────────────────────────────────
