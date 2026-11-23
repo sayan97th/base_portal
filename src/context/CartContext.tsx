@@ -25,6 +25,7 @@ import { getActiveDiscounts } from "@/services/client/discounts.service";
 import { getToken } from "@/lib/api-client";
 import type { Discount, BulkDiscountDetail } from "@/types/admin/discounts";
 import { isGiftCardRewardCoupon, type GiftCardRewardDetails } from "@/types/client/gift-card-rewards";
+import { limitToSinglePromoCode } from "@/lib/promo-codes";
 
 const EMPTY_GIFT_CARD_REWARD_DETAILS: GiftCardRewardDetails = {
   recipient_email: "",
@@ -184,7 +185,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       const local = readLocalSnapshot();
       if (local && local.items.length > 0) {
         setItems(local.items);
-        setAppliedCoupons(local.applied_coupons ?? []);
+        setAppliedCoupons(limitToSinglePromoCode(local.applied_coupons));
         setCouponInputCode(local.coupon_input_code ?? "");
         setOrderTitle(local.order_title ?? "");
         setOrderNotes(local.order_notes ?? "");
@@ -200,7 +201,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
           if (server && server.items.length > 0) {
             setItems(server.items);
-            setAppliedCoupons(server.applied_coupons ?? []);
+            setAppliedCoupons(limitToSinglePromoCode(server.applied_coupons));
             setCouponInputCode(server.coupon_input_code ?? "");
             setOrderTitle(server.order_title ?? "");
             setOrderNotes(server.order_notes ?? "");
@@ -211,7 +212,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             unifiedCartService
               .saveCart({
                 items: local.items,
-                applied_coupons: local.applied_coupons ?? [],
+                applied_coupons: limitToSinglePromoCode(local.applied_coupons),
                 coupon_input_code: local.coupon_input_code ?? "",
                 order_title: local.order_title ?? "",
                 order_notes: local.order_notes ?? "",

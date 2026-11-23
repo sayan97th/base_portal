@@ -7,6 +7,7 @@ import { validateCoupon } from "@/services/client/coupons.service";
 import { GiftIcon } from "@/components/gift-card-rewards/GiftCardIcons";
 import { formatRewardPercentage, isGiftCardRewardCoupon } from "@/types/client/gift-card-rewards";
 import type { CartAppliedCoupon } from "@/types/client/unified-cart";
+import { MAX_PROMO_CODES_PER_ORDER, PROMO_COMBINATION_ERROR_MESSAGE } from "@/lib/promo-codes";
 
 function formatMoney(value: number): string {
   return `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -103,6 +104,7 @@ export default function PromoCodeSection() {
   const [error_attempt, setErrorAttempt] = useState(0);
 
   const has_applied_coupon = applied_coupons.length > 0;
+  const has_reached_promo_limit = applied_coupons.length >= MAX_PROMO_CODES_PER_ORDER;
 
   const showError = (message: string) => {
     setCouponError(message);
@@ -118,9 +120,9 @@ export default function PromoCodeSection() {
     const trimmed_code = coupon_input_code.trim();
     if (!trimmed_code || coupon_is_applying) return;
 
-    // Only one promo code is allowed per order
-    if (has_applied_coupon) {
-      showError("Only one promo code can be applied per order. Remove the current one first.");
+    // Only one promo code is allowed per order, promo codes never stack
+    if (has_reached_promo_limit) {
+      showError(PROMO_COMBINATION_ERROR_MESSAGE);
       return;
     }
 
@@ -218,6 +220,7 @@ export default function PromoCodeSection() {
           {applied_coupons.map((applied) => (
             <AppliedPromoTicket key={applied.code} coupon={applied} onRemove={handleRemoveCoupon} />
           ))}
+          <p className={styles.hint}>{PROMO_COMBINATION_ERROR_MESSAGE} Remove it to use a different code.</p>
         </div>
       )}
 
