@@ -10,6 +10,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import DiscountFormPage from "@/components/admin/discounts/DiscountFormPage";
 import type { Discount } from "@/types/admin/discounts";
+import { makeBulkDiscount as makeDiscount } from "../../../utils/promo-code-stacking-fixtures";
 
 const mock_push = jest.fn();
 
@@ -35,25 +36,6 @@ const mock_create = createAdminDiscount as jest.MockedFunction<typeof createAdmi
 const mock_update = updateAdminDiscount as jest.MockedFunction<typeof updateAdminDiscount>;
 const mock_get = getAdminDiscount as jest.MockedFunction<typeof getAdminDiscount>;
 const mock_fetch_tiers = fetchDiscountFormDrTiers as jest.MockedFunction<typeof fetchDiscountFormDrTiers>;
-
-function makeDiscount(overrides: Partial<Discount> = {}): Discount {
-  return {
-    id: "discount-1",
-    name: "Bulk Link Building Discount",
-    description: null,
-    discount_type: "bulk",
-    discount_rate: 10,
-    min_quantity: 10,
-    applies_to: "link_building",
-    allow_promo_code_stacking: false,
-    is_active: true,
-    dr_tier_ids: [],
-    dr_tiers: [],
-    created_at: "2026-01-01T00:00:00Z",
-    updated_at: "2026-01-01T00:00:00Z",
-    ...overrides,
-  };
-}
 
 function stackingSwitch(): HTMLElement {
   return screen.getByRole("switch", { name: "Allow promo code stacking" });
@@ -109,6 +91,37 @@ describe("DiscountFormPage promo code stacking", () => {
     await waitFor(() => expect(stackingSwitch()).toHaveAttribute("aria-checked", "true"));
 
     await userEvent.click(stackingSwitch());
+    await userEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    await waitFor(() => expect(mock_update).toHaveBeenCalledTimes(1));
+    expect(mock_update.mock.calls[0][1]).toMatchObject({ allow_promo_code_stacking: false });
+  });
+
+  it("updates the live preview when the option changes", async () => {
+    render(<DiscountFormPage mode="create" />);
+
+    expect(await screen.findByText("Replaced by any promo code")).toBeInTheDocument();
+
+    await userEvent.click(stackingSwitch());
+
+    expect(screen.getByText("Stacks with money back promo codes")).toBeInTheDocument();
+    expect(screen.queryByText("Replaced by any promo code")).not.toBeInTheDocument();
+  });
+
+  it("explains that price discount promo codes still replace a stackable discount", async () => {
+    render(<DiscountFormPage mode="create" />);
+
+    await userEvent.click(await screen.findByRole("switch", { name: "Allow promo code stacking" }));
+
+    expect(screen.getByText(/Promo codes that lower the price still replace it\./)).toBeInTheDocument();
+  });
+
+  it("keeps the option off when only other fields are edited", async () => {
+    mock_get.mockResolvedValue(makeDiscount());
+    mock_update.mockResolvedValue(makeDiscount());
+    render(<DiscountFormPage mode="edit" discount_id="discount-1" />);
+
+    await waitFor(() => expect(stackingSwitch()).toHaveAttribute("aria-checked", "false"));
     await userEvent.click(screen.getByRole("button", { name: "Save Changes" }));
 
     await waitFor(() => expect(mock_update).toHaveBeenCalledTimes(1));
