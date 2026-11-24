@@ -110,7 +110,6 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
     bulk_discount_details,
     total_discount,
     effective_discount_amount,
-    active_discount_type,
     total,
     setItemQuantity,
     setAppliedCoupons,
@@ -151,19 +150,17 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
     effective_show_coupon && !!gift_card_reward_coupon && !isGiftCardRewardDetailsComplete(gift_card_reward_details);
 
   // Teasers: configs where threshold is not yet met. Hidden when a promo code
-  // would remove the discount anyway, since promotions never stack.
+  // would remove the discount anyway, since promotions do not stack by default.
   const teaser_details = bulk_discount_details.filter((d) => {
     if (d.is_eligible || d.is_blocked_by_promo_code) return false;
-    if (active_discount_type === "coupon") return false;
     if (d.config.applies_to === "all") return items.length > 0;
     return items.some((i) => i.product_type === d.config.applies_to);
   });
 
   // Applied bulk badges and rows. A promo code already marks every discount it
-  // replaces as not applied, so only the discounts that lower the total remain.
-  const applied_details = bulk_discount_details.filter(
-    (d) => d.is_applied && active_discount_type === "bulk"
-  );
+  // replaces as not applied, so only the discounts that lower the total remain
+  // (alone, or next to the promo code when the admin allowed combining them).
+  const applied_details = bulk_discount_details.filter((d) => d.is_applied);
 
   // Discounts the cart qualifies for but that the applied promo code replaced.
   const replaced_details = bulk_discount_details.filter(
@@ -278,7 +275,7 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
         );
       })}
 
-      {/* Promotions never stack: explain why a qualifying bulk discount is gone */}
+      {/* Promotions do not stack by default: explain why a qualifying bulk discount is gone */}
       {!is_applying_credits && replaced_details.length > 0 && !coupon_adjustment_notice && (
         <div
           role="status"

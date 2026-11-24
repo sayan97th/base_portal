@@ -1,5 +1,5 @@
 /**
- * Promotions never stack in the order review step (OrderReviewStep).
+ * Promotions do not stack by default in the order review step (OrderReviewStep).
  *
  * The Price Summary only lists the bulk discount when it really lowers the
  * total, so a discount replaced by a promo code never shows up next to it.
@@ -96,6 +96,24 @@ describe("OrderReviewStep promo code stacking", () => {
     expect(screen.queryByText(/Bulk Discount \(/)).not.toBeInTheDocument();
     expect(screen.getByText("Save 5%")).toBeInTheDocument();
     expect(screen.getByText("$3,800.00")).toBeInTheDocument();
+  });
+
+  it("lists the bulk discount and the price discount promo code together when combining is allowed", () => {
+    mockCart({
+      applied_coupons: [makePercentageCoupon()],
+      bulk_discount_amount: 400,
+      total_discount: 200,
+      total: 3400,
+      bulk_discount_details: [
+        makeAppliedDetail(400, { config: makeBulkDiscount({ allow_promo_code_stacking: true }) }),
+      ],
+    });
+
+    renderStep();
+
+    expect(screen.getByText(/Bulk Discount \(10% off links\)/)).toBeInTheDocument();
+    expect(screen.getByText("Save 5%")).toBeInTheDocument();
+    expect(screen.getByText("$3,400.00")).toBeInTheDocument();
   });
 
   it("lists the bulk discount next to the money back promo code when stacking is allowed", () => {

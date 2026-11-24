@@ -12,7 +12,11 @@ import {
   normalizeMaxDiscountAmount,
 } from "@/types/client/gift-card-rewards";
 import type { CartAppliedCoupon } from "@/types/client/unified-cart";
-import { MAX_PROMO_CODES_PER_ORDER, PROMO_COMBINATION_ERROR_MESSAGE } from "@/lib/promo-codes";
+import {
+  MAX_PROMO_CODES_PER_ORDER,
+  PROMO_COMBINATION_ERROR_MESSAGE,
+  isDiscountBlockedByPromoCode,
+} from "@/lib/promo-codes";
 
 function formatMoney(value: number): string {
   return `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -101,7 +105,7 @@ export default function PromoCodeSection() {
   const {
     items,
     subtotal,
-    bulk_discount_amount,
+    bulk_discount_details,
     applied_coupons,
     coupon_input_code,
     setAppliedCoupons,
@@ -178,13 +182,18 @@ export default function PromoCodeSection() {
       setCouponError(null);
       setCouponAdjustmentNotice(null);
 
-      // Promotions never stack: a regular coupon replaces the bulk discount, so
-      // tell the user when it saves less. When a money back promo code replaces
-      // the bulk discount, the order summary explains it below the items.
-      if (!response.is_gift_card_reward && bulk_discount_amount > 0 && response.discount_amount < bulk_discount_amount) {
+      // Promotions do not stack by default: the promo code removes every bulk
+      // discount the admin did not allow to combine. Tell the user when a price
+      // discount promo code saves less than what it removes. When a money back
+      // promo code removes it, the order summary explains it below the items.
+      const replaced_bulk_amount = bulk_discount_details
+        .filter((d) => d.is_eligible && isDiscountBlockedByPromoCode(d.config, true))
+        .reduce((sum, d) => sum + d.eligible_discount_amount, 0);
+
+      if (!response.is_gift_card_reward && replaced_bulk_amount > 0 && response.discount_amount < replaced_bulk_amount) {
         setCouponAdjustmentNotice(
           `Promo code "${response.code}" applied. It replaces the bulk discount (${formatMoney(
-            bulk_discount_amount
+            replaced_bulk_amount
           )}) with this promo (${formatMoney(response.discount_amount)}).`
         );
       }

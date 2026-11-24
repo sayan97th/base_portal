@@ -406,7 +406,7 @@ function PreviewCard({ form, available_dr_tiers }: PreviewCardProps) {
       <div className="mt-3 rounded-lg bg-white/10 px-3 py-2">
         <p className="text-[10px] uppercase tracking-wider text-violet-300">Promo Codes</p>
         <p className="mt-0.5 text-sm font-bold text-white">
-          {form.allow_promo_code_stacking ? "Stacks with money back promo codes" : "Replaced by any promo code"}
+          {form.allow_promo_code_stacking ? "Combined with promo codes" : "Removed when a promo code is used"}
         </p>
       </div>
 
@@ -795,28 +795,26 @@ export default function DiscountFormPage({ mode, discount_id }: DiscountFormPage
               </FormSection>
             )}
 
-            {/* Promo code stacking */}
+            {/* Combine with promo codes */}
             <FormSection
-              title="Promo Code Stacking"
-              description="Promotions do not stack by default. When a client applies a promo code at checkout, this discount is removed so only one promotion applies to the order."
+              title="Combine with Promo Codes"
+              description="Choose whether clients can get this discount and a promo code on the same order. Off by default."
             >
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    {form.allow_promo_code_stacking
-                      ? "Combine with money back promo codes"
-                      : "Do not combine with promo codes"}
+                    Allow this discount and promo codes together
                   </p>
                   <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                     {form.allow_promo_code_stacking
-                      ? "This discount stays on the order when the client also applies a money back promo code (gift card reward). Promo codes that lower the price still replace it."
-                      : "Any promo code applied at checkout replaces this discount. Recommended."}
+                      ? "On: when a client applies a promo code, they get both this discount and the promo code."
+                      : "Off: when a client applies a promo code, this discount is removed and only the promo code applies."}
                   </p>
                 </div>
                 <Toggle
                   enabled={form.allow_promo_code_stacking}
                   onChange={(v) => updateField("allow_promo_code_stacking", v)}
-                  label="Allow promo code stacking"
+                  label="Allow this discount and promo codes together"
                 />
               </div>
             </FormSection>

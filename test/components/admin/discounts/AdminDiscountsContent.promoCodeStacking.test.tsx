@@ -1,6 +1,6 @@
 /**
  * "Promo Codes" column of the admin discounts list (AdminDiscountsContent).
- * Admins can see at a glance which discounts stack with promo codes.
+ * Admins can see at a glance which discounts can be combined with promo codes.
  */
 
 import { render, screen, within } from "@testing-library/react";
@@ -44,14 +44,14 @@ describe("AdminDiscountsContent promo code stacking column", () => {
     render(<AdminDiscountsContent />);
 
     const badge = within(await rowFor("Default bulk")).getByText("Not combined");
-    expect(badge).toHaveAttribute("title", "Any promo code applied at checkout replaces this discount.");
+    expect(badge).toHaveAttribute("title", "When a client applies a promo code, this discount is removed.");
   });
 
-  it("marks discounts that allow stacking", async () => {
+  it("marks discounts that can be combined with promo codes", async () => {
     render(<AdminDiscountsContent />);
 
-    const badge = within(await rowFor("Holiday bulk")).getByText("Stacks");
-    expect(badge.getAttribute("title")).toMatch(/money back promo codes/);
+    const badge = within(await rowFor("Holiday bulk")).getByText("Combined");
+    expect(badge).toHaveAttribute("title", "Clients get this discount and the promo code on the same order.");
   });
 
   it("treats a discount without the option as not combined", async () => {

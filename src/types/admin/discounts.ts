@@ -22,9 +22,9 @@ export interface Discount {
   min_quantity: number;
   applies_to: DiscountAppliesTo;
   /**
-   * Promotions never stack by default: when false, any promo code applied at
-   * checkout removes this discount. When true, it stays next to money back
-   * promo codes (gift card rewards). Price discount promo codes always replace it.
+   * Promotions do not stack by default: when false, any promo code applied at
+   * checkout removes this discount. When true, the client gets both this
+   * discount and the promo code on the same order.
    */
   allow_promo_code_stacking: boolean;
   is_active: boolean;
@@ -38,7 +38,7 @@ export interface BulkDiscountDetail {
   config: Discount;
   /** The cart meets the minimum quantity of this discount. */
   is_eligible: boolean;
-  /** An applied promo code removes this discount (promotions never stack). */
+  /** An applied promo code removes this discount (promotions do not stack by default). */
   is_blocked_by_promo_code: boolean;
   /** Eligible and not blocked by a promo code: the discount lowers the total. */
   is_applied: boolean;

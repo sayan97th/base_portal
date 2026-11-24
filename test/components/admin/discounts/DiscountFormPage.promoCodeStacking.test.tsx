@@ -1,9 +1,10 @@
 /**
- * "Promo Code Stacking" option of the admin discount form
+ * "Combine with Promo Codes" option of the admin discount form
  * (src/components/admin/discounts/DiscountFormPage.tsx).
  *
- * Promotions never stack by default, so the option is off for new discounts
- * and for existing ones saved before the option existed.
+ * Promotions do not stack by default, so the option is off for new discounts
+ * and for existing ones saved before the option existed. When it is on, the
+ * client gets both the discount and the promo code.
  */
 
 import { render, screen, waitFor } from "@testing-library/react";
@@ -37,8 +38,12 @@ const mock_update = updateAdminDiscount as jest.MockedFunction<typeof updateAdmi
 const mock_get = getAdminDiscount as jest.MockedFunction<typeof getAdminDiscount>;
 const mock_fetch_tiers = fetchDiscountFormDrTiers as jest.MockedFunction<typeof fetchDiscountFormDrTiers>;
 
+const SWITCH_LABEL = "Allow this discount and promo codes together";
+const OFF_HELP = "Off: when a client applies a promo code, this discount is removed and only the promo code applies.";
+const ON_HELP = "On: when a client applies a promo code, they get both this discount and the promo code.";
+
 function stackingSwitch(): HTMLElement {
-  return screen.getByRole("switch", { name: "Allow promo code stacking" });
+  return screen.getByRole("switch", { name: SWITCH_LABEL });
 }
 
 describe("DiscountFormPage promo code stacking", () => {
@@ -50,10 +55,11 @@ describe("DiscountFormPage promo code stacking", () => {
   it("is off by default for a new discount", async () => {
     render(<DiscountFormPage mode="create" />);
 
-    expect(await screen.findByText("Promo Code Stacking")).toBeInTheDocument();
+    expect(await screen.findByText("Combine with Promo Codes")).toBeInTheDocument();
     expect(stackingSwitch()).toHaveAttribute("aria-checked", "false");
-    expect(screen.getByText("Do not combine with promo codes")).toBeInTheDocument();
-    expect(screen.getByText("Replaced by any promo code")).toBeInTheDocument();
+    expect(screen.getByText(SWITCH_LABEL)).toBeInTheDocument();
+    expect(screen.getByText(OFF_HELP)).toBeInTheDocument();
+    expect(screen.getByText("Removed when a promo code is used")).toBeInTheDocument();
   });
 
   it("sends the option as false when creating a discount without touching it", async () => {
@@ -67,7 +73,7 @@ describe("DiscountFormPage promo code stacking", () => {
     expect(mock_create.mock.calls[0][0]).toMatchObject({ allow_promo_code_stacking: false });
   });
 
-  it("lets the admin allow stacking with money back promo codes", async () => {
+  it("lets the admin allow the discount and promo codes together", async () => {
     mock_create.mockResolvedValue(makeDiscount({ allow_promo_code_stacking: true }));
     render(<DiscountFormPage mode="create" />);
 
@@ -75,7 +81,8 @@ describe("DiscountFormPage promo code stacking", () => {
     await userEvent.click(stackingSwitch());
 
     expect(stackingSwitch()).toHaveAttribute("aria-checked", "true");
-    expect(screen.getByText("Combine with money back promo codes")).toBeInTheDocument();
+    expect(screen.getByText(ON_HELP)).toBeInTheDocument();
+    expect(screen.queryByText(OFF_HELP)).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Create Discount" }));
 
@@ -100,20 +107,22 @@ describe("DiscountFormPage promo code stacking", () => {
   it("updates the live preview when the option changes", async () => {
     render(<DiscountFormPage mode="create" />);
 
-    expect(await screen.findByText("Replaced by any promo code")).toBeInTheDocument();
+    expect(await screen.findByText("Removed when a promo code is used")).toBeInTheDocument();
 
     await userEvent.click(stackingSwitch());
 
-    expect(screen.getByText("Stacks with money back promo codes")).toBeInTheDocument();
-    expect(screen.queryByText("Replaced by any promo code")).not.toBeInTheDocument();
+    expect(screen.getByText("Combined with promo codes")).toBeInTheDocument();
+    expect(screen.queryByText("Removed when a promo code is used")).not.toBeInTheDocument();
   });
 
-  it("explains that price discount promo codes still replace a stackable discount", async () => {
+  it("explains what happens with the option off and on", async () => {
     render(<DiscountFormPage mode="create" />);
 
-    await userEvent.click(await screen.findByRole("switch", { name: "Allow promo code stacking" }));
+    expect(await screen.findByText(OFF_HELP)).toBeInTheDocument();
 
-    expect(screen.getByText(/Promo codes that lower the price still replace it\./)).toBeInTheDocument();
+    await userEvent.click(stackingSwitch());
+
+    expect(screen.getByText(ON_HELP)).toBeInTheDocument();
   });
 
   it("keeps the option off when only other fields are edited", async () => {

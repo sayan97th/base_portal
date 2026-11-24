@@ -1,9 +1,10 @@
 /**
- * Promotions never stack in the checkout Order Summary (UnifiedCartSummary).
+ * Promotions do not stack by default in the checkout Order Summary
+ * (UnifiedCartSummary).
  *
  * When a promo code replaces a bulk discount the client qualifies for, the
- * summary explains why the discount is gone. When the admin allowed stacking,
- * the bulk discount is shown next to the money back promo code.
+ * summary explains why the discount is gone. When the admin allowed combining
+ * them, the bulk discount is shown next to the promo code.
  */
 
 import React from "react";
@@ -212,7 +213,50 @@ describe("UnifiedCartSummary promo code stacking", () => {
     });
   });
 
-  describe("stacking allowed by the admin", () => {
+  describe("combining allowed by the admin", () => {
+    it("shows the bulk discount and the price discount promo code together", () => {
+      mockCart({
+        applied_coupons: [makePercentageCoupon()],
+        bulk_discount_amount: 400,
+        total_discount: 200,
+        effective_discount_amount: 600,
+        active_discount_type: "combined",
+        total: 3400,
+        bulk_discount_details: [
+          makeAppliedDetail(400, { config: makeBulkDiscount({ allow_promo_code_stacking: true }) }),
+        ],
+      });
+
+      const { container } = render(<UnifiedCartSummary />);
+
+      const bulk_row = screen.getByText(/Bulk Discount \(10% off/i).parentElement as HTMLElement;
+      expect(within(bulk_row).getByText(/400\.00/)).toBeInTheDocument();
+      expect(container).toHaveTextContent("200.00");
+      expect(container).toHaveTextContent("3,400.00");
+      expect(container).not.toHaveTextContent(replaced_notice);
+    });
+
+    it("keeps showing the unlock teaser next to a promo code below the minimum", () => {
+      mockCart({
+        items: [{ ...ten_links[0], quantity: 5 }],
+        applied_coupons: [makePercentageCoupon()],
+        active_discount_type: "coupon",
+        bulk_discount_details: [
+          {
+            ...makeAppliedDetail(0, { config: makeBulkDiscount({ allow_promo_code_stacking: true }) }),
+            is_eligible: false,
+            is_applied: false,
+            current_quantity: 5,
+            quantity_needed: 5,
+          },
+        ],
+      });
+
+      render(<UnifiedCartSummary />);
+
+      expect(screen.getByText(/to unlock/i)).toBeInTheDocument();
+    });
+
     it("shows the bulk discount row and badge next to the money back promo code", () => {
       mockCart({
         applied_coupons: [makeRewardCoupon()],

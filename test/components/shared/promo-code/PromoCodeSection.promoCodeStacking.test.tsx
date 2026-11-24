@@ -1,10 +1,11 @@
 /**
- * Promotions never stack when the client applies a promo code
+ * Promotions do not stack by default when the client applies a promo code
  * (PromoCodeSection).
  *
- * The code is always validated against the full subtotal, since a promo code
- * replaces the bulk discount. A one time notice tells the client when a price
- * discount promo code saves less than the bulk discount it replaces.
+ * The code is always validated against the full subtotal. A one time notice
+ * tells the client when a price discount promo code saves less than the bulk
+ * discount it removes. No notice when the admin allowed combining them, since
+ * the client keeps the bulk discount.
  */
 
 import React from "react";
@@ -12,6 +13,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import PromoCodeSection from "@/components/shared/promo-code/PromoCodeSection";
 import { validateCoupon } from "@/services/client/coupons.service";
 import type { CartItem } from "@/types/client/unified-cart";
+import type { BulkDiscountDetail } from "@/types/admin/discounts";
+import { makeAppliedDetail, makeBulkDiscount } from "../../../utils/promo-code-stacking-fixtures";
 
 jest.mock("@/context/CartContext", () => ({
   useCart: jest.fn(),
@@ -63,11 +66,16 @@ const reward_response = validResponse({
   reward_amount: 400,
 } as Partial<ValidateResponse>);
 
-function setupCart(bulk_discount_amount: number, coupon_input_code: string) {
+function setupCart(
+  bulk_discount_amount: number,
+  coupon_input_code: string,
+  bulk_discount_details: BulkDiscountDetail[] = bulk_discount_amount > 0 ? [makeAppliedDetail(bulk_discount_amount)] : []
+) {
   const cart = {
     items: ten_links,
     subtotal: 4000,
     bulk_discount_amount,
+    bulk_discount_details,
     applied_coupons: [],
     coupon_input_code,
     setAppliedCoupons: jest.fn(),
@@ -135,6 +143,35 @@ describe("PromoCodeSection promo code stacking", () => {
     await waitFor(() => expect(cart.setAppliedCoupons).toHaveBeenCalledTimes(1));
     expect(cart.setCouponAdjustmentNotice).toHaveBeenCalledTimes(1);
     expect(cart.setCouponAdjustmentNotice).toHaveBeenCalledWith(null);
+  });
+
+  it("does not warn when the admin allowed combining the bulk discount with promo codes", async () => {
+    const cart = setupCart(400, "SAVE5", [
+      makeAppliedDetail(400, { config: makeBulkDiscount({ allow_promo_code_stacking: true }) }),
+    ]);
+    mock_validate_coupon.mockResolvedValue(validResponse());
+
+    await applyCode();
+
+    await waitFor(() => expect(cart.setAppliedCoupons).toHaveBeenCalledTimes(1));
+    expect(cart.setCouponAdjustmentNotice).toHaveBeenCalledTimes(1);
+    expect(cart.setCouponAdjustmentNotice).toHaveBeenCalledWith(null);
+  });
+
+  it("only compares against the bulk discounts the promo code removes", async () => {
+    const cart = setupCart(450, "SAVE5", [
+      makeAppliedDetail(400, { config: makeBulkDiscount({ allow_promo_code_stacking: true }) }),
+      makeAppliedDetail(250, { config: makeBulkDiscount({ id: "bulk-nc", applies_to: "new_content" }) }),
+    ]);
+    mock_validate_coupon.mockResolvedValue(validResponse({ discount_amount: 200 }));
+
+    await applyCode();
+
+    await waitFor(() =>
+      expect(cart.setCouponAdjustmentNotice).toHaveBeenLastCalledWith(
+        'Promo code "SAVE5" applied. It replaces the bulk discount ($250.00) with this promo ($200.00).'
+      )
+    );
   });
 
   it("does not warn when the cart has no bulk discount", async () => {

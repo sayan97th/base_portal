@@ -993,19 +993,23 @@ describe("UnifiedCartSummary", () => {
         buildCartContext({
           items: [makeCartItem({ quantity: 10, unit_price: 100 })],
           subtotal:              1000,
-          bulk_discount_amount:  100,
+          bulk_discount_amount:  0,
           applied_coupons:       [applied],
           total_discount:        120,
           effective_discount_amount: 120,
           active_discount_type:  "coupon",
           total:                 880,
           bulk_discount_details: [
+            // Eligible, but the promo code removed it (promotions do not stack by default).
             makeBulkDiscountDetail({
-              is_applied:       true,
-              current_quantity: 10,
-              quantity_needed:  0,
-              discount_amount:  100,
-              product_subtotal: 1000,
+              is_eligible:              true,
+              is_blocked_by_promo_code: true,
+              is_applied:               false,
+              eligible_discount_amount: 100,
+              current_quantity:         10,
+              quantity_needed:          0,
+              discount_amount:          0,
+              product_subtotal:         1000,
             }),
           ],
         })

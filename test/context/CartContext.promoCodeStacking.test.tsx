@@ -1,10 +1,10 @@
 /**
- * Promotions never stack (CartContext).
+ * Promotions do not stack by default (CartContext).
  *
  * Client request: "We don't want a client to be able to stack promos!"
- * An applied promo code removes the bulk discount from the cart. Admins can
- * let a discount stay next to money back promo codes with
- * "allow_promo_code_stacking". Price discount promo codes always replace it.
+ * Any promo code removes the bulk discount from the cart. When the admin
+ * enables "allow_promo_code_stacking" on the discount, the client gets both
+ * the bulk discount and the promo code.
  *
  * Unless stated otherwise the cart has 10 links at $400 ($4,000), which meets
  * the 10% bulk discount threshold ($400 off).
@@ -180,8 +180,8 @@ describe("CartContext promo code stacking", () => {
   // ─── Price discount promo codes ───────────────────────────────────────────
 
   describe("price discount promo code", () => {
-    it("always replaces the bulk discount, even when stacking is allowed", async () => {
-      const { result } = await renderBulkCart(makeBulkDiscount({ allow_promo_code_stacking: true }));
+    it("replaces the bulk discount by default", async () => {
+      const { result } = await renderBulkCart();
 
       act(() => result.current.setAppliedCoupons([makePercentageCoupon()]));
 
@@ -194,6 +194,37 @@ describe("CartContext promo code stacking", () => {
         is_blocked_by_promo_code: true,
         is_applied: false,
       });
+    });
+
+    it("applies both the bulk discount and the promo code when combining is allowed", async () => {
+      const { result } = await renderBulkCart(makeBulkDiscount({ allow_promo_code_stacking: true }));
+
+      act(() => result.current.setAppliedCoupons([makePercentageCoupon()]));
+
+      await waitFor(() => expect(result.current.active_discount_type).toBe("combined"));
+      expect(result.current.bulk_discount_amount).toBe(400);
+      expect(result.current.total_discount).toBe(200);
+      expect(result.current.effective_discount_amount).toBe(600);
+      expect(result.current.total).toBe(3400);
+      expect(result.current.bulk_discount_details[0]).toMatchObject({
+        is_eligible: true,
+        is_blocked_by_promo_code: false,
+        is_applied: true,
+        discount_amount: 400,
+      });
+    });
+
+    it("never takes the total below zero when combining", async () => {
+      const { result } = await renderBulkCart(makeBulkDiscount({ allow_promo_code_stacking: true }));
+
+      act(() =>
+        result.current.setAppliedCoupons([
+          makePercentageCoupon({ discount_type: "fixed_amount", discount_value: 4000, discount_amount: 4000 }),
+        ])
+      );
+
+      await waitFor(() => expect(result.current.active_discount_type).toBe("combined"));
+      expect(result.current.total).toBe(0);
     });
 
     it("replaces the bulk discount even when the promo saves less", async () => {

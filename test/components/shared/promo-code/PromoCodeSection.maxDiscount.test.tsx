@@ -68,6 +68,7 @@ function setupCart(overrides: { applied_coupons?: CartAppliedCoupon[]; coupon_in
     items: cart_items,
     subtotal: 50000,
     bulk_discount_amount: 0,
+    bulk_discount_details: [],
     applied_coupons: [] as CartAppliedCoupon[],
     coupon_input_code: "",
     ...overrides,

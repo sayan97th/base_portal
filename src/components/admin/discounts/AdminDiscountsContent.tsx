@@ -35,8 +35,8 @@ function PromoCodeStackingBadge({ allow_promo_code_stacking }: { allow_promo_cod
     <span
       title={
         allow_promo_code_stacking
-          ? "Stays on the order next to money back promo codes. Promo codes that lower the price still replace it."
-          : "Any promo code applied at checkout replaces this discount."
+          ? "Clients get this discount and the promo code on the same order."
+          : "When a client applies a promo code, this discount is removed."
       }
       className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${
         allow_promo_code_stacking
@@ -44,7 +44,7 @@ function PromoCodeStackingBadge({ allow_promo_code_stacking }: { allow_promo_cod
           : "bg-gray-100 text-gray-600 ring-1 ring-gray-200 dark:bg-white/5 dark:text-gray-400 dark:ring-gray-700"
       }`}
     >
-      {allow_promo_code_stacking ? "Stacks" : "Not combined"}
+      {allow_promo_code_stacking ? "Combined" : "Not combined"}
     </span>
   );
 }

@@ -25,21 +25,18 @@ interface PromoCodeStackingConfig {
 }
 
 /**
- * Promotions never stack: an applied promo code removes the automatic
- * discounts (for example the Bulk Link Building Discount) from the order.
+ * Promotions do not stack by default: an applied promo code (price discount
+ * or money back) removes the automatic discounts, for example the Bulk Link
+ * Building Discount, from the order.
  *
- * - A promo code that lowers the price always replaces the discount.
- * - A money back promo code (gift card reward) replaces it too, unless the
- *   admin enabled "allow_promo_code_stacking" on that discount record.
+ * When the admin enables "allow_promo_code_stacking" on a discount record,
+ * the client gets both that discount and the promo code.
  *
- * Mirrors GiftCardRewardService::allowsBulkDiscountWith on the API.
+ * Mirrors Discount::resolveBulkDiscount on the API.
  */
 export function isDiscountBlockedByPromoCode(
   config: PromoCodeStackingConfig,
-  has_discount_coupon: boolean,
-  has_gift_card_reward_coupon: boolean
+  has_promo_code: boolean
 ): boolean {
-  if (has_discount_coupon) return true;
-  if (has_gift_card_reward_coupon) return config.allow_promo_code_stacking !== true;
-  return false;
+  return has_promo_code && config.allow_promo_code_stacking !== true;
 }

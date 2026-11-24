@@ -13,6 +13,7 @@ jest.mock("@/services/client/coupons.service", () => ({
 }));
 
 import { useCart } from "@/context/CartContext";
+import { makeAppliedDetail } from "../../../utils/promo-code-stacking-fixtures";
 
 const mockUseCart = useCart as jest.MockedFunction<typeof useCart>;
 const mockValidateCoupon = validateCoupon as jest.MockedFunction<typeof validateCoupon>;
@@ -55,7 +56,7 @@ function validResponse(overrides: Partial<ValidateResponse> = {}): ValidateRespo
 
 type CartState = Pick<
   ReturnType<typeof useCart>,
-  "items" | "subtotal" | "bulk_discount_amount" | "applied_coupons" | "coupon_input_code"
+  "items" | "subtotal" | "bulk_discount_amount" | "bulk_discount_details" | "applied_coupons" | "coupon_input_code"
 >;
 
 function setupCart(overrides: Partial<CartState> = {}) {
@@ -63,6 +64,7 @@ function setupCart(overrides: Partial<CartState> = {}) {
     items: cart_items,
     subtotal: 1000,
     bulk_discount_amount: 0,
+    bulk_discount_details: [],
     applied_coupons: [] as CartAppliedCoupon[],
     coupon_input_code: "",
     ...overrides,
@@ -156,8 +158,12 @@ describe("PromoCodeSection", () => {
       expect(cart.setCouponInputCode).toHaveBeenCalledWith("");
     });
 
-    it("keeps the bulk discount, so no override notice is shown", async () => {
-      const cart = setupCart({ coupon_input_code: "HAPPYHOLIDAYS", bulk_discount_amount: 50 });
+    it("shows no one time notice, the order summary explains the replaced bulk discount", async () => {
+      const cart = setupCart({
+        coupon_input_code: "HAPPYHOLIDAYS",
+        bulk_discount_amount: 50,
+        bulk_discount_details: [makeAppliedDetail(50)],
+      });
       mockValidateCoupon.mockResolvedValue(validResponse());
       render(<PromoCodeSection />);
 
@@ -204,7 +210,11 @@ describe("PromoCodeSection", () => {
     });
 
     it("explains when a weaker coupon replaces the bulk discount", async () => {
-      const cart = setupCart({ coupon_input_code: "SAVE5", bulk_discount_amount: 100 });
+      const cart = setupCart({
+        coupon_input_code: "SAVE5",
+        bulk_discount_amount: 100,
+        bulk_discount_details: [makeAppliedDetail(100)],
+      });
       mockValidateCoupon.mockResolvedValue(
         validResponse({
           coupon_id: "c5",

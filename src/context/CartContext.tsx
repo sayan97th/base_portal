@@ -148,7 +148,8 @@ export interface CartContextType {
   subtotal_after_bulk: number;
   total_discount: number;
   effective_discount_amount: number;
-  active_discount_type: "bulk" | "coupon" | "none";
+  /** "combined" when the admin allowed the bulk discount and the promo code together. */
+  active_discount_type: "bulk" | "coupon" | "combined" | "none";
   total: number;
   item_count: number;
 
@@ -499,7 +500,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   );
   const gift_card_reward_coupon = applied_coupons.find((c) => isGiftCardRewardCoupon(c)) ?? null;
   const has_discount_coupon = discount_coupons.length > 0;
-  const has_gift_card_reward_coupon = gift_card_reward_coupon !== null;
+  const has_promo_code = has_discount_coupon || gift_card_reward_coupon !== null;
 
   const bulk_discount_details = useMemo<BulkDiscountDetail[]>(() => {
     return bulk_discount_configs.map((config) => {
@@ -524,11 +525,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         ? Math.round(product_subtotal * rate * 100) / 100
         : 0;
 
-      const is_blocked_by_promo_code = isDiscountBlockedByPromoCode(
-        config,
-        has_discount_coupon,
-        has_gift_card_reward_coupon
-      );
+      const is_blocked_by_promo_code = isDiscountBlockedByPromoCode(config, has_promo_code);
       const is_applied = is_eligible && !is_blocked_by_promo_code;
 
       return {
@@ -543,7 +540,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         product_subtotal,
       };
     });
-  }, [bulk_discount_configs, items, subtotal, has_discount_coupon, has_gift_card_reward_coupon]);
+  }, [bulk_discount_configs, items, subtotal, has_promo_code]);
 
   const bulk_discount_amount = useMemo(
     () => bulk_discount_details.reduce((sum, d) => sum + d.discount_amount, 0),
@@ -557,19 +554,20 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     0
   );
 
-  // Promotions never stack: a promo code that lowers the price always replaces
-  // the bulk discount, even if it saves less. A money back promo code replaces
-  // it too, unless the admin allowed stacking on the discount record (the
-  // bulk_discount_amount above is already 0 for every blocked discount).
-  const active_discount_type: "bulk" | "coupon" | "none" =
-    has_discount_coupon
+  // Promotions do not stack by default: any promo code removes the bulk
+  // discount, even if it saves less. When the admin allowed combining them,
+  // the client gets both (bulk_discount_amount above is already 0 for every
+  // discount a promo code removed).
+  const active_discount_type: "bulk" | "coupon" | "combined" | "none" =
+    has_discount_coupon && bulk_discount_amount > 0
+      ? "combined"
+      : has_discount_coupon
       ? "coupon"
       : bulk_discount_amount > 0
       ? "bulk"
       : "none";
 
-  const effective_discount_amount =
-    active_discount_type === "coupon" ? total_discount : bulk_discount_amount;
+  const effective_discount_amount = total_discount + bulk_discount_amount;
 
   const total = Math.max(0, subtotal - effective_discount_amount);
 
