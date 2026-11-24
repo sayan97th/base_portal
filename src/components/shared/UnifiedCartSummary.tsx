@@ -150,17 +150,28 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
   const show_gift_card_reminder =
     effective_show_coupon && !!gift_card_reward_coupon && !isGiftCardRewardDetailsComplete(gift_card_reward_details);
 
-  // Teasers: configs where threshold is not yet met, hidden when a coupon is winning
+  // Teasers: configs where threshold is not yet met. Hidden when a promo code
+  // would remove the discount anyway, since promotions never stack.
   const teaser_details = bulk_discount_details.filter((d) => {
-    if (d.is_applied) return false;
+    if (d.is_eligible || d.is_blocked_by_promo_code) return false;
     if (active_discount_type === "coupon") return false;
     if (d.config.applies_to === "all") return items.length > 0;
     return items.some((i) => i.product_type === d.config.applies_to);
   });
 
-  // Applied bulk badges — hidden when a coupon is active (coupon overrides bulk)
+  // Applied bulk badges and rows. A promo code already marks every discount it
+  // replaces as not applied, so only the discounts that lower the total remain.
   const applied_details = bulk_discount_details.filter(
-    (d) => d.is_applied && active_discount_type === "bulk" && applied_coupons.length === 0
+    (d) => d.is_applied && active_discount_type === "bulk"
+  );
+
+  // Discounts the cart qualifies for but that the applied promo code replaced.
+  const replaced_details = bulk_discount_details.filter(
+    (d) => d.is_eligible && d.is_blocked_by_promo_code
+  );
+  const replaced_discount_amount = replaced_details.reduce(
+    (sum, d) => sum + d.eligible_discount_amount,
+    0
   );
 
   const grouped_items = PRODUCT_TYPE_ORDER.map((product_type) => ({
@@ -266,6 +277,41 @@ const UnifiedCartSummary: React.FC<UnifiedCartSummaryProps> = ({
           </div>
         );
       })}
+
+      {/* Promotions never stack: explain why a qualifying bulk discount is gone */}
+      {!is_applying_credits && replaced_details.length > 0 && !coupon_adjustment_notice && (
+        <div
+          role="status"
+          className="mb-3 flex items-start gap-2.5 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 dark:border-gray-700 dark:bg-white/5"
+        >
+          <svg
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-500 dark:text-gray-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"
+            />
+          </svg>
+          <p className="text-xs font-medium text-gray-600 dark:text-gray-300">
+            Promotions cannot be combined. Your promo code replaces the{" "}
+            {replaced_details
+              .map((d) => `${Math.round(d.config.discount_rate)}% bulk discount`)
+              .join(" and ")}{" "}
+            (
+            {replaced_discount_amount.toLocaleString("en-US", {
+              style: "currency",
+              currency: "USD",
+            })}
+            ) on this order. Remove the promo code to get the bulk discount back.
+          </p>
+        </div>
+      )}
 
       {/* Locked notice when quantities cannot be modified */}
       {is_quantity_locked && grouped_items.length > 0 && (

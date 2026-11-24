@@ -30,6 +30,7 @@ interface FormData {
   discount_rate: string;
   min_quantity: string;
   applies_to: DiscountAppliesTo;
+  allow_promo_code_stacking: boolean;
   is_active: boolean;
   dr_tier_ids: string[];
 }
@@ -102,6 +103,8 @@ function getEmptyForm(): FormData {
     discount_rate: "10",
     min_quantity: "12",
     applies_to: "link_building",
+    // Promotions never stack by default, the admin must opt in per discount.
+    allow_promo_code_stacking: false,
     is_active: true,
     dr_tier_ids: [],
   };
@@ -115,6 +118,7 @@ function discountToForm(d: Discount): FormData {
     discount_rate: String(d.discount_rate),
     min_quantity: String(d.min_quantity),
     applies_to: d.applies_to,
+    allow_promo_code_stacking: d.allow_promo_code_stacking ?? false,
     is_active: d.is_active,
     dr_tier_ids: d.dr_tier_ids ?? [],
   };
@@ -162,10 +166,21 @@ function FieldError({ message }: { message?: string }) {
   return <p className="mt-1 text-xs text-red-500">{message}</p>;
 }
 
-function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean) => void }) {
+function Toggle({
+  enabled,
+  onChange,
+  label,
+}: {
+  enabled: boolean;
+  onChange: (v: boolean) => void;
+  label?: string;
+}) {
   return (
     <button
       type="button"
+      role="switch"
+      aria-checked={enabled}
+      aria-label={label}
       onClick={() => onChange(!enabled)}
       className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
         enabled ? "bg-brand-500" : "bg-gray-300 dark:bg-gray-600"
@@ -388,6 +403,13 @@ function PreviewCard({ form, available_dr_tiers }: PreviewCardProps) {
         </div>
       </div>
 
+      <div className="mt-3 rounded-lg bg-white/10 px-3 py-2">
+        <p className="text-[10px] uppercase tracking-wider text-violet-300">Promo Codes</p>
+        <p className="mt-0.5 text-sm font-bold text-white">
+          {form.allow_promo_code_stacking ? "Stacks with money back promo codes" : "Replaced by any promo code"}
+        </p>
+      </div>
+
       {form.name && (
         <p className="mt-4 truncate text-xs font-medium text-violet-300">{form.name}</p>
       )}
@@ -506,6 +528,7 @@ export default function DiscountFormPage({ mode, discount_id }: DiscountFormPage
       discount_rate: parseFloat(form.discount_rate),
       min_quantity: parseInt(form.min_quantity, 10),
       applies_to: form.applies_to,
+      allow_promo_code_stacking: form.allow_promo_code_stacking,
       is_active: form.is_active,
     };
 
@@ -772,6 +795,32 @@ export default function DiscountFormPage({ mode, discount_id }: DiscountFormPage
               </FormSection>
             )}
 
+            {/* Promo code stacking */}
+            <FormSection
+              title="Promo Code Stacking"
+              description="Promotions do not stack by default. When a client applies a promo code at checkout, this discount is removed so only one promotion applies to the order."
+            >
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {form.allow_promo_code_stacking
+                      ? "Combine with money back promo codes"
+                      : "Do not combine with promo codes"}
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                    {form.allow_promo_code_stacking
+                      ? "This discount stays on the order when the client also applies a money back promo code (gift card reward). Promo codes that lower the price still replace it."
+                      : "Any promo code applied at checkout replaces this discount. Recommended."}
+                  </p>
+                </div>
+                <Toggle
+                  enabled={form.allow_promo_code_stacking}
+                  onChange={(v) => updateField("allow_promo_code_stacking", v)}
+                  label="Allow promo code stacking"
+                />
+              </div>
+            </FormSection>
+
             {/* Status */}
             <FormSection
               title="Status"
@@ -788,7 +837,7 @@ export default function DiscountFormPage({ mode, discount_id }: DiscountFormPage
                       : "This rule is disabled and will not affect any orders."}
                   </p>
                 </div>
-                <Toggle enabled={form.is_active} onChange={(v) => updateField("is_active", v)} />
+                <Toggle enabled={form.is_active} onChange={(v) => updateField("is_active", v)} label="Discount active" />
               </div>
             </FormSection>
 

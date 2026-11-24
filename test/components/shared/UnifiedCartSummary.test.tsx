@@ -44,6 +44,7 @@ function makeDiscount(overrides: Partial<Discount> = {}): Discount {
     discount_rate: 10,
     min_quantity:  10,
     applies_to:    "link_building",
+    allow_promo_code_stacking: false,
     is_active:     true,
     dr_tier_ids:   [],
     dr_tiers:      [],
@@ -54,9 +55,13 @@ function makeDiscount(overrides: Partial<Discount> = {}): Discount {
 }
 
 function makeBulkDiscountDetail(overrides: Partial<BulkDiscountDetail> = {}): BulkDiscountDetail {
+  const is_applied = overrides.is_applied ?? false;
   return {
     config:           makeDiscount(),
-    is_applied:       false,
+    is_eligible:      is_applied,
+    is_blocked_by_promo_code: false,
+    is_applied,
+    eligible_discount_amount: overrides.discount_amount ?? 0,
     discount_amount:  0,
     current_quantity: 0,
     quantity_needed:  0,
@@ -295,6 +300,107 @@ describe("UnifiedCartSummary", () => {
 
       expect(screen.getByText(/add/i)).toBeInTheDocument();
       expect(screen.getByText(/10% off/i)).toBeInTheDocument();
+    });
+  });
+
+  // ─── Promotions never stack ─────────────────────────────────────────────
+
+  describe("promo code replaces the bulk discount", () => {
+    const reward_coupon: CartAppliedCoupon = {
+      coupon_id:               "holiday-uuid",
+      code:                    "HAPPYHOLIDAYS",
+      coupon_name:             "Happy Holidays 10% Back",
+      discount_amount:         0,
+      discount_type:           "gift_card_reward",
+      discount_value:          10,
+      applies_to:              "all",
+      product_types:           [],
+      minimum_purchase_amount: null,
+      dr_tier_id:              null,
+      is_gift_card_reward:     true,
+    };
+
+    it("explains that the promo code replaced the bulk discount", () => {
+      mockUseCart.mockReturnValue(
+        buildCartContext({
+          items:                [makeCartItem({ quantity: 10, unit_price: 100 })],
+          subtotal:             1000,
+          applied_coupons:      [reward_coupon],
+          active_discount_type: "none",
+          total:                1000,
+          bulk_discount_details: [
+            makeBulkDiscountDetail({
+              is_eligible:              true,
+              is_blocked_by_promo_code: true,
+              is_applied:               false,
+              eligible_discount_amount: 100,
+              discount_amount:          0,
+              current_quantity:         10,
+              product_subtotal:         1000,
+            }),
+          ],
+        })
+      );
+
+      render(<UnifiedCartSummary />);
+
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Promotions cannot be combined. Your promo code replaces the 10% bulk discount ($100.00) on this order."
+      );
+      expect(screen.queryByText(/bulk discount applied/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/to unlock/i)).not.toBeInTheDocument();
+      expect(screen.queryByText("Subtotal")).not.toBeInTheDocument();
+    });
+
+    it("hides the teaser while a promo code would replace the discount", () => {
+      mockUseCart.mockReturnValue(
+        buildCartContext({
+          items:           [makeCartItem({ quantity: 5 })],
+          applied_coupons: [reward_coupon],
+          bulk_discount_details: [
+            makeBulkDiscountDetail({
+              is_eligible:              false,
+              is_blocked_by_promo_code: true,
+              current_quantity:         5,
+              quantity_needed:          5,
+            }),
+          ],
+        })
+      );
+
+      render(<UnifiedCartSummary />);
+
+      expect(screen.queryByText(/to unlock/i)).not.toBeInTheDocument();
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    });
+
+    it("shows the bulk discount next to a money back promo code when stacking is allowed", () => {
+      mockUseCart.mockReturnValue(
+        buildCartContext({
+          items:                     [makeCartItem({ quantity: 10, unit_price: 100 })],
+          subtotal:                  1000,
+          applied_coupons:           [reward_coupon],
+          bulk_discount_amount:      100,
+          effective_discount_amount: 100,
+          active_discount_type:      "bulk",
+          total:                     900,
+          bulk_discount_details: [
+            makeBulkDiscountDetail({
+              config:           makeDiscount({ allow_promo_code_stacking: true }),
+              is_applied:       true,
+              discount_amount:  100,
+              current_quantity: 10,
+              product_subtotal: 1000,
+            }),
+          ],
+        })
+      );
+
+      render(<UnifiedCartSummary />);
+
+      expect(screen.getByText(/10% bulk discount applied/i)).toBeInTheDocument();
+      expect(screen.getByText(/Bulk Discount \(10% off/i)).toBeInTheDocument();
+      expect(screen.queryByText(/Promotions cannot be combined/i)).not.toBeInTheDocument();
     });
   });
 

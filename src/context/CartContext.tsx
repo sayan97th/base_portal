@@ -29,7 +29,7 @@ import {
   isGiftCardRewardCoupon,
   type GiftCardRewardDetails,
 } from "@/types/client/gift-card-rewards";
-import { limitToSinglePromoCode } from "@/lib/promo-codes";
+import { isDiscountBlockedByPromoCode, limitToSinglePromoCode } from "@/lib/promo-codes";
 
 const EMPTY_GIFT_CARD_REWARD_DETAILS: GiftCardRewardDetails = {
   recipient_email: "",
@@ -491,6 +491,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     [items]
   );
 
+  // Money back promo codes never lower the price, so they are left out of the
+  // coupon discount math (mirrors the API).
+  const discount_coupons = useMemo(
+    () => applied_coupons.filter((c) => !isGiftCardRewardCoupon(c)),
+    [applied_coupons]
+  );
+  const gift_card_reward_coupon = applied_coupons.find((c) => isGiftCardRewardCoupon(c)) ?? null;
+  const has_discount_coupon = discount_coupons.length > 0;
+  const has_gift_card_reward_coupon = gift_card_reward_coupon !== null;
+
   const bulk_discount_details = useMemo<BulkDiscountDetail[]>(() => {
     return bulk_discount_configs.map((config) => {
       let current_quantity = 0;
@@ -508,22 +518,32 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         );
       }
 
-      const is_applied = current_quantity >= config.min_quantity;
+      const is_eligible = current_quantity >= config.min_quantity;
       const rate = config.discount_rate / 100;
-      const discount_amount = is_applied
+      const eligible_discount_amount = is_eligible
         ? Math.round(product_subtotal * rate * 100) / 100
         : 0;
 
+      const is_blocked_by_promo_code = isDiscountBlockedByPromoCode(
+        config,
+        has_discount_coupon,
+        has_gift_card_reward_coupon
+      );
+      const is_applied = is_eligible && !is_blocked_by_promo_code;
+
       return {
         config,
+        is_eligible,
+        is_blocked_by_promo_code,
         is_applied,
-        discount_amount,
+        eligible_discount_amount,
+        discount_amount: is_applied ? eligible_discount_amount : 0,
         current_quantity,
         quantity_needed: Math.max(0, config.min_quantity - current_quantity),
         product_subtotal,
       };
     });
-  }, [bulk_discount_configs, items, subtotal]);
+  }, [bulk_discount_configs, items, subtotal, has_discount_coupon, has_gift_card_reward_coupon]);
 
   const bulk_discount_amount = useMemo(
     () => bulk_discount_details.reduce((sum, d) => sum + d.discount_amount, 0),
@@ -532,21 +552,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const subtotal_after_bulk = Math.max(0, subtotal - bulk_discount_amount);
 
-  // Money back promo codes never lower the price, so they are left out of the
-  // discount math and the bulk discount keeps applying (mirrors the API).
-  const discount_coupons = applied_coupons.filter((c) => !isGiftCardRewardCoupon(c));
-  const gift_card_reward_coupon = applied_coupons.find((c) => isGiftCardRewardCoupon(c)) ?? null;
-
   const total_discount = discount_coupons.reduce(
     (sum, c) => sum + c.discount_amount,
     0
   );
 
-  // When a coupon is explicitly applied it always overrides the bulk discount,
-  // even if the coupon saves less. The user (or admin) made a deliberate choice
-  // to apply the promo, so that decision takes precedence.
+  // Promotions never stack: a promo code that lowers the price always replaces
+  // the bulk discount, even if it saves less. A money back promo code replaces
+  // it too, unless the admin allowed stacking on the discount record (the
+  // bulk_discount_amount above is already 0 for every blocked discount).
   const active_discount_type: "bulk" | "coupon" | "none" =
-    discount_coupons.length > 0
+    has_discount_coupon
       ? "coupon"
       : bulk_discount_amount > 0
       ? "bulk"
@@ -558,7 +574,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const total = Math.max(0, subtotal - effective_discount_amount);
 
   // Estimated gift card value: reward percentage of what the client pays for
-  // the qualifying products (after the bulk discount on those products),
+  // the qualifying products (after the bulk discount on those products, only
+  // when the admin allowed that discount to stack with promo codes),
   // limited by the coupon max_discount_amount (HAPPYHOLIDAYS: $1,000).
   const gift_card_reward_amount = useMemo(() => {
     if (!gift_card_reward_coupon) return 0;
@@ -670,7 +687,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Applied coupons always override the bulk discount — no removal.
+    // Applied coupons always override the bulk discount, no removal.
     if (changed) setAppliedCoupons(updated);
   }, [is_cart_ready, items, applied_coupons, bulk_discount_amount]); // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -178,8 +178,9 @@ export default function PromoCodeSection() {
       setCouponError(null);
       setCouponAdjustmentNotice(null);
 
-      // A regular coupon overrides the bulk discount, so tell the user when it
-      // saves less. Money back promo codes keep the bulk discount, no notice.
+      // Promotions never stack: a regular coupon replaces the bulk discount, so
+      // tell the user when it saves less. When a money back promo code replaces
+      // the bulk discount, the order summary explains it below the items.
       if (!response.is_gift_card_reward && bulk_discount_amount > 0 && response.discount_amount < bulk_discount_amount) {
         setCouponAdjustmentNotice(
           `Promo code "${response.code}" applied. It replaces the bulk discount (${formatMoney(

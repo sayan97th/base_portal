@@ -28,6 +28,27 @@ function formatDate(date_str: string): string {
   });
 }
 
+// ── Promo Code Stacking Badge ──────────────────────────────────────────────────
+
+function PromoCodeStackingBadge({ allow_promo_code_stacking }: { allow_promo_code_stacking: boolean }) {
+  return (
+    <span
+      title={
+        allow_promo_code_stacking
+          ? "Stays on the order next to money back promo codes. Promo codes that lower the price still replace it."
+          : "Any promo code applied at checkout replaces this discount."
+      }
+      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${
+        allow_promo_code_stacking
+          ? "bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20"
+          : "bg-gray-100 text-gray-600 ring-1 ring-gray-200 dark:bg-white/5 dark:text-gray-400 dark:ring-gray-700"
+      }`}
+    >
+      {allow_promo_code_stacking ? "Stacks" : "Not combined"}
+    </span>
+  );
+}
+
 // ── Status Badge ───────────────────────────────────────────────────────────────
 
 function StatusBadge({ is_active }: { is_active: boolean }) {
@@ -241,7 +262,7 @@ export default function AdminDiscountsContent() {
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-gray-100 dark:border-gray-800">
-                  {["Name", "Rate", "Min. Qty", "Applies To", "DR Tiers", "Status", "Created", "Actions"].map(
+                  {["Name", "Rate", "Min. Qty", "Applies To", "DR Tiers", "Promo Codes", "Status", "Created", "Actions"].map(
                     (h) => (
                       <th
                         key={h}
@@ -290,6 +311,9 @@ export default function AdminDiscountsContent() {
                       ) : (
                         <span className="text-xs text-gray-300 dark:text-gray-600">—</span>
                       )}
+                    </td>
+                    <td className="px-5 py-4">
+                      <PromoCodeStackingBadge allow_promo_code_stacking={discount.allow_promo_code_stacking ?? false} />
                     </td>
                     <td className="px-5 py-4">
                       <button
